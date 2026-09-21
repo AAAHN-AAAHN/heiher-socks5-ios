@@ -1,0 +1,56 @@
+name: Diagnose UDP relay after port-zero guard
+on:
+  push:
+    branches: [diagnostics/hev-udp-20260921]
+    paths: [Diagnostics/**, .github/workflows/diagnose-udp.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: heiher/hev-socks5-server
+          ref: b3585289622561caf4b8789b436cc8820ecd6be0
+          submodules: recursive
+          path: core
+          persist-credentials: false
+      - name: Build original and patched native executables
+        run: |
+          set -euo pipefail
+          mkdir -p results binaries
+          uname -a > results/platform.txt
+          git -C core submodule status --recursive >> results/platform.txt
+          (cd core && make -j4) > results/build-original.log 2>&1
+          cp core/bin/hev-socks5-server binaries/original
+          git -C core apply --check "$PWD/Patches/hev-udp-port-zero.patch"
+          git -C core apply "$PWD/Patches/hev-udp-port-zero.patch"
+          (cd core && make -j4) > results/build-patched.log 2>&1
+          cp core/bin/hev-socks5-server binaries/patched
+          git -C core diff > results/applied.patch
+      - name: Exercise real UDP echo through SOCKS5
+        run: |
+          set -euo pipefail
+          python3 -u Diagnostics/udp_matrix.py binaries/original original results | tee results/original-summary.jsonl
+          python3 -u Diagnostics/udp_matrix.py binaries/patched patched results | tee results/patched-summary.jsonl
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: UDP-diagnostics-${{ matrix.os }}
+          path: |
+            results/
+            binaries/
+          retention-days: 7
