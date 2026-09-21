@@ -134,7 +134,7 @@
 				Base,
 			);
 			mainGroup = D30F96512C18058B002DB6BF;
-			productRefGroup = D30F965B2C18058B002DB6BF /* Products */;
+			productRefGroup = D30F965B2C18058B002DB6BF;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -351,7 +351,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		D30F96652C18058B002DB6BF /* Build configuration list for PBXProject "Socks5" */ = {
+		D30F96552C18058B002DB6BF /* Build configuration list for PBXProject "Socks5" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				D30F96662C18058E002DB6BF /* Debug */,
