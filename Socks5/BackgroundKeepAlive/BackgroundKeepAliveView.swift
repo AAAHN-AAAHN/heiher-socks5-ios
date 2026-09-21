@@ -6,7 +6,8 @@ import SwiftUI
 @MainActor
 struct BackgroundKeepAliveRoot: View {
     @StateObject private var keepAlive = BackgroundKeepAlive()
-    @State private var selectedTab = 0
+    @StateObject private var settings = SettingsStore()
+    @StateObject private var server = ServerController()
 
     private let audioEvents = Publishers.MergeMany([
         AVAudioSession.interruptionNotification,
@@ -17,18 +18,17 @@ struct BackgroundKeepAliveRoot: View {
         .receive(on: RunLoop.main)
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: settings.binding(\.selectedTab)) {
+            TrafficStatisticsView(isVisible: settings.value.selectedTab == .statistics)
+                .tabItem { Label("Statistics", systemImage: "chart.bar") }
+                .tag(AppSettings.Tab.statistics)
             ScrollView { ContentView() }
                 .tabItem { Label("Server", systemImage: "network") }
-                .tag(0)
-            TrafficStatisticsView(isVisible: selectedTab == 1)
-                .tabItem { Label("Statistics", systemImage: "chart.bar") }
-                .tag(1)
+                .tag(AppSettings.Tab.server)
             NavigationStack {
                 Form {
                     Section {
-                        Toggle("Continuous location", isOn: Binding(
-                            get: { keepAlive.locationEnabled }, set: { keepAlive.setLocation($0) }))
+                        Toggle("Continuous location", isOn: settings.binding(\.background.continuousLocation))
                     } header: {
                         Text("Location")
                     } footer: {
@@ -44,27 +44,39 @@ struct BackgroundKeepAliveRoot: View {
                             .font(.footnote)
                     }
                     Section {
-                        Toggle("Loop silent WAV", isOn: Binding(
-                            get: { keepAlive.audioEnabled }, set: { keepAlive.setAudio($0) }))
+                        Toggle("Loop silent WAV", isOn: settings.binding(\.background.silentAudio))
                         Text(keepAlive.audioState).font(.footnote)
                     } header: {
                         Text("Audio")
                     } footer: {
-                        Text("Loops digital silence and mixes with other audio. Automatically attempts recovery after interruptions; the switch stays on while waiting for iOS.")
+                        Text("Checks playback every 2 seconds. Interruptions trigger immediate recovery; failures retry every second while On. Mixes with other audio.")
                     }
                     Section {
-                        Text("Settings are saved and restored when this app opens. Background services are independent of Server Start/Stop. iOS may suspend or terminate the app; recovery runs only while the app can execute.")
+                        Text("All settings are saved automatically. Use Settings to import or export JSON. Background services are independent of Server Start/Stop. Recovery runs only while iOS allows the app to execute.")
                             .font(.footnote)
                     }
                 }
                 .navigationTitle("Background")
             }
             .tabItem { Label("Background", systemImage: "switch.2") }
-            .tag(2)
+            .tag(AppSettings.Tab.background)
+            SettingsView(settings: settings)
+                .tabItem { Label("Settings", systemImage: "square.and.arrow.up") }
+                .tag(AppSettings.Tab.settings)
         }
-        .task { keepAlive.restore() }
+        .environmentObject(settings)
+        .environmentObject(server)
+        .onChange(of: settings.value, initial: true) { _, value in
+            if keepAlive.locationEnabled != value.background.continuousLocation {
+                keepAlive.setLocation(value.background.continuousLocation)
+            }
+            if keepAlive.audioEnabled != value.background.silentAudio {
+                keepAlive.setAudio(value.background.silentAudio)
+            }
+            server.apply(value)
+        }
         .onReceive(audioEvents) { keepAlive.audioEvent($0) }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
-            .receive(on: RunLoop.main)) { _ in keepAlive.restore() }
+            .receive(on: RunLoop.main)) { _ in keepAlive.restore(); server.apply(settings.value) }
     }
 }

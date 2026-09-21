@@ -1,7 +1,7 @@
 # Background services
 
-The Background tab has two independent saved switches: Continuous location and
-Loop silent WAV. Server controls, statistics and all five Hev patches are unchanged.
+The Background tab has two independently controlled switches: Continuous location and
+Loop silent WAV. SettingsStore persists their values. Statistics and all five Hev patches are unchanged.
 
 ## Location
 
@@ -40,13 +40,19 @@ players are replaced. Unexpected completion is restarted; decoder errors are
 paced rather than recursively restarted. Own category-change notifications are
 ignored to avoid feedback loops.
 
-If activation or playback fails, the preference remains On and a single timer
-retries after 1, 2, 4 and then at most one attempt every 8 seconds. A fresh system
-event or foreground entry tries immediately. After success, a five-second health
-check observes isPlaying and recovers an unnotified stop. It does not reactivate a
-healthy session. Timer tolerance permits coalescing; the callback captures the
-controller weakly, and Off cancels it before releasing the player. These checks
-are distinct from the deleted five-second location modes.
+If activation or playback fails, the On intent remains and a single timer retries
+every one second without backoff or an attempt limit. After success, a two-second
+check observes isPlaying and recovers an unnotified stop. Retry checks also inspect
+isPlaying, so a second timer is unnecessary. A healthy player is not reactivated.
+Every interruption notification triggers recovery regardless of its metadata or
+shouldResume flag; resetting the player also handles a stale true isPlaying value.
+System events can prompt an earlier attempt. Own category-change notifications
+cannot create reconfiguration loops; they preserve a scheduled check instead.
+
+The timer runs in common main-run-loop modes. No intentional tolerance is added.
+Only one timer exists; a stale timer callback cannot replace a newer timer. Off
+cancels it, detaches the delegate and releases the player. Timers still depend on
+iOS scheduling; one or two seconds is a requested cadence, not a real-time guarantee.
 
 The controller and all player state belong to MainActor. Core Location delivers
 callbacks on the main run loop where its manager was created; its legacy delegate
@@ -56,12 +62,11 @@ error information; stale callbacks cannot revive a stopped or replaced player.
 
 ## Persistence and limits
 
-UserDefaults stores two booleans, written only when a user changes a switch.
-On launch and foreground entry, the controller restores enabled services without
-creating duplicates. Initial installation defaults to Off. The older app did not
-persist choices, so enable the desired switches once after this upgrade.
-Settings survive normal app restarts/updates, not app deletion. Diagnostic count
-and time are not stored. This does not automatically start the SOCKS5 server.
+SettingsStore owns the single application JSON, including both background switches,
+server settings and desired Start/Stop, and the last tab. This controller has no
+separate preference store. Root-level observers stay active on every tab, and root
+reconciliation applies saved choices at launch and after an import. Diagnostic
+count/time are not persisted. See ../Settings/README.md for migration and export.
 
 No app code can run after process termination or while iOS has suspended it.
 Audio activation can be refused, including under background/priority policies.
@@ -72,7 +77,7 @@ extra background-task loop or force-quit bypass is implemented or claimed.
 ## Verification
 
 Tests/Background compiles the production controller body with scripted platform
-doubles, checking permission handling, persistence, interruptions, retry limits,
+doubles, checking permission handling, interruptions, fixed retry cadence,
 route/reset events, failure paths, stale callbacks and timer ownership. Only its
 framework imports are substituted; tests do not enter the IPA. This is not an
 actual phone-call or suspension test. The app itself is built with the iOS SDK.

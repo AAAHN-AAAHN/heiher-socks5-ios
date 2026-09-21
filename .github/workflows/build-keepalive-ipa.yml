@@ -1,4 +1,4 @@
-name: Build SOCKS5 with persistent background services
+name: Build SOCKS5 with unified settings and audio recovery
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 
 env:
   CORE_SHA: b3585289622561caf4b8789b436cc8820ecd6be0
-  APP_BASE: 81eb9e1564a2e206ba4f1ba2521c017a16784de1
+  APP_BASE: 5db25b9f625675783a9f6dc5b7c7bc866ea5e540
 
 jobs:
   audit:
@@ -112,10 +112,8 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts
           git -C app fetch --depth=1 origin "$APP_BASE"
-          git -C app diff --exit-code "$APP_BASE" -- Socks5/ContentView.swift Socks5/Statistics \
-            Socks5.xcodeproj/project.pbxproj Socks5/BackgroundKeepAlive/Silence.wav Patches \
-            Tests/apply_traffic_stats.sh Tests/traffic_statistics_model.swift \
-            Tests/traffic_stats_host.c Tests/traffic_stats_regression.py Tests/udp_sockaddr_regression.py
+          git -C app diff --exit-code "$APP_BASE" -- Socks5/Statistics Patches \
+            Tests/apply_traffic_stats.sh Socks5/BackgroundKeepAlive/Silence.wav
           sh app/Tests/apply_traffic_stats.sh
           plutil -lint app/Socks5.xcodeproj/project.pbxproj
           {
@@ -125,7 +123,7 @@ jobs:
             xcrun --sdk iphoneos --show-sdk-version
             shasum -a 256 app/Patches/*.patch
           } > artifacts/build-info.txt
-          git -C app archive --format=zip HEAD -o "$GITHUB_WORKSPACE/artifacts/Socks5-background-final-source.zip"
+          git -C app archive --format=zip HEAD -o "$GITHUB_WORKSPACE/artifacts/Socks5-unified-settings-source.zip"
           cp app/Patches/* artifacts/
           cp app/LICENSE artifacts/LICENSE-app.txt
           find core -not -path '*/.git/*' -type f \( -iname LICENSE -o -iname COPYING \) \
@@ -154,6 +152,11 @@ jobs:
             | tee artifacts/decoded-silence.log
           cp app/Socks5/BackgroundKeepAlive/README.md artifacts/BACKGROUND.md
           git -C app diff "$APP_BASE" -- Socks5/BackgroundKeepAlive > artifacts/background-changes.patch
+      - name: Verify unified settings and server lifecycle
+        run: |
+          set -euo pipefail
+          python3 -u app/Tests/Settings/run_checks.py 2>&1 | tee artifacts/settings-tests.log
+          python3 app/Tests/Settings/check_integration.py | tee artifacts/integration-tests.log
       - name: Build the patched Apple framework
         run: |
           set -euo pipefail
@@ -183,11 +186,14 @@ jobs:
           APP='package/Payload/Socks5.app'
           plutil -lint "$APP/Info.plist"
           xcrun lipo "$APP/Socks5" -verify_arch arm64
+          test -s "$APP/Assets.car"
           python3 - <<'PY'
           import pathlib, plistlib, wave
           app = pathlib.Path('package/Payload/Socks5.app')
           p = plistlib.loads((app / 'Info.plist').read_bytes())
           assert set(p['UIBackgroundModes']) == {'audio', 'location'}
+          assert p['UIApplicationSceneManifest']['UIApplicationSupportsMultipleScenes'] is False
+          assert p['CFBundleIcons']['CFBundlePrimaryIcon']['CFBundleIconName'] == 'AppIcon'
           for key in ['NSLocationWhenInUseUsageDescription', 'NSLocationAlwaysAndWhenInUseUsageDescription', 'NSLocalNetworkUsageDescription']:
               assert p.get(key)
           with wave.open(str(app / 'Silence.wav'), 'rb') as w:
@@ -196,14 +202,14 @@ jobs:
           print('Permissions and digital silence preserved.')
           PY
           /usr/libexec/PlistBuddy -c Print "$APP/Info.plist" > artifacts/app-info-plist.txt
-          (cd package && zip -q -r ../artifacts/Socks5-background-final-unsigned.ipa Payload)
-          unzip -t artifacts/Socks5-background-final-unsigned.ipa
+          (cd package && zip -q -r ../artifacts/Socks5-unified-settings-unsigned.ipa Payload)
+          unzip -t artifacts/Socks5-unified-settings-unsigned.ipa
           ditto -c -k --keepParent build/Socks5.xcarchive/dSYMs artifacts/Socks5-dSYMs.zip
-          (cd artifacts && shasum -a 256 Socks5-background-final-unsigned.ipa > SHA256SUMS.txt)
+          (cd artifacts && shasum -a 256 Socks5-unified-settings-unsigned.ipa > SHA256SUMS.txt)
           cat artifacts/build-info.txt > "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: Socks5-background-final-unsigned
+          name: Socks5-unified-settings-unsigned
           path: artifacts/
           retention-days: 14

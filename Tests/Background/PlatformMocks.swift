@@ -146,6 +146,7 @@ let AVAudioSessionRouteChangeReasonKey = "RouteChangeReason"
         self.block = block
     }
     nonisolated func invalidate() { valid = false }
+    func fireStale() { block(self) }
     func fire() {
         guard valid else { return }
         valid = false

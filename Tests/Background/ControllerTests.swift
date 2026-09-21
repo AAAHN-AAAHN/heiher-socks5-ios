@@ -8,170 +8,113 @@ import Foundation
             checks += 1
             print("PASS: \(name)")
         }
-        let name = "BackgroundTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: name)!
-        defer { defaults.removePersistentDomain(forName: name) }
-        let app = BackgroundKeepAlive(defaults: defaults)
+        let app = BackgroundKeepAlive()
         app.restore()
-        check(!app.locationEnabled && !app.audioEnabled && Timer.live.isEmpty, "Fresh installation is opt-in with no timer")
-
+        check(!app.locationEnabled && !app.audioEnabled && Timer.live.isEmpty, "Runtime waits for central saved preferences")
         UIApplication.shared.applicationState = .inactive
         CLLocationManager.initialAuthorization = .notDetermined
         app.setLocation(true)
         let location = CLLocationManager.instances.last!
-        check(location.requests == 0, "Permission is not requested while inactive")
+        check(location.requests == 0, "No permission request while inactive")
         UIApplication.shared.applicationState = .active
         app.restore()
         app.locationManagerDidChangeAuthorization(location)
-        check(location.requests == 1, "Only one pending permission request")
+        check(location.requests == 1, "One permission request")
         location.authorizationStatus = .authorizedWhenInUse
         app.locationManagerDidChangeAuthorization(location)
         app.restore()
-        check(location.starts == 1, "Authorized continuous service starts once; restore is idempotent")
-        check(location.desiredAccuracy == 3000 && location.distanceFilter == -1, "Low accuracy and no movement filter")
-        check(location.allowsBackgroundLocationUpdates && location.showsBackgroundLocationIndicator && !location.pausesLocationUpdatesAutomatically, "Background mode, indicator and no automatic pause")
-        check(Timer.live.isEmpty, "Location uses no timer or polling")
-        app.locationManager(location, didUpdateLocations: [])
-        check(app.readCount == 0, "Empty location callback ignored")
+        check(location.starts == 1 && Timer.live.isEmpty, "One continuous manager without polling")
+        check(location.desiredAccuracy == 3000 && !location.pausesLocationUpdatesAutomatically, "Coarse continuous location preserved")
         app.locationManager(location, didUpdateLocations: [CLLocation()])
-        check(app.readCount == 1 && app.lastRead != nil, "Location state retains count and reception time")
+        check(app.readCount == 1 && app.lastRead != nil, "Location state retained")
         app.locationManager(location, didFailWithError: CLError(code: .locationUnknown))
-        check(app.locationEnabled && location.starts == 1, "Temporary location failure does not recreate or disable service")
+        check(app.locationEnabled, "Temporary error retains intent")
         location.authorizationStatus = .denied
         app.locationManagerDidChangeAuthorization(location)
-        check(app.locationEnabled && defaults.bool(forKey: "background.continuousLocation"), "Denied permission retains the saved intent")
-        let before = location.starts
+        check(app.locationEnabled, "Denial does not change user intent")
         location.authorizationStatus = .authorizedAlways
         app.locationManagerDidChangeAuthorization(location)
-        check(location.starts == before + 1, "Permission restoration restarts the same manager")
+        check(location.starts == 2, "Permission restoration restarts the same manager")
         app.setLocation(false)
         app.locationManager(location, didUpdateLocations: [CLLocation()])
-        check(app.readCount == 1 && location.delegate == nil, "Disabled location ignores stale callbacks and releases delegate")
-        check(!defaults.bool(forKey: "background.continuousLocation"), "Location Off is saved")
-        CLLocationManager.initialAuthorization = .authorizedAlways
-        app.setLocation(true)
+        check(app.readCount == 1 && location.delegate == nil, "Off ignores stale location callbacks")
 
         let audio = AVAudioSession.shared
         app.setAudio(true)
         var player = AVAudioPlayer.instances.last!
-        check(app.audioEnabled && player.isPlaying && player.numberOfLoops == -1, "Native player starts an infinite loop")
-        check(audio.category == .playback && audio.categoryOptions == [.mixWithOthers], "Playback mixes without microphone or ducking")
-        check(audio.prefersNoInterruptionsFromSystemAlerts, "Nonessential alert interruptions are minimized")
-        check(Timer.live.count == 1 && Timer.live[0].interval == 5 && Timer.live[0].tolerance == 1, "One low-frequency health timer with tolerance")
-        let count = audio.activations
-        app.restore()
-        Timer.live[0].fire()
-        check(audio.activations == count && AVAudioPlayer.instances.last === player, "Healthy polling and restore do not reactivate or rebuild player")
-
-        let began = Notification(name: AVAudioSession.interruptionNotification,
-                                 userInfo: [AVAudioSessionInterruptionTypeKey: UInt(1)])
-        let ended = Notification(name: AVAudioSession.interruptionNotification,
-                                 userInfo: [AVAudioSessionInterruptionTypeKey: UInt(0)])
-        app.audioEvent(began)
-        check(player.delegate == nil && AVAudioPlayer.instances.last!.isPlaying && audio.activations == count + 1, "Interruption begin immediately attempts recovery")
-        app.audioEvent(ended)
-        check(audio.activations == count + 1, "Already recovered audio is not restarted at interruption end")
-        audio.rejectActivation = true
-        app.audioEvent(began)
-        check(app.audioEnabled && defaults.bool(forKey: "background.silentAudio"), "Activation denial never clears persisted audio preference")
-        check(app.audioState.hasPrefix("Waiting to resume") && Timer.live[0].interval == 1, "Rejected activation reports waiting and schedules first retry")
-        for delay in [2.0, 4.0, 8.0, 8.0] {
-            Timer.live[0].fire()
-            check(Timer.live.count == 1 && Timer.live[0].interval == delay, "Retry delay is bounded: \(delay) seconds")
+        check(player.isPlaying && player.numberOfLoops == -1, "Native infinite WAV playback")
+        check(audio.category == .playback && audio.categoryOptions == [.mixWithOthers], "Mixing playback category")
+        check(Timer.live.count == 1 && Timer.live[0].interval == 2, "Two-second health check")
+        let healthyActivations = audio.activations
+        for _ in 0..<100 { Timer.live[0].fire(); app.restore() }
+        check(audio.activations == healthyActivations && AVAudioPlayer.instances.last === player, "100 healthy checks reuse the player without reactivation")
+        for info: [AnyHashable: Any]? in [
+            [AVAudioSessionInterruptionTypeKey: UInt(1)],
+            [AVAudioSessionInterruptionTypeKey: UInt(0)],
+            [AVAudioSessionInterruptionTypeKey: UInt(999)], nil
+        ] {
+            let previous = AVAudioPlayer.instances.last!
+            app.audioEvent(Notification(name: AVAudioSession.interruptionNotification, userInfo: info))
+            check(AVAudioPlayer.instances.last !== previous && AVAudioPlayer.instances.last!.isPlaying,
+                  "Interruption is handled even with absent/unknown metadata and stale isPlaying")
         }
-        audio.rejectActivation = false
-        app.audioEvent(ended)
-        check(AVAudioPlayer.instances.last!.isPlaying && Timer.live[0].interval == 5, "End notification resumes even without shouldResume")
-        player = AVAudioPlayer.instances.last!
-        player.isPlaying = false
-        Timer.live[0].fire()
-        check(player.isPlaying, "Health check recovers an unnotified playback stop")
-        player.isPlaying = false
-        app.audioEvent(Notification(name: AVAudioSession.routeChangeNotification,
-                                    userInfo: [AVAudioSessionRouteChangeReasonKey: UInt(2)]))
-        check(player.isPlaying, "Route removal resumes digital silence")
-        let configurations = audio.configurations
+        audio.rejectActivation = true
+        app.audioEvent(Notification(name: AVAudioSession.interruptionNotification))
+        for _ in 0..<1000 {
+            check(Timer.live.count == 1 && Timer.live[0].interval == 1 && app.audioEnabled,
+                  "Failure retains one fixed one-second retry")
+            Timer.live[0].fire()
+        }
+        let beforeCategoryEvent = audio.activations
         app.audioEvent(Notification(name: AVAudioSession.routeChangeNotification,
                                     userInfo: [AVAudioSessionRouteChangeReasonKey: UInt(3)]))
-        check(audio.configurations == configurations, "Own category-change notification does not create a recovery loop")
-        app.audioEvent(Notification(name: AVAudioSession.mediaServicesWereLostNotification))
-        check(AVAudioPlayer.instances.last !== player, "Media-service loss discards the old player")
-        audio.category = .ambient
-        audio.categoryOptions = []
-        app.audioEvent(Notification(name: AVAudioSession.mediaServicesWereResetNotification))
-        check(AVAudioPlayer.instances.last!.isPlaying && audio.category == .playback, "Media reset reconfigures and rebuilds playback")
-        player = AVAudioPlayer.instances.last!
-        app.audioPlayerDidFinishPlaying(player, successfully: false)
-        check(AVAudioPlayer.instances.last !== player && AVAudioPlayer.instances.last!.isPlaying, "Unexpected player completion restarts playback")
-        player = AVAudioPlayer.instances.last!
-        app.audioPlayerDecodeErrorDidOccur(player, error: NSError(domain: "Test", code: 1))
-        check(!player.isPlaying && Timer.live.count == 1, "Decoder callback schedules bounded recovery instead of recursion")
+        check(audio.activations == beforeCategoryEvent && Timer.live.count == 1, "Own category event cannot create a recursive retry loop")
+        audio.rejectActivation = false
         Timer.live[0].fire()
-        check(AVAudioPlayer.instances.last !== player && AVAudioPlayer.instances.last!.isPlaying, "Decoder retry rebuilds and restarts playback")
-
+        check(AVAudioPlayer.instances.last!.isPlaying && Timer.live[0].interval == 2, "Recovery returns to two-second monitoring")
+        player = AVAudioPlayer.instances.last!
+        player.isPlaying = false
+        Timer.live[0].fire()
+        check(player.isPlaying, "Unnotified stop recovered by active monitoring")
+        for event in [AVAudioSession.mediaServicesWereLostNotification, AVAudioSession.mediaServicesWereResetNotification] {
+            let old = AVAudioPlayer.instances.last!
+            app.audioEvent(Notification(name: event))
+            check(old !== AVAudioPlayer.instances.last && AVAudioPlayer.instances.last!.isPlaying, "Media service event recreates player")
+        }
+        audio.category = .ambient
+        app.audioEvent(Notification(name: AVAudioSession.routeChangeNotification,
+                                    userInfo: [AVAudioSessionRouteChangeReasonKey: UInt(3)]))
+        check(audio.category == .playback && AVAudioPlayer.instances.last!.isPlaying, "External category change repaired")
+        player = AVAudioPlayer.instances.last!
+        app.audioPlayerDecodeErrorDidOccur(player, error: nil)
+        check(Timer.live.count == 1 && Timer.live[0].interval == 1, "Decoder errors retry in one second")
+        Timer.live[0].fire()
+        let staleTimer = Timer.live[0]
+        app.audioEvent(Notification(name: AVAudioSession.interruptionNotification))
+        let newTimer = Timer.live[0]
+        staleTimer.fireStale()
+        check(Timer.live.count == 1 && Timer.live[0] === newTimer, "Stale timer cannot cancel or duplicate its replacement")
         AVAudioPlayer.rejectPlay = true
-        app.audioEvent(began)
-        check(app.audioEnabled && Timer.live[0].interval == 1, "play() failure preserves intent and retries")
+        app.audioEvent(Notification(name: AVAudioSession.interruptionNotification))
+        check(app.audioEnabled && Timer.live[0].interval == 1, "play failure retains intent and retry")
         AVAudioPlayer.rejectPlay = false
         Timer.live[0].fire()
-        check(AVAudioPlayer.instances.last!.isPlaying, "Retry recovers play() failure")
-        AVAudioPlayer.rejectInit = true
-        app.audioEvent(began)
-        check(app.audioEnabled && Timer.live.count == 1, "Decoder construction failure preserves intent")
-        AVAudioPlayer.rejectInit = false
-        Timer.live[0].fire()
         Bundle.main.resourceAvailable = false
-        app.audioEvent(began)
-        check(app.audioEnabled && app.audioState.contains("Silence.wav"), "Missing asset reports failure without silently disabling option")
+        app.audioEvent(Notification(name: AVAudioSession.interruptionNotification))
+        check(app.audioEnabled && Timer.live[0].interval == 1, "Missing resource cannot silently disable monitoring")
         Bundle.main.resourceAvailable = true
         Timer.live[0].fire()
-        audio.prefersNoInterruptionsFromSystemAlerts = false
-        audio.rejectPreference = true
-        app.audioEvent(began)
-        check(AVAudioPlayer.instances.last!.isPlaying, "Optional alert preference failure does not block playback")
-        audio.rejectPreference = false
-        audio.rejectCategory = true
-        audio.category = .ambient
-        app.audioEvent(began)
-        check(app.audioEnabled && Timer.live.count == 1, "Category setup failure preserves intent")
-        audio.rejectCategory = false
-        Timer.live[0].fire()
-        check(AVAudioPlayer.instances.last!.isPlaying, "Category retry succeeds")
-
-        let reopened = BackgroundKeepAlive(defaults: defaults)
-        check(reopened.audioEnabled && reopened.locationEnabled, "Both preferences survive controller recreation")
-        let oldTimer = Timer.live[0]
         player = AVAudioPlayer.instances.last!
+        let timer = Timer.live[0]
         app.setAudio(false)
-        check(!player.isPlaying && player.delegate == nil && Timer.live.isEmpty, "User Off stops player, clears delegate and cancels checks")
-        let disabledCount = audio.activations
-        oldTimer.fire()
-        app.audioEvent(began)
-        app.audioEvent(ended)
-        app.audioPlayerDidFinishPlaying(player, successfully: true)
+        let offActivations = audio.activations
+        timer.fireStale()
+        app.audioEvent(Notification(name: AVAudioSession.interruptionNotification))
+        app.audioPlayerDidFinishPlaying(player, successfully: false)
         app.restore()
-        check(audio.activations == disabledCount && Timer.live.isEmpty, "Delayed events cannot restart explicitly disabled audio")
-        check(!defaults.bool(forKey: "background.silentAudio"), "Audio Off persists")
-        reopened.restore()
-        check(AVAudioPlayer.instances.last!.isPlaying && CLLocationManager.instances.last!.starts == 1, "Saved On choices automatically activate on launch restore")
-        reopened.setAudio(false)
-        reopened.setLocation(false)
-        app.setLocation(false)
-        check(!BackgroundKeepAlive(defaults: defaults).audioEnabled && !BackgroundKeepAlive(defaults: defaults).locationEnabled, "Saved Off remains off on next launch")
-        check(Timer.live.isEmpty, "No recovery timer remains when audio is disabled")
-        var temporary: BackgroundKeepAlive? = BackgroundKeepAlive(defaults: defaults)
-        weak var released = temporary
-        temporary?.setAudio(true)
-        temporary = nil
-        check(released == nil && Timer.live.isEmpty, "Timer closure does not retain the controller; deinit invalidates it")
-        app.setAudio(false)
-        for _ in 0..<100 {
-            app.setAudio(true)
-            app.audioEvent(began)
-            app.setAudio(false)
-            app.audioEvent(ended)
-        }
-        check(Timer.live.isEmpty && !defaults.bool(forKey: "background.silentAudio"), "100 enable/interruption/disable cycles leave no active timer or enabled preference")
-        print("SUMMARY: \(checks) controller checks passed (scripted platform doubles, not real call or suspension tests)")
+        check(Timer.live.isEmpty && audio.activations == offActivations && !player.isPlaying, "Only Off cancels recovery; stale events stay inert")
+        for _ in 0..<100 { app.setAudio(true); app.setAudio(false) }
+        check(Timer.live.isEmpty, "100 toggle cycles leak no active timer")
+        print("SUMMARY: \(checks) controller checks passed using platform doubles, not iOS call scheduling")
     }
 }

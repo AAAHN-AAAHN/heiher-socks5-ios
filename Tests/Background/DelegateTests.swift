@@ -2,10 +2,7 @@ import Foundation
 
 @main struct DelegateTests {
     @MainActor static func main() async {
-        let name = "BackgroundDelegates.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: name)!
-        defer { defaults.removePersistentDomain(forName: name) }
-        let app = BackgroundKeepAlive(defaults: defaults)
+        let app = BackgroundKeepAlive()
         app.setAudio(true)
         let finished = AVAudioPlayer.instances.last!
         await Task.detached { app.audioPlayerDidFinishPlaying(finished, successfully: false) }.value
@@ -16,7 +13,7 @@ import Foundation
         await Task.detached { app.audioPlayerDecodeErrorDidOccur(decoder, error: nil) }.value
         await waitUntil { app.audioState.hasPrefix("Waiting to resume") }
         precondition(app.audioEnabled && Timer.live.count == 1)
-        print("PASS: decoder failure on a worker safely schedules bounded recovery")
+        print("PASS: decoder failure on a worker safely schedules one-second recovery")
         Timer.live[0].fire()
         precondition(AVAudioPlayer.instances.last!.isPlaying)
         app.setAudio(false)

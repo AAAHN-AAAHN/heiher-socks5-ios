@@ -17,6 +17,10 @@
 		B60000000000000000000003 /* Silence.wav in Resources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000013 /* Silence.wav */; };
 		C70000000000000000000001 /* TrafficStatistics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000011 /* TrafficStatistics.swift */; };
 		C70000000000000000000002 /* TrafficStatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000012 /* TrafficStatisticsView.swift */; };
+		E80000000000000000000001 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80000000000000000000011 /* AppSettings.swift */; };
+		E80000000000000000000002 /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80000000000000000000012 /* SettingsStore.swift */; };
+		E80000000000000000000003 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80000000000000000000013 /* SettingsView.swift */; };
+		E80000000000000000000004 /* ServerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80000000000000000000014 /* ServerController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +36,10 @@
 		B60000000000000000000014 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C70000000000000000000011 /* TrafficStatistics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficStatistics.swift; sourceTree = "<group>"; };
 		C70000000000000000000012 /* TrafficStatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficStatisticsView.swift; sourceTree = "<group>"; };
+		E80000000000000000000011 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		E80000000000000000000012 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
+		E80000000000000000000013 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		E80000000000000000000014 /* ServerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +80,8 @@
 				D30F96632C18058E002DB6BF /* Preview Content */,
 				C70000000000000000000020 /* Statistics */,
 				B60000000000000000000020 /* BackgroundKeepAlive */,
+				E80000000000000000000021 /* Server */,
+				E80000000000000000000020 /* Settings */,
 			);
 			path = Socks5;
 			sourceTree = "<group>";
@@ -102,6 +112,24 @@
 				C70000000000000000000012 /* TrafficStatisticsView.swift */,
 			);
 			path = Statistics;
+			sourceTree = "<group>";
+		};
+		E80000000000000000000020 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				E80000000000000000000011 /* AppSettings.swift */,
+				E80000000000000000000012 /* SettingsStore.swift */,
+				E80000000000000000000013 /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		E80000000000000000000021 /* Server */ = {
+			isa = PBXGroup;
+			children = (
+				E80000000000000000000014 /* ServerController.swift */,
+			);
+			path = Server;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -176,6 +204,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				D30F96602C18058B002DB6BF /* ContentView.swift in Sources */,
+				E80000000000000000000004 /* ServerController.swift in Sources */,
+				E80000000000000000000003 /* SettingsView.swift in Sources */,
+				E80000000000000000000002 /* SettingsStore.swift in Sources */,
+				E80000000000000000000001 /* AppSettings.swift in Sources */,
 				D30F965E2C18058B002DB6BF /* Socks5App.swift in Sources */,
 				B60000000000000000000001 /* BackgroundKeepAlive.swift in Sources */,
 				B60000000000000000000002 /* BackgroundKeepAliveView.swift in Sources */,

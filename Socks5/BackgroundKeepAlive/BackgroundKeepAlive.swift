@@ -2,32 +2,21 @@ import AVFAudio
 import CoreLocation
 import SwiftUI
 
-/// Saved background services, independent of the SOCKS5 server and statistics.
+/// Background services; SettingsStore owns persistence and user intent.
 @MainActor
 final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate, AVAudioPlayerDelegate {
-    @Published private(set) var locationEnabled: Bool
-    @Published private(set) var audioEnabled: Bool
+    @Published private(set) var locationEnabled = false
+    @Published private(set) var audioEnabled = false
     @Published private(set) var locationState = "Off"
     @Published private(set) var readCount = 0
     @Published private(set) var lastRead: Date?
     @Published private(set) var audioState = "Off"
 
-    private static let locationKey = "background.continuousLocation"
-    private static let audioKey = "background.silentAudio"
-    private let defaults: UserDefaults
     private var locationManager: CLLocationManager?
     private var updating = false
     private var requestedPermission = false
     private var player: AVAudioPlayer?
     private var audioCheck: Timer?
-    private var retryDelay: TimeInterval = 1
-
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-        locationEnabled = defaults.bool(forKey: Self.locationKey)
-        audioEnabled = defaults.bool(forKey: Self.audioKey)
-        super.init()
-    }
 
     deinit { audioCheck?.invalidate() }
 
@@ -39,7 +28,6 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
 
     func setLocation(_ enabled: Bool) {
         locationEnabled = enabled
-        defaults.set(enabled, forKey: Self.locationKey)
         if enabled {
             openLocation()
         } else {
@@ -119,8 +107,6 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
 
     func setAudio(_ enabled: Bool) {
         audioEnabled = enabled
-        defaults.set(enabled, forKey: Self.audioKey)
-        retryDelay = 1
         if enabled {
             resumeAudio()
         } else {
@@ -135,7 +121,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     private func resumeAudio() {
         guard audioEnabled else { return }
         if player?.isPlaying == true {
-            if audioCheck == nil { scheduleAudioCheck(after: 5) }
+            if audioCheck == nil { scheduleAudioCheck(after: 2) }
             return
         }
         audioCheck?.invalidate()
@@ -162,19 +148,18 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
                 throw NSError(domain: "BackgroundKeepAlive", code: 2,
                               userInfo: [NSLocalizedDescriptionKey: "Audio playback could not start"])
             }
-            retryDelay = 1
             audioState = "Playing silent WAV continuously"
-            scheduleAudioCheck(after: 5)
+            scheduleAudioCheck(after: 2)
         } catch {
             retryAudio(error)
         }
     }
 
     private func retryAudio(_ error: Error?) {
+        guard audioEnabled else { return }
         discardPlayer()
         audioState = "Waiting to resume: \(error?.localizedDescription ?? "Audio decoder stopped")"
-        scheduleAudioCheck(after: retryDelay)
-        retryDelay = min(retryDelay * 2, 8)
+        scheduleAudioCheck(after: 1)
     }
 
     private func discardPlayer() {
@@ -185,14 +170,14 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
 
     private func scheduleAudioCheck(after delay: TimeInterval) {
         audioCheck?.invalidate()
-        // One main-run-loop timer: cheap health checks, bounded retry rate on failure.
-        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+        // One timer: two-second health checks or one-second retries until disabled.
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] timer in
             MainActor.assumeIsolated {
-                self?.audioCheck = nil
-                self?.resumeAudio()
+                guard let self, self.audioCheck === timer else { return }
+                self.audioCheck = nil
+                self.resumeAudio()
             }
         }
-        timer.tolerance = min(delay * 0.2, 1)
         audioCheck = timer
         RunLoop.main.add(timer, forMode: .common)
     }
@@ -201,16 +186,22 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         guard audioEnabled else { return }
         switch notification.name {
         case AVAudioSession.interruptionNotification:
-            guard let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
-                  let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
-            if type == .began { discardPlayer() }
-            // The saved opt-in remains authoritative, even without shouldResume.
+            // Every interruption is actionable, including missing/unknown metadata.
+            // Recreate even if an interrupted player still reports isPlaying.
+            discardPlayer()
         case AVAudioSession.mediaServicesWereLostNotification,
              AVAudioSession.mediaServicesWereResetNotification:
             discardPlayer()
         case AVAudioSession.routeChangeNotification:
             let reason = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
-            if reason == AVAudioSession.RouteChangeReason.categoryChange.rawValue { return }
+            if reason == AVAudioSession.RouteChangeReason.categoryChange.rawValue {
+                let session = AVAudioSession.sharedInstance()
+                if session.category == .playback && session.mode == .default && session.categoryOptions == [.mixWithOthers] {
+                    if audioCheck == nil { scheduleAudioCheck(after: player?.isPlaying == true ? 2 : 1) }
+                    return
+                }
+                discardPlayer()
+            }
         default:
             return
         }
