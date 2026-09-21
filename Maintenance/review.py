@@ -29,7 +29,7 @@ def prepare(repo, templates, workspace):
             '        desired = settings.serverRunning ? settings.server : nil',
             '        desired = settings.serverRunning ? settings.server : nil\n        if desired == nil { attempted = nil }')
     replace('Server/ServerController.swift', '        startDesired()\n    }',
-            '        if retry || desired != attempted { startDesired() }\n    }')
+            '        if desired == nil || retry || desired != attempted { startDesired() }\n    }')
     replace('Server/ServerController.swift', '    private func startDesired() {\n        guard let desired',
             '    private func startDesired() {\n        attempted = desired\n        guard let desired')
     p = root / 'ContentView.swift'
@@ -61,3 +61,15 @@ def prepare(repo, templates, workspace):
     (root / 'Info.plist').write_bytes((root / 'BackgroundKeepAlive/Info.plist').read_bytes())
     (root / 'BackgroundKeepAlive/Info.plist').unlink()
     subprocess.run(['git', '-C', str(tests), 'apply', '--unsafe-paths', str(templates / 'reviewed-tests.patch')], check=True)
+    p = tests / 'ServerTests.swift'
+    marker = '        print("PASS: explicit retry and a completed Stop/Start each start exactly once")'
+    text = p.read_text()
+    assert text.count(marker) == 1
+    p.write_text(text.replace(marker, marker + '''
+        value.serverRunning = true
+        value.server.listenPort = "invalid"
+        server.apply(value)
+        value.serverRunning = false
+        server.apply(value)
+        precondition(server.status == "Stopped" && !server.isRunning)
+        print("PASS: Stop clears a failed configuration status without launching")'''))
