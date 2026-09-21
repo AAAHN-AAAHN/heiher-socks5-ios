@@ -12,6 +12,11 @@
 		D30F96622C18058E002DB6BF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D30F96612C18058E002DB6BF /* Assets.xcassets */; };
 		D30F96652C18058E002DB6BF /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D30F96642C18058E002DB6BF /* Preview Assets.xcassets */; };
 		D30F96722C1809EB002DB6BF /* HevSocks5Server.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = D30F96712C1809EB002DB6BF /* HevSocks5Server.xcframework */; };
+		F0B49EF432005E531F41803A /* AppRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = F012CAD8EFF712318ABE3D46 /* AppRoot.swift */; };
+		F0D57C5237027ACBCE64F90B /* ServerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F04793A4BF6C0636DF8B45 /* ServerController.swift */; };
+		F0D050DCB12B402039CEFF21 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F233452FD39987C43481E6 /* AppSettings.swift */; };
+		F0F917C6383BD6F91F48D7EF /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F077C7B2DB94A69DFA51497B /* SettingsStore.swift */; };
+		F0BBB827AE9F43DAFEA2FBA4 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F0567B891CC8E45A81CFF8 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -21,6 +26,12 @@
 		D30F96612C18058E002DB6BF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D30F96642C18058E002DB6BF /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		D30F96712C1809EB002DB6BF /* HevSocks5Server.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = HevSocks5Server.xcframework; sourceTree = "<group>"; };
+		F012CAD8EFF712318ABE3D46 /* AppRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppRoot.swift"; sourceTree = "<group>"; };
+		F03BEAAF29668CE70ACC7A54 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+		F0F04793A4BF6C0636DF8B45 /* ServerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServerController.swift"; sourceTree = "<group>"; };
+		F0F233452FD39987C43481E6 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppSettings.swift"; sourceTree = "<group>"; };
+		F077C7B2DB94A69DFA51497B /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsStore.swift"; sourceTree = "<group>"; };
+		F0F0567B891CC8E45A81CFF8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsView.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -56,6 +67,10 @@
 			isa = PBXGroup;
 			children = (
 				D30F965D2C18058B002DB6BF /* Socks5App.swift */,
+				F012CAD8EFF712318ABE3D46 /* AppRoot.swift */,
+				F03BEAAF29668CE70ACC7A54 /* Info.plist */,
+				F003C59DDD2068C6C3C435AE /* Server */,
+				F0359CD709105E8C2C7CB481 /* Settings */,
 				D30F965F2C18058B002DB6BF /* ContentView.swift */,
 				D30F96612C18058E002DB6BF /* Assets.xcassets */,
 				D30F96632C18058E002DB6BF /* Preview Content */,
@@ -69,6 +84,24 @@
 				D30F96642C18058E002DB6BF /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		F003C59DDD2068C6C3C435AE /* Server */ = {
+			isa = PBXGroup;
+			children = (
+				F0F04793A4BF6C0636DF8B45 /* ServerController.swift */,
+			);
+			path = "Server";
+			sourceTree = "<group>";
+		};
+		F0359CD709105E8C2C7CB481 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				F0F233452FD39987C43481E6 /* AppSettings.swift */,
+				F077C7B2DB94A69DFA51497B /* SettingsStore.swift */,
+				F0F0567B891CC8E45A81CFF8 /* SettingsView.swift */,
+			);
+			path = "Settings";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -131,6 +164,7 @@
 			files = (
 				D30F96652C18058E002DB6BF /* Preview Assets.xcassets in Resources */,
 				D30F96622C18058E002DB6BF /* Assets.xcassets in Resources */,
+
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -142,6 +176,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				D30F96602C18058B002DB6BF /* ContentView.swift in Sources */,
+				F0B49EF432005E531F41803A /* AppRoot.swift in Sources */,
+				F0D57C5237027ACBCE64F90B /* ServerController.swift in Sources */,
+				F0D050DCB12B402039CEFF21 /* AppSettings.swift in Sources */,
+				F0F917C6383BD6F91F48D7EF /* SettingsStore.swift in Sources */,
+				F0BBB827AE9F43DAFEA2FBA4 /* SettingsView.swift in Sources */,
 				D30F965E2C18058B002DB6BF /* Socks5App.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -278,7 +317,8 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Socks5/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_FILE = Socks5/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -306,7 +346,8 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Socks5/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_FILE = Socks5/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";

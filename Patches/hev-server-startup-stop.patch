@@ -1,0 +1,15 @@
+diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
+--- a/src/hev-socks5-proxy.c
++++ b/src/hev-socks5-proxy.c
+@@ -302,8 +302,10 @@
+ {
+     LOG_D ("socks5 proxy run");
+ 
+-    if (atomic_fetch_and (&tsync, ~SYNC_STOP) & SYNC_STOP)
++    if (atomic_fetch_and (&tsync, ~SYNC_STOP) & SYNC_STOP) {
++        atomic_fetch_or (&tsync, SYNC_ABRT);
+         return;
++    }
+ 
+     atomic_fetch_or (&tsync, SYNC_CONT);
+ 
