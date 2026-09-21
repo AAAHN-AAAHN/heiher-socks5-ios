@@ -1,8 +1,8 @@
-name: Build keep-alive IPA with UDP address fix
+name: Build keep-alive IPA with address patch only
 
 on:
   push:
-    branches: [feature/background-keepalive]
+    branches: [test/udp-sockaddr-only-20260921]
   workflow_dispatch:
 
 permissions:
@@ -15,6 +15,7 @@ jobs:
     env:
       APP_BASE: 180012e8b9dbaa2002a68ebd2c75bccebcfb789c
       CORE_SHA: b3585289622561caf4b8789b436cc8820ecd6be0
+      COMPARISON_BASE: 900ca327efd7a71a88f63040382b0158d3d6f513
     defaults:
       run:
         shell: bash
@@ -40,6 +41,8 @@ jobs:
           mkdir -p artifacts
           git -C app fetch --depth=1 https://github.com/heiher/socks5-ios.git "$APP_BASE"
           git -C app diff --exit-code "$APP_BASE" -- Socks5/ContentView.swift
+          git -C app fetch --depth=1 origin "$COMPARISON_BASE"
+          git -C app diff --exit-code "$COMPARISON_BASE" -- Socks5 Socks5.xcodeproj Patches Tests
           plutil -lint app/Socks5.xcodeproj/project.pbxproj
           python3 - <<'PY'
           import os, pathlib, subprocess, wave
@@ -59,35 +62,20 @@ jobs:
             xcrun --sdk iphoneos --show-sdk-version
           } > artifacts/build-info.txt
           git -C app diff "$APP_BASE" -- Socks5 Socks5.xcodeproj > artifacts/app-changes.patch
-          git -C app archive --format=zip HEAD -o "$GITHUB_WORKSPACE/artifacts/Socks5-keepalive-udpaddrfix-source.zip"
+          git -C app archive --format=zip HEAD -o "$GITHUB_WORKSPACE/artifacts/Socks5-keepalive-addr-only-source.zip"
           cp app/LICENSE artifacts/LICENSE-app.txt
           find core -not -path '*/.git/*' -type f \( -iname LICENSE -o -iname COPYING \) \
             -exec sh -c 'printf "\n--- %s ---\n" "$1"; cat "$1"' sh {} \; > artifacts/LICENSES-core.txt
 
-      - name: Apply the single-file UDP port-zero patch
+      - name: Verify original port-zero connect path is retained
         run: |
           set -euo pipefail
-          PATCH="$GITHUB_WORKSPACE/app/Patches/hev-udp-port-zero.patch"
           test "$(git -C core rev-parse HEAD)" = "$CORE_SHA"
           git -C core diff --exit-code
           git -C core submodule foreach --recursive 'git diff --exit-code'
           test "$(git -C core hash-object src/hev-socks5-session.c)" = "06ce823dd3d29df9107bb53c12178e6b4ebf45c4"
-          git -C core apply --check --whitespace=error-all "$PATCH"
-          git -C core apply --whitespace=error-all "$PATCH"
-          test "$(git -C core diff --name-only)" = 'src/hev-socks5-session.c'
-          test "$(git -C core hash-object src/hev-socks5-session.c)" = "17c02cb47c96770ae4de4f2dba5b1ceae366db3a"
-          cp "$PATCH" artifacts/hev-udp-port-zero.patch
-          git -C core diff --full-index -- src/hev-socks5-session.c > artifacts/core-changes.patch
-          shasum -a 256 "$PATCH" >> artifacts/build-info.txt
-          printf 'Patched session blob: 17c02cb47c96770ae4de4f2dba5b1ceae366db3a\n' >> artifacts/build-info.txt
-
-      - name: Reproduce the current UDP behavior on macOS
-        run: |
-          set -euo pipefail
-          (cd core && make -j3) > artifacts/macos-baseline-build.log 2>&1
-          python3 -u app/Tests/udp_sockaddr_regression.py core/bin/hev-socks5-server \
-            --output artifacts/macos-before.json --allow-failures | tee artifacts/macos-before.log
-          (cd core && make clean) >> artifacts/macos-baseline-build.log 2>&1
+          cp core/src/hev-socks5-session.c artifacts/unmodified-hev-socks5-session.c
+          printf 'Port-zero patch: NOT APPLIED. Original session blob: 06ce823dd3d29df9107bb53c12178e6b4ebf45c4\n' >> artifacts/build-info.txt
 
       - name: Apply the single-file UDP address patch
         run: |
@@ -104,25 +92,25 @@ jobs:
           shasum -a 256 "$PATCH" >> artifacts/build-info.txt
           cp core/src/core/src/hev-socks5-udp.c artifacts/patched-hev-socks5-udp.c
 
-      - name: Test patched UDP and TCP on macOS
+      - name: Record address-only UDP and TCP results on macOS
         run: |
           set -euo pipefail
+          # This ablation build records networking failures without blocking the IPA.
           (cd core && make -j3) > artifacts/macos-patched-build.log 2>&1
           python3 -u app/Tests/udp_sockaddr_regression.py core/bin/hev-socks5-server \
-            --output artifacts/macos-after.json | tee artifacts/macos-after.log
+            --output artifacts/macos-address-only.json --allow-failures | tee artifacts/macos-address-only.log
           (cd core && make clean) >> artifacts/macos-patched-build.log 2>&1
 
-      - name: Build Hev framework with the two isolated patches
+      - name: Build Hev framework with the address patch only
         run: |
           set -euo pipefail
+          test "$(git -C core hash-object src/hev-socks5-session.c)" = "06ce823dd3d29df9107bb53c12178e6b4ebf45c4"
           (cd core && ./build-apple.sh) 2>&1 | tee artifacts/core-build.log
-          test "$(git -C core hash-object src/hev-socks5-session.c)" = "17c02cb47c96770ae4de4f2dba5b1ceae366db3a"
+          test "$(git -C core hash-object src/hev-socks5-session.c)" = "06ce823dd3d29df9107bb53c12178e6b4ebf45c4"
           test "$(git -C core/src/core hash-object src/hev-socks5-udp.c)" = "$(cat artifacts/patched-udp-blob.txt)"
           git -C core/src/core apply --reverse --check "$GITHUB_WORKSPACE/app/Patches/hev-udp-sockaddr.patch"
           git -C core/src/core apply --reverse "$GITHUB_WORKSPACE/app/Patches/hev-udp-sockaddr.patch"
           test "$(git -C core/src/core hash-object src/hev-socks5-udp.c)" = "084c03b98d8f80b646381d5cbf82eca95de2eddb"
-          git -C core apply --reverse --check "$GITHUB_WORKSPACE/app/Patches/hev-udp-port-zero.patch"
-          git -C core apply --reverse "$GITHUB_WORKSPACE/app/Patches/hev-udp-port-zero.patch"
           test "$(git -C core hash-object src/hev-socks5-session.c)" = "06ce823dd3d29df9107bb53c12178e6b4ebf45c4"
           git -C core diff --exit-code
           git -C core submodule foreach --recursive 'git diff --exit-code'
@@ -159,18 +147,18 @@ jobs:
           PY
           /usr/libexec/PlistBuddy -c Print "$APP/Info.plist" > artifacts/app-info-plist.txt
           xcrun otool -L "$APP/Socks5" > artifacts/linked-libraries.txt
-          (cd package && zip -q -r ../artifacts/Socks5-keepalive-udpaddrfix-unsigned.ipa Payload)
-          unzip -t artifacts/Socks5-keepalive-udpaddrfix-unsigned.ipa
+          (cd package && zip -q -r ../artifacts/Socks5-keepalive-addr-only-unsigned.ipa Payload)
+          unzip -t artifacts/Socks5-keepalive-addr-only-unsigned.ipa
           ditto -c -k --keepParent build/Socks5.xcarchive/dSYMs artifacts/Socks5-dSYMs.zip
-          (cd artifacts && shasum -a 256 Socks5-keepalive-udpaddrfix-unsigned.ipa > SHA256SUMS.txt)
-          printf '\nUnsigned ARM64 Release. Port-zero guard retained; UDP sockaddr normalization added in one core file. macOS regression results included. iPhone UDP and background testing still required.\n' >> artifacts/build-info.txt
+          (cd artifacts && shasum -a 256 Socks5-keepalive-addr-only-unsigned.ipa > SHA256SUMS.txt)
+          printf '\nUnsigned ARM64 Release. Experimental address-only build. Original port-zero connect restored; only the unchanged UDP sockaddr patch is applied. macOS results are diagnostic, not a pass gate. iPhone testing required.\n' >> artifacts/build-info.txt
           cat artifacts/build-info.txt > "$GITHUB_STEP_SUMMARY"
 
       - name: Upload IPA, source, symbols and build records
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Socks5-keepalive-udpaddrfix-unsigned
+          name: Socks5-keepalive-addr-only-unsigned
           path: artifacts/
           if-no-files-found: error
           retention-days: 14
