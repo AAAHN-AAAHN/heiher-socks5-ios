@@ -1,11 +1,3 @@
-# SOCKS5 for iOS: traffic-statistics
-
-This is the focused `feature/traffic-statistics` branch.
-For the complete app use `release/integrated`; pristine upstream remains on `main`.
-
-Build and verification: [instructions](docs/build-and-validation.md).
-The following specification is also preserved verbatim at `docs/features/traffic-statistics.md`.
-
 # Traffic statistics: native counters and a sampled iOS display
 
 ## Purpose and branch boundary

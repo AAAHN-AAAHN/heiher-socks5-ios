@@ -1,0 +1,128 @@
+diff --git a/src/lib/io/basic/hev-task-io.c b/src/lib/io/basic/hev-task-io.c
+index af36b19f09b82a6a1f2a3ccc7c6938d2761cdaba..f4c3aaf1446a8a1fb4749ea4f1a7aed26fed2a5e 100644
+--- a/src/lib/io/basic/hev-task-io.c
++++ b/src/lib/io/basic/hev-task-io.c
+@@ -250,7 +250,8 @@ task_io_splicer_fini (HevTaskIOSplicer *self)
+ }
+ 
+ static int
+-task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out)
++task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out, size_t *received,
++                size_t *sent)
+ {
+     int res;
+     ssize_t s;
+@@ -265,6 +266,8 @@ task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out)
+     } else {
+         res = 1;
+         self->wlen += s;
++        if (received)
++            *received += s;
+     }
+ 
+     if (self->wlen) {
+@@ -278,6 +281,8 @@ task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out)
+         } else {
+             res = 1;
+             self->wlen -= s;
++            if (sent)
++                *sent += s;
+         }
+     } else if (res < 0) {
+         shutdown (fd_out, SHUT_WR);
+@@ -306,7 +311,8 @@ task_io_splicer_fini (HevTaskIOSplicer *self)
+ }
+ 
+ static int
+-task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out)
++task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out, size_t *received,
++                size_t *sent)
+ {
+     struct iovec iov[2];
+     int res = 1, iovc;
+@@ -321,6 +327,8 @@ task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out)
+                 res = -1;
+         } else {
+             hev_circular_buffer_write_finish (self->buf, s);
++            if (received)
++                *received += s;
+         }
+     }
+ 
+@@ -335,6 +343,8 @@ task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out)
+         } else {
+             res = 1;
+             hev_circular_buffer_read_finish (self->buf, s);
++            if (sent)
++                *sent += s;
+         }
+     } else if (res < 0) {
+         shutdown (fd_out, SHUT_WR);
+@@ -349,6 +359,16 @@ EXPORT_SYMBOL void
+ hev_task_io_splice (int fd_a_i, int fd_a_o, int fd_b_i, int fd_b_o,
+                     size_t buf_size, HevTaskIOYielder yielder,
+                     void *yielder_data)
++{
++    hev_task_io_splice_with_stats (fd_a_i, fd_a_o, fd_b_i, fd_b_o, buf_size,
++                                   yielder, yielder_data, NULL, NULL);
++}
++
++EXPORT_SYMBOL void
++hev_task_io_splice_with_stats (int fd_a_i, int fd_a_o, int fd_b_i, int fd_b_o,
++                               size_t buf_size, HevTaskIOYielder yielder,
++                               void *yielder_data, HevTaskIOTransfer transfer,
++                               void *data)
+ {
+     HevTaskIOSplicer splicer_f;
+     HevTaskIOSplicer splicer_b;
+@@ -362,11 +382,16 @@ hev_task_io_splice (int fd_a_i, int fd_a_o, int fd_b_i, int fd_b_o,
+ 
+     for (;;) {
+         HevTaskYieldType type;
++        size_t received = 0, sent = 0;
+ 
+         if (res_f >= 0)
+-            res_f = task_io_splice (&splicer_f, fd_a_i, fd_b_o);
++            res_f = task_io_splice (&splicer_f, fd_a_i, fd_b_o, NULL,
++                                    transfer ? &sent : NULL);
+         if (res_b >= 0)
+-            res_b = task_io_splice (&splicer_b, fd_b_i, fd_a_o);
++            res_b = task_io_splice (&splicer_b, fd_b_i, fd_a_o,
++                                    transfer ? &received : NULL, NULL);
++        if (transfer && (received || sent))
++            transfer (received, sent, data);
+ 
+         if (res_f > 0 || res_b > 0)
+             type = HEV_TASK_YIELD;
+diff --git a/src/lib/io/basic/hev-task-io.h b/src/lib/io/basic/hev-task-io.h
+index f2a142fa2b7707379449ac86dca3b434bdb7afd8..699704206d9ed8ffe7318b2e135a0e61e078c46d 100644
+--- a/src/lib/io/basic/hev-task-io.h
++++ b/src/lib/io/basic/hev-task-io.h
+@@ -18,6 +18,7 @@ extern "C" {
+ #endif
+ 
+ typedef int (*HevTaskIOYielder) (HevTaskYieldType type, void *data);
++typedef void (*HevTaskIOTransfer) (size_t received, size_t sent, void *data);
+ 
+ /**
+  * hev_task_io_open:
+@@ -188,6 +189,19 @@ void hev_task_io_splice (int fd_a_i, int fd_a_o, int fd_b_i, int fd_b_o,
+                          size_t buf_size, HevTaskIOYielder yielder,
+                          void *yielder_data);
+ 
++/**
++ * hev_task_io_splice_with_stats:
++ *
++ * Like hev_task_io_splice, with an optional synchronous transfer callback.
++ * Report successful reads from fd_b_i and writes to fd_b_o once per loop.
++ * The callback must not block or yield. Existing I/O and buffering are unchanged.
++ */
++void hev_task_io_splice_with_stats (int fd_a_i, int fd_a_o, int fd_b_i,
++                                    int fd_b_o, size_t buf_size,
++                                    HevTaskIOYielder yielder,
++                                    void *yielder_data,
++                                    HevTaskIOTransfer transfer, void *data);
++
+ #ifdef __cplusplus
+ }
+ #endif

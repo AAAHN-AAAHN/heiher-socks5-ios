@@ -1,7 +1,8 @@
 {
-  "name": "udp-compat",
+  "name": "traffic-statistics",
   "features": [
-    "udp"
+    "udp",
+    "statistics"
   ],
   "upstream_app": "83d350d28d6a31e7730cfa74b49f58d2af642397",
   "sources": {
@@ -18,6 +19,18 @@
     {
       "file": "hev-udp-sockaddr.patch",
       "repository": "src/core"
+    },
+    {
+      "file": "hev-stats-task-io.patch",
+      "repository": "third-part/hev-task-system"
+    },
+    {
+      "file": "hev-stats-core.patch",
+      "repository": "src/core"
+    },
+    {
+      "file": "hev-stats-server.patch",
+      "repository": "."
     }
   ]
 }

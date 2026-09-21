@@ -9,7 +9,7 @@ import SwiftUI
 struct Socks5App: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppRoot()
         }
     }
 }
