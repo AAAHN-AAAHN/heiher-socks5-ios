@@ -12,6 +12,9 @@
 		D30F96622C18058E002DB6BF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D30F96612C18058E002DB6BF /* Assets.xcassets */; };
 		D30F96652C18058E002DB6BF /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D30F96642C18058E002DB6BF /* Preview Assets.xcassets */; };
 		D30F96722C1809EB002DB6BF /* HevSocks5Server.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = D30F96712C1809EB002DB6BF /* HevSocks5Server.xcframework */; };
+		B60000000000000000000001 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000011 /* BackgroundKeepAlive.swift */; };
+		B60000000000000000000002 /* BackgroundKeepAliveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000012 /* BackgroundKeepAliveView.swift */; };
+		B60000000000000000000003 /* Silence.wav in Resources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000013 /* Silence.wav */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -21,6 +24,10 @@
 		D30F96612C18058E002DB6BF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D30F96642C18058E002DB6BF /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		D30F96712C1809EB002DB6BF /* HevSocks5Server.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = HevSocks5Server.xcframework; sourceTree = "<group>"; };
+		B60000000000000000000011 /* BackgroundKeepAlive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundKeepAlive.swift; sourceTree = "<group>"; };
+		B60000000000000000000012 /* BackgroundKeepAliveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundKeepAliveView.swift; sourceTree = "<group>"; };
+		B60000000000000000000013 /* Silence.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = Silence.wav; sourceTree = "<group>"; };
+		B60000000000000000000014 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +66,7 @@
 				D30F965F2C18058B002DB6BF /* ContentView.swift */,
 				D30F96612C18058E002DB6BF /* Assets.xcassets */,
 				D30F96632C18058E002DB6BF /* Preview Content */,
+				B60000000000000000000020 /* BackgroundKeepAlive */,
 			);
 			path = Socks5;
 			sourceTree = "<group>";
@@ -69,6 +77,17 @@
 				D30F96642C18058E002DB6BF /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		B60000000000000000000020 /* BackgroundKeepAlive */ = {
+			isa = PBXGroup;
+			children = (
+				B60000000000000000000011 /* BackgroundKeepAlive.swift */,
+				B60000000000000000000012 /* BackgroundKeepAliveView.swift */,
+				B60000000000000000000013 /* Silence.wav */,
+				B60000000000000000000014 /* Info.plist */,
+			);
+			path = BackgroundKeepAlive;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -131,6 +150,7 @@
 			files = (
 				D30F96652C18058E002DB6BF /* Preview Assets.xcassets in Resources */,
 				D30F96622C18058E002DB6BF /* Assets.xcassets in Resources */,
+				B60000000000000000000003 /* Silence.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -143,6 +163,8 @@
 			files = (
 				D30F96602C18058B002DB6BF /* ContentView.swift in Sources */,
 				D30F965E2C18058B002DB6BF /* Socks5App.swift in Sources */,
+				B60000000000000000000001 /* BackgroundKeepAlive.swift in Sources */,
+				B60000000000000000000002 /* BackgroundKeepAliveView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -278,6 +300,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Socks5/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Socks5/BackgroundKeepAlive/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -306,6 +329,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Socks5/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Socks5/BackgroundKeepAlive/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -327,7 +351,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		D30F96552C18058B002DB6BF /* Build configuration list for PBXProject "Socks5" */ = {
+		D30F96652C18058B002DB6BF /* Build configuration list for PBXProject "Socks5" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				D30F96662C18058E002DB6BF /* Debug */,
