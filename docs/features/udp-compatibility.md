@@ -1,11 +1,3 @@
-# SOCKS5 for iOS: udp-compat
-
-This is the focused `feature/udp-compat` branch.
-For the complete app use `release/integrated`; pristine upstream remains on `main`.
-
-Build and verification: [instructions](docs/build-and-validation.md).
-The following specification is also preserved verbatim at `docs/features/udp-compatibility.md`.
-
 # UDP compatibility: Darwin peer ports and received addresses
 
 ## Purpose and scope
