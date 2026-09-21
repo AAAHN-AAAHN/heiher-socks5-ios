@@ -1,0 +1,121 @@
+name: Build background keep-alive IPA
+
+on:
+  push:
+    branches: [feature/background-keepalive]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      APP_BASE: 180012e8b9dbaa2002a68ebd2c75bccebcfb789c
+      CORE_SHA: b3585289622561caf4b8789b436cc8820ecd6be0
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout modified app
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: app
+          persist-credentials: false
+
+      - name: Checkout unchanged tested core
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: heiher/hev-socks5-server
+          ref: ${{ env.CORE_SHA }}
+          submodules: recursive
+          path: core
+          persist-credentials: false
+
+      - name: Verify minimal integration and record versions
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          git -C app fetch --depth=1 https://github.com/heiher/socks5-ios.git "$APP_BASE"
+          git -C app diff --exit-code "$APP_BASE" -- Socks5/ContentView.swift
+          python3 - <<'PY'
+          import os, pathlib, subprocess, wave
+          root = pathlib.Path('app')
+          original = subprocess.check_output(['git', '-C', 'app', 'show', os.environ['APP_BASE'] + ':Socks5/Socks5App.swift'])
+          current = (root / 'Socks5/Socks5App.swift').read_bytes()
+          assert current.replace(b'BackgroundKeepAliveRoot()', b'ContentView()') == original
+          diff = subprocess.check_output(['git', '-C', 'app', 'diff', '--numstat', os.environ['APP_BASE'], '--', 'Socks5.xcodeproj/project.pbxproj']).decode().split()
+          assert len(diff) == 3 and diff[1] == '0', 'Unexpected original project deletions'
+          with wave.open(str(root / 'Socks5/BackgroundKeepAlive/Silence.wav'), 'rb') as w:
+              assert (w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()) == (1, 2, 8000, 400)
+              assert w.readframes(400) == bytes(800)
+          print('Original server UI unchanged; entry-point-only integration; WAV samples all zero.')
+          PY
+          {
+            printf 'App commit: %s\nBase app: %s\nCore: %s\n' "$GITHUB_SHA" "$APP_BASE" "$CORE_SHA"
+            git -C core submodule status --recursive
+            xcodebuild -version
+            xcrun --sdk iphoneos --show-sdk-version
+          } > artifacts/build-info.txt
+          git -C app diff "$APP_BASE" -- Socks5 Socks5.xcodeproj > artifacts/app-changes.patch
+          git -C app archive --format=zip HEAD -o "$GITHUB_WORKSPACE/artifacts/Socks5-keepalive-source.zip"
+          cp app/LICENSE artifacts/LICENSE-app.txt
+          find core -not -path '*/.git/*' -type f \( -iname LICENSE -o -iname COPYING \) \
+            -exec sh -c 'printf "\n--- %s ---\n" "$1"; cat "$1"' sh {} \; > artifacts/LICENSES-core.txt
+
+      - name: Build unmodified Hev framework
+        run: |
+          set -euo pipefail
+          (cd core && ./build-apple.sh) 2>&1 | tee artifacts/core-build.log
+          git -C core diff --exit-code
+          git -C core submodule foreach --recursive 'git diff --exit-code'
+          rm -rf app/HevSocks5Server.xcframework
+          cp -R core/HevSocks5Server.xcframework app/
+
+      - name: Archive app without signing
+        run: |
+          set -euo pipefail
+          xcodebuild archive -project app/Socks5.xcodeproj -scheme Socks5 \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$GITHUB_WORKSPACE/build/Socks5.xcarchive" \
+            CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee artifacts/app-build.log
+
+      - name: Verify permissions and package IPA
+        run: |
+          set -euo pipefail
+          mkdir -p package/Payload
+          ditto build/Socks5.xcarchive/Products/Applications/Socks5.app package/Payload/Socks5.app
+          APP='package/Payload/Socks5.app'
+          plutil -lint "$APP/Info.plist"
+          xcrun lipo "$APP/Socks5" -verify_arch arm64
+          python3 - <<'PY'
+          import pathlib, plistlib, wave
+          app = pathlib.Path('package/Payload/Socks5.app')
+          p = plistlib.loads((app / 'Info.plist').read_bytes())
+          assert set(p['UIBackgroundModes']) == {'audio', 'location'}
+          for key in ['NSLocationWhenInUseUsageDescription', 'NSLocationAlwaysAndWhenInUseUsageDescription', 'NSLocalNetworkUsageDescription']:
+              assert p.get(key)
+          with wave.open(str(app / 'Silence.wav'), 'rb') as w:
+              assert w.getnframes() == 400 and w.readframes(400) == bytes(800)
+          print('Packaged permissions and digital silence verified.')
+          PY
+          /usr/libexec/PlistBuddy -c Print "$APP/Info.plist" > artifacts/app-info-plist.txt
+          xcrun otool -L "$APP/Socks5" > artifacts/linked-libraries.txt
+          (cd package && zip -q -r ../artifacts/Socks5-keepalive-unsigned.ipa Payload)
+          unzip -t artifacts/Socks5-keepalive-unsigned.ipa
+          ditto -c -k --keepParent build/Socks5.xcarchive/dSYMs artifacts/Socks5-dSYMs.zip
+          (cd artifacts && shasum -a 256 Socks5-keepalive-unsigned.ipa > SHA256SUMS.txt)
+          printf '\nUnsigned ARM64 Release. No core patches. Device background testing still required.\n' >> artifacts/build-info.txt
+          cat artifacts/build-info.txt > "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload IPA, source, symbols and build records
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Socks5-keepalive-unsigned
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
