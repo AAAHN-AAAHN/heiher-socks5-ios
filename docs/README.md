@@ -33,12 +33,12 @@ attempting to run several competing app entry points.
 
 ## Implementation specifications
 
-- [UDP compatibility](docs/features/udp-compatibility.md)
-- [Traffic statistics, engine and display](docs/features/traffic-statistics.md)
-- [Background location and audio](docs/features/background.md)
-- [JSON settings and server lifecycle](docs/features/settings-lifecycle.md)
-- [App icon](docs/features/app-icon.md)
-- [Build, testing, source pins and archival policy](docs/build-and-validation.md)
+- [UDP compatibility](features/udp-compatibility.md)
+- [Traffic statistics, engine and display](features/traffic-statistics.md)
+- [Background location and audio](features/background.md)
+- [JSON settings and server lifecycle](features/settings-lifecycle.md)
+- [App icon](features/app-icon.md)
+- [Build, testing, source pins and archival policy](build-and-validation.md)
 
 The original upstream README is preserved at `docs/upstream/README.md` in feature
 and release branches. Its original contents also remain unchanged on main.

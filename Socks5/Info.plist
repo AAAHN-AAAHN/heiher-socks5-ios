@@ -7,6 +7,15 @@
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
 	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>audio</string>
+	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Keep your SOCKS5 background location session active when enabled. Coordinates are not saved or transmitted.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Continue your enabled location session while this app is in the background. Coordinates are discarded.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Allow devices on your hotspot or local network to connect to your SOCKS5 server.</string>
 </dict>

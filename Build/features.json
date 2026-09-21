@@ -1,8 +1,11 @@
 {
-  "name": "traffic-statistics",
+  "name": "integrated",
   "features": [
     "udp",
-    "statistics"
+    "statistics",
+    "background",
+    "settings",
+    "icon"
   ],
   "upstream_app": "83d350d28d6a31e7730cfa74b49f58d2af642397",
   "sources": {
@@ -30,6 +33,10 @@
     },
     {
       "file": "hev-stats-server.patch",
+      "repository": "."
+    },
+    {
+      "file": "hev-server-startup-stop.patch",
       "repository": "."
     }
   ]
