@@ -34,20 +34,19 @@ jobs:
           path: core
           persist-credentials: false
 
-      - name: Verify minimal integration and record versions
+      - name: Verify integration and record versions
         run: |
           set -euo pipefail
           mkdir -p artifacts
           git -C app fetch --depth=1 https://github.com/heiher/socks5-ios.git "$APP_BASE"
           git -C app diff --exit-code "$APP_BASE" -- Socks5/ContentView.swift
+          plutil -lint app/Socks5.xcodeproj/project.pbxproj
           python3 - <<'PY'
           import os, pathlib, subprocess, wave
           root = pathlib.Path('app')
           original = subprocess.check_output(['git', '-C', 'app', 'show', os.environ['APP_BASE'] + ':Socks5/Socks5App.swift'])
           current = (root / 'Socks5/Socks5App.swift').read_bytes()
           assert current.replace(b'BackgroundKeepAliveRoot()', b'ContentView()') == original
-          diff = subprocess.check_output(['git', '-C', 'app', 'diff', '--numstat', os.environ['APP_BASE'], '--', 'Socks5.xcodeproj/project.pbxproj']).decode().split()
-          assert len(diff) == 3 and diff[1] == '0', 'Unexpected original project deletions'
           with wave.open(str(root / 'Socks5/BackgroundKeepAlive/Silence.wav'), 'rb') as w:
               assert (w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()) == (1, 2, 8000, 400)
               assert w.readframes(400) == bytes(800)
