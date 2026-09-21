@@ -1,9 +1,11 @@
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
+index 084c03b98d8f80b646381d5cbf82eca95de2eddb..5016df65e4a0b66ecdebfef8fbbce46856e042a6 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
-@@ -26,4 +26,25 @@
+@@ -25,6 +25,27 @@
+ 
  #define UDP_BUF_SIZE 1500
-+
+ 
 +static void
 +hev_socks5_udp_addr_normalize (struct sockaddr_in6 *addr)
 +{
@@ -24,27 +26,34 @@ diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
 +    memcpy (&addr->sin6_addr.s6_addr[12], &ipv4.sin_addr,
 +            sizeof (ipv4.sin_addr));
 +}
- 
++
  static int
  task_io_yielder (HevTaskYieldType type, void *data)
-@@ -276,6 +297,7 @@
+ {
+@@ -271,9 +292,8 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+     }
+ 
      if (!HEV_SOCKS5 (self)->udp_associated) {
-         struct sockaddr *saddr = mvec[0].msg_hdr.msg_name;
+-        struct sockaddr *saddr = mvec[0].msg_hdr.msg_name;
 -        socklen_t alen = mvec[0].msg_hdr.msg_namelen;
-+        socklen_t alen = sizeof (taddr);
+-        if (connect (fd, saddr, alen) < 0)
 +        hev_socks5_udp_addr_normalize (&taddr);
-         if (connect (fd, saddr, alen) < 0)
++        if (connect (fd, (struct sockaddr *)&taddr, sizeof (taddr)) < 0)
              return -1;
          HEV_SOCKS5 (self)->udp_associated = 1;
-@@ -413,4 +435,7 @@
+     }
+@@ -399,6 +419,9 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
+ {
      int i, res;
-+
+ 
 +    for (i = 0; i < num; i++)
 +        svec[i].msg_hdr.msg_namelen = sizeof (struct sockaddr_in6);
- 
++
      res = hev_task_io_socket_recvmmsg (fd, svec, num, MSG_DONTWAIT,
                                         task_io_yielder, self);
-@@ -424,5 +449,6 @@
+     if (res > 0) {
+@@ -409,6 +432,7 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
+             dvec[i].buf = svec[i].msg_hdr.msg_iov->iov_base;
              dvec[i].len = svec[i].msg_len;
              dvec[i].addr = (HevSocks5Addr *)&saddr[i];
 +            hev_socks5_udp_addr_normalize (svec[i].msg_hdr.msg_name);

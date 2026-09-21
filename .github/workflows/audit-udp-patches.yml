@@ -1,0 +1,105 @@
+name: Audit UDP patches without building
+
+on:
+  push:
+    branches: [audit/udp-patches-20260921]
+    paths:
+      - .github/workflows/audit-udp-patches.yml
+      - Patches/hev-udp-sockaddr.patch
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: app
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: heiher/hev-socks5-server
+          ref: b3585289622561caf4b8789b436cc8820ecd6be0
+          submodules: recursive
+          path: core
+          persist-credentials: false
+      - name: Apply and verify the exact two patches
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          git -C core submodule status --recursive > audit/revisions.txt
+          test "$(git -C core/src/core rev-parse HEAD)" = 162dd996299fc2d2bff2dd63728f8a2cd71ed31a
+          git -C core apply --check --whitespace=error-all "$PWD/app/Patches/hev-udp-port-zero.patch"
+          git -C core apply --whitespace=error-all "$PWD/app/Patches/hev-udp-port-zero.patch"
+          git -C core/src/core apply --check --whitespace=error-all "$PWD/app/Patches/hev-udp-sockaddr.patch"
+          git -C core/src/core apply --whitespace=error-all "$PWD/app/Patches/hev-udp-sockaddr.patch"
+          test "$(git -C core hash-object src/hev-socks5-session.c)" = 17c02cb47c96770ae4de4f2dba5b1ceae366db3a
+          test "$(git -C core/src/core hash-object src/hev-socks5-udp.c)" = 5016df65e4a0b66ecdebfef8fbbce46856e042a6
+          git -C core diff --check
+          git -C core/src/core diff --check
+          git -C core diff --numstat -- src/hev-socks5-session.c > audit/source-scope.txt
+          git -C core/src/core diff --numstat >> audit/source-scope.txt
+          cp core/src/core/src/hev-socks5-udp.c audit/patched-udp.c
+      - name: Syntax-only checks; no objects, libraries or applications
+        run: |
+          set -euo pipefail
+          cd core
+          INCLUDES=(-Isrc/misc -Isrc/core/include -Ithird-part/yaml/src -Ithird-part/hev-task-system/include)
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            xcrun --sdk iphoneos clang --version > ../audit/compiler.txt
+            xcrun --sdk iphoneos clang -arch arm64 -mios-version-min=15.0 \
+              -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" \
+              -std=gnu11 -Wall -Werror -fsyntax-only "${INCLUDES[@]}" \
+              src/hev-socks5-session.c src/core/src/hev-socks5-udp.c \
+              2>&1 | tee ../audit/syntax-only.log
+          else
+            clang --version > ../audit/compiler.txt
+            clang -std=gnu11 -Wall -Werror -fsyntax-only "${INCLUDES[@]}" \
+              src/hev-socks5-session.c src/core/src/hev-socks5-udp.c \
+              2>&1 | tee ../audit/syntax-only.log
+          fi
+          printf 'Syntax-only check passed. No compilation outputs or runtime tests.\n' >> ../audit/syntax-only.log
+      - name: Inspect upstream formatting without changing source
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          if ! command -v clang-format; then
+            sudo apt-get update -qq
+            sudo apt-get install -y clang-format
+          fi
+          clang-format --version > audit/formatter.txt
+          cp core/src/core/.clang-format audit/upstream-clang-format.yml
+          clang-format --style=file core/src/core/src/hev-socks5-udp.c > audit/formatted-udp.c
+          diff -u core/src/core/src/hev-socks5-udp.c audit/formatted-udp.c > audit/format-udp.diff || test "$?" -eq 1
+          clang-format --style=file core/src/hev-socks5-session.c > audit/formatted-session.c
+          diff -u core/src/hev-socks5-session.c audit/formatted-session.c > audit/format-session.diff || test "$?" -eq 1
+          git -C core/src/core show HEAD:src/hev-socks5-udp.c > core/src/core/src/udp-original.c
+          clang-format --style=file core/src/core/src/udp-original.c > audit/formatted-original-udp.c
+          diff -u core/src/core/src/udp-original.c audit/formatted-original-udp.c > audit/format-original-udp.diff || test "$?" -eq 1
+          rm core/src/core/src/udp-original.c
+      - name: Reverse patches and verify original sources
+        run: |
+          set -euo pipefail
+          git -C core/src/core apply --reverse "$PWD/app/Patches/hev-udp-sockaddr.patch"
+          git -C core apply --reverse "$PWD/app/Patches/hev-udp-port-zero.patch"
+          git -C core diff --exit-code
+          git -C core submodule foreach --recursive 'git diff --exit-code'
+          test -z "$(find core -type f \( -name '*.o' -o -name '*.a' -o -name '*.ipa' \) -print)"
+          printf 'Reverse-apply identity verified; no build artifacts generated.\n' > audit/verification.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: udp-patch-audit-${{ matrix.os }}
+          path: audit/
+          retention-days: 14
