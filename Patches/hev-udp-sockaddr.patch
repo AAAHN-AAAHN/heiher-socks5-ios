@@ -1,0 +1,53 @@
+diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
+--- a/src/hev-socks5-udp.c
++++ b/src/hev-socks5-udp.c
+@@ -26,4 +26,25 @@
+ #define UDP_BUF_SIZE 1500
++
++static void
++hev_socks5_udp_addr_normalize (struct sockaddr_in6 *addr)
++{
++    struct sockaddr_in ipv4;
++
++    if (addr->sin6_family != AF_INET)
++        return;
++
++    memcpy (&ipv4, addr, sizeof (ipv4));
++    memset (addr, 0, sizeof (*addr));
++#if defined(__APPLE__)
++    addr->sin6_len = sizeof (*addr);
++#endif
++    addr->sin6_family = AF_INET6;
++    addr->sin6_port = ipv4.sin_port;
++    addr->sin6_addr.s6_addr[10] = 0xff;
++    addr->sin6_addr.s6_addr[11] = 0xff;
++    memcpy (&addr->sin6_addr.s6_addr[12], &ipv4.sin_addr,
++            sizeof (ipv4.sin_addr));
++}
+ 
+ static int
+ task_io_yielder (HevTaskYieldType type, void *data)
+@@ -276,6 +297,7 @@
+     if (!HEV_SOCKS5 (self)->udp_associated) {
+         struct sockaddr *saddr = mvec[0].msg_hdr.msg_name;
+-        socklen_t alen = mvec[0].msg_hdr.msg_namelen;
++        socklen_t alen = sizeof (taddr);
++        hev_socks5_udp_addr_normalize (&taddr);
+         if (connect (fd, saddr, alen) < 0)
+             return -1;
+         HEV_SOCKS5 (self)->udp_associated = 1;
+@@ -413,4 +435,7 @@
+     int i, res;
++
++    for (i = 0; i < num; i++)
++        svec[i].msg_hdr.msg_namelen = sizeof (struct sockaddr_in6);
+ 
+     res = hev_task_io_socket_recvmmsg (fd, svec, num, MSG_DONTWAIT,
+                                        task_io_yielder, self);
+@@ -424,5 +449,6 @@
+             dvec[i].len = svec[i].msg_len;
+             dvec[i].addr = (HevSocks5Addr *)&saddr[i];
++            hev_socks5_udp_addr_normalize (svec[i].msg_hdr.msg_name);
+             hev_socks5_addr_from_sockaddr6 (dvec[i].addr,
+                                             svec[i].msg_hdr.msg_name);
+         }
