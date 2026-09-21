@@ -1,8 +1,8 @@
 diff --git a/src/hev-socks5-session.c b/src/hev-socks5-session.c
-index 06ce823dd3d29df9107bb53c12178e6b4ebf45c4..17c02cb47c96770ae4de4f2dba5b1ceae366db3a 100644
+index 06ce823dd3d29df9107bb53c12178e6b4ebf45c4..ef8556619e498b8217b16d75d16a2973b73ac62a 100644
 --- a/src/hev-socks5-session.c
 +++ b/src/hev-socks5-session.c
-@@ -163,9 +163,11 @@ hev_socks5_session_udp_bind (HevSocks5Server *self, int sock,
+@@ -163,9 +163,12 @@ hev_socks5_session_udp_bind (HevSocks5Server *self, int sock,
          dst = &addr;
      }
  
@@ -10,7 +10,8 @@ index 06ce823dd3d29df9107bb53c12178e6b4ebf45c4..17c02cb47c96770ae4de4f2dba5b1cea
 -    if (res < 0)
 -        return -1;
 +    if (dst->sin6_port != 0) {
-+        res = connect (sock, (struct sockaddr *)dst, sizeof (struct sockaddr_in6));
++        res = connect (sock, (struct sockaddr *)dst,
++                       sizeof (struct sockaddr_in6));
 +        if (res < 0)
 +            return -1;
 +    }

@@ -75,11 +75,11 @@ jobs:
           git -C core apply --check --whitespace=error-all "$PATCH"
           git -C core apply --whitespace=error-all "$PATCH"
           test "$(git -C core diff --name-only)" = 'src/hev-socks5-session.c'
-          test "$(git -C core hash-object src/hev-socks5-session.c)" = "17c02cb47c96770ae4de4f2dba5b1ceae366db3a"
+          test "$(git -C core hash-object src/hev-socks5-session.c)" = "ef8556619e498b8217b16d75d16a2973b73ac62a"
           cp "$PATCH" artifacts/hev-udp-port-zero.patch
           git -C core diff --full-index -- src/hev-socks5-session.c > artifacts/core-changes.patch
           shasum -a 256 "$PATCH" >> artifacts/build-info.txt
-          printf 'Patched session blob: 17c02cb47c96770ae4de4f2dba5b1ceae366db3a\n' >> artifacts/build-info.txt
+          printf 'Patched session blob: ef8556619e498b8217b16d75d16a2973b73ac62a\n' >> artifacts/build-info.txt
 
       - name: Reproduce the current UDP behavior on macOS
         run: |
@@ -116,7 +116,7 @@ jobs:
         run: |
           set -euo pipefail
           (cd core && ./build-apple.sh) 2>&1 | tee artifacts/core-build.log
-          test "$(git -C core hash-object src/hev-socks5-session.c)" = "17c02cb47c96770ae4de4f2dba5b1ceae366db3a"
+          test "$(git -C core hash-object src/hev-socks5-session.c)" = "ef8556619e498b8217b16d75d16a2973b73ac62a"
           test "$(git -C core/src/core hash-object src/hev-socks5-udp.c)" = "$(cat artifacts/patched-udp-blob.txt)"
           git -C core/src/core apply --reverse --check "$GITHUB_WORKSPACE/app/Patches/hev-udp-sockaddr.patch"
           git -C core/src/core apply --reverse "$GITHUB_WORKSPACE/app/Patches/hev-udp-sockaddr.patch"
