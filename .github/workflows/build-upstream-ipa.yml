@@ -92,7 +92,7 @@ jobs:
           APP='package/Payload/Socks5.app'
           test -s "$APP/Socks5"
           plutil -lint "$APP/Info.plist"
-          xcrun lipo -verify_arch arm64 "$APP/Socks5"
+          xcrun lipo "$APP/Socks5" -verify_arch arm64
           xcrun lipo -info "$APP/Socks5" | tee -a artifacts/build-info.txt
           xcrun otool -L "$APP/Socks5" > artifacts/linked-libraries.txt
           /usr/libexec/PlistBuddy -c Print "$APP/Info.plist" > artifacts/app-info-plist.txt
