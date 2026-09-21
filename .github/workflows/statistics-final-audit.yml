@@ -1,0 +1,127 @@
+name: Final review of tested statistics code
+on:
+  push:
+    branches: [audit/statistics-final-20260921]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: review
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: app
+          ref: 81eb9e1564a2e206ba4f1ba2521c017a16784de1
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: heiher/hev-socks5-server
+          ref: b3585289622561caf4b8789b436cc8820ecd6be0
+          path: core
+          submodules: recursive
+          persist-credentials: false
+      - name: Apply exact production patches
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          sh app/Tests/apply_traffic_stats.sh
+          {
+            git -C app rev-parse HEAD
+            git -C core rev-parse HEAD
+            git -C core submodule status --recursive
+            shasum -a 256 app/Patches/*.patch
+            uname -a
+            clang --version
+          } > artifacts/revisions.txt
+          python3 - <<'PY'
+          import hashlib, json, pathlib, subprocess
+          files = {}
+          for repo in ['core', 'core/src/core', 'core/third-part/hev-task-system']:
+              for name in subprocess.check_output(['git', '-C', repo, 'diff', '--name-only']).decode().splitlines():
+                  p = pathlib.Path(repo) / name
+                  if p.is_file() and p.suffix in ['.c', '.h']:
+                      files[str(p)] = hashlib.sha256(p.read_bytes()).hexdigest()
+          pathlib.Path('artifacts/source-hashes.json').write_text(json.dumps(files, indent=2))
+          assert len(files) == 10, files
+          PY
+      - name: Enforce upstream C formatting without rewriting
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-format-18
+          python3 - <<'PY'
+          import json, pathlib, subprocess
+          for name in json.loads(pathlib.Path('artifacts/source-hashes.json').read_text()):
+              assert subprocess.check_output(['clang-format-18', name]) == pathlib.Path(name).read_bytes(), name
+          print('PASS: all ten modified C/header files match upstream formatting')
+          PY
+      - name: Native regression, failure injection and counter stress
+        run: |
+          set -euo pipefail
+          modes=(buffered)
+          if [[ "$RUNNER_OS" == Linux ]]; then modes+=(splice); fi
+          for mode in "${modes[@]}"; do
+            flags=''
+            if [[ "$mode" == splice ]]; then flags='-DENABLE_IO_SPLICE_SYSCALL'; fi
+            (cd core && make -j3 CFLAGS="$flags" static exec) > "artifacts/$mode-build.log" 2>&1
+            libs=(core/bin/libhev-socks5-server.a core/third-part/yaml/bin/libyaml.a core/third-part/hev-task-system/bin/libhev-task-system.a)
+            cc -std=gnu11 -O2 -Wall -Werror -pthread -Icore/src app/Tests/traffic_stats_host.c "${libs[@]}" -o artifacts/stats-host
+            python3 -u app/Tests/udp_sockaddr_regression.py core/bin/hev-socks5-server --output "artifacts/$mode-protocol.json" | tee "artifacts/$mode-protocol.log"
+            for run in 1 2 3; do
+              python3 -u app/Tests/traffic_stats_regression.py artifacts/stats-host 2> "artifacts/$mode-server-$run.log" | tee "artifacts/$mode-statistics-$run.log"
+            done
+            cc -std=gnu11 -O2 -Wall -Werror -pthread -Icore/src review/Audit/statistics/counter_stress.c "${libs[@]}" -o artifacts/counter-stress
+            artifacts/counter-stress | tee "artifacts/$mode-counters.log"
+            clang -std=gnu11 -O1 -g -Wall -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -fno-omit-frame-pointer $flags \
+              -Icore/third-part/hev-task-system/src -Icore/third-part/hev-task-system/include \
+              review/Audit/statistics/transfer_probe.c core/third-part/hev-task-system/bin/libhev-task-system.a -pthread -o artifacts/transfer-probe
+            ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1 artifacts/transfer-probe 2>&1 | tee "artifacts/$mode-failure-probe.log"
+            if [[ "$RUNNER_OS" == macOS ]]; then
+              clang -std=gnu11 -O1 -g -fsanitize=thread -pthread -Icore/src -Icore/third-part/hev-task-system/include \
+                review/Audit/statistics/counter_stress.c core/src/core/src/hev-socks5-misc.c "${libs[@]}" -o artifacts/counter-tsan
+              TSAN_OPTIONS=halt_on_error=1 artifacts/counter-tsan 2>&1 | tee artifacts/counter-tsan.log
+              swiftc app/Socks5/Statistics/TrafficStatistics.swift app/Tests/traffic_statistics_model.swift -o artifacts/model-test
+              artifacts/model-test | tee artifacts/swift-model.log
+            fi
+            (cd core && make clean) >> "artifacts/$mode-build.log" 2>&1
+          done
+      - name: Confirm source identity and patch reversibility
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          for name, expected in json.loads(pathlib.Path('artifacts/source-hashes.json').read_text()).items():
+              assert hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest() == expected, name
+          print('PASS: compilation and tests made no production source changes')
+          PY
+          git -C core apply -R "$GITHUB_WORKSPACE/app/Patches/hev-stats-server.patch"
+          git -C core/src/core apply -R "$GITHUB_WORKSPACE/app/Patches/hev-stats-core.patch"
+          git -C core/third-part/hev-task-system apply -R "$GITHUB_WORKSPACE/app/Patches/hev-stats-task-io.patch"
+          git -C core/src/core apply -R "$GITHUB_WORKSPACE/app/Patches/hev-udp-sockaddr.patch"
+          git -C core apply -R "$GITHUB_WORKSPACE/app/Patches/hev-udp-port-zero.patch"
+          git -C core diff --exit-code
+          git -C core submodule foreach --recursive 'git diff --exit-code'
+          git -C app diff --exit-code
+          rm -f artifacts/stats-host artifacts/counter-stress artifacts/transfer-probe artifacts/counter-tsan artifacts/model-test
+          printf 'Audit only: no app archive, IPA or production source change.\n' > artifacts/AUDIT-SCOPE.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Statistics-final-review-${{ runner.os }}
+          path: artifacts/
+          retention-days: 14
