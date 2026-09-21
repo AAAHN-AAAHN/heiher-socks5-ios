@@ -16,82 +16,101 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     env:
+      APP_SHA: 180012e8b9dbaa2002a68ebd2c75bccebcfb789c
       CORE_SHA: b3585289622561caf4b8789b436cc8820ecd6be0
     defaults:
       run:
         shell: bash
     steps:
-      - name: Checkout unmodified upstream app
-        uses: actions/checkout@v4
+      - name: Checkout current upstream iOS app
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          repository: heiher/socks5-ios
+          ref: ${{ env.APP_SHA }}
+          path: app
           persist-credentials: false
 
-      - name: Record app and toolchain versions
+      - name: Checkout current upstream server core
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: heiher/hev-socks5-server
+          ref: ${{ env.CORE_SHA }}
+          submodules: recursive
+          path: core
+          persist-credentials: false
+
+      - name: Record source and toolchain versions
         run: |
           set -euo pipefail
           mkdir -p artifacts
+          test "$(git -C app rev-parse HEAD)" = "$APP_SHA"
+          test "$(git -C core rev-parse HEAD)" = "$CORE_SHA"
           {
-            printf 'App repository: heiher/socks5-ios\n'
-            printf 'App upstream commit: 180012e8b9dbaa2002a68ebd2c75bccebcfb789c\n'
-            printf 'Build commit: '
-            git rev-parse HEAD
-            printf 'Core repository: heiher/hev-socks5-server\n'
-            printf 'Core commit: %s\n' "$CORE_SHA"
+            printf 'App repository: heiher/socks5-ios\nApp commit: %s\n' "$APP_SHA"
+            printf 'Core repository: heiher/hev-socks5-server\nCore commit: %s\n' "$CORE_SHA"
+            printf 'Workflow commit: %s\n' "$GITHUB_SHA"
+            git -C core submodule status --recursive
             xcodebuild -version
             xcrun --sdk iphoneos --show-sdk-version
           } | tee artifacts/build-info.txt
-          git diff --exit-code 180012e8b9dbaa2002a68ebd2c75bccebcfb789c -- Socks5 Socks5.xcodeproj
+          cp app/LICENSE artifacts/LICENSE-app.txt
+          find core -not -path '*/.git/*' -type f \( -iname LICENSE -o -iname COPYING \) \
+            -exec sh -c 'printf "\n--- %s ---\n" "$1"; cat "$1"' sh {} \; \
+            > artifacts/LICENSES-core.txt
 
-      - name: Build latest core without source changes
+      - name: Build unmodified official Apple library
         run: |
           set -euo pipefail
-          git clone https://github.com/heiher/hev-socks5-server.git core
-          git -C core checkout --detach "$CORE_SHA"
-          git -C core submodule update --init --recursive
-          git -C core submodule status --recursive | tee -a artifacts/build-info.txt
           (cd core && ./build-apple.sh) 2>&1 | tee artifacts/core-build.log
+          test -f core/HevSocks5Server.xcframework/Info.plist
           git -C core diff --exit-code
-          rm -rf HevSocks5Server.xcframework
-          cp -R core/HevSocks5Server.xcframework HevSocks5Server.xcframework
+          git -C core submodule foreach --recursive 'git diff --exit-code'
+          rm -rf app/HevSocks5Server.xcframework
+          cp -R core/HevSocks5Server.xcframework app/HevSocks5Server.xcframework
 
-      - name: Archive original app without signing
+      - name: Archive unmodified app without signing
         run: |
           set -euo pipefail
           xcodebuild archive \
-            -project Socks5.xcodeproj \
+            -project app/Socks5.xcodeproj \
             -scheme Socks5 \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -archivePath "$PWD/build/Socks5.xcarchive" \
+            -archivePath "$GITHUB_WORKSPACE/build/Socks5.xcarchive" \
             CODE_SIGN_IDENTITY='' \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee artifacts/app-build.log
-          git diff --exit-code -- Socks5 Socks5.xcodeproj
+          git -C app diff --exit-code -- . ':(exclude)HevSocks5Server.xcframework'
 
-      - name: Package and verify IPA
+      - name: Package and verify unsigned IPA
         run: |
           set -euo pipefail
           mkdir -p package/Payload
-          cp -R build/Socks5.xcarchive/Products/Applications/Socks5.app package/Payload/
+          ditto build/Socks5.xcarchive/Products/Applications/Socks5.app package/Payload/Socks5.app
           APP='package/Payload/Socks5.app'
           test -s "$APP/Socks5"
           plutil -lint "$APP/Info.plist"
+          xcrun lipo -verify_arch arm64 "$APP/Socks5"
           xcrun lipo -info "$APP/Socks5" | tee -a artifacts/build-info.txt
+          xcrun otool -L "$APP/Socks5" > artifacts/linked-libraries.txt
           /usr/libexec/PlistBuddy -c Print "$APP/Info.plist" > artifacts/app-info-plist.txt
           (cd package && /usr/bin/zip -q -r ../artifacts/Socks5-unsigned.ipa Payload)
           unzip -t artifacts/Socks5-unsigned.ipa
           (cd artifacts && shasum -a 256 Socks5-unsigned.ipa > SHA256SUMS.txt)
           {
             printf '\nUnsigned IPA; sign with SideStore before installation.\n'
-            printf 'No application source, plist, or core source patches applied.\n'
+            printf 'App source and project: unchanged from the recorded upstream commit.\n'
+            printf 'Core and submodule sources: unchanged from recorded commits.\n'
+            printf 'Bundled XCFramework replaced only with the newly built upstream core.\n'
+            printf 'No added plist permissions, background modes, or application features.\n'
           } >> artifacts/build-info.txt
           cp artifacts/build-info.txt "$GITHUB_STEP_SUMMARY"
 
       - name: Upload IPA and build records
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: Socks5-upstream-unsigned
           path: artifacts/
