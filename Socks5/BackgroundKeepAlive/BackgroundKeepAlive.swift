@@ -2,76 +2,97 @@ import AVFAudio
 import CoreLocation
 import SwiftUI
 
-/// Optional experiments only; the SOCKS5 engine is not changed.
+/// Saved background services, independent of the SOCKS5 server and statistics.
 @MainActor
-final class BackgroundKeepAlive: NSObject, ObservableObject, CLLocationManagerDelegate {
-    enum LocationMode { case off, continuous, held, cycled }
-
-    @Published private(set) var locationMode: LocationMode = .off
+final class BackgroundKeepAlive: NSObject, ObservableObject, CLLocationManagerDelegate, AVAudioPlayerDelegate {
+    @Published private(set) var locationEnabled: Bool
+    @Published private(set) var audioEnabled: Bool
     @Published private(set) var locationState = "Off"
     @Published private(set) var readCount = 0
     @Published private(set) var lastRead: Date?
-    @Published private(set) var audioEnabled = false
     @Published private(set) var audioState = "Off"
 
+    private static let locationKey = "background.continuousLocation"
+    private static let audioKey = "background.silentAudio"
+    private let defaults: UserDefaults
     private var locationManager: CLLocationManager?
-    private var readTimer: Timer?
-    private var awaitingRead = false
     private var updating = false
+    private var requestedPermission = false
     private var player: AVAudioPlayer?
-    private var interrupted = false
+    private var audioCheck: Timer?
+    private var retryDelay: TimeInterval = 1
 
-    func selectLocation(_ mode: LocationMode) {
-        readTimer?.invalidate()
-        readTimer = nil
-        closeLocation()
-        locationMode = mode
-        readCount = 0
-        lastRead = nil
-        locationState = "Off"
-        if mode != .off { openLocation() }
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        locationEnabled = defaults.bool(forKey: Self.locationKey)
+        audioEnabled = defaults.bool(forKey: Self.audioKey)
+        super.init()
     }
 
-    private func openLocation() {
-        guard locationMode != .off else { return }
-        let manager = CLLocationManager()
-        locationManager = manager
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyBest
-        manager.distanceFilter = kCLDistanceFilterNone
-        manager.allowsBackgroundLocationUpdates = true
-        manager.showsBackgroundLocationIndicator = true
-        manager.pausesLocationUpdatesAutomatically = false
-        authorizeAndStart(manager)
+    deinit { audioCheck?.invalidate() }
+
+    /// Called at launch and on return to the foreground. Safe to call repeatedly.
+    func restore() {
+        if locationEnabled { openLocation() }
+        if audioEnabled { resumeAudio() }
     }
 
-    private func authorizeAndStart(_ manager: CLLocationManager) {
-        guard manager === locationManager, locationMode != .off else { return }
-        switch manager.authorizationStatus {
-        case .notDetermined:
-            locationState = "Waiting for location permission"
-            manager.requestAlwaysAuthorization()
-        case .authorizedAlways, .authorizedWhenInUse:
-            guard !updating else { return }
-            updating = true
-            awaitingRead = true
-            locationState = "Waiting for a location update"
-            manager.startUpdatingLocation()
-        case .denied, .restricted:
-            selectLocation(.off)
-            locationState = "Location access denied; enable it in Settings"
-        @unknown default:
-            selectLocation(.off)
-            locationState = "Location authorization unavailable"
+    func setLocation(_ enabled: Bool) {
+        locationEnabled = enabled
+        defaults.set(enabled, forKey: Self.locationKey)
+        if enabled {
+            openLocation()
+        } else {
+            locationManager?.stopUpdatingLocation()
+            locationManager?.delegate = nil
+            locationManager = nil
+            updating = false
+            requestedPermission = false
+            locationState = "Off"
         }
     }
 
-    private func closeLocation() {
-        locationManager?.stopUpdatingLocation()
-        locationManager?.delegate = nil
-        locationManager = nil
-        updating = false
-        awaitingRead = false
+    private func openLocation() {
+        guard locationEnabled else { return }
+        if locationManager == nil {
+            let manager = CLLocationManager()
+            locationManager = manager
+            manager.delegate = self
+            // Coordinates are discarded; navigation-grade accuracy is unnecessary.
+            manager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
+            manager.distanceFilter = kCLDistanceFilterNone
+            manager.allowsBackgroundLocationUpdates = true
+            manager.showsBackgroundLocationIndicator = true
+            manager.pausesLocationUpdatesAutomatically = false
+        }
+        if let manager = locationManager { authorizeAndStart(manager) }
+    }
+
+    private func authorizeAndStart(_ manager: CLLocationManager) {
+        guard manager === locationManager, locationEnabled else { return }
+        switch manager.authorizationStatus {
+        case .notDetermined:
+            locationState = "Waiting for location permission"
+            if !requestedPermission, UIApplication.shared.applicationState == .active {
+                requestedPermission = true
+                manager.requestAlwaysAuthorization()
+            }
+        case .authorizedAlways, .authorizedWhenInUse:
+            requestedPermission = false
+            guard !updating else { return }
+            updating = true
+            locationState = "Waiting for a location update"
+            manager.startUpdatingLocation()
+        case .denied, .restricted:
+            manager.stopUpdatingLocation()
+            updating = false
+            requestedPermission = false
+            locationState = "Location access unavailable; enable it in Settings"
+        @unknown default:
+            manager.stopUpdatingLocation()
+            updating = false
+            locationState = "Location authorization unavailable"
+        }
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -79,121 +100,132 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, CLLocationManagerDe
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard manager === locationManager, awaitingRead, !locations.isEmpty else { return }
-        // Consume and discard the coordinates. Retain only diagnostic count/time.
+        guard manager === locationManager, locationEnabled, updating, !locations.isEmpty else { return }
+        // Keep only diagnostic count/time, never coordinates or a location history.
         readCount += 1
         lastRead = Date()
-        if locationMode == .continuous {
-            locationState = "Continuous session active"
-            return
-        }
-        awaitingRead = false
-        if locationMode == .cycled {
-            closeLocation()
-            locationState = "Session closed; waiting 5 s"
-        } else {
-            locationState = "Session open; waiting 5 s"
-        }
-        let timer = Timer(timeInterval: 5, target: self,
-                          selector: #selector(readAgain), userInfo: nil, repeats: false)
-        readTimer = timer
-        RunLoop.main.add(timer, forMode: .common)
-    }
-
-    @objc private func readAgain() {
-        readTimer = nil
-        switch locationMode {
-        case .held:
-            // Keep the service open, then wait for the NEXT callback, not cached data.
-            awaitingRead = true
-            locationState = "Session open; waiting for next update"
-        case .cycled:
-            openLocation()
-        default:
-            break
-        }
+        locationState = "Continuous location active"
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        guard manager === locationManager else { return }
+        guard manager === locationManager, locationEnabled else { return }
         if (error as? CLError)?.code == .denied {
-            selectLocation(.off)
+            manager.stopUpdatingLocation()
+            updating = false
         }
+        // A temporary failure must not erase the user's saved preference.
         locationState = "Location error: \(error.localizedDescription)"
     }
 
     func setAudio(_ enabled: Bool) {
         audioEnabled = enabled
-        interrupted = false
+        defaults.set(enabled, forKey: Self.audioKey)
+        retryDelay = 1
         if enabled {
-            startAudio()
+            resumeAudio()
         } else {
-            stopAudio()
+            audioCheck?.invalidate()
+            audioCheck = nil
+            discardPlayer()
+            try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
             audioState = "Off"
         }
     }
 
-    private func startAudio() {
-        guard audioEnabled, !interrupted else { return }
+    private func resumeAudio() {
+        guard audioEnabled else { return }
+        if player?.isPlaying == true {
+            if audioCheck == nil { scheduleAudioCheck(after: 5) }
+            return
+        }
+        audioCheck?.invalidate()
+        audioCheck = nil
         do {
-            guard let url = Bundle.main.url(forResource: "Silence", withExtension: "wav") else {
-                throw NSError(domain: "BackgroundKeepAlive", code: 1,
-                              userInfo: [NSLocalizedDescriptionKey: "Silence.wav is missing"])
-            }
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            if player == nil || session.category != .playback || session.mode != .default || session.categoryOptions != [.mixWithOthers] {
+                try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            }
+            if player == nil || !session.prefersNoInterruptionsFromSystemAlerts {
+                try? session.setPrefersNoInterruptionsFromSystemAlerts(true)
+            }
             try session.setActive(true)
             if player == nil {
+                guard let url = Bundle.main.url(forResource: "Silence", withExtension: "wav") else {
+                    throw NSError(domain: "BackgroundKeepAlive", code: 1,
+                                  userInfo: [NSLocalizedDescriptionKey: "Silence.wav is missing"])
+                }
                 player = try AVAudioPlayer(contentsOf: url)
+                player?.delegate = self
                 player?.numberOfLoops = -1
-                player?.prepareToPlay()
             }
             guard player?.play() == true else {
                 throw NSError(domain: "BackgroundKeepAlive", code: 2,
                               userInfo: [NSLocalizedDescriptionKey: "Audio playback could not start"])
             }
+            retryDelay = 1
             audioState = "Playing silent WAV continuously"
+            scheduleAudioCheck(after: 5)
         } catch {
-            stopAudio()
-            audioEnabled = false
-            audioState = "Audio error: \(error.localizedDescription)"
+            retryAudio(error)
         }
     }
 
-    private func stopAudio() {
+    private func retryAudio(_ error: Error?) {
+        discardPlayer()
+        audioState = "Waiting to resume: \(error?.localizedDescription ?? "Audio decoder stopped")"
+        scheduleAudioCheck(after: retryDelay)
+        retryDelay = min(retryDelay * 2, 8)
+    }
+
+    private func discardPlayer() {
+        player?.delegate = nil
         player?.stop()
         player = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
     }
 
-    func audioInterruption(_ notification: Notification) {
-        guard audioEnabled,
-              let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
-              let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
-        if type == .began {
-            interrupted = true
-            player?.pause()
-            audioState = "Interrupted by iOS"
-        } else {
-            let rawOptions = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
-            let mayResume = AVAudioSession.InterruptionOptions(rawValue: rawOptions).contains(.shouldResume)
-            interrupted = !mayResume
-            if mayResume {
-                startAudio()
-            } else {
-                audioState = "Paused; toggle audio off/on to resume"
+    private func scheduleAudioCheck(after delay: TimeInterval) {
+        audioCheck?.invalidate()
+        // One main-run-loop timer: cheap health checks, bounded retry rate on failure.
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.audioCheck = nil
+                self?.resumeAudio()
             }
         }
+        timer.tolerance = min(delay * 0.2, 1)
+        audioCheck = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
-    func audioServicesReset() {
-        player = nil
-        interrupted = false
-        if audioEnabled { audioState = "Audio reset; return to the app to resume" }
-        if UIApplication.shared.applicationState == .active { becameActive() }
+    func audioEvent(_ notification: Notification) {
+        guard audioEnabled else { return }
+        switch notification.name {
+        case AVAudioSession.interruptionNotification:
+            guard let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
+            if type == .began { discardPlayer() }
+            // The saved opt-in remains authoritative, even without shouldResume.
+        case AVAudioSession.mediaServicesWereLostNotification,
+             AVAudioSession.mediaServicesWereResetNotification:
+            discardPlayer()
+        case AVAudioSession.routeChangeNotification:
+            let reason = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
+            if reason == AVAudioSession.RouteChangeReason.categoryChange.rawValue { return }
+        default:
+            return
+        }
+        resumeAudio()
     }
 
-    func becameActive() {
-        if audioEnabled, !interrupted, player?.isPlaying != true { startAudio() }
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        guard player === self.player, audioEnabled else { return }
+        discardPlayer()
+        resumeAudio()
+    }
+
+    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        guard player === self.player, audioEnabled else { return }
+        // Decoder failures can repeat immediately; pace retries rather than spin.
+        retryAudio(error)
     }
 }

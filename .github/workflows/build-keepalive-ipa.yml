@@ -1,4 +1,4 @@
-name: Build SOCKS5 with external traffic statistics
+name: Build SOCKS5 with persistent background services
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 
 env:
   CORE_SHA: b3585289622561caf4b8789b436cc8820ecd6be0
-  APP_BASE: 672fc5061518f83a387a8cb3b5768f2de9da534a
+  APP_BASE: 81eb9e1564a2e206ba4f1ba2521c017a16784de1
 
 jobs:
   audit:
@@ -112,10 +112,10 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts
           git -C app fetch --depth=1 origin "$APP_BASE"
-          git -C app diff --exit-code "$APP_BASE" -- Socks5/ContentView.swift \
-            Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift \
-            Socks5/BackgroundKeepAlive/Info.plist Socks5/BackgroundKeepAlive/Silence.wav \
-            Patches/hev-udp-port-zero.patch Patches/hev-udp-sockaddr.patch
+          git -C app diff --exit-code "$APP_BASE" -- Socks5/ContentView.swift Socks5/Statistics \
+            Socks5.xcodeproj/project.pbxproj Socks5/BackgroundKeepAlive/Silence.wav Patches \
+            Tests/apply_traffic_stats.sh Tests/traffic_statistics_model.swift \
+            Tests/traffic_stats_host.c Tests/traffic_stats_regression.py Tests/udp_sockaddr_regression.py
           sh app/Tests/apply_traffic_stats.sh
           plutil -lint app/Socks5.xcodeproj/project.pbxproj
           {
@@ -125,7 +125,7 @@ jobs:
             xcrun --sdk iphoneos --show-sdk-version
             shasum -a 256 app/Patches/*.patch
           } > artifacts/build-info.txt
-          git -C app archive --format=zip HEAD -o "$GITHUB_WORKSPACE/artifacts/Socks5-statistics-source.zip"
+          git -C app archive --format=zip HEAD -o "$GITHUB_WORKSPACE/artifacts/Socks5-background-final-source.zip"
           cp app/Patches/* artifacts/
           cp app/LICENSE artifacts/LICENSE-app.txt
           find core -not -path '*/.git/*' -type f \( -iname LICENSE -o -iname COPYING \) \
@@ -146,6 +146,14 @@ jobs:
           artifacts/stats-model | tee artifacts/model-tests.log
           rm artifacts/stats-host artifacts/stats-model
           (cd core && make clean) >> artifacts/macos-build.log 2>&1
+      - name: Verify background state recovery and digital silence
+        run: |
+          set -euo pipefail
+          python3 -u app/Tests/Background/run_checks.py | tee artifacts/background-controller-tests.log
+          swift app/Tests/Background/check_silence.swift app/Socks5/BackgroundKeepAlive/Silence.wav \
+            | tee artifacts/decoded-silence.log
+          cp app/Socks5/BackgroundKeepAlive/README.md artifacts/BACKGROUND.md
+          git -C app diff "$APP_BASE" -- Socks5/BackgroundKeepAlive > artifacts/background-changes.patch
       - name: Build the patched Apple framework
         run: |
           set -euo pipefail
@@ -183,18 +191,19 @@ jobs:
           for key in ['NSLocationWhenInUseUsageDescription', 'NSLocationAlwaysAndWhenInUseUsageDescription', 'NSLocalNetworkUsageDescription']:
               assert p.get(key)
           with wave.open(str(app / 'Silence.wav'), 'rb') as w:
-              assert w.getnframes() == 400 and w.readframes(400) == bytes(800)
+              assert (w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()) == (1, 2, 8000, 400)
+              assert w.readframes(400) == bytes(800)
           print('Permissions and digital silence preserved.')
           PY
           /usr/libexec/PlistBuddy -c Print "$APP/Info.plist" > artifacts/app-info-plist.txt
-          (cd package && zip -q -r ../artifacts/Socks5-statistics-unsigned.ipa Payload)
-          unzip -t artifacts/Socks5-statistics-unsigned.ipa
+          (cd package && zip -q -r ../artifacts/Socks5-background-final-unsigned.ipa Payload)
+          unzip -t artifacts/Socks5-background-final-unsigned.ipa
           ditto -c -k --keepParent build/Socks5.xcarchive/dSYMs artifacts/Socks5-dSYMs.zip
-          (cd artifacts && shasum -a 256 Socks5-statistics-unsigned.ipa > SHA256SUMS.txt)
+          (cd artifacts && shasum -a 256 Socks5-background-final-unsigned.ipa > SHA256SUMS.txt)
           cat artifacts/build-info.txt > "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: Socks5-statistics-unsigned
+          name: Socks5-background-final-unsigned
           path: artifacts/
           retention-days: 14

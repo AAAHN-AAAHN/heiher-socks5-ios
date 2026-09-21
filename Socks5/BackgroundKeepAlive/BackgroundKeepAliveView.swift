@@ -1,11 +1,20 @@
 import AVFAudio
+import Combine
 import SwiftUI
 
-/// Holds the experiments for the app lifetime, independently of the server UI.
+/// Holds background services for the app lifetime, independently of the server UI.
 @MainActor
 struct BackgroundKeepAliveRoot: View {
     @StateObject private var keepAlive = BackgroundKeepAlive()
     @State private var selectedTab = 0
+
+    private let audioEvents = Publishers.MergeMany([
+        AVAudioSession.interruptionNotification,
+        AVAudioSession.routeChangeNotification,
+        AVAudioSession.mediaServicesWereLostNotification,
+        AVAudioSession.mediaServicesWereResetNotification
+    ].map { NotificationCenter.default.publisher(for: $0) })
+        .receive(on: RunLoop.main)
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -18,13 +27,12 @@ struct BackgroundKeepAliveRoot: View {
             NavigationStack {
                 Form {
                     Section {
-                        locationToggle("1. Continuous location", mode: .continuous)
-                        locationToggle("2. Keep open, read every 5 s", mode: .held)
-                        locationToggle("3. Read, close, wait 5 s", mode: .cycled)
+                        Toggle("Continuous location", isOn: Binding(
+                            get: { keepAlive.locationEnabled }, set: { keepAlive.setLocation($0) }))
                     } header: {
-                        Text("Location experiments")
+                        Text("Location")
                     } footer: {
-                        Text("Select one location mode. Mode 2 limits consumption, not GPS updates. Mode 3 stops the service between reads; iOS may suspend the app before the next read.")
+                        Text("Keeps a standard location session open with approximate accuracy. Updates are scheduled by iOS; coordinates are discarded.")
                     }
                     Section("Location state") {
                         Text(keepAlive.locationState)
@@ -32,20 +40,20 @@ struct BackgroundKeepAliveRoot: View {
                         if let date = keepAlive.lastRead {
                             LabeledContent("Last read") { Text(date, style: .time) }
                         }
-                        Text("Choose Always in iOS location settings for restart experiments. Coordinates are not saved or transmitted.")
+                        Text("Allow location access in Settings. Precise Location is not required.")
                             .font(.footnote)
                     }
                     Section {
-                        Toggle("4. Loop silent WAV", isOn: Binding(
+                        Toggle("Loop silent WAV", isOn: Binding(
                             get: { keepAlive.audioEnabled }, set: { keepAlive.setAudio($0) }))
                         Text(keepAlive.audioState).font(.footnote)
                     } header: {
-                        Text("Audio experiment")
+                        Text("Audio")
                     } footer: {
-                        Text("Independent of location. Mixes with other audio. iOS interruptions and termination can still stop playback.")
+                        Text("Loops digital silence and mixes with other audio. Automatically attempts recovery after interruptions; the switch stays on while waiting for iOS.")
                     }
                     Section {
-                        Text("All options start off. They stay on until you turn them off or quit the app, even after stopping the SOCKS5 server.")
+                        Text("Settings are saved and restored when this app opens. Background services are independent of Server Start/Stop. iOS may suspend or terminate the app; recovery runs only while the app can execute.")
                             .font(.footnote)
                     }
                 }
@@ -54,17 +62,9 @@ struct BackgroundKeepAliveRoot: View {
             .tabItem { Label("Background", systemImage: "switch.2") }
             .tag(2)
         }
-        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)
-            .receive(on: RunLoop.main)) { keepAlive.audioInterruption($0) }
-        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.mediaServicesWereResetNotification)
-            .receive(on: RunLoop.main)) { _ in keepAlive.audioServicesReset() }
+        .task { keepAlive.restore() }
+        .onReceive(audioEvents) { keepAlive.audioEvent($0) }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
-            .receive(on: RunLoop.main)) { _ in keepAlive.becameActive() }
-    }
-
-    private func locationToggle(_ title: String, mode: BackgroundKeepAlive.LocationMode) -> some View {
-        Toggle(title, isOn: Binding(
-            get: { keepAlive.locationMode == mode },
-            set: { keepAlive.selectLocation($0 ? mode : .off) }))
+            .receive(on: RunLoop.main)) { _ in keepAlive.restore() }
     }
 }
