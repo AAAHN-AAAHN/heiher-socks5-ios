@@ -1,0 +1,80 @@
+--- a/SettingsTests.swift
++++ b/SettingsTests.swift
+@@ -86,6 +86,17 @@
+         let broken = SettingsStore(fileURL: file)
+         check(broken.errorMessage != nil && !broken.value.serverRunning, "Unreadable saved settings fail closed with visible error")
+         check(try Data(contentsOf: file) == Data("broken JSON".utf8), "Unreadable original file is not silently overwritten")
++        for separator in ["\u{0085}", "\u{2028}", "\u{2029}"] {
++            var injected = AppSettings()
++            injected.server.authUsername = "user" + separator + "main:"
++            injected.server.authPassword = "password"
++            do { _ = try injected.server.configuration(); preconditionFailure("YAML newline accepted") } catch {}
++            check(true, "Unicode YAML line separator rejected")
++        }
++        var oversized = AppSettings()
++        oversized.server.authPassword = String(repeating: "x", count: 70_000)
++        do { _ = try oversized.encoded(); preconditionFailure("Unreloadable JSON exported") } catch {}
++        check(true, "An oversized configuration cannot be exported as a valid snapshot")
+         print("SUMMARY: \(checks) settings checks passed")
+     }
+ }
+--- a/ServerMocks.swift
++++ b/ServerMocks.swift
+@@ -4,10 +4,15 @@
+ enum EngineProbe {
+     static let condition = NSCondition()
+     nonisolated(unsafe) static var stopped = false
++    nonisolated(unsafe) static var nextResult: Int32?
+     nonisolated(unsafe) static var starts = 0
+     nonisolated(unsafe) static var active = 0
+     nonisolated(unsafe) static var maximumActive = 0
+     nonisolated(unsafe) static var configurations: [String] = []
++    static func failNext(_ result: Int32) {
++        condition.lock(); defer { condition.unlock() }
++        nextResult = result
++    }
+     static func snapshot() -> (Int, Int, [String]) {
+         condition.lock(); defer { condition.unlock() }
+         return (starts, maximumActive, configurations)
+@@ -20,6 +25,12 @@
+     EngineProbe.active += 1
+     EngineProbe.maximumActive = max(EngineProbe.maximumActive, EngineProbe.active)
+     EngineProbe.configurations.append(value)
++    if let result = EngineProbe.nextResult {
++        EngineProbe.nextResult = nil
++        EngineProbe.active -= 1
++        EngineProbe.condition.unlock()
++        return result
++    }
+     while !EngineProbe.stopped { EngineProbe.condition.wait() }
+     EngineProbe.stopped = false
+     EngineProbe.active -= 1
+--- a/ServerTests.swift
++++ b/ServerTests.swift
+@@ -35,6 +35,26 @@
+         server.apply(value)
+         precondition(!server.isRunning && EngineProbe.snapshot().0 == previous)
+         print("PASS: invalid saved startup configuration reports an error without running the engine")
++        value.server.listenPort = "12345"
++        EngineProbe.failNext(-1)
++        server.apply(value)
++        await waitUntil { !server.isRunning }
++        let failedCount = EngineProbe.snapshot().0
++        for _ in 0..<100 { server.apply(value) }
++        precondition(EngineProbe.snapshot().0 == failedCount)
++        print("PASS: tab and foreground notifications do not retry a failed configuration")
++        server.apply(value, retry: true)
++        await waitUntil { EngineProbe.snapshot().0 == failedCount + 1 }
++        value.serverRunning = false
++        server.apply(value)
++        await waitUntil { !server.isRunning }
++        value.serverRunning = true
++        server.apply(value)
++        await waitUntil { EngineProbe.snapshot().0 == failedCount + 2 }
++        value.serverRunning = false
++        server.apply(value)
++        await waitUntil { !server.isRunning }
++        print("PASS: explicit retry and a completed Stop/Start each start exactly once")
+     }
+ 
+     @MainActor static func waitUntil(_ condition: () -> Bool) async {

@@ -1,0 +1,68 @@
+name: Reorganize, verify all features, and publish integrated IPA
+on:
+  push:
+    branches: [maintenance/reorganize-20260922]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: socks5-branch-reorganization
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    outputs:
+      matrix: ${{ steps.prepare.outputs.matrix }}
+      integrated: ${{ steps.prepare.outputs.integrated }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Build reviewed feature trees, preserve originals, and push new branches
+        id: prepare
+        run: python3 Maintenance/assemble.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: reorganization-state
+          path: artifacts/reorganization/
+          retention-days: 90
+  features:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    uses: ./.github/workflows/verify-build.yml
+    with:
+      ref: ${{ matrix.ref }}
+  integrated:
+    needs: [prepare, features]
+    uses: ./.github/workflows/verify-build.yml
+    with:
+      ref: ${{ needs.prepare.outputs.integrated }}
+  publish:
+    needs: [prepare, features, integrated]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: reorganization-state
+          path: reorganization-state
+      - name: Restore pristine main and remove archived names with expected-SHA protection
+        run: python3 Maintenance/publish.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: branch-reorganization-completed
+          path: reorganization-state/
+          retention-days: 90
