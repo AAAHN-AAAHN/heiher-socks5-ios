@@ -2,7 +2,7 @@ name: Diagnose UDP relay after port-zero guard
 on:
   push:
     branches: [diagnostics/hev-udp-20260921]
-    paths: [Diagnostics/**, .github/workflows/diagnose-udp.yml]
+    paths: [.github/workflows/diagnose-udp.yml]
   workflow_dispatch:
 permissions:
   contents: read
@@ -46,6 +46,61 @@ jobs:
           set -euo pipefail
           python3 -u Diagnostics/udp_matrix.py binaries/original original results | tee results/original-summary.jsonl
           python3 -u Diagnostics/udp_matrix.py binaries/patched patched results | tee results/patched-summary.jsonl
+      - name: Inspect native sockaddr layout and reply source
+        run: |
+          set -euo pipefail
+          cc -Wall -Wextra Diagnostics/sockaddr_probe.c -o binaries/sockaddr-probe
+          binaries/sockaddr-probe | tee results/native-sockaddr.txt
+          python3 -u - <<'PY' | tee results/binding-summary.jsonl
+          import json, pathlib, socket, subprocess, sys, time
+          sys.path.insert(0, 'Diagnostics')
+          import udp_matrix as m
+          echo = m.Echo()
+          records = []
+          try:
+              for name, bind in [('default', '0.0.0.0'), ('omitted', None), ('blank', ''), ('ipv6-wildcard', '::')]:
+                  port = m.free_port(socket.SOCK_STREAM)
+                  config = ['main:', '  workers: 4', '  port: %d' % port, "  listen-address: '::'", '  udp-port: 0', "  bind-address-v6: '::'", 'misc:', '  log-level: debug', '  log-file: stderr']
+                  if bind is not None:
+                      config.insert(6, "  bind-address-v4: '%s'" % bind)
+                  path = pathlib.Path('results/binding-' + name + '.yml')
+                  path.write_text('\n'.join(config) + '\n')
+                  record = {'binding': name, 'bind_v4': bind, 'expected_source': list(echo.address)}
+                  with pathlib.Path('results/binding-' + name + '.log').open('w') as log:
+                      process = subprocess.Popen(['binaries/patched', str(path)], stdout=log, stderr=log)
+                      a = None
+                      try:
+                          for i in range(100):
+                              try:
+                                  with socket.create_connection(('127.0.0.1', port), .1):
+                                      break
+                              except OSError:
+                                  time.sleep(.02)
+                          a = m.Association(port, '0.0.0.0', False)
+                          record['reply'] = a.reply
+                          payload = b'IPv4 source address verification'
+                          a.udp.settimeout(1)
+                          a.udp.sendto(b'\0\0\0' + m.addr_bytes(*echo.address) + payload, a.target)
+                          data, sender = a.udp.recvfrom(65535)
+                          host, remote_port, offset = m.parse_addr(data, 3)
+                          record.update(source=[host, remote_port], payload_exact=data[offset:] == payload, raw_header=data[:offset].hex())
+                      except Exception as exc:
+                          record['exception'] = repr(exc)
+                      finally:
+                          if a is not None:
+                              a.close()
+                          process.terminate()
+                          try:
+                              process.wait(2)
+                          except subprocess.TimeoutExpired:
+                              process.kill()
+                              process.wait()
+                  records.append(record)
+                  print(json.dumps(record), flush=True)
+          finally:
+              echo.close()
+          pathlib.Path('results/binding-results.json').write_text(json.dumps(records, indent=2) + '\n')
+          PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
