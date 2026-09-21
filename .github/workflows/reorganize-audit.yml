@@ -1,0 +1,36 @@
+name: Export pinned sources for the branch audit
+on:
+  push:
+    branches: [maintenance/reorganize-20260922]
+permissions:
+  contents: read
+jobs:
+  sources:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          path: app
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: heiher/hev-socks5-server
+          ref: b3585289622561caf4b8789b436cc8820ecd6be0
+          submodules: recursive
+          persist-credentials: false
+          path: core
+      - name: Export exact source and history snapshots without changing refs
+        run: |
+          set -eu
+          mkdir artifacts
+          git -C app bundle create "$GITHUB_WORKSPACE/artifacts/app-history.bundle" --all
+          git -C app for-each-ref --format='%(refname) %(objectname)' refs/remotes/origin/ > artifacts/original-refs.txt
+          tar --exclude=.git -czf artifacts/core-sources.tar.gz core
+          git -C core submodule status --recursive > artifacts/core-versions.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: branch-audit-pinned-sources
+          path: artifacts/
+          retention-days: 30
