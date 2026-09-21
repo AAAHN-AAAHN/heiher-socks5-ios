@@ -22,6 +22,7 @@ protocol ObservableObject {}
 @propertyWrapper struct Published<T> { var wrappedValue: T }
 struct Binding<T> { init(get: @escaping () -> T, set: @escaping (T) -> Void) {} }
 class NSFileCoordinator {
+    init(filePresenter: Any?) {}
     func coordinate(readingItemAt url: URL, options: [Int], error: UnsafeMutablePointer<NSError?>?, byAccessor: (URL) -> Void) { byAccessor(url) }
 }
 extension URL {

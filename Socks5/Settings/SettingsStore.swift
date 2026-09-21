@@ -60,7 +60,7 @@ final class SettingsStore: ObservableObject {
             defer { if access { url.stopAccessingSecurityScopedResource() } }
             var coordinationError: NSError?
             var result: Result<Data, Error>?
-            NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { url in
+            NSFileCoordinator(filePresenter: nil).coordinate(readingItemAt: url, options: [], error: &coordinationError) { url in
                 result = Result {
                     let file = try FileHandle(forReadingFrom: url)
                     defer { try? file.close() }
