@@ -16,12 +16,13 @@ print('Controller SHA256:', hashlib.sha256(source.read_bytes()).hexdigest(), flu
 with tempfile.TemporaryDirectory() as temp:
     temp = Path(temp)
     (temp / 'BackgroundKeepAlive.swift').write_text(tested)
-    subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
-                    str(Path(__file__).with_name('PlatformMocks.swift')),
-                    str(temp / 'BackgroundKeepAlive.swift'),
-                    str(Path(__file__).with_name('ControllerTests.swift')),
-                    '-o', str(temp / 'controller-tests')], check=True)
-    subprocess.run([str(temp / 'controller-tests')], check=True)
+    for name in ['ControllerTests', 'DelegateTests']:
+        subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
+                        str(Path(__file__).with_name('PlatformMocks.swift')),
+                        str(temp / 'BackgroundKeepAlive.swift'),
+                        str(Path(__file__).with_name(name + '.swift')),
+                        '-o', str(temp / name)], check=True)
+        subprocess.run([str(temp / name)], check=True)
 asset = root / 'Socks5/BackgroundKeepAlive/Silence.wav'
 with wave.open(str(asset), 'rb') as wav:
     assert (wav.getnchannels(), wav.getsampwidth(), wav.getframerate(), wav.getnframes()) == (1, 2, 8000, 400)

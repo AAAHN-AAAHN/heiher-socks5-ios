@@ -6,8 +6,15 @@ protocol ObservableObject {}
 @propertyWrapper struct Published<Value> {
     var wrappedValue: Value
 }
-protocol CLLocationManagerDelegate: AnyObject {}
-protocol AVAudioPlayerDelegate: AnyObject {}
+protocol CLLocationManagerDelegate: AnyObject {
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager)
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation])
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error)
+}
+protocol AVAudioPlayerDelegate: AnyObject {
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool)
+    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?)
+}
 
 enum CLAuthorizationStatus { case notDetermined, authorizedAlways, authorizedWhenInUse, denied, restricted }
 let kCLLocationAccuracyThreeKilometers = 3000.0

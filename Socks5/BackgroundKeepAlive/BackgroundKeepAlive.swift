@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Saved background services, independent of the SOCKS5 server and statistics.
 @MainActor
-final class BackgroundKeepAlive: NSObject, ObservableObject, CLLocationManagerDelegate, AVAudioPlayerDelegate {
+final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate, AVAudioPlayerDelegate {
     @Published private(set) var locationEnabled: Bool
     @Published private(set) var audioEnabled: Bool
     @Published private(set) var locationState = "Off"
@@ -217,15 +217,31 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, CLLocationManagerDe
         resumeAudio()
     }
 
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        guard player === self.player, audioEnabled else { return }
-        discardPlayer()
-        resumeAudio()
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        let id = ObjectIdentifier(player)
+        onMain { [weak self] in
+            guard let self, let current = self.player,
+                  ObjectIdentifier(current) == id, self.audioEnabled else { return }
+            self.discardPlayer()
+            self.resumeAudio()
+        }
     }
 
-    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
-        guard player === self.player, audioEnabled else { return }
-        // Decoder failures can repeat immediately; pace retries rather than spin.
-        retryAudio(error)
+    nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        let id = ObjectIdentifier(player)
+        onMain { [weak self] in
+            guard let self, let current = self.player,
+                  ObjectIdentifier(current) == id, self.audioEnabled else { return }
+            // Decoder failures can repeat immediately; pace retries rather than spin.
+            self.retryAudio(error)
+        }
+    }
+
+    private nonisolated func onMain(_ action: @escaping @MainActor @Sendable () -> Void) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { action() }
+        } else {
+            Task { @MainActor in action() }
+        }
     }
 }

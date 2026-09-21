@@ -48,6 +48,12 @@ healthy session. Timer tolerance permits coalescing; the callback captures the
 controller weakly, and Off cancels it before releasing the player. These checks
 are distinct from the deleted five-second location modes.
 
+The controller and all player state belong to MainActor. Core Location delivers
+callbacks on the main run loop where its manager was created; its legacy delegate
+conformance uses @preconcurrency to express that documented runtime contract.
+Audio delegates bridge to MainActor when needed, passing only player identity and
+error information; stale callbacks cannot revive a stopped or replaced player.
+
 ## Persistence and limits
 
 UserDefaults stores two booleans, written only when a user changes a switch.
