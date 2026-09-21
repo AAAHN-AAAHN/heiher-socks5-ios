@@ -1,0 +1,40 @@
+diff --git a/src/hev-main.h b/src/hev-main.h
+--- a/src/hev-main.h
++++ b/src/hev-main.h
+@@ -11,4 +11,6 @@
+ #define __HEV_MAIN_H__
++
++#include <stdint.h>
+ 
+ #ifdef __cplusplus
+ extern "C" {
+@@ -59,4 +61,15 @@
+ void hev_socks5_server_quit (void);
++
++/**
++ * hev_socks5_server_stats:
++ * @received: receives payload bytes read from external sockets
++ * @sent: receives payload bytes written to external sockets
++ *
++ * Thread-safe process-lifetime totals; retained across server restarts.
++ * Both output pointers must be non-NULL. Totals are sampled independently.
++ * Excludes SOCKS5 and transport headers; not peer acknowledgements or VPN bytes.
++ */
++void hev_socks5_server_stats (uint64_t *received, uint64_t *sent);
+ 
+ #ifdef __cplusplus
+ }
+diff --git a/src/hev-main.c b/src/hev-main.c
+--- a/src/hev-main.c
++++ b/src/hev-main.c
+@@ -137,4 +137,10 @@
+     hev_socks5_proxy_stop ();
+ }
+ 
++void
++hev_socks5_server_stats (uint64_t *received, uint64_t *sent)
++{
++    hev_socks5_transfer_get (received, sent);
++}
++
+ WEAK int

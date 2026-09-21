@@ -1,4 +1,4 @@
-name: Build keep-alive IPA with UDP address fix
+name: Build SOCKS5 with external traffic statistics
 
 on:
   push:
@@ -8,128 +8,158 @@ on:
 permissions:
   contents: read
 
+env:
+  CORE_SHA: b3585289622561caf4b8789b436cc8820ecd6be0
+  APP_BASE: 672fc5061518f83a387a8cb3b5768f2de9da534a
+
 jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: app
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: heiher/hev-socks5-server
+          ref: ${{ env.CORE_SHA }}
+          path: core
+          submodules: recursive
+          persist-credentials: false
+      - name: Apply isolated patches
+        run: |
+          mkdir -p artifacts
+          sh app/Tests/apply_traffic_stats.sh
+      - name: Check upstream formatting and record canonical patches
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-format-18
+          python3 - <<'PY'
+          import pathlib, subprocess
+          for repo, patch in [('core', 'hev-stats-server.patch'),
+                              ('core/src/core', 'hev-stats-core.patch'),
+                              ('core/third-part/hev-task-system', 'hev-stats-task-io.patch')]:
+              # Stage only the existing compatibility change, not the statistics.
+              if repo == 'core':
+                  subprocess.run(['git', '-C', repo, 'add', 'src/hev-socks5-session.c'], check=True)
+              elif repo == 'core/src/core':
+                  # Install the known compatibility-only version into the index.
+                  base = subprocess.check_output(['git', '-C', repo, 'show', 'HEAD:src/hev-socks5-udp.c'])
+                  temp = pathlib.Path('/tmp/stats-base')
+                  (temp / 'src').mkdir(parents=True, exist_ok=True)
+                  (temp / 'src/hev-socks5-udp.c').write_bytes(base)
+                  subprocess.run(['git', '-C', str(temp), 'apply', str(pathlib.Path('app/Patches/hev-udp-sockaddr.patch').resolve())], check=True)
+                  blob = subprocess.check_output(['git', '-C', repo, 'hash-object', '-w', str(temp / 'src/hev-socks5-udp.c')]).decode().strip()
+                  subprocess.run(['git', '-C', repo, 'update-index', '--cacheinfo', '100644,' + blob + ',src/hev-socks5-udp.c'], check=True)
+              paths = subprocess.check_output(['git', '-C', repo, 'diff', '--name-only', '--', '*.c', '*.h']).decode().splitlines()
+              for name in paths:
+                  p = pathlib.Path(repo) / name
+                  before = p.read_bytes()
+                  subprocess.run(['clang-format-18', '-i', str(p)], check=True)
+                  if before != p.read_bytes():
+                      pathlib.Path('artifacts/format-changed').touch()
+                      print('FORMAT:', repo, name)
+              diff = subprocess.check_output(['git', '-C', repo, 'diff', '--full-index', '--', '*.c', '*.h'])
+              pathlib.Path('artifacts', patch).write_bytes(diff)
+          PY
+      - name: Test buffered and Linux splice paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
+            mode=buffered
+            test -z "$flags" || mode=splice
+            (cd core && make -j3 CFLAGS="$flags" static) > "artifacts/linux-$mode-build.log" 2>&1
+            cc -std=gnu11 -O2 -Wall -Werror -pthread -Icore/src app/Tests/traffic_stats_host.c \
+              core/bin/libhev-socks5-server.a core/third-part/yaml/bin/libyaml.a \
+              core/third-part/hev-task-system/bin/libhev-task-system.a -o artifacts/stats-host
+            python3 -u app/Tests/traffic_stats_regression.py artifacts/stats-host \
+              2> "artifacts/linux-$mode-server.log" | tee "artifacts/linux-$mode-tests.log"
+            (cd core && make clean) >> "artifacts/linux-$mode-build.log" 2>&1
+          done
+          rm artifacts/stats-host
+          test ! -e artifacts/format-changed
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Traffic-statistics-audit
+          path: artifacts/
+          retention-days: 14
+
   build:
+    needs: audit
     runs-on: macos-15
     timeout-minutes: 30
-    env:
-      APP_BASE: 180012e8b9dbaa2002a68ebd2c75bccebcfb789c
-      CORE_SHA: b3585289622561caf4b8789b436cc8820ecd6be0
     defaults:
       run:
         shell: bash
     steps:
-      - name: Checkout modified app
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: app
           persist-credentials: false
-
-      - name: Checkout unchanged tested core
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: heiher/hev-socks5-server
           ref: ${{ env.CORE_SHA }}
-          submodules: recursive
           path: core
+          submodules: recursive
           persist-credentials: false
-
-      - name: Verify integration and record versions
+      - name: Verify preserved code and apply patches
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          git -C app fetch --depth=1 https://github.com/heiher/socks5-ios.git "$APP_BASE"
-          git -C app diff --exit-code "$APP_BASE" -- Socks5/ContentView.swift
+          git -C app fetch --depth=1 origin "$APP_BASE"
+          git -C app diff --exit-code "$APP_BASE" -- Socks5/ContentView.swift \
+            Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift \
+            Socks5/BackgroundKeepAlive/Info.plist Socks5/BackgroundKeepAlive/Silence.wav \
+            Patches/hev-udp-port-zero.patch Patches/hev-udp-sockaddr.patch
+          sh app/Tests/apply_traffic_stats.sh
           plutil -lint app/Socks5.xcodeproj/project.pbxproj
-          python3 - <<'PY'
-          import os, pathlib, subprocess, wave
-          root = pathlib.Path('app')
-          original = subprocess.check_output(['git', '-C', 'app', 'show', os.environ['APP_BASE'] + ':Socks5/Socks5App.swift'])
-          current = (root / 'Socks5/Socks5App.swift').read_bytes()
-          assert current.replace(b'BackgroundKeepAliveRoot()', b'ContentView()') == original
-          with wave.open(str(root / 'Socks5/BackgroundKeepAlive/Silence.wav'), 'rb') as w:
-              assert (w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()) == (1, 2, 8000, 400)
-              assert w.readframes(400) == bytes(800)
-          print('Original server UI unchanged; entry-point-only integration; WAV samples all zero.')
-          PY
           {
-            printf 'App commit: %s\nBase app: %s\nCore: %s\n' "$GITHUB_SHA" "$APP_BASE" "$CORE_SHA"
+            printf 'App: %s\nBase: %s\nCore: %s\n' "$GITHUB_SHA" "$APP_BASE" "$CORE_SHA"
             git -C core submodule status --recursive
             xcodebuild -version
             xcrun --sdk iphoneos --show-sdk-version
+            shasum -a 256 app/Patches/*.patch
           } > artifacts/build-info.txt
-          git -C app diff "$APP_BASE" -- Socks5 Socks5.xcodeproj > artifacts/app-changes.patch
-          git -C app archive --format=zip HEAD -o "$GITHUB_WORKSPACE/artifacts/Socks5-keepalive-udpaddrfix-source.zip"
+          git -C app archive --format=zip HEAD -o "$GITHUB_WORKSPACE/artifacts/Socks5-statistics-source.zip"
+          cp app/Patches/* artifacts/
           cp app/LICENSE artifacts/LICENSE-app.txt
           find core -not -path '*/.git/*' -type f \( -iname LICENSE -o -iname COPYING \) \
             -exec sh -c 'printf "\n--- %s ---\n" "$1"; cat "$1"' sh {} \; > artifacts/LICENSES-core.txt
-
-      - name: Apply the single-file UDP port-zero patch
+      - name: Native macOS protocol and exact-byte tests
         run: |
           set -euo pipefail
-          PATCH="$GITHUB_WORKSPACE/app/Patches/hev-udp-port-zero.patch"
-          test "$(git -C core rev-parse HEAD)" = "$CORE_SHA"
-          git -C core diff --exit-code
-          git -C core submodule foreach --recursive 'git diff --exit-code'
-          test "$(git -C core hash-object src/hev-socks5-session.c)" = "06ce823dd3d29df9107bb53c12178e6b4ebf45c4"
-          git -C core apply --check --whitespace=error-all "$PATCH"
-          git -C core apply --whitespace=error-all "$PATCH"
-          test "$(git -C core diff --name-only)" = 'src/hev-socks5-session.c'
-          test "$(git -C core hash-object src/hev-socks5-session.c)" = "ef8556619e498b8217b16d75d16a2973b73ac62a"
-          cp "$PATCH" artifacts/hev-udp-port-zero.patch
-          git -C core diff --full-index -- src/hev-socks5-session.c > artifacts/core-changes.patch
-          shasum -a 256 "$PATCH" >> artifacts/build-info.txt
-          printf 'Patched session blob: ef8556619e498b8217b16d75d16a2973b73ac62a\n' >> artifacts/build-info.txt
-
-      - name: Reproduce the current UDP behavior on macOS
-        run: |
-          set -euo pipefail
-          (cd core && make -j3) > artifacts/macos-baseline-build.log 2>&1
+          (cd core && make -j3 static exec) > artifacts/macos-build.log 2>&1
+          cc -std=gnu11 -O2 -Wall -Werror -pthread -Icore/src app/Tests/traffic_stats_host.c \
+            core/bin/libhev-socks5-server.a core/third-part/yaml/bin/libyaml.a \
+            core/third-part/hev-task-system/bin/libhev-task-system.a -o artifacts/stats-host
           python3 -u app/Tests/udp_sockaddr_regression.py core/bin/hev-socks5-server \
-            --output artifacts/macos-before.json --allow-failures | tee artifacts/macos-before.log
-          (cd core && make clean) >> artifacts/macos-baseline-build.log 2>&1
-
-      - name: Apply the single-file UDP address patch
-        run: |
-          set -euo pipefail
-          PATCH="$GITHUB_WORKSPACE/app/Patches/hev-udp-sockaddr.patch"
-          test "$(git -C core/src/core rev-parse HEAD)" = "162dd996299fc2d2bff2dd63728f8a2cd71ed31a"
-          test "$(git -C core/src/core hash-object src/hev-socks5-udp.c)" = "084c03b98d8f80b646381d5cbf82eca95de2eddb"
-          git -C core/src/core apply --check --whitespace=error-all "$PATCH"
-          git -C core/src/core apply --whitespace=error-all "$PATCH"
-          test "$(git -C core/src/core diff --name-only)" = 'src/hev-socks5-udp.c'
-          cp "$PATCH" artifacts/hev-udp-sockaddr.patch
-          git -C core/src/core diff --full-index > artifacts/udp-address-changes.patch
-          git -C core/src/core hash-object src/hev-socks5-udp.c > artifacts/patched-udp-blob.txt
-          shasum -a 256 "$PATCH" >> artifacts/build-info.txt
-          cp core/src/core/src/hev-socks5-udp.c artifacts/patched-hev-socks5-udp.c
-
-      - name: Test patched UDP and TCP on macOS
-        run: |
-          set -euo pipefail
-          (cd core && make -j3) > artifacts/macos-patched-build.log 2>&1
-          python3 -u app/Tests/udp_sockaddr_regression.py core/bin/hev-socks5-server \
-            --output artifacts/macos-after.json | tee artifacts/macos-after.log
-          (cd core && make clean) >> artifacts/macos-patched-build.log 2>&1
-
-      - name: Build Hev framework with the two isolated patches
+            --output artifacts/protocol-tests.json | tee artifacts/protocol-tests.log
+          python3 -u app/Tests/traffic_stats_regression.py artifacts/stats-host \
+            2> artifacts/stats-server.log | tee artifacts/stats-tests.log
+          swiftc app/Socks5/Statistics/TrafficStatistics.swift app/Tests/traffic_statistics_model.swift \
+            -o artifacts/stats-model
+          artifacts/stats-model | tee artifacts/model-tests.log
+          rm artifacts/stats-host artifacts/stats-model
+          (cd core && make clean) >> artifacts/macos-build.log 2>&1
+      - name: Build the patched Apple framework
         run: |
           set -euo pipefail
           (cd core && ./build-apple.sh) 2>&1 | tee artifacts/core-build.log
-          test "$(git -C core hash-object src/hev-socks5-session.c)" = "ef8556619e498b8217b16d75d16a2973b73ac62a"
-          test "$(git -C core/src/core hash-object src/hev-socks5-udp.c)" = "$(cat artifacts/patched-udp-blob.txt)"
-          git -C core/src/core apply --reverse --check "$GITHUB_WORKSPACE/app/Patches/hev-udp-sockaddr.patch"
-          git -C core/src/core apply --reverse "$GITHUB_WORKSPACE/app/Patches/hev-udp-sockaddr.patch"
-          test "$(git -C core/src/core hash-object src/hev-socks5-udp.c)" = "084c03b98d8f80b646381d5cbf82eca95de2eddb"
-          git -C core apply --reverse --check "$GITHUB_WORKSPACE/app/Patches/hev-udp-port-zero.patch"
-          git -C core apply --reverse "$GITHUB_WORKSPACE/app/Patches/hev-udp-port-zero.patch"
-          test "$(git -C core hash-object src/hev-socks5-session.c)" = "06ce823dd3d29df9107bb53c12178e6b4ebf45c4"
+          git -C core apply -R "$GITHUB_WORKSPACE/app/Patches/hev-stats-server.patch"
+          git -C core/src/core apply -R "$GITHUB_WORKSPACE/app/Patches/hev-stats-core.patch"
+          git -C core/third-part/hev-task-system apply -R "$GITHUB_WORKSPACE/app/Patches/hev-stats-task-io.patch"
+          git -C core/src/core apply -R "$GITHUB_WORKSPACE/app/Patches/hev-udp-sockaddr.patch"
+          git -C core apply -R "$GITHUB_WORKSPACE/app/Patches/hev-udp-port-zero.patch"
           git -C core diff --exit-code
           git -C core submodule foreach --recursive 'git diff --exit-code'
           rm -rf app/HevSocks5Server.xcframework
           cp -R core/HevSocks5Server.xcframework app/
-
-      - name: Archive app without signing
+      - name: Archive iPhone application
         run: |
           set -euo pipefail
           xcodebuild archive -project app/Socks5.xcodeproj -scheme Socks5 \
@@ -137,8 +167,7 @@ jobs:
             -archivePath "$GITHUB_WORKSPACE/build/Socks5.xcarchive" \
             CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee artifacts/app-build.log
-
-      - name: Verify permissions and package IPA
+      - name: Verify and package IPA
         run: |
           set -euo pipefail
           mkdir -p package/Payload
@@ -155,22 +184,17 @@ jobs:
               assert p.get(key)
           with wave.open(str(app / 'Silence.wav'), 'rb') as w:
               assert w.getnframes() == 400 and w.readframes(400) == bytes(800)
-          print('Packaged permissions and digital silence verified.')
+          print('Permissions and digital silence preserved.')
           PY
           /usr/libexec/PlistBuddy -c Print "$APP/Info.plist" > artifacts/app-info-plist.txt
-          xcrun otool -L "$APP/Socks5" > artifacts/linked-libraries.txt
-          (cd package && zip -q -r ../artifacts/Socks5-keepalive-udpaddrfix-unsigned.ipa Payload)
-          unzip -t artifacts/Socks5-keepalive-udpaddrfix-unsigned.ipa
+          (cd package && zip -q -r ../artifacts/Socks5-statistics-unsigned.ipa Payload)
+          unzip -t artifacts/Socks5-statistics-unsigned.ipa
           ditto -c -k --keepParent build/Socks5.xcarchive/dSYMs artifacts/Socks5-dSYMs.zip
-          (cd artifacts && shasum -a 256 Socks5-keepalive-udpaddrfix-unsigned.ipa > SHA256SUMS.txt)
-          printf '\nUnsigned ARM64 Release. Port-zero guard retained; UDP sockaddr normalization added in one core file. macOS regression results included. iPhone UDP and background testing still required.\n' >> artifacts/build-info.txt
+          (cd artifacts && shasum -a 256 Socks5-statistics-unsigned.ipa > SHA256SUMS.txt)
           cat artifacts/build-info.txt > "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload IPA, source, symbols and build records
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Socks5-keepalive-udpaddrfix-unsigned
+          name: Socks5-statistics-unsigned
           path: artifacts/
-          if-no-files-found: error
           retention-days: 14

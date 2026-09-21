@@ -15,6 +15,8 @@
 		B60000000000000000000001 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000011 /* BackgroundKeepAlive.swift */; };
 		B60000000000000000000002 /* BackgroundKeepAliveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000012 /* BackgroundKeepAliveView.swift */; };
 		B60000000000000000000003 /* Silence.wav in Resources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000013 /* Silence.wav */; };
+		C70000000000000000000001 /* TrafficStatistics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000011 /* TrafficStatistics.swift */; };
+		C70000000000000000000002 /* TrafficStatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000012 /* TrafficStatisticsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +30,8 @@
 		B60000000000000000000012 /* BackgroundKeepAliveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundKeepAliveView.swift; sourceTree = "<group>"; };
 		B60000000000000000000013 /* Silence.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = Silence.wav; sourceTree = "<group>"; };
 		B60000000000000000000014 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C70000000000000000000011 /* TrafficStatistics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficStatistics.swift; sourceTree = "<group>"; };
+		C70000000000000000000012 /* TrafficStatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficStatisticsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -66,6 +70,7 @@
 				D30F965F2C18058B002DB6BF /* ContentView.swift */,
 				D30F96612C18058E002DB6BF /* Assets.xcassets */,
 				D30F96632C18058E002DB6BF /* Preview Content */,
+				C70000000000000000000020 /* Statistics */,
 				B60000000000000000000020 /* BackgroundKeepAlive */,
 			);
 			path = Socks5;
@@ -88,6 +93,15 @@
 				B60000000000000000000014 /* Info.plist */,
 			);
 			path = BackgroundKeepAlive;
+			sourceTree = "<group>";
+		};
+		C70000000000000000000020 /* Statistics */ = {
+			isa = PBXGroup;
+			children = (
+				C70000000000000000000011 /* TrafficStatistics.swift */,
+				C70000000000000000000012 /* TrafficStatisticsView.swift */,
+			);
+			path = Statistics;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -165,6 +179,8 @@
 				D30F965E2C18058B002DB6BF /* Socks5App.swift in Sources */,
 				B60000000000000000000001 /* BackgroundKeepAlive.swift in Sources */,
 				B60000000000000000000002 /* BackgroundKeepAliveView.swift in Sources */,
+				C70000000000000000000002 /* TrafficStatisticsView.swift in Sources */,
+				C70000000000000000000001 /* TrafficStatistics.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -5,11 +5,16 @@ import SwiftUI
 @MainActor
 struct BackgroundKeepAliveRoot: View {
     @StateObject private var keepAlive = BackgroundKeepAlive()
+    @State private var selectedTab = 0
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             ScrollView { ContentView() }
                 .tabItem { Label("Server", systemImage: "network") }
+                .tag(0)
+            TrafficStatisticsView(isVisible: selectedTab == 1)
+                .tabItem { Label("Statistics", systemImage: "chart.bar") }
+                .tag(1)
             NavigationStack {
                 Form {
                     Section {
@@ -47,6 +52,7 @@ struct BackgroundKeepAliveRoot: View {
                 .navigationTitle("Background")
             }
             .tabItem { Label("Background", systemImage: "switch.2") }
+            .tag(2)
         }
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)
             .receive(on: RunLoop.main)) { keepAlive.audioInterruption($0) }

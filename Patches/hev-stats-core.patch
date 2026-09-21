@@ -1,0 +1,102 @@
+diff --git a/src/hev-socks5-misc.c b/src/hev-socks5-misc.c
+--- a/src/hev-socks5-misc.c
++++ b/src/hev-socks5-misc.c
+@@ -10,3 +10,4 @@
+ #include <stdio.h>
++#include <stdatomic.h>
+ #include <string.h>
+ #include <unistd.h>
+@@ -34,4 +35,25 @@
+ static int udp_copy_buffer_nums = 10;
++
++static _Atomic uint64_t traffic_received;
++static _Atomic uint64_t traffic_sent;
++
++void
++hev_socks5_transfer_add (size_t received, size_t sent, void *data)
++{
++    (void)data;
++    if (received)
++        atomic_fetch_add_explicit (&traffic_received, received,
++                                    memory_order_relaxed);
++    if (sent)
++        atomic_fetch_add_explicit (&traffic_sent, sent, memory_order_relaxed);
++}
++
++void
++hev_socks5_transfer_get (uint64_t *received, uint64_t *sent)
++{
++    *received = atomic_load_explicit (&traffic_received, memory_order_relaxed);
++    *sent = atomic_load_explicit (&traffic_sent, memory_order_relaxed);
++}
+ 
+ int
+ hev_socks5_task_io_yielder (HevTaskYieldType type, void *data)
+diff --git a/src/hev-socks5-misc.h b/src/hev-socks5-misc.h
+--- a/src/hev-socks5-misc.h
++++ b/src/hev-socks5-misc.h
+@@ -13,3 +13,4 @@
++#include <stdint.h>
+ #include <netinet/in.h>
+ 
+ #include <hev-task.h>
+@@ -24,3 +25,5 @@
+ int hev_socks5_task_io_yielder (HevTaskYieldType type, void *data);
+ 
++void hev_socks5_transfer_get (uint64_t *received, uint64_t *sent);
++
+ void hev_socks5_set_connect_timeout (int timeout);
+diff --git a/src/hev-socks5-misc-priv.h b/src/hev-socks5-misc-priv.h
+--- a/src/hev-socks5-misc-priv.h
++++ b/src/hev-socks5-misc-priv.h
+@@ -25,3 +25,5 @@
+ int hev_socks5_socket (int type);
+ 
++void hev_socks5_transfer_add (size_t received, size_t sent, void *data);
++
+ const char *hev_socks5_addr_into_str (const HevSocks5Addr *addr, char *buf,
+diff --git a/src/hev-socks5-tcp.c b/src/hev-socks5-tcp.c
+--- a/src/hev-socks5-tcp.c
++++ b/src/hev-socks5-tcp.c
+@@ -37,4 +37,5 @@
+-    hev_task_io_splice (cfd, cfd, fd, fd, 8192, task_io_yielder, self);
++    hev_task_io_splice_with_stats (cfd, cfd, fd, fd, 8192, task_io_yielder,
++                                   self, hev_socks5_transfer_add, NULL);
+ 
+     return 0;
+ }
+diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
+--- a/src/hev-socks5-udp.c
++++ b/src/hev-socks5-udp.c
+@@ -402,6 +402,12 @@
+ 
+         res = hev_task_io_socket_sendmmsg (fd, dvec, res, MSG_WAITALL,
+                                            task_io_yielder, self);
++        if (res > 0) {
++            size_t sent = 0;
++            for (i = 0; i < res; i++)
++                sent += dvec[i].msg_len;
++            hev_socks5_transfer_add (0, sent, NULL);
++        }
+     }
+     if (res <= 0) {
+         if (res == -1 && errno == EAGAIN)
+@@ -427,8 +433,10 @@
+     if (res > 0) {
+         HevSocks5UDPMsg dvec[res];
+         char saddr[res][19];
++        size_t received = 0;
+ 
+         for (i = 0; i < res; i++) {
++            received += svec[i].msg_len;
+             dvec[i].buf = svec[i].msg_hdr.msg_iov->iov_base;
+             dvec[i].len = svec[i].msg_len;
+             dvec[i].addr = (HevSocks5Addr *)&saddr[i];
+@@ -436,6 +444,7 @@
+             hev_socks5_addr_from_sockaddr6 (dvec[i].addr,
+                                             svec[i].msg_hdr.msg_name);
+         }
++        hev_socks5_transfer_add (received, 0, NULL);
+         res = hev_socks5_udp_sendmmsg (self, dvec, res);
+     }
+     if (res <= 0) {
