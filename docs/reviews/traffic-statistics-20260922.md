@@ -99,7 +99,7 @@ network/counter/I/O/model probes (including macOS TSan), but macOS stopped at th
 new standalone iOS syntax check. That check omitted the Makefile-supplied COMMIT_ID
 macro and compiled upstream task-io.h without its required prior task type. The
 runner now supplies the pinned commit macro and checks the four headers in a small
-temporary translation unit that includes hev-task.h first. The five production C
+ temporary translation unit that includes hev-task.h first. The five production C
 sources keep their own original include order. No production header is rewritten
 just to satisfy an artificial standalone-header test. Swift type checking still
 runs only after these syntax checks succeed.
@@ -150,3 +150,44 @@ Only feature/traffic-statistics may move. Main, UDP, other feature branches and
 release remain out of scope. No IPA or framework build is authorized by this review.
 A final completion report must distinguish actual matching CI results from this
 reproducible test specification and must recheck the remote branch tips.
+
+## Completed evidence checkpoint
+
+The final executable audit at `acd65e04152495c04c3a9b033b917a6e60d4af9e`
+completed successfully in GitHub Actions run `35718052239` on Linux and macOS.
+This checkpoint adds documentation only; all runtime, tests and workflows remain
+at that tested snapshot. CI is skipped for the checkpoint, not represented as a
+new test execution. The earlier failed runs remain failures in the record.
+
+| Completed check | Result in run 35718052239 |
+| --- | --- |
+| Linux buffered native statistics | 10/10 twice |
+| Linux splice native statistics | 10/10 twice |
+| macOS buffered native statistics | 10/10 twice |
+| Actual counter stress per native mode | Eight writers, 800,000 increments, exact final sums and concurrent monotonic reads |
+| TCP/UDP forwarder probes | Passed in each applicable mode under ASan/UBSan |
+| macOS production-counter TSan | Passed |
+| Swift model and host pipe-reader probes | 10,000 generated model samples and six pipe scenarios passed on both platforms |
+| iOS ARM64 C/header syntax and Swift type checking | Passed; no application link or archive |
+| Source identity, dependency preservation, format and reversal | Passed |
+
+The 60 native network executions are ten scenarios repeated twice in three
+confirmed mode/platform combinations, not 60 independent specifications. Large
+counter additions are synthetic, not actual petabytes of network traffic.
+The two downloaded artifacts' source.zip files are identical. Reconstructing all
+65 tracked files produced tree `4aa7d4a04790402dc9765c9bc028409a426d7722`, exactly
+matching the audited commit. Both artifact digests matched GitHub's SHA-256 values.
+The final inventory contains 31 paths differing from main: 21 statistics-owned
+paths and ten preserved UDP dependencies. This checkpoint changes neither inventory.
+
+During completion, the six pipe-reader cases and production Swift model tests were
+also rerun locally and passed. All ten inherited dependency hashes were rechecked,
+and the 280-line root README equals the 280-line statistics feature specification.
+No scoped runtime change is warranted by these results. The existing measurement
+contract, batching delay, finite counters and accepted UDP limits remain explicit.
+
+The chat's Thinking failed message is distinct from CI status. Repository logs
+identify the earlier test-runner errors and the subsequent successful run, not the
+internal reason why ChatGPT failed to finish its answer. Completion uses the saved
+commit and artifacts instead of rerunning already successful long jobs. A claim
+that future ChatGPT failures are impossible is not supported by this evidence.
