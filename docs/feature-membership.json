@@ -1,0 +1,39 @@
+{
+  "base_commit": "d2534cd6bce7389fdf8f362bd8f681c0bd583eb1",
+  "branches": {
+    "feature/app-icon": "f88e8c8946b095c4d5551d413dee3b4a60943714",
+    "feature/background": "4a8ccc2660a7968cb5e0a4b8c91c0081e445b080",
+    "feature/settings": "9c2e76afcde7a20ff1bbdcf2a1f7e9092e1a98fd",
+    "feature/traffic-statistics": "d2306768e92d49c54bf8ca6f425571b6aa122b05",
+    "feature/udp-compat": "3a76532c14826f8938b0977d30c8d94143bdfeea"
+  },
+  "files": {
+    "Patches/hev-server-startup-stop.patch": "e914c247e4e7d541e510874315fc259abbf020d4c3954d17e4216ec7df6cc365",
+    "Patches/hev-stats-core.patch": "acd6525d4538d716c404bc750f48fef9f9f3f260e60b866f46184ec7c94af26d",
+    "Patches/hev-stats-server.patch": "2fa393d578f1dbfc92ae3090b2aae31fa255e9bdc9fe4990954e7bbe84cea0cd",
+    "Patches/hev-stats-task-io.patch": "8e04be1633e4382e741ad803c68212ec0282e99873c874cb6101adcfa0c88edc",
+    "Patches/hev-udp-port-zero.patch": "9cd0a43550a6128046f81d11bd16971e426386e2656e3e8f16fa790d57bbb315",
+    "Patches/hev-udp-sockaddr.patch": "0b2088e6f0519fe01d9d0c64d0bda4cc5909f292ed9095613a1b2434f930ac0e",
+    "Socks5/Assets.xcassets/AppIcon.appiconset/AppIcon.png": "4a2f2a9384e8b6db351a9284232db56e719377e60f17123e4a6992cee1799cc2",
+    "Socks5/Assets.xcassets/AppIcon.appiconset/Contents.json": "852920cb36e95beb53771138a4b8195a16fcce1cc31250632f246081cc638f9a",
+    "Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift": "fd56828090826481fd73f0ee27143e34440900523f6e2c4d061347e49dda7a91",
+    "Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift": "0ed1c21db435353a425eddeb82949639cd4ea79dcad3f579dab904fbc5b272e3",
+    "Socks5/BackgroundKeepAlive/Silence.wav": "26131825c935435301fb05d3549d815bc93b1e717d6228d890ee9578dd00025e",
+    "Socks5/Server/ServerController.swift": "4b21a1fb750b6a872697a09707dde5f0be7919956390724d3a2b6b56cceba715",
+    "Socks5/Settings/AppSettings.swift": "46f498ee6fc6a93d29644e6b0a50107d647a19daba5658fff9f848aaf43a33e8",
+    "Socks5/Settings/SettingsStore.swift": "cd57f27faf88d07970d4ba7e370080a56eb126b5ee04b2c7fcf4ddaf840264ce",
+    "Socks5/Settings/SettingsView.swift": "ab716849b0ccfc440141593ecc0f144dd4b88449295b4f418442ed83b8cca930",
+    "Socks5/Statistics/TrafficStatistics.swift": "b6b814b135165bc38c82bfe866ae088717988e7bac20a1e86b8c2c2695ff4b49",
+    "Socks5/Statistics/TrafficStatisticsView.swift": "8c395f723651a862295480ec43d18bbdd834bd0f4b12c0b6c9afdf316a30d18f",
+    "docs/branches/feature-app-icon.md": "89d99e5c82f341740fc719c6f189d9999ce411f9a9b6eceba5f58af8bd450914",
+    "docs/branches/feature-background.md": "bc56752877ed4170df535e5bfdfe06b10d9ee2f2af251263ec27e362d16e23f5",
+    "docs/branches/feature-settings.md": "f0b1feaa8b926725954e901256719729d94603fb04fce1ef5cc5e090e1c6fe50",
+    "docs/branches/feature-traffic-statistics.md": "95a8ffd7960ea88643c761d8b790bd517132af17c59f4eb5466a3d31b79cc64f",
+    "docs/branches/feature-udp-compat.md": "5e49366397c80a38e4d3d6951aac4e759cd641ea28d1db28b96b17eeda5d125e",
+    "docs/features/app-icon.md": "e6f5f1eee57879289b5b085a51273462ae7f0daa5f0605b51a858834d6bd8b4b",
+    "docs/features/background.md": "1a77161e6c8329850961ff8f641fd46d4ac6f9ea4a7165f25c602fb7fa7360a9",
+    "docs/features/settings-lifecycle.md": "2c79a4be23c76b37be9645fe1a0da3626bc5ae41f651f6760a3c1fbc9a200e97",
+    "docs/features/traffic-statistics.md": "4b85879eb40a5b4139f6f84059f06854cea93e0865801508dfb0a7b20d0033f0",
+    "docs/features/udp-compatibility.md": "d5bfcde4904cec7dd35691d67e7ae1b78d3da1c49e5761990a115f3f546be65a"
+  }
+}

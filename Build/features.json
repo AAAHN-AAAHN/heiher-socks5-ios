@@ -2,9 +2,12 @@
   "base_commit": "d2534cd6bce7389fdf8f362bd8f681c0bd583eb1",
   "features": [
     "udp",
-    "statistics"
+    "statistics",
+    "background",
+    "settings",
+    "icon"
   ],
-  "name": "traffic-statistics",
+  "name": "integrated",
   "patches": [
     {
       "file": "hev-udp-port-zero.patch",
@@ -24,6 +27,10 @@
     },
     {
       "file": "hev-stats-server.patch",
+      "repository": "."
+    },
+    {
+      "file": "hev-server-startup-stop.patch",
       "repository": "."
     }
   ],

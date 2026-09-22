@@ -1,0 +1,15 @@
+31ef4a7baa15f76e7c7cdbc1ed11216c1fa2f93e	refs/heads/audit/statistics-final-20260921
+eccd78c41103e6d31e305eebc4e176864d442d48	refs/heads/audit/udp-patches-20260921
+99680a3bcdb6a3270767dcc43b1d9133866714b2	refs/heads/build/hev-2.13.1-ipa-20260921
+6a9d7930fe2cdf103a1b8ad80c157dc60fcc2bfc	refs/heads/build/hev-upstream-20260921
+790167ae72155a138969840885e710a9fb36473f	refs/heads/diagnostics/hev-udp-20260921
+3168e7bd24443764f6eb25a9e84aa7f45c704999	refs/heads/feature/app-icon
+6da18e94985dad0f5790380a52d9db70cd6bd480	refs/heads/feature/background
+b68dbb9ca7d4d028111666915eba951911857b1d	refs/heads/feature/background-keepalive
+5d0444570e10b91187c259ef0a440e2b2396d1f7	refs/heads/feature/settings
+881a38db51b003ade2200be02f2753a01bec4f88	refs/heads/feature/traffic-statistics
+352ae06d2984066d8e7145a89a226d034ef64c07	refs/heads/feature/udp-compat
+99680a3bcdb6a3270767dcc43b1d9133866714b2	refs/heads/main
+0be4e061443ca7e705f1133dcf4483897bbefb04	refs/heads/maintenance/reorganize-20260922
+339ca83f78ae69c726913c0ea34dab258a79d3e3	refs/heads/release/integrated
+9e1ed7513f9b1b0c61f7a8930ad4be06556a55d7	refs/heads/test/udp-sockaddr-only-20260921

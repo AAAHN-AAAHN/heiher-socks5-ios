@@ -13,6 +13,13 @@
 		D30F96652C18058E002DB6BF /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D30F96642C18058E002DB6BF /* Preview Assets.xcassets */; };
 		D30F96722C1809EB002DB6BF /* HevSocks5Server.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = D30F96712C1809EB002DB6BF /* HevSocks5Server.xcframework */; };
 		F0B49EF432005E531F41803A /* AppRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = F012CAD8EFF712318ABE3D46 /* AppRoot.swift */; };
+		F0301EB5F2CF2B728DA9BA91 /* BackgroundKeepAlive.swift in Sources */ = {isa = PBXBuildFile; fileRef = F09E6B82453D1079B3356F4A /* BackgroundKeepAlive.swift */; };
+		F024F5BAEE919A12B6FB1D80 /* BackgroundKeepAliveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F047825098A1831435A0B452 /* BackgroundKeepAliveView.swift */; };
+		F09AE7FF9FCD39A3CF12EB4D /* Silence.wav in Resources */ = {isa = PBXBuildFile; fileRef = F0A3C2B384BE8C1E7A3E7ECF /* Silence.wav */; };
+		F0D57C5237027ACBCE64F90B /* ServerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F04793A4BF6C0636DF8B45 /* ServerController.swift */; };
+		F0D050DCB12B402039CEFF21 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F233452FD39987C43481E6 /* AppSettings.swift */; };
+		F0F917C6383BD6F91F48D7EF /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F077C7B2DB94A69DFA51497B /* SettingsStore.swift */; };
+		F0BBB827AE9F43DAFEA2FBA4 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F0567B891CC8E45A81CFF8 /* SettingsView.swift */; };
 		F01458C735412E0D383C0D64 /* TrafficStatistics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F2AD6594E2C498AD1D258B /* TrafficStatistics.swift */; };
 		F0304AB3D1EBB5612B39426F /* TrafficStatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F029B5868B1526CF1898650C /* TrafficStatisticsView.swift */; };
 /* End PBXBuildFile section */
@@ -25,7 +32,14 @@
 		D30F96642C18058E002DB6BF /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		D30F96712C1809EB002DB6BF /* HevSocks5Server.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = HevSocks5Server.xcframework; sourceTree = "<group>"; };
 		F012CAD8EFF712318ABE3D46 /* AppRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppRoot.swift"; sourceTree = "<group>"; };
+		F09E6B82453D1079B3356F4A /* BackgroundKeepAlive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BackgroundKeepAlive.swift"; sourceTree = "<group>"; };
+		F047825098A1831435A0B452 /* BackgroundKeepAliveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BackgroundKeepAliveView.swift"; sourceTree = "<group>"; };
+		F0A3C2B384BE8C1E7A3E7ECF /* Silence.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "Silence.wav"; sourceTree = "<group>"; };
 		F03BEAAF29668CE70ACC7A54 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+		F0F04793A4BF6C0636DF8B45 /* ServerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServerController.swift"; sourceTree = "<group>"; };
+		F0F233452FD39987C43481E6 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppSettings.swift"; sourceTree = "<group>"; };
+		F077C7B2DB94A69DFA51497B /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsStore.swift"; sourceTree = "<group>"; };
+		F0F0567B891CC8E45A81CFF8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsView.swift"; sourceTree = "<group>"; };
 		F0F2AD6594E2C498AD1D258B /* TrafficStatistics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrafficStatistics.swift"; sourceTree = "<group>"; };
 		F029B5868B1526CF1898650C /* TrafficStatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrafficStatisticsView.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -65,6 +79,9 @@
 				D30F965D2C18058B002DB6BF /* Socks5App.swift */,
 				F012CAD8EFF712318ABE3D46 /* AppRoot.swift */,
 				F03BEAAF29668CE70ACC7A54 /* Info.plist */,
+				F0D4F75D05524C67A96E2242 /* BackgroundKeepAlive */,
+				F003C59DDD2068C6C3C435AE /* Server */,
+				F0359CD709105E8C2C7CB481 /* Settings */,
 				F02F87751CD799C484F3256E /* Statistics */,
 				D30F965F2C18058B002DB6BF /* ContentView.swift */,
 				D30F96612C18058E002DB6BF /* Assets.xcassets */,
@@ -79,6 +96,34 @@
 				D30F96642C18058E002DB6BF /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		F0D4F75D05524C67A96E2242 /* BackgroundKeepAlive */ = {
+			isa = PBXGroup;
+			children = (
+				F09E6B82453D1079B3356F4A /* BackgroundKeepAlive.swift */,
+				F047825098A1831435A0B452 /* BackgroundKeepAliveView.swift */,
+				F0A3C2B384BE8C1E7A3E7ECF /* Silence.wav */,
+			);
+			path = "BackgroundKeepAlive";
+			sourceTree = "<group>";
+		};
+		F003C59DDD2068C6C3C435AE /* Server */ = {
+			isa = PBXGroup;
+			children = (
+				F0F04793A4BF6C0636DF8B45 /* ServerController.swift */,
+			);
+			path = "Server";
+			sourceTree = "<group>";
+		};
+		F0359CD709105E8C2C7CB481 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				F0F233452FD39987C43481E6 /* AppSettings.swift */,
+				F077C7B2DB94A69DFA51497B /* SettingsStore.swift */,
+				F0F0567B891CC8E45A81CFF8 /* SettingsView.swift */,
+			);
+			path = "Settings";
 			sourceTree = "<group>";
 		};
 		F02F87751CD799C484F3256E /* Statistics */ = {
@@ -150,7 +195,7 @@
 			files = (
 				D30F96652C18058E002DB6BF /* Preview Assets.xcassets in Resources */,
 				D30F96622C18058E002DB6BF /* Assets.xcassets in Resources */,
-
+				F09AE7FF9FCD39A3CF12EB4D /* Silence.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -163,6 +208,12 @@
 			files = (
 				D30F96602C18058B002DB6BF /* ContentView.swift in Sources */,
 				F0B49EF432005E531F41803A /* AppRoot.swift in Sources */,
+				F0301EB5F2CF2B728DA9BA91 /* BackgroundKeepAlive.swift in Sources */,
+				F024F5BAEE919A12B6FB1D80 /* BackgroundKeepAliveView.swift in Sources */,
+				F0D57C5237027ACBCE64F90B /* ServerController.swift in Sources */,
+				F0D050DCB12B402039CEFF21 /* AppSettings.swift in Sources */,
+				F0F917C6383BD6F91F48D7EF /* SettingsStore.swift in Sources */,
+				F0BBB827AE9F43DAFEA2FBA4 /* SettingsView.swift in Sources */,
 				F01458C735412E0D383C0D64 /* TrafficStatistics.swift in Sources */,
 				F0304AB3D1EBB5612B39426F /* TrafficStatisticsView.swift in Sources */,
 				D30F965E2C18058B002DB6BF /* Socks5App.swift in Sources */,
