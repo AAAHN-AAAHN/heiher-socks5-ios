@@ -18,11 +18,18 @@ The word latest describes that verified snapshot, not an automatic update servic
 **The two targeted compatibility defects are repaired. This is not an unconditional
 SOCKS5 security/conformance approval.** In particular, a shared fixed UDP listen
 port with several unknown client ports has a first-peer allocation limitation.
-The expanded native tests reproduce it on Linux in both the unpatched server and
-the two-patch server. A single successful Moonlight session does not disprove this
+Expanded native tests reproduce a concurrent-association failure with both patches
+on Linux and macOS. A single successful Moonlight session does not disprove this
 multi-association limitation. Use `udp-port: 0` when multiple unknown-port
-associations must coexist. The audit reports fixed-port observations separately
-rather than counting their failures as successful coverage. See Limits below.
+associations must coexist. Observations remain separate from required passes.
+
+Evidence qualification: in completed run `35696504942`, Linux's unpatched fixed-port
+profile passed the concurrent-association scenario; its one failure was the separate
+`::1:0` hint scenario. That aggregate 8/9 result does NOT establish the same
+concurrent failure in unpatched code. Darwin's unpatched version fails earlier at
+association setup. The two-patch shared-port failure is real, but these controls do
+not establish that it is exclusively inherited rather than exposed or affected by
+the patch. See `docs/reviews/udp-compat-20260922.md` and each named JSON result.
 
 ## Why the patches exist
 
@@ -44,8 +51,8 @@ I/O doubles and a successful compile are not new iPhone/VPN/Moonlight measuremen
 
 ## Complete file inventory relative to main
 
-The branch originally differed from main in eight files. Every one was inspected,
-including configuration and Xcode metadata rather than only the C patch text.
+The branch entered review with eight differing files. The completed audit has
+12 differing paths. Every changed file is part of the review, not just the C text.
 
 | File | Responsibility and reason |
 | --- | --- |
@@ -53,18 +60,19 @@ including configuration and Xcode metadata rather than only the C patch text.
 | `Patches/hev-udp-port-zero.patch` | Guard the invalid initial peer-port-zero connect in the server session binder. |
 | `Patches/hev-udp-sockaddr.patch` | Normalize received AF_INET addresses at two boundaries and restore reusable address capacity. |
 | `README.md` | Canonical complete feature, scope, verification and limitation specification. |
-| `docs/features/udp-compatibility.md` | Same specification retained at the shared feature-document location. |
+| `docs/features/udp-compatibility.md` | Identical specification at the shared feature-document location. |
 | `Socks5/Info.plist` | Local-network permission explanation and single-scene ownership; no location/audio background modes. |
-| `Socks5.xcodeproj/project.pbxproj` | Register that plist and use it in Debug/Release. Its existing blank-line differences are non-executable and not a separate feature. |
-| `Tests/udp_sockaddr_regression.py` | Real native TCP/UDP echo tests; expanded with fixed-port, worker, burst and mixed-family profiles. |
+| `Socks5.xcodeproj/project.pbxproj` | Register that plist and use it in Debug/Release. Existing blank-line differences are non-executable, not another feature. |
+| `Tests/udp_sockaddr_regression.py` | Real native TCP/UDP echo tests, expanded with fixed-port, worker, burst and mixed-family profiles. |
+| `Tests/udp_sockaddr_unit.c` | Exercise the actual patched C translation unit with scripted I/O boundaries. |
+| `Tests/udp_compat_audit.py` | Native-only audit driver, negative controls, source/diff artifacts and iOS syntax-only checks. |
+| `.github/workflows/verify-build.yml` | On this branch only, run the native audit at the triggering commit without creating an IPA. |
+| `docs/reviews/udp-compat-20260922.md` | Concrete results, corrections, residual limitations and final disposition. |
 
-The review adds `Tests/udp_sockaddr_unit.c` (actual patched C translation unit,
-scripted I/O boundaries) and `Tests/udp_compat_audit.py` (native-only audit driver).
-On this branch alone `.github/workflows/verify-build.yml` runs that driver, so this
-review's push cannot create an IPA. Common `Build/build.sh`, `Build/check.py`,
-source locks, baseline framework and upstream Swift sources remain unchanged.
-The single-window/local-network metadata was already present on this feature
-branch; it is supporting application configuration, not part of the UDP algorithm.
+Common `Build/build.sh`, `Build/check.py`, source locks, baseline framework and
+upstream Swift sources remain unchanged. The single-window/local-network metadata
+already existed on this feature branch; it is supporting app configuration, not
+part of the UDP algorithm. Test code is not registered in the application target.
 
 ## Patch 1: unknown client port
 
@@ -158,9 +166,11 @@ python3 Tests/udp_compat_audit.py
 The driver refuses an unrelated feature composition or an existing audit checkout.
 It verifies shared main ancestry, source pins and the committed framework, clones
 the exact recursive native source, and compares four variants: unpatched,
-port-only, address-only, and both. Darwin negative controls must demonstrate the
-missing individual repairs. Linux results are reported without pretending its
-socket behavior is Darwin's. Failure details remain in JSON and server logs.
+port-only, address-only, and both. Darwin controls must fail for the specific missing
+repair, not merely fail for any reason. Linux results are reported without
+pretending its socket behavior is Darwin's. Failure details remain in JSON and
+server logs. On macOS, both patched C files also undergo ARM64 iOS syntax-only
+compilation against the installed iPhoneOS SDK; this creates no app or IPA.
 
 Strict two-patch profiles exercise ephemeral listening ports with one/four workers,
 explicit IPv4/IPv6 outbound binds and unbound outbound sockets, repeated mixed
@@ -179,17 +189,18 @@ serialization. It runs with AddressSanitizer/UndefinedBehaviorSanitizer and agai
 at `-O3 -fstrict-aliasing`. Linked support libraries are not claimed to have full
 sanitizer coverage. No full-app sanitizer or real-device energy test is implied.
 
-Artifacts under `artifacts/udp-final-audit/` contain manifests, exact diffs, controls,
-strict profiles, observations and unit logs. Patch reversal must restore upstream
-source. This audit never invokes `build-apple.sh`, `xcodebuild archive`, or IPA
-packaging. A separate future distribution build can use the unchanged
-`Build/build.sh`; it must not be confused with this review's native audit.
+Artifacts under `artifacts/udp-final-audit/` contain the tested source ZIP, complete
+main-to-feature diff, manifests, controls, strict profiles, observations and unit
+logs. Patch reversal must restore upstream source. This audit never invokes
+`build-apple.sh`, `xcodebuild archive`, or IPA packaging. A separate future
+distribution build can use the unchanged `Build/build.sh`; it must not be confused
+with this review's native audit.
 
 ## Explicit remaining limits
 
 | Condition | Status and consequence |
 | --- | --- |
-| Several unknown-port associations share one fixed UDP relay port | SO_REUSEPORT/first-datagram selection can assign a peer to the wrong control session; failures reproduce in Linux original and patched code. An ephemeral local port avoids that ambiguity. A passing sample is not a universal guarantee. |
+| Several unknown-port associations share one fixed UDP relay port | Concurrent failures are reproduced with both patches. The existing SO_REUSEPORT/first-datagram design permits ambiguous session ownership, but the controls do not prove exclusive upstream causation. Ephemeral local ports passed the tested profiles. |
 | First packet before peer establishment | The minimal design does not check that its source IP matches the TCP control peer before learning it. Connected UDP then filters the selected peer, but that is not initial authentication. Do not expose the listener to untrusted devices. |
 | SOCKS fragment/reserved fields | These patches do not introduce a FRAG/RSV validation or reassembly policy. The pinned parser's existing behavior is not a full RFC 1928 conformance guarantee. |
 | Large/empty datagrams | The original 1500-byte relay buffers, truncation handling and rejection of empty outgoing payloads are not redesigned. Six successful test sizes do not establish arbitrary UDP payload support. |

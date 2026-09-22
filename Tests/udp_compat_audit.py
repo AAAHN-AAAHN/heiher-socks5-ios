@@ -56,6 +56,10 @@ def main():
         raise SystemExit('Use a fresh checkout or remove .build/udp-final-audit first.')
     run(['git', 'rev-parse', 'HEAD'], 'tested-commit.txt')
     run(['git', 'diff', '--name-status', CONFIG['base_commit'], 'HEAD'], 'branch-files.txt')
+    run(['git', 'diff', CONFIG['base_commit'], 'HEAD'], 'branch-diff.patch')
+    run(['git', 'archive', '--format=zip', 'HEAD', '-o', OUT / 'source.zip'], 'source-archive.log')
+    if (ROOT / 'README.md').read_bytes() != (ROOT / 'docs/features/udp-compatibility.md').read_bytes():
+        raise RuntimeError('Root README and feature specification differ.')
     # Unified patches require a single space on empty context lines. Their added
     # C code is checked separately by git apply and the upstream formatter.
     run(['git', 'diff', '--check', CONFIG['base_commit'], 'HEAD', '--', '.',
@@ -104,12 +108,22 @@ def main():
         raise RuntimeError('The UDP unit test differs from upstream C formatting.')
 
     if sys.platform == 'darwin':
+        sdk = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path'], text=True).strip()
+        includes = ['-I' + str(CORE / path) for path in (
+            'src/misc', 'src/core/include', 'src/core/src',
+            'third-part/yaml/src', 'third-part/hev-task-system/include')]
+        run(['xcrun', '--sdk', 'iphoneos', 'clang', '-target', 'arm64-apple-ios17.2',
+             '-isysroot', sdk, '-std=gnu11', '-Wall', '-Werror', '-fsyntax-only',
+             *includes, CORE / 'src/hev-socks5-session.c',
+             CORE / 'src/core/src/hev-socks5-udp.c'], 'ios-arm64-syntax.log')
         if all(row['passed'] for row in baseline):
             raise RuntimeError('Darwin negative control did not reproduce either defect.')
         known = next(row for row in port_only if row['test'].startswith('UDP 127.0.0.1 hint=known'))
         unknown = next(row for row in address_only if row['test'].startswith('UDP 127.0.0.1 hint=0.0.0.0'))
-        if known['passed'] or unknown['passed']:
-            raise RuntimeError('A Darwin negative control did not reproduce the expected missing repair.')
+        if not known.get('error', '').startswith('AssertionError: Wrong source:'):
+            raise RuntimeError('Missing address repair did not produce a wrong source address.')
+        if unknown.get('error') != 'AssertionError: UDP/TCP setup REP=0x01':
+            raise RuntimeError('Missing port repair did not produce the expected setup error.')
 
     network('patched-default')
     network('patched-workers4', '--workers', '4')
