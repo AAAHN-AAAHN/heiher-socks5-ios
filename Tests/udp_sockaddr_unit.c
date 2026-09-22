@@ -128,7 +128,8 @@ audit_send (int fd, void *messages, unsigned int num, int flags,
 static void
 addresses (void)
 {
-    struct {
+    struct
+    {
         uint64_t before;
         struct sockaddr_in6 addr;
         uint64_t after;
@@ -169,7 +170,8 @@ addresses (void)
         hev_socks5_udp_addr_normalize (&guarded.addr);
         assert (!memcmp (&expected, &guarded.addr, sizeof (expected)));
     }
-    puts ("PASS: 65536 port values; mapping, canaries, idempotence and IPv6 preservation");
+    puts (
+        "PASS: 65536 port values; mapping, canaries, idempotence and IPv6 preservation");
 }
 
 int
@@ -177,7 +179,7 @@ main (void)
 {
     HevObjectClass klass = { .iface = get_iface };
     HevSocks5 self = { .base.klass = &klass,
-                      .type = HEV_SOCKS5_TYPE_UDP_IN_UDP };
+                       .type = HEV_SOCKS5_TYPE_UDP_IN_UDP };
     unsigned char buffers[10][64];
     HevSocks5UDPMsg msgs[10];
     struct sockaddr_in6 addrs[10];
@@ -206,7 +208,8 @@ main (void)
         assert (peer.sin6_port == htons (5300));
         assert (!!IN6_IS_ADDR_V4MAPPED (&peer.sin6_addr) == !pass);
     }
-    puts ("PASS: actual first-peer receive path; EAGAIN/connect failure preserve state");
+    puts (
+        "PASS: actual first-peer receive path; EAGAIN/connect failure preserve state");
     for (i = 0; i < 10; i++) {
         iov[i].iov_base = buffers[i];
         iov[i].iov_len = sizeof (buffers[i]);
@@ -224,6 +227,7 @@ main (void)
         assert (hev_socks5_udp_fwd_b (&self, 11, vec, 10) == 1);
     }
     assert (send_calls == 20);
-    puts ("PASS: actual reply path; all 10 capacities reset, mixed families serialized correctly");
+    puts (
+        "PASS: actual reply path; all 10 capacities reset, mixed families serialized correctly");
     return 0;
 }

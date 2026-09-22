@@ -54,6 +54,7 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     if CORE.exists():
         raise SystemExit('Use a fresh checkout or remove .build/udp-final-audit first.')
+    run(['git', 'rev-parse', 'HEAD'], 'tested-commit.txt')
     run(['git', 'diff', '--name-status', CONFIG['base_commit'], 'HEAD'], 'branch-files.txt')
     # Unified patches require a single space on empty context lines. Their added
     # C code is checked separately by git apply and the upstream formatter.
@@ -96,10 +97,11 @@ def main():
     if 'version 18.' not in version:
         raise RuntimeError(version)
     run([sys.executable, 'Build/check.py', 'format', CORE, formatter], 'core-format.log')
-    # Save formatter output for the new test without changing production sources.
+    # The test follows the same project formatting as the C code it exercises.
     formatted = subprocess.check_output([formatter, '--style=file:' + str(CORE / '.clang-format'),
                                          str(ROOT / 'Tests/udp_sockaddr_unit.c')])
-    (OUT / 'udp_sockaddr_unit.formatted.c').write_bytes(formatted)
+    if formatted != (ROOT / 'Tests/udp_sockaddr_unit.c').read_bytes():
+        raise RuntimeError('The UDP unit test differs from upstream C formatting.')
 
     if sys.platform == 'darwin':
         if all(row['passed'] for row in baseline):

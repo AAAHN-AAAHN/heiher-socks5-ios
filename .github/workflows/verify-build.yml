@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Install upstream formatter
@@ -37,10 +37,6 @@ jobs:
       - name: Audit exact sources, native UDP behavior and address memory safety
         shell: bash
         run: python3 Tests/udp_compat_audit.py
-      - name: Name artifact
-        if: always()
-        shell: bash
-        run: echo "NAME=$(python3 -c 'import json; print(json.load(open("Build/features.json"))["name"])')" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
