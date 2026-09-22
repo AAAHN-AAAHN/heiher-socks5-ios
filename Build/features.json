@@ -1,9 +1,10 @@
 {
   "base_commit": "d2534cd6bce7389fdf8f362bd8f681c0bd583eb1",
   "features": [
-    "udp"
+    "udp",
+    "statistics"
   ],
-  "name": "udp-compat",
+  "name": "traffic-statistics",
   "patches": [
     {
       "file": "hev-udp-port-zero.patch",
@@ -12,6 +13,18 @@
     {
       "file": "hev-udp-sockaddr.patch",
       "repository": "src/core"
+    },
+    {
+      "file": "hev-stats-task-io.patch",
+      "repository": "third-part/hev-task-system"
+    },
+    {
+      "file": "hev-stats-core.patch",
+      "repository": "src/core"
+    },
+    {
+      "file": "hev-stats-server.patch",
+      "repository": "."
     }
   ],
   "sources": {

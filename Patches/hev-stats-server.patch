@@ -1,0 +1,48 @@
+diff --git a/src/hev-main.c b/src/hev-main.c
+index 0695ce6f122b17a3865521c86f3e174ddc25874f..00fc18c9b171fdda88144d2839f6ab2f97ccdca3 100644
+--- a/src/hev-main.c
++++ b/src/hev-main.c
+@@ -131,6 +131,12 @@ hev_socks5_server_quit (void)
+     hev_socks5_proxy_stop ();
+ }
+ 
++void
++hev_socks5_server_stats (uint64_t *received, uint64_t *sent)
++{
++    hev_socks5_transfer_get (received, sent);
++}
++
+ WEAK int
+ main (int argc, char *argv[])
+ {
+diff --git a/src/hev-main.h b/src/hev-main.h
+index 37a3c8ce0db9f734f07bfc57b3b59df8559562e6..d541390acc963ba248f8bc232ad50381f1a5905d 100644
+--- a/src/hev-main.h
++++ b/src/hev-main.h
+@@ -10,6 +10,8 @@
+ #ifndef __HEV_MAIN_H__
+ #define __HEV_MAIN_H__
+ 
++#include <stdint.h>
++
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
+@@ -51,6 +53,17 @@ int hev_socks5_server_main_from_str (const unsigned char *config_str,
+  */
+ void hev_socks5_server_quit (void);
+ 
++/**
++ * hev_socks5_server_stats:
++ * @received: receives payload bytes read from external sockets
++ * @sent: receives payload bytes written to external sockets
++ *
++ * Thread-safe process-lifetime totals; retained across server restarts.
++ * Both output pointers must be non-NULL. Totals are sampled independently.
++ * Excludes SOCKS5 and transport headers; not peer acknowledgements or VPN bytes.
++ */
++void hev_socks5_server_stats (uint64_t *received, uint64_t *sent);
++
+ #ifdef __cplusplus
+ }
+ #endif
