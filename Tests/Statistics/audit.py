@@ -146,12 +146,15 @@ def ios_checks(changed):
 
 
 def main():
+    # A rejected or failed retry must not reuse an earlier success marker.
+    (OUT / 'SUCCESS.txt').unlink(missing_ok=True)
     if not __debug__:
         raise SystemExit('Assertions must be enabled; do not use Python -O.')
     OUT.mkdir(parents=True, exist_ok=True)
     if CORE.exists():
         raise SystemExit('Use a clean checkout or remove .build/statistics-final-audit.')
     inspect_sources()
+    run([sys.executable, 'Tests/Statistics/audit_driver_probe.py'], 'audit-driver.log')
     run([sys.executable, 'Tests/Statistics/host_probe.py'], 'host-reader.log')
     run(['git', 'clone', '--no-checkout', 'https://github.com/heiher/hev-socks5-server.git', CORE], 'clone.log')
     run(['git', 'checkout', '--detach', CONFIG['sources']['.']], 'checkout.log', CORE)

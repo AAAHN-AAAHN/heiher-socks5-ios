@@ -116,8 +116,10 @@ changes behind a runtime-only list.
 | `Tests/Statistics/tcp_probe.c` | Include actual I/O code; script partial writes, failures and cancellation boundaries. |
 | `Tests/Statistics/udp_probe.c` | Include actual UDP forwarders; check successful-prefix sums and receive-before-delivery-error semantics. |
 | `Tests/Statistics/host_probe.py` | Test-only pipe framing, silence/partial-line deadlines, EOF and bounded rows. |
+| `Tests/Statistics/audit_driver_probe.py` | Failed/rejected retry regression: invalidate an old success marker while retaining diagnostic logs. |
 | `Tests/Statistics/counter_probe.c` | Real counter/public-getter stress with concurrent writers and readers. |
 | `docs/reviews/traffic-statistics-20260922.md` | Focused findings, evidence scope and final disposition. |
+| `docs/reviews/traffic-statistics-20260923.md` | Follow-up final review, stale-success regression and matching completion evidence. |
 
 The following are dependencies, not independent statistics edits: both UDP patches;
 three `Tests/udp_*` files; `Socks5/Info.plist`; the UDP feature/review documents;
@@ -256,6 +258,10 @@ Tests use temporary files, bounded waits, explicit failures and cleanup. The nat
 host's complete response line has a monotonic deadline, EOF handling and a bounded
 4096-byte buffer; silence and partial lines cannot bypass it. Startup failure cleans
 up the process, and the echo handler has a read deadline. Assertions must be enabled.
+The driver removes an earlier SUCCESS.txt before starting or rejecting a new
+audit attempt. A failed retry must not leave a previous pass marker usable as
+current evidence; existing diagnostic logs are retained. Three test-only cases
+exercise a rejected existing checkout, a failed source check, and a fresh failure.
 Actual results belong to the matching commit's `artifacts/statistics-final-audit/` logs, tested-commit.txt,
 source.zip and inventory.json, not to a reused historical build badge.
 
@@ -271,7 +277,8 @@ security, protocol, battery or future-iOS certification.
 - Apple task lifecycle: https://developer.apple.com/documentation/swiftui/view/task(id:priority:_:)
 - Apple monotonic uptime: https://developer.apple.com/documentation/foundation/processinfo/systemuptime
 - C11 draft, atomics and unsigned arithmetic: https://www.open-std.org/jtc1/sc22/wg14/www/docs/n1570.pdf
-- Statistics review: `docs/reviews/traffic-statistics-20260922.md`.
+- Statistics reviews: `docs/reviews/traffic-statistics-20260922.md` and
+  `docs/reviews/traffic-statistics-20260923.md`.
 - Frozen UDP operating policy: `docs/features/udp-compatibility.md`.
 - Main/build policy: `docs/main-baseline.md` and `docs/build-and-validation.md`.
 
