@@ -1,0 +1,45 @@
+name: Audit UDP compatibility without IPA packaging
+on:
+  push:
+    branches: [feature/udp-compat]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install upstream formatter
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y clang-format-18
+          else
+            brew install llvm@18
+            echo "$(brew --prefix llvm@18)/bin" >> "$GITHUB_PATH"
+          fi
+      - name: Audit exact sources, native UDP behavior and address memory safety
+        shell: bash
+        run: python3 Tests/udp_compat_audit.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: UDP-final-audit-${{ runner.os }}
+          path: artifacts/
+          retention-days: 30
