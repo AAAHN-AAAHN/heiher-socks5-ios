@@ -1,6 +1,9 @@
 {
-  "features": [],
-  "name": "baseline",
+  "base_commit": "d2534cd6bce7389fdf8f362bd8f681c0bd583eb1",
+  "features": [
+    "icon"
+  ],
+  "name": "app-icon",
   "patches": [],
   "sources": {
     ".": "b3585289622561caf4b8789b436cc8820ecd6be0",
