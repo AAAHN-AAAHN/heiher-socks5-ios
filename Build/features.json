@@ -1,7 +1,19 @@
 {
-  "features": [],
-  "name": "baseline",
-  "patches": [],
+  "base_commit": "d2534cd6bce7389fdf8f362bd8f681c0bd583eb1",
+  "features": [
+    "udp"
+  ],
+  "name": "udp-compat",
+  "patches": [
+    {
+      "file": "hev-udp-port-zero.patch",
+      "repository": "."
+    },
+    {
+      "file": "hev-udp-sockaddr.patch",
+      "repository": "src/core"
+    }
+  ],
   "sources": {
     ".": "b3585289622561caf4b8789b436cc8820ecd6be0",
     "src/core": "162dd996299fc2d2bff2dd63728f8a2cd71ed31a",
