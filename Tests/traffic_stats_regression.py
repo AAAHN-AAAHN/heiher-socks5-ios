@@ -18,6 +18,7 @@ from udp_sockaddr_regression import association, echo_server, encode, exact, exc
 
 class Asymmetric(socketserver.BaseRequestHandler):
     def handle(self):
+        self.request.settimeout(5)
         received = bytearray()
         while True:
             chunk = self.request.recv(1021)
@@ -38,7 +39,13 @@ class Host:
         self.proc = subprocess.Popen([binary, str(config)], stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE, stderr=sys.stderr, text=True,
                                      bufsize=1)
-        assert self.proc.stdout.readline().strip() == 'LOCK_FREE 1'
+        try:
+            if not select.select([self.proc.stdout], [], [], 5)[0]:
+                raise TimeoutError('Native host did not report startup')
+            assert self.proc.stdout.readline().strip() == 'LOCK_FREE 1'
+        except BaseException:
+            self.close()
+            raise
 
     def stats(self, command='stats'):
         self.proc.stdin.write(command + '\n')
@@ -46,7 +53,7 @@ class Host:
         if not select.select([self.proc.stdout], [], [], 5)[0]:
             raise TimeoutError('Native statistics API timed out')
         row = self.proc.stdout.readline().split()
-        assert row[0] == 'STATS', row
+        assert len(row) == 3 and row[0] == 'STATS', row
         return tuple(map(int, row[1:]))
 
     def close(self):
@@ -184,4 +191,6 @@ misc:
 
 
 if __name__ == '__main__':
+    if not __debug__:
+        raise SystemExit('Assertions are required; do not use Python -O.')
     main()

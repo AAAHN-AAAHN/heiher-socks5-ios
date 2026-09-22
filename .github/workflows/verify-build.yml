@@ -1,7 +1,7 @@
-name: Verify and build declared SOCKS5 features
+name: Audit traffic statistics without IPA packaging
 on:
   push:
-    branches: [main, feature/udp-compat, feature/traffic-statistics, feature/background, feature/settings, feature/app-icon, release/integrated]
+    branches: [feature/traffic-statistics]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Install upstream formatter
@@ -34,16 +34,12 @@ jobs:
             brew install llvm@18
             echo "$(brew --prefix llvm@18)/bin" >> "$GITHUB_PATH"
           fi
-      - name: Validate source, test native code, and archive iOS on macOS
+      - name: Verify statistics-only sources, native accounting and Swift types
         shell: bash
-        run: bash Build/build.sh
-      - name: Name artifact
-        if: always()
-        shell: bash
-        run: echo "NAME=$(python3 -c 'import json; print(json.load(open("Build/features.json"))["name"])')" >> "$GITHUB_ENV"
+        run: python3 Tests/Statistics/audit.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: Socks5-${{ env.NAME }}-${{ runner.os }}
+          name: Statistics-final-audit-${{ runner.os }}
           path: artifacts/
           retention-days: 30

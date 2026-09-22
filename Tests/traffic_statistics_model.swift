@@ -25,6 +25,36 @@ struct TrafficStatisticsTests {
         precondition(TrafficStatistics.speed(125_000) == "1.00 Mbps")
         precondition(TrafficStatistics.speed(125_000_000) == "1.00 Gbps")
         precondition(TrafficStatistics.speed(0) == "0.00 Kbps")
+        value.sample(received: 10, sent: 20, at: 61)
+        precondition(value.receiveRate == 0 && value.sendRate == 0)
+        value.sample(received: 20, sent: 30, at: 60)
+        precondition(value.receiveRate == 0 && value.sendRate == 0)
+        value.sample(received: 30, sent: 50, at: 60.25)
+        precondition(value.receiveRate == 40 && value.sendRate == 80)
+        value = TrafficStatistics()
+        let large = UInt64.max - 100_000
+        value.sample(received: large, sent: large, at: 1)
+        value.sample(received: large + 1, sent: large + 3, at: 1.5)
+        precondition(value.receiveRate == 2 && value.sendRate == 6)
+        let total = Double(UInt64.max) + Double(UInt64.max)
+        precondition(total.isFinite && TrafficStatistics.capacity(total).hasSuffix(" GB"))
+        var received = UInt64(1) << 60
+        var sent = received
+        var time = 100.0
+        value = TrafficStatistics()
+        value.sample(received: received, sent: sent, at: time)
+        for index in 1...10_000 {
+            let incoming = UInt64(index % 113)
+            let outgoing = UInt64(index % 197)
+            let interval = Double(index % 7 + 1) / 4
+            received += incoming
+            sent += outgoing
+            time += interval
+            value.sample(received: received, sent: sent, at: time)
+            precondition(value.receiveRate == Double(incoming) / interval)
+            precondition(value.sendRate == Double(outgoing) / interval)
+        }
+        print("PASS: 10000 generated samples, large UInt64 deltas, clock boundaries and total conversion")
         print("PASS: direction deltas, elapsed time, idle, re-entry, counter decrease and SI units")
     }
 }
