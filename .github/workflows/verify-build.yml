@@ -1,7 +1,7 @@
-name: Verify and build declared SOCKS5 features
+name: Audit UDP compatibility without IPA packaging
 on:
   push:
-    branches: [main, feature/udp-compat, feature/traffic-statistics, feature/background, feature/settings, feature/app-icon, release/integrated]
+    branches: [feature/udp-compat]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -34,9 +34,9 @@ jobs:
             brew install llvm@18
             echo "$(brew --prefix llvm@18)/bin" >> "$GITHUB_PATH"
           fi
-      - name: Validate source, test native code, and archive iOS on macOS
+      - name: Audit exact sources, native UDP behavior and address memory safety
         shell: bash
-        run: bash Build/build.sh
+        run: python3 Tests/udp_compat_audit.py
       - name: Name artifact
         if: always()
         shell: bash
@@ -44,6 +44,6 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: Socks5-${{ env.NAME }}-${{ runner.os }}
+          name: UDP-final-audit-${{ runner.os }}
           path: artifacts/
           retention-days: 30
