@@ -1,0 +1,12 @@
+{
+  "features": [],
+  "name": "baseline",
+  "patches": [],
+  "sources": {
+    ".": "b3585289622561caf4b8789b436cc8820ecd6be0",
+    "src/core": "162dd996299fc2d2bff2dd63728f8a2cd71ed31a",
+    "third-part/hev-task-system": "328f35d903221b51811b3d02b277d665dfbdc75f",
+    "third-part/yaml": "162227cd7d2b6108bc8bc133273e11413222ddf4"
+  },
+  "upstream_app": "180012e8b9dbaa2002a68ebd2c75bccebcfb789c"
+}
