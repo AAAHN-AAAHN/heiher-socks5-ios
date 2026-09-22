@@ -52,8 +52,9 @@ not. No historical pass count is retroactively presented as new verified coverag
 
 The old live test host's first stdout.readline() had no deadline before cleanup was
 registered. If the test child never reported readiness, a nominal five-second
-later query timeout did not help. The regression harness now bounds that first
-read, closes the child when startup fails, validates the complete stats row, and
+later query timeout did not help. The regression harness now bounds the entire
+response line, including a partial line without a newline, closes the child when
+startup fails, validates the complete stats row, and
 sets a receive timeout on its asymmetric TCP endpoint. Optimized Python assertion
 removal is rejected. These are test-only changes, not server timeouts or new app
 work. The native host file is retained; the enclosing driver adds process deadlines.
@@ -68,6 +69,34 @@ are now identical, with a per-file inventory, exact patch/function ownership,
 accounting semantics, data exclusions, architecture/efficiency reasons, native
 and Swift tests, limitations and reproduction commands. No excluded DNS byte count
 is added and no resolver is changed. The image/UI definition stays unchanged.
+
+## Resumption findings (not runtime changes)
+
+The commit `72ef2201359c705cff6f120ebe59644a6d7afca6` was saved before the chat
+interruption. Its audit run `35712649925` failed on both platforms; it must not be
+reported as completed verification. The repository does not expose ChatGPT's
+internal termination reason, and a CI failure is not proof of the chat failure's
+cause. Two specific audit-runner mistakes are now corrected:
+
+- macOS: `V=1` selects an upstream Makefile `undefine` directive unsupported by the
+  runner's make. Set `ECHO_PREFIX=` instead to show commands without this branch.
+- Linux: the splice object still exports general readv/writev wrappers. Their
+  undefined symbols do not imply the buffered splice loop was selected. Test
+  presence of splice versus the circular-buffer allocation symbol instead. The
+  failed run had passed two ten-scenario buffered network runs and the buffered
+  counter/TCP/UDP probes, then stopped at this overly strict mode assertion.
+
+All three test-only C probes now use the upstream formatter output, and CI requires
+byte equality with that output. Merely saving formatted copies was not a style
+check of the committed test files. The test host now waits for a complete bounded
+line under one monotonic deadline using raw pipe reads: select followed by blocking
+readline alone does not bound a partial line. Six subprocess tests cover buffered
+lines, fragmented lines, silent/partial output, EOF and an overlong row. None of
+these test scripts enter the application target or the network hot path.
+
+The resumed commit repeats the actual native tests in explicitly verified modes
+and the platform-specific checks. Only its matching logs and SUCCESS.txt establish
+completion. No result below is predeclared to pass, and no runtime/UDP file is changed.
 
 ## Current reproducible verification
 

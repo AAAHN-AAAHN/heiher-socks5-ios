@@ -106,8 +106,7 @@ audit_send (int fd, void *messages, unsigned int num, int flags,
 int
 main (void)
 {
-    HevSocks5Class klass = { .base.iface = get_iface,
-                             .binder = bind_socket };
+    HevSocks5Class klass = { .base.iface = get_iface, .binder = bind_socket };
     HevSocks5 self = { .base.klass = &klass.base,
                        .type = HEV_SOCKS5_TYPE_UDP_IN_UDP,
                        .udp_associated = 1 };
@@ -129,7 +128,8 @@ main (void)
         hev_socks5_transfer_get (&received, &sent);
         assert (received == before_in && sent == before_out + expected);
     }
-    puts ("PASS: UDP Out counts only the successful prefix, no headers or stale suffix");
+    puts (
+        "PASS: UDP Out counts only the successful prefix, no headers or stale suffix");
 
     receive_result = -1;
     hev_socks5_transfer_get (&before_in, &before_out);
@@ -143,7 +143,8 @@ main (void)
     hev_socks5_udp_fwd_f (&self, 11, buffer, 3, &bound);
     hev_socks5_transfer_get (&received, &sent);
     assert (received == before_in && sent == before_out);
-    puts ("PASS: client receives, failed receives and failed binds add no external bytes");
+    puts (
+        "PASS: client receives, failed receives and failed binds add no external bytes");
 
     for (i = 0; i < 3; i++) {
         iov[i].iov_base = buffer + UDP_BUF_SIZE * i;
@@ -159,7 +160,8 @@ main (void)
         hev_socks5_transfer_get (&received, &sent);
         assert (received == before_in + 21 && sent == before_out);
     }
-    puts ("PASS: UDP In survives partial or failed client delivery without double counting");
+    puts (
+        "PASS: UDP In survives partial or failed client delivery without double counting");
     receive_result = -1;
     hev_socks5_transfer_get (&before_in, &before_out);
     for (i = 0; i < 2; i++) {
@@ -171,6 +173,7 @@ main (void)
     hev_socks5_udp_fwd_b (&self, 11, vec, 3);
     hev_socks5_transfer_get (&received, &sent);
     assert (received == before_in && sent == before_out);
-    puts ("PASS: failed receives and zero-byte payloads add no artificial traffic");
+    puts (
+        "PASS: failed receives and zero-byte payloads add no artificial traffic");
     return 0;
 }

@@ -78,14 +78,14 @@ def native_checks(mode):
     splice = mode == 'splice'
     run(['make', 'clean'], mode + '-clean.log', CORE)
     # CFLAGS alone cannot disable a default-enabled Makefile option.
-    run(['make', '-j3', 'V=1', 'ENABLE_IO_SPLICE_SYSCALL=' + str(int(splice)),
+    run(['make', '-j3', 'ECHO_PREFIX=', 'ENABLE_IO_SPLICE_SYSCALL=' + str(int(splice)),
          'static', 'exec'], mode + '-build.log', CORE, timeout=300)
     task = CORE / 'third-part/hev-task-system'
     symbols = subprocess.check_output(['nm', '-u', task / 'build/lib/io/basic/hev-task-io.o'], text=True)
     (OUT / (mode + '-io-symbols.txt')).write_text(symbols)
     assert bool(re.search(r'\b_?splice\s*$', symbols, re.M)) == splice
-    assert bool(re.search(r'\b_?readv\s*$', symbols, re.M)) != splice
-    assert bool(re.search(r'\b_?writev\s*$', symbols, re.M)) != splice
+    # Generic readv/writev wrappers are always part of this object.
+    assert bool(re.search(r'\b_?hev_circular_buffer_new\s*$', symbols, re.M)) != splice
     libs = [CORE / 'bin/libhev-socks5-server.a', CORE / 'third-part/yaml/bin/libyaml.a',
             task / 'bin/libhev-task-system.a']
     common = ['clang', '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread']
@@ -147,6 +147,7 @@ def main():
     if CORE.exists():
         raise SystemExit('Use a clean checkout or remove .build/statistics-final-audit.')
     inspect_sources()
+    run([sys.executable, 'Tests/Statistics/host_probe.py'], 'host-reader.log')
     run(['git', 'clone', '--no-checkout', 'https://github.com/heiher/hev-socks5-server.git', CORE], 'clone.log')
     run(['git', 'checkout', '--detach', CONFIG['sources']['.']], 'checkout.log', CORE)
     run(['git', 'submodule', 'update', '--init', '--recursive'], 'submodules.log', CORE)
@@ -166,10 +167,12 @@ def main():
         hashes[str(path.relative_to(CORE))] = hashlib.sha256(path.read_bytes()).hexdigest()
     assert len(hashes) == 9
     (OUT / 'statistics-source-hashes.json').write_text(json.dumps(hashes, indent=2) + '\n')
-    # Preserve formatter output for the new test probes without rewriting the checkout.
+    # Test-only C follows the same formatter; never silently rewrite reviewed files.
     for path in (ROOT / 'Tests/Statistics').glob('*.c'):
         target = OUT / ('formatted-' + path.name)
-        target.write_bytes(subprocess.check_output([formatter, '--style=file:' + str(CORE / '.clang-format'), str(path)]))
+        formatted = subprocess.check_output([formatter, '--style=file:' + str(CORE / '.clang-format'), str(path)])
+        target.write_bytes(formatted)
+        assert formatted == path.read_bytes(), path
     for mode in (('buffered', 'splice') if sys.platform == 'linux' else ('buffered',)):
         native_checks(mode)
     run(['swiftc', '-swift-version', '5', '-warnings-as-errors',

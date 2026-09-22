@@ -115,6 +115,7 @@ changes behind a runtime-only list.
 | `Tests/Statistics/audit.py` | Source identity/inventory, enforced I/O modes, native probes and iOS type checking. |
 | `Tests/Statistics/tcp_probe.c` | Include actual I/O code; script partial writes, failures and cancellation boundaries. |
 | `Tests/Statistics/udp_probe.c` | Include actual UDP forwarders; check successful-prefix sums and receive-before-delivery-error semantics. |
+| `Tests/Statistics/host_probe.py` | Test-only pipe framing, silence/partial-line deadlines, EOF and bounded rows. |
 | `Tests/Statistics/counter_probe.c` | Real counter/public-getter stress with concurrent writers and readers. |
 | `docs/reviews/traffic-statistics-20260922.md` | Focused findings, evidence scope and final disposition. |
 
@@ -174,7 +175,7 @@ are not added to a hot query path merely to lengthen the implementation.
 The three statistics patches change nine C/header files, 102 additions and five
 deletions (net 97 lines). Existing GNU C dialect and upstream class/interface,
 header guards, naming, indentation and formatter rules are preserved. Public header
-C/C++ use and iOS ARM64 compilation are checked. The patches remain byte-identical
+declarations and iOS ARM64 compilation are checked. The patches remain byte-identical
 to the working pre-review version; no speculative optimization is introduced.
 
 ## Swift, UI lifecycle and resource cost
@@ -222,9 +223,19 @@ HevTaskSystem defaults `ENABLE_IO_SPLICE_SYSCALL` to 1. Merely using empty CFLAG
 for a run called buffered does not disable that Makefile option. Historical log
 names alone therefore do not prove two different native server paths. This focused
 audit passes the actual Make variable as 0/1, cleans between variants and inspects
-undefined symbols of the built I/O object: buffered must reference readv/writev
-and not splice; splice must reference splice and not readv/writev. macOS is buffered.
+undefined symbols of the built I/O object: buffered must reference its circular
+buffer implementation and not splice; splice must reference splice and not the
+circular buffer. Generic readv/writev wrappers exist in both builds and cannot
+discriminate them. macOS is buffered.
 The shared main-owned build script is not changed in this branch-only review.
+
+The interrupted audit run `35712649925` was not successful. Its macOS make failed
+when `V=1` activated an upstream `undefine` directive unsupported by that runner's
+make. Its Linux buffered tests passed, but an incorrect assertion expected common
+readv/writev wrappers to disappear in splice mode. The audit now uses
+`ECHO_PREFIX=` for verbose commands and verifies the actual splice/circular-buffer
+symbols. Neither fix changes production code. Test probes are formatted with the
+same upstream style and exact formatter equality is required, not just archived.
 
 Each confirmed mode executes the existing ten live-network statistics scenarios
 twice. Tests use ephemeral relay ports and do not turn the accepted UDP limitation
@@ -242,9 +253,10 @@ app. No `build-apple.sh`, Xcode archive, IPA packaging, release update or other 
 write occurs. Header type checking is not an iPhone binary/linker or UI test.
 
 Tests use temporary files, bounded waits, explicit failures and cleanup. The native
-host's first pipe read now has a deadline and cleanup on failed startup; the echo
-handler has a read deadline. Assertions must be enabled. Actual results belong to
-the matching commit's `artifacts/statistics-final-audit/` logs, tested-commit.txt,
+host's complete response line has a monotonic deadline, EOF handling and a bounded
+4096-byte buffer; silence and partial lines cannot bypass it. Startup failure cleans
+up the process, and the echo handler has a read deadline. Assertions must be enabled.
+Actual results belong to the matching commit's `artifacts/statistics-final-audit/` logs, tested-commit.txt,
 source.zip and inventory.json, not to a reused historical build badge.
 
 ## Disposition and primary references
