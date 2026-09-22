@@ -55,7 +55,10 @@ def main():
     if CORE.exists():
         raise SystemExit('Use a fresh checkout or remove .build/udp-final-audit first.')
     run(['git', 'diff', '--name-status', CONFIG['base_commit'], 'HEAD'], 'branch-files.txt')
-    run(['git', 'diff', '--check', CONFIG['base_commit'], 'HEAD'], 'whitespace.log')
+    # Unified patches require a single space on empty context lines. Their added
+    # C code is checked separately by git apply and the upstream formatter.
+    run(['git', 'diff', '--check', CONFIG['base_commit'], 'HEAD', '--', '.',
+         ':(exclude)Patches/*.patch'], 'whitespace.log')
     run([sys.executable, 'Build/check.py', 'baseline'], 'baseline.log')
     run([sys.executable, 'Build/check.py', 'composition'], 'composition.log')
     if sys.platform == 'darwin':
