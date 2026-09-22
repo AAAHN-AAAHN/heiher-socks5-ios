@@ -1,0 +1,91 @@
+name: Build latest upstream combination and update every branch
+on:
+  push:
+    branches: [maintenance/latest-baseline-20260922]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: socks5-latest-baseline-update
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: macos-15
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    outputs:
+      matrix: ${{ steps.prepare.outputs.matrix }}
+      integrated: ${{ steps.prepare.outputs.integrated }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Build the latest verified server without patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/baseline-update
+          git fetch --no-tags https://github.com/heiher/socks5-ios.git 180012e8b9dbaa2002a68ebd2c75bccebcfb789c
+          git clone --no-checkout https://github.com/heiher/hev-socks5-server.git .build/baseline-core
+          git -C .build/baseline-core checkout --detach b3585289622561caf4b8789b436cc8820ecd6be0
+          git -C .build/baseline-core submodule update --init --recursive
+          (cd .build/baseline-core && ./build-apple.sh) > artifacts/baseline-update/unpatched-framework-build.log 2>&1
+          python3 - <<'PY'
+          import datetime, json, os, pathlib, subprocess
+          record = {
+              'built_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'workflow_run': os.environ['GITHUB_RUN_ID'],
+              'maintenance_commit': os.environ['GITHUB_SHA'],
+              'xcode': subprocess.check_output(['xcodebuild', '-version'], text=True).strip(),
+              'iphoneos_sdk': subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-version'], text=True).strip(),
+              'patches': [],
+              'command': './build-apple.sh'
+          }
+          pathlib.Path('artifacts/baseline-update/provenance.json').write_text(json.dumps(record, indent=2) + '\n')
+          PY
+      - name: Prepare baseline and descendants without moving active branches
+        id: prepare
+        run: python3 Maintenance/update_baseline.py prepare .build/baseline-core/HevSocks5Server.xcframework artifacts/baseline-update/provenance.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: baseline-update-state
+          path: artifacts/baseline-update/
+          retention-days: 90
+  branches:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    uses: ./.github/workflows/verify-build.yml
+    with:
+      ref: ${{ matrix.ref }}
+  integrated:
+    needs: [prepare, branches]
+    uses: ./.github/workflows/verify-build.yml
+    with:
+      ref: ${{ needs.prepare.outputs.integrated }}
+  publish:
+    needs: [prepare, branches, integrated]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: baseline-update-state
+          path: baseline-update-state
+      - name: Publish all tested commits with expected-SHA protection
+        run: python3 Maintenance/update_baseline.py publish baseline-update-state/state.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: baseline-update-completed
+          path: baseline-update-state/
+          retention-days: 90

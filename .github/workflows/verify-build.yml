@@ -1,7 +1,7 @@
 name: Verify and build declared SOCKS5 features
 on:
   push:
-    branches: [feature/udp-compat, feature/traffic-statistics, feature/background, feature/settings, feature/app-icon, release/integrated]
+    branches: [main, feature/udp-compat, feature/traffic-statistics, feature/background, feature/settings, feature/app-icon, release/integrated]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -23,6 +23,7 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
           persist-credentials: false
+          fetch-depth: 0
       - name: Install upstream formatter
         shell: bash
         run: |
