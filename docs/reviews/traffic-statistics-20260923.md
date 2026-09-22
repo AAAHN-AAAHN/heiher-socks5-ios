@@ -64,3 +64,44 @@ GitHub Actions workflow, rather than being claimed as local executions.
 
 A fresh run must identify its triggering commit and both platform artifacts.
 Completion results are recorded below only after those jobs and artifacts are read.
+
+## Completed fresh evidence
+
+GitHub Actions run `35762391883` completed successfully on Linux and macOS at
+`31fa14b8ffe08748debe5850bb1282dde91b5f67`. The matching downloaded artifacts,
+SUCCESS.txt, tested-commit.txt and individual logs were inspected. This closing
+addition is documentation only with CI skipped; all executable checks remain at
+that successful commit. It does not claim a second run for the documentation.
+
+| Check in this fresh run | Result |
+| --- | --- |
+| Linux buffered native scenarios | 10/10, repeated twice |
+| Linux splice native scenarios | 10/10, repeated twice |
+| macOS buffered native scenarios | 10/10, repeated twice |
+| Actual counter stress in each native mode | Eight writers, 800,000 updates, exact totals and concurrent monotonic reads |
+| TCP and UDP actual-source probes | Passed under ASan/UBSan in applicable modes |
+| macOS production-counter TSan | Passed |
+| Production Swift model | 10,000 generated samples plus boundary/unit tests passed on both platforms |
+| Existing host pipe reader | Six cases passed on both platforms |
+| New stale-success driver regression | Three cases passed on both platforms |
+| iOS ARM64 C/header syntax, Swift typecheck and project plist lint | Passed; no app linking or archive |
+| Source pins, dependency preservation, formatter and patch reversal | Passed |
+
+These are 60 native network scenario executions, not 60 different specifications.
+Large synthetic counter additions are not actual petabytes of network traffic.
+The Linux artifact SHA-256 is
+`8044b4bc9104ef096e1dea765d976ac05923795aa1999e412952eac861ce12f4`;
+the macOS artifact SHA-256 is
+`69ca4696089cb6f9e08c151ae3b93da95d299795bdb12fa8f11c48605dbfbc56`.
+Both match GitHub's recorded digests. Their source.zip bytes are identical, and all
+67 source files match the checked candidate tree
+`93c3b8e9acb91b3465e4d516032a0f1faf4aad8d`. The actual inventory confirms
+33 differing paths, 23 statistics-owned paths and ten unchanged UDP dependencies.
+
+All five patches, five application Swift sources, project/plist, shared Build files,
+committed framework and inherited UDP bytes remain unchanged from the review start.
+The six non-statistics branch tips were checked again after the successful run and
+remain at their starting commits. This review adds no runtime cost, new feature,
+source-version change or distribution build. Accepted counter/scheduling and UDP
+limits remain documented; actual iPhone UI, VPN, phone-call, battery and throughput
+tests are outside this native/type-check review and were not performed.
