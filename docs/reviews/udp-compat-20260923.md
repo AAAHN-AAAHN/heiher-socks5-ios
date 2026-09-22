@@ -101,3 +101,73 @@ locally. GitHub could not be resolved by git in the local container, so a new fu
 native/Linux/macOS audit is performed by the existing GitHub Actions workflow.
 Fresh completion is established only by its matching jobs and downloaded artifacts;
 results are appended after inspection, not declared in advance.
+
+## Completed fresh audit
+
+Run `35765748273` completed successfully on Linux and macOS at commit
+`b6929811a11c30ed8b519d062b9d869caae7be21`. Both jobs, downloaded artifact digests,
+tested-commit.txt, source.zip, SUCCESS.txt, summary and individual logs were checked.
+This completion entry is documentation only; it does not represent another test
+execution. All executable files remain at that tested snapshot.
+
+| Required two-patch profile | Linux | macOS |
+| --- | --- | --- |
+| Ephemeral relay, one worker | 9/9 | 9/9 |
+| Ephemeral relay, four workers | 9/9 | 9/9 |
+| Unbound external socket, mixed families, one worker | 11/11 | 11/11 |
+| Unbound external socket, mixed families, four workers | 11/11 | 11/11 |
+| Fixed relay, known client ports, one worker | 9/9 | 9/9 |
+| Fixed relay, known client ports, four workers | 9/9 | 9/9 |
+| Required scenario executions | 58/58 | 58/58 |
+
+These are 116 required scenario executions across two platforms, not 116 unique
+specifications or device measurements. The existing actual-C unit passed under
+ASan/UBSan and separately at -O3 with strict aliasing on both platforms: 65,536
+port values, selected IPv4 address bytes, canaries, idempotence, IPv6 scope/flow
+preservation, EAGAIN/connect failure and all ten reusable address capacities.
+The five new audit-driver tests passed on both platforms. C formatter equality,
+source/baseline checks, composition, patch reversal, Darwin project/plist lint and
+ARM64 iOS syntax-only compilation passed. No new application link/archive,
+Swift runtime, on-device VPN/Moonlight test or energy benchmark is implied.
+
+Negative controls remain distinct from required passes. In this run the ephemeral
+unpatched/port-only/address-only controls passed 8/9, 9/9 and 8/9 on Linux, versus
+3/9, 4/9 and 4/9 on macOS. On Darwin, missing normalization still produces the
+wrong IPv4 source, and missing the port-zero guard still produces REP=0x01 for an
+unknown peer. These are specific reproduced failures, not arbitrary build errors.
+
+| Patched fixed-port, unknown-client observation | Result in this run |
+| --- | --- |
+| Linux, one worker | 8/9; concurrent-close failed with ConnectionRefusedError |
+| Linux, four workers | 9/9; no failure in this trial |
+| macOS, one worker | 8/9; concurrent-close timed out |
+| macOS, four workers | 8/9; concurrent-close timed out |
+
+Linux's unpatched fixed-port concurrent-close case passed in this run; its 8/9
+profile failure was the separate ::1:0 hint. That does not overwrite the preceding
+run's failure or prove the patched behavior regression-free. The accepted fixed-port
+limitation remains open as an operating constraint, not an unfinished hidden pass.
+
+The Linux artifact SHA-256 is
+`a275a7a9a57851ed28e2cf39a0c3bfeab91d9463dc21a4ac6490f059d2adc4aa`;
+the macOS artifact SHA-256 is
+`c62c9fbd4b9efba4f4adee5bf5ec26e4e22f03794ffc737de175a91496611342`.
+Both match GitHub's digests. Their source.zip bytes are identical; the 49 files
+match the reviewed candidate and reconstruct tree
+`4eeb61e4fdd72dd8d50f2ad5417a5aca3c16aae6`. Reversing the original full branch diff
+also reconstructed the common main tree `aa9eacf47cc964c5b1c8be7248ae88e79aa0e7be`.
+The fourteen-path current inventory was checked against that exact baseline.
+
+Preserved runtime patch SHA-256:
+
+```text
+9cd0a43550a6128046f81d11bd16971e426386e2656e3e8f16fa790d57bbb315  hev-udp-port-zero.patch
+0b2088e6f0519fe01d9d0c64d0bda4cc5909f292ed9095613a1b2434f930ac0e  hev-udp-sockaddr.patch
+```
+
+After the fresh run, all six non-UDP branch tips remained at their starting SHAs.
+The source delta is limited to the audit driver, its new regression, the two
+identical feature specifications and this review. Neither runtime patch, native
+network/unit probe, application, defaults, shared build infrastructure, existing
+workflow nor baseline framework changed. The final disposition is completion of
+the agreed two-repair feature audit with its explicitly accepted limitations.
