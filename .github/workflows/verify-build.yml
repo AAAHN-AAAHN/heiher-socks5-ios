@@ -11,7 +11,12 @@ on:
 permissions:
   contents: read
 jobs:
+  udp-prerequisite:
+    uses: ./.github/workflows/udp-compat-audit.yml
+    with:
+      ref: 49784b7c78a99dab824eceeb071e459bc94b2e90
   verify:
+    needs: udp-prerequisite
     strategy:
       fail-fast: false
       matrix:

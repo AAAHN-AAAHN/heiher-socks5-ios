@@ -109,8 +109,9 @@ I/O doubles and a successful compile are not new iPhone/VPN/Moonlight measuremen
 
 ## Complete file inventory relative to main
 
-The branch entered review with eight differing files. The completed audit has
-12 differing paths. Every changed file is part of the review, not just the C text.
+The branch entered the original review with eight differing files and closed it
+with twelve. The follow-up has 14 differing paths. Every changed file is part of
+the review, not just the C text.
 
 | File | Responsibility and reason |
 | --- | --- |
@@ -126,6 +127,8 @@ The branch entered review with eight differing files. The completed audit has
 | `Tests/udp_compat_audit.py` | Native-only audit driver, negative controls, source/diff artifacts and iOS syntax-only checks. |
 | `.github/workflows/verify-build.yml` | On this branch only, run the native audit at the triggering commit without creating an IPA. |
 | `docs/reviews/udp-compat-20260922.md` | Concrete results, corrections, residual limitations and final disposition. |
+| `Tests/udp_audit_driver_regression.py` | Five rejected/failed-attempt cases verify stale-success invalidation and log preservation. |
+| `docs/reviews/udp-compat-20260923.md` | Follow-up review, exact runtime preservation and separately identified fresh evidence. |
 
 Common `Build/build.sh`, `Build/check.py`, source locks, baseline framework and
 upstream Swift sources remain unchanged. The single-window/local-network metadata
@@ -233,8 +236,8 @@ compilation against the installed iPhoneOS SDK; this creates no app or IPA.
 Strict two-patch profiles exercise ephemeral listening ports with one/four workers,
 explicit IPv4/IPv6 outbound binds and unbound outbound sockets, repeated mixed
 external families, three simultaneous associations, closing one while keeping the
-others, and three bursts of 24 unordered datagrams. The original six payload sizes
-and IPv4/IPv6 TCP cases are retained. Shared fixed ports with advertised known
+others, and three bursts of 24 unordered datagrams. The six payload trials
+(1, 64, 512, 1200, 1400, then 64 bytes again) and IPv4/IPv6 TCP cases are retained. Shared fixed ports with advertised known
 client ports are also required to pass. Fixed-port/unknown-peer cases are explicit
 **observations**, not hidden expected-success tests.
 
@@ -254,6 +257,16 @@ logs. Patch reversal must restore upstream source. This audit never invokes
 distribution build can use the unchanged `Build/build.sh`; it must not be confused
 with this review's native audit.
 
+On entry to main, the driver removes an earlier SUCCESS.txt before validating or
+rejecting the attempt; failed retries must not reuse an old pass marker. Earlier
+diagnostic logs are retained. Five test-only cases cover an existing checkout,
+unrelated composition, a failed source command, fresh failure, and Python -O.
+Require successful process/job exit and matching source, summary and logs as well
+as the marker. This guard does not cover import failures before main or arbitrary
+filesystem failure. Use separate clean checkouts, not concurrent audit attempts.
+The follow-up results and preserved runtime hashes are documented in
+`docs/reviews/udp-compat-20260923.md`; earlier runs remain historical evidence.
+
 ## Explicit remaining limits
 
 | Condition | Status and consequence |
@@ -261,7 +274,7 @@ with this review's native audit.
 | Several unknown-port associations share one fixed UDP relay port | Concurrent failures are reproduced with both patches. The existing SO_REUSEPORT/first-datagram design permits ambiguous session ownership, but the controls do not prove exclusive upstream causation. Ephemeral local ports passed the tested profiles. |
 | First packet before peer establishment | The minimal design does not check that its source IP matches the TCP control peer before learning it. Connected UDP then filters the selected peer, but that is not initial authentication. Do not expose the listener to untrusted devices. |
 | SOCKS fragment/reserved fields | These patches do not introduce a FRAG/RSV validation or reassembly policy. The pinned parser's existing behavior is not a full RFC 1928 conformance guarantee. |
-| Large/empty datagrams | The original 1500-byte relay buffers, truncation handling and rejection of empty outgoing payloads are not redesigned. Six successful test sizes do not establish arbitrary UDP payload support. |
+| Large/empty datagrams | The original 1500-byte relay buffers, truncation handling and rejection of empty outgoing payloads are not redesigned. The tested payload sizes do not establish arbitrary UDP payload support. |
 | Outbound address-family binding | A socket explicitly bound for one family need not support later traffic of the other family. Mixed-family tests intentionally omit that bind. |
 | Wildcard/public relay addresses, link-local scope, VPN transitions | These settings and routing behaviors remain upstream responsibilities; this audit is not coverage of every deployment. |
 

@@ -13,14 +13,15 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
-UDP = 'ae466dab1a394af0c83f3dc36e51755f25f91910'
+UDP = '49784b7c78a99dab824eceeb071e459bc94b2e90'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 UDP_FILES = {
     '.github/workflows/udp-compat-audit.yml': '.github/workflows/verify-build.yml',
     'docs/branches/feature-udp-compat.md': 'README.md',
     **{p: p for p in ('Patches/hev-udp-port-zero.patch', 'Patches/hev-udp-sockaddr.patch',
                      'Tests/udp_compat_audit.py', 'Tests/udp_sockaddr_regression.py',
-                     'Tests/udp_sockaddr_unit.c', 'docs/features/udp-compatibility.md',
+                     'Tests/udp_sockaddr_unit.c', 'Tests/udp_audit_driver_regression.py',
+                     'docs/reviews/udp-compat-20260923.md', 'docs/features/udp-compatibility.md',
                      'docs/reviews/udp-compat-20260922.md', 'Socks5/Info.plist')}
 }
 
@@ -39,6 +40,14 @@ def inspect_sources():
     if CONFIG['name'] != 'traffic-statistics' or CONFIG['features'] != ['udp', 'statistics']:
         raise RuntimeError('This review is for the statistics composition only.')
     inventory = git('diff', '--name-only', CONFIG['base_commit'], 'HEAD').decode().splitlines()
+    udp_config = json.loads(git('show', UDP + ':Build/features.json'))
+    for key in ('base_commit', 'sources', 'upstream_app'):
+        assert CONFIG[key] == udp_config[key], key
+    assert CONFIG['patches'][:len(udp_config['patches'])] == udp_config['patches']
+    workflow = (ROOT / '.github/workflows/verify-build.yml').read_text()
+    assert ('    uses: ./.github/workflows/udp-compat-audit.yml\n'
+            f'    with:\n      ref: {UDP}\n') in workflow
+    assert '    needs: udp-prerequisite\n' in workflow
     preserved = {}
     for target, source in UDP_FILES.items():
         data = (ROOT / target).read_bytes()

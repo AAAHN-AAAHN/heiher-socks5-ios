@@ -16,12 +16,16 @@ The main baseline is `d2534cd6bce7389fdf8f362bd8f681c0bd583eb1`. It combines iOS
 `Build/upstream.json`; `Build/features.json` selects UDP plus statistics and five
 ordered patches. These are reproducible pins, not automatic upstream tracking.
 
-The UDP prerequisite is `ae466dab1a394af0c83f3dc36e51755f25f91910`, merged by
-`d34e49478d7e061b8824e9f431b40998db25f8b2`, the starting point of this focused review.
-Its patches, tests, documentation and branch-specific workflow are preserved
-byte-for-byte. The retained UDP recommendation is local **UDP Listen Port = 0**.
+The current UDP prerequisite is `49784b7c78a99dab824eceeb071e459bc94b2e90`.
+The earlier prerequisite `ae466dab1a394af0c83f3dc36e51755f25f91910` was merged by
+`d34e49478d7e061b8824e9f431b40998db25f8b2`, the original statistics-review start.
+The current prerequisite is also merged as a Git ancestor, not merely cited in a
+README. Twelve inherited files, including the follow-up audit correction and its
+regression/review, are preserved byte-for-byte. The original production-code
+freeze is unchanged. The retained UDP recommendation is local **UDP Listen Port = 0**.
 The known fixed-port / unknown-client / concurrent-association limitation is not
-reinvestigated or declared repaired by statistics tests.
+declared repaired. The combined workflow checks the exact UDP-only checkout first,
+then the statistics composition; neither runtime implementation is rewritten.
 
 ## Purpose and why measurement belongs in the core
 
@@ -111,7 +115,7 @@ changes behind a runtime-only list.
 | `Tests/traffic_statistics_model.swift` | Actual production-model tests, including large totals and 10,000 deterministic samples. |
 | `README.md` | Canonical feature specification and operating boundaries. |
 | `docs/features/traffic-statistics.md` | Identical canonical specification at the feature-document path. |
-| `.github/workflows/verify-build.yml` | This branch's native-only final audit; no app archive or IPA. |
+| `.github/workflows/verify-build.yml` | Run the pinned UDP-only prerequisite and require its success before the statistics native/type audit; no app archive or IPA. |
 | `Tests/Statistics/audit.py` | Source identity/inventory, enforced I/O modes, native probes and iOS type checking. |
 | `Tests/Statistics/tcp_probe.c` | Include actual I/O code; script partial writes, failures and cancellation boundaries. |
 | `Tests/Statistics/udp_probe.c` | Include actual UDP forwarders; check successful-prefix sums and receive-before-delivery-error semantics. |
@@ -120,14 +124,23 @@ changes behind a runtime-only list.
 | `Tests/Statistics/counter_probe.c` | Real counter/public-getter stress with concurrent writers and readers. |
 | `docs/reviews/traffic-statistics-20260922.md` | Focused findings, evidence scope and final disposition. |
 | `docs/reviews/traffic-statistics-20260923.md` | Follow-up final review, stale-success regression and matching completion evidence. |
+| `docs/reviews/udp-statistics-alignment-20260923.md` | Latest-UDP merge, complete dependency map, preserved runtime and joint verification evidence. |
 
-The following are dependencies, not independent statistics edits: both UDP patches;
-three `Tests/udp_*` files; `Socks5/Info.plist`; the UDP feature/review documents;
-`docs/branches/feature-udp-compat.md` (verbatim UDP root README); and
-`.github/workflows/udp-compat-audit.yml` (verbatim UDP workflow under another name).
-The isolated UDP audit retains its UDP-only guard and must be run on its own
-checkout. The statistics workflow does not invoke it on a combined manifest.
-No inherited file is silently adapted to make that guard pass.
+The following twelve files are dependencies, not independent statistics edits:
+both UDP patches; four `Tests/udp_*` files; `Socks5/Info.plist`; the UDP feature
+specification and both dated UDP reviews; `docs/branches/feature-udp-compat.md`
+(verbatim UDP root README); and `.github/workflows/udp-compat-audit.yml` (verbatim
+UDP workflow under another name). The mixed build manifest still selects UDP plus
+statistics; its source pins and ordered UDP patch prefix match the prerequisite.
+The project retains the UDP metadata plus its separate statistics registration.
+The exact mapping is enforced by UDP_FILES in Tests/Statistics/audit.py.
+
+The isolated UDP audit retains its UDP-only guard and runs on its own pinned
+checkout through the unchanged reusable workflow. The statistics workflow requires
+that job before its own matrix; it never invokes the UDP-only driver on a combined
+manifest or modifies an inherited file to make that guard pass. The audit verifies
+that the workflow checkout ref equals its UDP pin. This is a reproducible snapshot,
+not an automatic promise to follow future remote branch movement.
 
 Common baseline build scripts, source locks and the committed unpatched framework
 are also unchanged. New tests and documents are not app target sources/resources.
@@ -215,7 +228,13 @@ Run on a clean checkout with Python 3, Clang, make, Swift and clang-format 18:
 python3 Tests/Statistics/audit.py
 ```
 
-The audit checks main ancestry, all source pins, frozen UDP blobs, all unchanged
+The GitHub workflow first runs the unmodified UDP-only audit at the pinned UDP
+commit on Linux and macOS, in separate jobs/checkouts. Only after both succeed does
+it run this statistics audit. Running the command locally performs the statistics
+composition checks; it does not silently launch the separate UDP audit. Run that
+on its pinned checkout when reproducing the complete two-branch verification.
+
+The audit checks main and current UDP ancestry, all source pins, frozen UDP blobs, all unchanged
 production files, the entire main-to-feature diff, statistics registration/wiring,
 and exact upstream formatting of the nine affected C/header files. It applies the
 five ordered patches to freshly fetched pinned code and reverses them afterward.
@@ -279,6 +298,7 @@ security, protocol, battery or future-iOS certification.
 - C11 draft, atomics and unsigned arithmetic: https://www.open-std.org/jtc1/sc22/wg14/www/docs/n1570.pdf
 - Statistics reviews: `docs/reviews/traffic-statistics-20260922.md` and
   `docs/reviews/traffic-statistics-20260923.md`.
+- Latest dependency alignment: `docs/reviews/udp-statistics-alignment-20260923.md`.
 - Frozen UDP operating policy: `docs/features/udp-compatibility.md`.
 - Main/build policy: `docs/main-baseline.md` and `docs/build-and-validation.md`.
 

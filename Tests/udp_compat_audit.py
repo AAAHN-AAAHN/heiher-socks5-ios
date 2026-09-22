@@ -47,6 +47,8 @@ def build():
 
 
 def main():
+    # A rejected or failed retry must not reuse an earlier success marker.
+    (OUT / 'SUCCESS.txt').unlink(missing_ok=True)
     if not __debug__:
         raise SystemExit('Assertions are required; do not use Python -O.')
     if CONFIG['name'] != 'udp-compat' or CONFIG['features'] != ['udp']:
@@ -66,6 +68,7 @@ def main():
          ':(exclude)Patches/*.patch'], 'whitespace.log')
     run([sys.executable, 'Build/check.py', 'baseline'], 'baseline.log')
     run([sys.executable, 'Build/check.py', 'composition'], 'composition.log')
+    run([sys.executable, 'Tests/udp_audit_driver_regression.py'], 'audit-driver.log')
     if sys.platform == 'darwin':
         run(['plutil', '-lint', 'Socks5/Info.plist',
              'Socks5.xcodeproj/project.pbxproj'], 'xcode-metadata.log')
