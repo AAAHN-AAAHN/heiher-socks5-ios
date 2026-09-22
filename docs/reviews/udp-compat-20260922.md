@@ -136,6 +136,68 @@ The documented residual source-IP/FRAG validation, 1500-byte buffering/truncatio
 empty payload and explicit address-family bind limits remain outside these two
 compatibility repairs. Passing the targeted tests is not full RFC conformance.
 
+## Final closure and accepted operating constraint
+
+The owner explicitly chooses to keep the two runtime patches as they are and
+finish by documenting operation, rather than implementing shared-port multiplexing
+or changing any port policy. The production-code freeze is the state at
+`8c81e6165b3f84b20957ef39e60016a7a0dfd71a`. This closing change edits only README.md,
+its identical feature specification, and this review. Tests, workflow, source pins,
+app code/configuration, public API, baseline framework and both patches are unchanged.
+Main, release/integrated and the other feature branches are outside the write scope.
+
+The canonical recommendation is **UDP Listen Port = 0** for general operation and
+for reliable separation of concurrent associations with unknown client ports.
+The fixed-port setting is retained, not banned or silently converted to zero.
+Known, accurately advertised client endpoints passed the existing fixed-port tests.
+Unknown concurrent endpoints on the same fixed port remain an accepted limitation:
+loss, timeout, refusal and disruption after another association closes are possible.
+This is not an equally reliable mode with only less detailed attribution.
+
+The README now distinguishes association count from destination count, explains
+BND.PORT negotiation with an unchanged TCP server entry, separates client port zero
+from local listening port zero, and states that allocation is per association rather
+than per packet. The recommendation changes neither the stored configuration nor
+the actual application defaults. It does not authenticate the initial sender, fix
+FRAG/RSV or buffer-size limits, or establish arbitrary network/VPN behavior.
+
+### Follow-up evidence already completed
+
+Run `35698841052` tested the frozen runtime at commit `8c81e616...` after the
+preceding attribution correction and ARM64 iOS syntax checks were added. Its
+required profiles again passed 58/58 on Linux and 58/58 on macOS. Its fixed-port,
+unknown-concurrent-peer observations failed the concurrent-close scenario with
+one and four workers on both platforms; Linux four-worker output reported
+ConnectionRefusedError and the other three reported TimeoutError.
+
+In that follow-up run the Linux *unpatched* fixed-port profile was 7/9 and also
+failed the concurrent-close scenario, whereas run `35696504942` passed that
+scenario. Both individual records are retained. The new result is evidence that
+the unpatched implementation can fail too; it does not retroactively validate the
+previous run's incorrect attribution or prove every failure has one exclusive cause.
+No failure is added to the required-pass count or removed from the observation log.
+
+The closing documentation commit invokes the same native-only audit without
+changing it. Its own tested-commit.txt and summary.json identify its actual results;
+the historical counts above must not be mistaken for an unexecuted future run.
+No IPA, XCFramework or application archive is produced by that audit.
+
+### Final inspection against the owner's criteria
+
+| Criterion | Final disposition |
+| --- | --- |
+| Minimal, concise implementation and resource efficiency | Retain two C files and net 27 C lines. No new heap allocation, socket, task, timer, queue, payload copy, or public API. No unsupported absolute-performance claim. |
+| Standard style and existing structure | Preserve the upstream GNU C dialect, class/interface and coroutine paths. Patched C and the unit follow upstream clang-format 18; iOS syntax and warning checks remain required. |
+| Residual defects and omissions | The two targeted Darwin failures are repaired in the tested configurations. Shared-fixed-port ambiguity and the listed upstream protocol/security/buffer limits are explicitly not declared resolved. |
+| Correct scoped behavior without unnecessary expansion | Keep existing failure returns, association-state changes, address fields, receiving capacities and IPv6 preservation. Add no automatic fallback or alternative relay architecture. |
+| Complete documentation | Retain the twelve-path inventory, exact targets, rationale, port semantics, resource review, operating table, examples, test scope, named historical evidence and limitations. Root README equals the feature specification. |
+
+All twelve differing paths relative to main were rechecked against the inspected
+snapshot; files outside the three documentation paths remain byte-identical. The
+existing regression and actual-C probes remain available and are rerun at the
+closing commit. This is completion of the agreed feature with accepted limitations,
+not a statement that all UDP configurations or every future iOS version are safe.
+
 ## Reproduction
 
 ```sh

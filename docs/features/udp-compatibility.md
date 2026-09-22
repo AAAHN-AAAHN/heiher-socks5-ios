@@ -31,6 +31,64 @@ association setup. The two-patch shared-port failure is real, but these controls
 not establish that it is exclusively inherited rather than exposed or affected by
 the patch. See `docs/reviews/udp-compat-20260922.md` and each named JSON result.
 
+## Final operating policy
+
+The owner has chosen to finish this feature with the existing two runtime patches
+unchanged and to retain the documented fixed-port limitation. This is an accepted
+operating constraint, not a claim that the failing condition has been repaired.
+No shared UDP dispatcher, association-ID extension, automatic port fallback, or
+client change is added. This documentation does not change any UI default or saved
+port value and does not alter the release branch.
+
+**Recommended setting: UDP Listen Port = `0` (`udp-port: 0`).** This is the normal
+recommendation when reliable separation and independent closure of several SOCKS5
+UDP associations are required, particularly when clients advertise port zero.
+A bound ephemeral endpoint separates associations by their local relay endpoint.
+This resolves the tested shared-endpoint ambiguity; it does not authenticate the
+first packet or repair the other protocol/security limits listed below.
+
+| Requested use | Existing behavior and operating guidance |
+| --- | --- |
+| UDP Listen Port `0` | The OS selects a local UDP relay port when each association is created. Concurrent unknown-port and independent-close profiles passed. Recommended for general use. |
+| Fixed UDP Listen Port; clients advertise distinct, accurate source endpoints | The initial peer can be connected before UDP traffic. Tested concurrent known-port profiles passed. The advertised endpoints must match what the server actually sees. |
+| Fixed UDP Listen Port; one active unknown-port association | Can work, including the owner's earlier Moonlight test. One successful session does not establish multi-association safety. |
+| Fixed UDP Listen Port; several unknown-port associations | Remains selectable, but first-peer ownership may be ambiguous. Actual tests include timeouts and connection-refused errors; closing one association can disrupt another. Use only with this limitation understood. |
+
+A fixed port is **not** a reliable catch-all mode that merely sacrifices attribution
+or statistics. The current implementation still has separate sockets and lifetimes
+for separate TCP control connections; it does not merge them into one long-lived
+public receiver. Loss of ownership clarity can therefore affect real delivery and
+closure. The possible kernel/first-peer assignment explains the failure plausibly,
+but this review does not claim a complete packet-by-packet causal trace.
+
+Here, multiple associations means multiple SOCKS5 UDP ASSOCIATE control sessions,
+not simply multiple UDP destinations or packets. One association may carry many
+destinations. Ordinary SOCKS5 UDP datagrams have no TCP-association identifier;
+a flow lookup by source IP/port alone cannot unambiguously identify which of
+several same-IP, unknown-port control connections created that flow.
+
+Example (the TCP port is illustrative, not a changed application default):
+
+```text
+Server Listen Port: 9876
+UDP Listen Port:    0
+Client SOCKS5 entry: 172.20.10.1:9876
+```
+
+The client first negotiates with TCP port 9876 and then sends UDP to the endpoint
+returned in BND.ADDR/BND.PORT. Users do not discover or manually enter each allocated
+UDP port. Port zero does not mean one new port or socket per packet, nor does it
+close the TCP listener. Hev already allocates a client-facing UDP socket for each
+association even with a fixed port; selecting zero adds no second relay layer.
+The path/firewall must allow the negotiated UDP endpoint. If an environment permits
+only one fixed UDP port, that deployment restriction and the above concurrency
+limitation must both be considered; this implementation does not evade either.
+
+The local UDP Listen Port is independent of the client port zero in the ASSOCIATE
+request. Using local port zero does not make the existing port-zero guard optional.
+A successful scoped audit closes this feature under these stated conditions, not
+as unrestricted fixed-port, full-RFC, or security-conformance approval.
+
 ## Why the patches exist
 
 The owner uses a Windows sing-box SOCKS5 client over an iPhone hotspot, including
