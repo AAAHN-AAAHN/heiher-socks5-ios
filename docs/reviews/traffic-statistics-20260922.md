@@ -94,6 +94,16 @@ readline alone does not bound a partial line. Six subprocess tests cover buffere
 lines, fragmented lines, silent/partial output, EOF and an overlong row. None of
 these test scripts enter the application target or the network hot path.
 
+The first resumed run `35717489560` at `4415774f...` passed Linux and macOS native
+network/counter/I/O/model probes (including macOS TSan), but macOS stopped at the
+new standalone iOS syntax check. That check omitted the Makefile-supplied COMMIT_ID
+macro and compiled upstream task-io.h without its required prior task type. The
+runner now supplies the pinned commit macro and checks the four headers in a small
+temporary translation unit that includes hev-task.h first. The five production C
+sources keep their own original include order. No production header is rewritten
+just to satisfy an artificial standalone-header test. Swift type checking still
+runs only after these syntax checks succeed.
+
 The resumed commit repeats the actual native tests in explicitly verified modes
 and the platform-specific checks. Only its matching logs and SUCCESS.txt establish
 completion. No result below is predeclared to pass, and no runtime/UDP file is changed.

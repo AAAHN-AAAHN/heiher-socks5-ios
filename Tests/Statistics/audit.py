@@ -126,9 +126,14 @@ def ios_checks(changed):
     includes = ['-I' + str(p) for p in (CORE / 'src', CORE / 'src/misc',
                 CORE / 'src/core/include', CORE / 'src/core/src', CORE / 'third-part/yaml/src',
                 task / 'include', task / 'src')]
+    # Upstream task-io.h expects hev-task.h first; C sources keep their own includes.
+    headers = OUT / 'statistics-headers.c'
+    headers.write_text('#include <hev-task.h>\n' + ''.join(
+        '#include "' + str(p) + '"\n' for p in changed if p.suffix == '.h'))
     run(['xcrun', '--sdk', 'iphoneos', 'clang', '-target', 'arm64-apple-ios17.2',
          '-isysroot', sdk, '-std=gnu11', '-Wall', '-Werror', '-fsyntax-only',
-         '-x', 'c', *includes, *changed], 'ios-c-syntax.log')
+         '-DCOMMIT_ID="' + CONFIG['sources']['.'] + '"', '-x', 'c', *includes,
+         *[p for p in changed if p.suffix == '.c'], headers], 'ios-c-syntax.log')
     module = OUT / 'swift-module'
     module.mkdir()
     shutil.copyfile(CORE / 'src/hev-main.h', module / 'hev-main.h')
