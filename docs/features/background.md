@@ -1,11 +1,3 @@
-# SOCKS5 for iOS: background
-
-This is the focused `feature/background` branch.
-For the complete app use `release/integrated`; the shared app + engine baseline remains on `main`.
-
-Build and verification: [instructions](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/feature/background/docs/build-and-validation.md).
-The following specification is also preserved verbatim at `docs/features/background.md`.
-
 # Background services: continuous coarse location and silent audio recovery
 
 ## Purpose and scope
