@@ -77,7 +77,7 @@ def main():
     (OUT / 'assets-info.json').write_text(assetinfo + '\n')
     require(any('AppIcon' in str(item.get('Name', '')) for item in json.loads(assetinfo)), 'CAR missing AppIcon renditions')
     decoder = WORK / 'decode-images'
-    run('xcrun', 'swiftc', '-swift-version', '5', '-warnings-as-errors',
+    run('xcrun', 'swiftc', '-parse-as-library', '-swift-version', '5', '-warnings-as-errors',
         ROOT / 'Tests/AppIcon/DecodeImages.swift', '-o', decoder)
     decoded = run(decoder, ROOT / CATALOG / 'AppIcon.png', *device_images)
     (OUT / 'imageio-decoded.json').write_text(decoded + '\n')
