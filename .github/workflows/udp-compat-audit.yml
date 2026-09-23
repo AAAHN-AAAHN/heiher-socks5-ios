@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15]
+        os: [ubuntu-24.04, xcode-27]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
     steps:
@@ -27,16 +27,39 @@ jobs:
       - name: Install upstream formatter
         shell: bash
         run: |
+          set -euo pipefail
           if [ "$RUNNER_OS" = Linux ]; then
             sudo apt-get update -qq
             sudo apt-get install -y clang-format-18
           else
             brew install llvm@18
-            echo "$(brew --prefix llvm@18)/bin" >> "$GITHUB_PATH"
+            mkdir -p "$RUNNER_TEMP/format-only"
+            ln -s "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
+            echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
           fi
+      - name: Record the actual iOS 27 toolchain
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/udp-final-audit
+          xcodebuild -version | tee artifacts/udp-final-audit/toolchain.txt
+          xcrun --sdk iphoneos --show-sdk-version | tee -a artifacts/udp-final-audit/toolchain.txt | grep -E '^27\.'
+          xcrun swiftc --version >> artifacts/udp-final-audit/toolchain.txt
+          sw_vers >> artifacts/udp-final-audit/toolchain.txt
       - name: Audit exact sources, native UDP behavior and address memory safety
         shell: bash
         run: python3 Tests/udp_compat_audit.py
+      - name: Type check the unchanged app with the actual iOS 27 SDK
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swiftc -typecheck -swift-version 5 -warnings-as-errors \
+            -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -target arm64-apple-ios17.2 \
+            -I HevSocks5Server.xcframework/ios-arm64/Headers \
+            Socks5/Socks5App.swift Socks5/ContentView.swift \
+            > artifacts/udp-final-audit/ios-swift-typecheck.log 2>&1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

@@ -14,13 +14,13 @@ jobs:
   udp-prerequisite:
     uses: ./.github/workflows/udp-compat-audit.yml
     with:
-      ref: 49784b7c78a99dab824eceeb071e459bc94b2e90
+      ref: 05524e3fb917f2a0e5264bc9919118fcc484cb11
   verify:
     needs: udp-prerequisite
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15]
+        os: [ubuntu-24.04, xcode-27]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
     steps:
@@ -32,13 +32,26 @@ jobs:
       - name: Install upstream formatter
         shell: bash
         run: |
+          set -euo pipefail
           if [ "$RUNNER_OS" = Linux ]; then
             sudo apt-get update -qq
             sudo apt-get install -y clang-format-18
           else
             brew install llvm@18
-            echo "$(brew --prefix llvm@18)/bin" >> "$GITHUB_PATH"
+            mkdir -p "$RUNNER_TEMP/format-only"
+            ln -s "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
+            echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
           fi
+      - name: Record the actual iOS 27 toolchain
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/statistics-final-audit
+          xcodebuild -version | tee artifacts/statistics-final-audit/toolchain.txt
+          xcrun --sdk iphoneos --show-sdk-version | tee -a artifacts/statistics-final-audit/toolchain.txt | grep -E '^27\.'
+          xcrun swiftc --version >> artifacts/statistics-final-audit/toolchain.txt
+          sw_vers >> artifacts/statistics-final-audit/toolchain.txt
       - name: Verify statistics-only sources, native accounting and Swift types
         shell: bash
         run: python3 Tests/Statistics/audit.py
