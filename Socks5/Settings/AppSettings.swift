@@ -52,10 +52,10 @@ struct ServerSettings: Codable, Equatable {
         }
         let fields = [listenAddress, udpListenAddress, bindIPv4Address, bindIPv6Address,
                       bindInterface, authUsername, authPassword]
-        guard fields.allSatisfy({ $0.utf8.count <= 1024 && $0.rangeOfCharacter(from: .controlCharacters.union(.newlines)) == nil }),
-              authUsername.utf8.count <= 255, authPassword.utf8.count <= 255,
+        // The native parser stores each of these fields in a 256-byte C buffer.
+        guard fields.allSatisfy({ $0.utf8.count <= 255 && $0.rangeOfCharacter(from: .controlCharacters.union(.newlines)) == nil }),
               authUsername.isEmpty == authPassword.isEmpty else {
-            throw SettingsError.invalid("Address fields must be single-line. Set both authentication fields or leave both empty (255 UTF-8 bytes each maximum).")
+            throw SettingsError.invalid("Text fields must be single-line and at most 255 UTF-8 bytes. Set both authentication fields or leave both empty.")
         }
         func quote(_ text: String) -> String { "'" + text.replacingOccurrences(of: "'", with: "''") + "'" }
         return """

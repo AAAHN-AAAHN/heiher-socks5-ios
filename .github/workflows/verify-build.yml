@@ -12,6 +12,7 @@ permissions:
   contents: read
 jobs:
   verify:
+    if: ${{ !contains(github.event.head_commit.message, '[settings-checks-only]') }}
     strategy:
       fail-fast: false
       matrix:
@@ -46,4 +47,25 @@ jobs:
         with:
           name: Socks5-${{ env.NAME }}-${{ runner.os }}
           path: artifacts/
+          retention-days: 30
+  settings-checks:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[settings-checks-only]') }}
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install formatter only (keep the Xcode compiler)
+        run: brew install llvm@18
+      - name: Settings audit and iOS 27 type checks (no app archive or IPA)
+        shell: bash
+        run: bash Tests/Settings/check_settings_sdk.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Settings-audit-no-IPA
+          path: artifacts/settings-checks/
           retention-days: 30

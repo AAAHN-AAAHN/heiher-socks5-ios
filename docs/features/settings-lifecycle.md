@@ -1,3 +1,11 @@
+# SOCKS5 for iOS: settings
+
+This is the focused `feature/settings` branch.
+For the complete app use `release/integrated`; the shared app + engine baseline remains on `main`.
+
+Build and verification: [instructions](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/feature/settings/docs/build-and-validation.md).
+The following specification is also preserved verbatim at `docs/features/settings-lifecycle.md`.
+
 # Unified settings and server lifecycle
 
 ## Goal and isolation

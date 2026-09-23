@@ -6,6 +6,8 @@ final class SettingsStore: ObservableObject {
     @Published private(set) var value = AppSettings()
     @Published private(set) var errorMessage: String?
     let fileURL: URL
+    private var importRevision: UInt64 = 0
+    private var migrationDefaults: UserDefaults?
 
     init(fileURL: URL? = nil, legacy: UserDefaults = .standard) {
         self.fileURL = fileURL ?? FileManager.default.urls(for: .applicationSupportDirectory,
@@ -17,9 +19,8 @@ final class SettingsStore: ObservableObject {
                 // Migrate the two settings saved by the preceding version once.
                 value.background.continuousLocation = legacy.bool(forKey: "background.continuousLocation")
                 value.background.silentAudio = legacy.bool(forKey: "background.silentAudio")
+                migrationDefaults = legacy
                 try write(value)
-                legacy.removeObject(forKey: "background.continuousLocation")
-                legacy.removeObject(forKey: "background.silentAudio")
             }
         } catch {
             errorMessage = "Settings could not be loaded: \(error.localizedDescription)"
@@ -31,6 +32,8 @@ final class SettingsStore: ObservableObject {
     }
 
     func set<Value>(_ path: WritableKeyPath<AppSettings, Value>, _ newValue: Value) {
+        // Even an explicit unchanged Stop supersedes a pending file import.
+        importRevision &+= 1
         var next = value
         next[keyPath: path] = newValue
         guard next != value else { return }
@@ -46,6 +49,7 @@ final class SettingsStore: ObservableObject {
 
     /// Decode and validate everything before changing either the file or live services.
     func importData(_ data: Data) throws {
+        importRevision &+= 1
         let next = try AppSettings.decoded(data)
         _ = try next.server.configuration()
         try write(next)
@@ -54,6 +58,9 @@ final class SettingsStore: ObservableObject {
     }
 
     func importFile(_ url: URL) async throws {
+        try Task.checkCancellation()
+        importRevision &+= 1
+        let revision = importRevision
         // File-provider coordination can wait for a download; keep it off MainActor.
         let data = try await Task.detached(priority: .userInitiated) {
             let access = url.startAccessingSecurityScopedResource()
@@ -67,6 +74,11 @@ final class SettingsStore: ObservableObject {
             guard let result else { throw SettingsError.invalid("The settings file could not be read.") }
             return try result.get()
         }.value
+        // A slow provider must not undo Stop, an edit, or a newer import.
+        try Task.checkCancellation()
+        guard revision == importRevision else {
+            throw SettingsError.invalid("Settings changed while the file was being read. Import again to replace them.")
+        }
         try importData(data)
     }
 
@@ -84,5 +96,9 @@ final class SettingsStore: ObservableObject {
         options.insert(.completeFileProtectionUntilFirstUserAuthentication)
         #endif
         try value.encoded().write(to: fileURL, options: options)
+        // Finish migration after the first successful write, including a later retry.
+        migrationDefaults?.removeObject(forKey: "background.continuousLocation")
+        migrationDefaults?.removeObject(forKey: "background.silentAudio")
+        migrationDefaults = nil
     }
 }
