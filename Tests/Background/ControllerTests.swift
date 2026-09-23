@@ -88,8 +88,11 @@ import Foundation
                                     userInfo: [AVAudioSessionRouteChangeReasonKey: UInt(3)]))
         check(audio.category == .playback && AVAudioPlayer.instances.last!.isPlaying, "External category change repaired")
         player = AVAudioPlayer.instances.last!
+        let beforeDecoder = audio.activations
         app.audioPlayerDecodeErrorDidOccur(player, error: nil)
-        check(Timer.live.count == 1 && Timer.live[0].interval == 1, "Decoder errors retry in one second")
+        check(audio.activations == beforeDecoder + 1 && AVAudioPlayer.instances.last !== player
+              && Timer.live.count == 1 && Timer.live[0].interval == 1,
+              "First decoder failure immediately recreates playback and retains one-second monitoring")
         Timer.live[0].fire()
         let staleTimer = Timer.live[0]
         app.audioEvent(Notification(name: AVAudioSession.interruptionNotification))

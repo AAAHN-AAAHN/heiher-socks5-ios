@@ -17,7 +17,7 @@ struct BackgroundKeepAliveView: View {
                 } header: {
                     Text("Audio")
                 } footer: {
-                    Text("Checks playback every second. Interruptions trigger immediate recovery; failures retry every second while On. Mixes with other audio.")
+                    Text("Checks playback every second. Interruption and stop signals trigger immediate recovery; repeated failures retry every second while On. Mixes with other audio.")
                 }
                 Section {
                     Toggle("Continuous location", isOn: $locationEnabled)
@@ -49,13 +49,9 @@ struct BackgroundKeepAliveView: View {
 @MainActor
 struct BackgroundKeepAliveEvents: ViewModifier {
     let keepAlive: BackgroundKeepAlive
-    private let audioEvents = Publishers.MergeMany([
-        AVAudioSession.interruptionNotification,
-        AVAudioSession.routeChangeNotification,
-        AVAudioSession.mediaServicesWereLostNotification,
-        AVAudioSession.mediaServicesWereResetNotification
-    ].map { NotificationCenter.default.publisher(for: $0) })
-        .receive(on: RunLoop.main)
+    private let audioEvents = Publishers.MergeMany(
+        BackgroundKeepAlive.audioNotifications.map { NotificationCenter.default.publisher(for: $0) }
+    ).receive(on: RunLoop.main)
 
     func body(content: Content) -> some View {
         content

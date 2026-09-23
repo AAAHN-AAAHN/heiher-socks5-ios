@@ -44,37 +44,83 @@ no iPhone battery benchmark has established a precise percentage saving.
 
 A single AVAudioPlayer loops `Silence.wav` with `numberOfLoops = -1`. The session uses
 `.playback`, `.default`, and `.mixWithOthers`. No microphone permission or recording
-is used. System-alert interruption avoidance is requested as a best effort.
+is used. System-alert interruption avoidance remains a best-effort preference.
 
-The On choice is user intent, distinct from actual playback success. A single
-one-shot Timer on the main run loop in common modes performs a healthy `isPlaying`
-check after one second. If playback is stopped it attempts recovery. Failures retry
-after one second, without backoff or an attempt limit; success retains one-second
-checks. There is no second polling timer during recovery and no timer for each WAV
-loop. Normal healthy checks do not reconstruct the player or reactivate the session.
+Saved On is user intent, not a claim of successful playback. One common-mode,
+one-shot main-run-loop Timer checks `isPlaying` every second. An observed stop
+attempts recovery in that callback, without another initial one-second wait.
+A new interruption or invalidation likewise attempts recovery immediately in its
+MainActor handler, even if the old player still claims to be playing. Failed
+activation, construction or play schedules the next attempt after one second,
+without backoff, attempt limit or automatic Off. Healthy samples do not reactivate
+or recreate the player. This is not a real-time timer or suspension bypass.
 
-Interruption notifications (including missing/unknown metadata) recreate the player
-and attempt immediate recovery even if `isPlaying` was stale. Media service loss and
-reset do the same. Route changes check and repair playback; the application's own
-normal category-change notification does not recursively rebuild a healthy player.
-A root-level ViewModifier owns the event subscriptions so leaving the Background
-tab does not detach them. Returning to the foreground reconciles enabled services.
+### Public signal coverage
 
-Unexpected completion retries immediately. Decoder failure is paced at one second
-to avoid a synchronous error spin. Delegate callbacks arriving off-main are routed
-to MainActor. Object identity rejects callbacks from replaced players. Timer identity
-rejects delayed callbacks from cancelled timers. Explicit Off invalidates the timer,
-clears player/delegate state, and deactivates audio. Neither an error nor an old
-callback silently re-enables or permanently disables a user's choice.
+The subscriber and handler share `BackgroundKeepAlive.audioNotifications`, avoiding
+separate lists that can drift. On iOS 27 the registry contains all 13 playback-
+relevant AVAudioSession notification names below, plus four lifecycle checkpoints.
+The legacy interruption notification is deliberately retained alongside its new
+replacements, including missing/unknown userInfo. Typed NotificationCenter messages
+are alternative representations of these events, not extra signals to duplicate.
+
+| Signal | Handling while Audio is On |
+| --- | --- |
+| `interruptionNotification` (legacy) | Recreate and attempt recovery, for began/ended and unknown or missing metadata. |
+| `didBecomeInactiveNotification` (iOS 27) | Recreate and attempt recovery regardless of deactivation reason/context. |
+| `resumptionRecommendationNotification` (iOS 27) | Recreate and attempt recovery; missing/negative advice does not erase saved On. System priority can still deny activation. |
+| `mediaServicesWereLostNotification`, `mediaServicesWereResetNotification` | Discard stale audio objects, restore the session and attempt recovery. |
+| `routeChangeNotification` | All route reasons reach playback reconciliation. Repair changed category/mode/options. A stopped existing player is retried even on a normal category-change event. |
+| `didBecomeActiveNotification` (iOS 27) | Reconcile playback without rebuilding a healthy player. Suppress our own activation echo when a missing player already has a recovery attempt/retry. |
+| `silenceSecondaryAudioHintNotification` | Reconcile playback; this foreground-only hint is not a guaranteed background end notification. The WAV is already silent. |
+| `spatialPlaybackCapabilitiesChangedNotification`, `renderingModeChangeNotification`, `renderingCapabilitiesChangeNotification` | Reconcile playback, without reconstructing a healthy player solely for a rendering change. |
+| `outputMuteStateChangeNotification`, `userIntentToUnmuteOutputNotification` (iOS 26+) | Reconcile playback without overriding mute/volume or declaring silence a playback failure. |
+
+App will-resign-active, did-enter-background, will-enter-foreground and protected-
+data-available notifications provide additional audio-only checkpoints. The existing
+root did-become-active callback continues reconciling both enabled services. The
+root owns subscriptions, not the Background tab. This is observation, not a request
+for new background execution, and neither changes the saved switches nor the server.
+
+Microphone-injection/input-mute notifications concern unused recording facilities;
+AVAudioEngine/AVPlayer events do not describe this AVAudioPlayer. They are not added
+as fake interruption coverage. Remote media commands are not audio-session
+interruption broadcasts: no Now Playing/remote-command ownership is introduced,
+which could interfere with the LiveContainer host or other media. Undelivered OS
+notifications, process termination and events outside this session cannot be
+observed by subscribing to more names. Polling and foreground reconciliation remain
+the fallback when no stop notification arrives.
+
+### Immediate recovery without recursive failure loops
+
+The first unexpected completion or decoder failure after healthy playback now
+recreates and retries immediately. A failed replacement that errors again before
+one healthy timer sample belongs to the same recovery episode: preserve the pending
+one-second retry rather than spin or push its deadline further into the future.
+A healthy sample resets this pacing so the next independent failure is immediate.
+There is no global throttle on genuinely new interruption notifications.
+
+If setCategory, setActive, stop or play synchronously delivers another event or
+player failure, an in-progress guard prevents recursive activation/play. An
+invalidating event marks that attempt unsuccessful, and its retry remains one
+second. A delayed own-category/active echo with no player does not bypass an already
+scheduled failure retry. These are re-entry/echo protections, not ignored external
+stopped-player events. Explicit Off wins even if it occurs during activation.
+
+Delegate callbacks off-main are routed to MainActor. Player identity rejects stale
+callbacks; timer identity rejects cancelled callbacks. Off cancels the timer,
+clears recovery pacing/player/delegate state, and deactivates audio. Recovery may
+fail during a call or while iOS denies activation; it does not defeat that policy.
 
 ## Persistence and integration
 
 The isolated branch uses the two existing AppStorage preference keys, which makes
 its switches complete and persistent without depending on the JSON feature.
-The final release uses the exact same controller and screen but injects JSON-backed
-bindings from SettingsStore. On first migration it consumes the two old keys and
-removes them only after a successful JSON save. It does not run both persistence
-systems in parallel. The controller itself contains no settings-file I/O.
+The integration contract uses the same controller/screen interfaces with JSON-backed
+bindings from SettingsStore. The existing release migration consumes the two old
+keys and removes them only after a successful JSON save; it does not run both
+persistence systems in parallel. This branch update has not been merged into that
+release. The controller itself contains no settings-file I/O.
 
 The Background screen places Audio above Location and Location state.
 `BackgroundKeepAliveView` receives the controller and two bindings. It does not own
@@ -96,20 +142,52 @@ be delayed until the app is scheduled. Saved On is reapplied on the next launch;
 the app does not relaunch itself. A call may or may not allow reactivation. The code
 continues retrying when it can execute, but cannot override iOS audio priorities.
 
-## Current scoped change and environment
+## Supported versions, installation environments and current scope
 
-The 2026-09-23 update only moves Audio above Location and changes healthy playback
-checks from two seconds to one. Immediate event recovery and one-second failure
-retries remain unchanged. Healthy timer requests are twice as frequent; there is
-still only one timer, and no measured battery/CPU impact is claimed. This branch
-update is not merged into `release/integrated`.
+- **Target use:** iOS 27.0 physical iPhone, SideStore standalone installation or
+  LiveContainer guest execution. These are different runtime environments.
+- **Minimum deployment target:** unchanged at iOS 17.2; this is not certification
+  that every OS release has been tested. New 26/27 notifications are runtime-gated.
+- **Build requirement for these symbols:** Xcode 27 / iPhoneOS 27 SDK. The branch's
+  macOS CI runner now selects that toolchain. The app identity, entitlements,
+  permissions, audio options, location behavior and WAV are unchanged.
+- **Scope:** add the public playback signals above and fix stopped-category and
+  first-decoder recovery. Audio remains above Location. No BGTask, host patch,
+  ID rewrite, extra timer, persistent diagnostic log or relay change is introduced.
+- **No IPA requested:** a commit marked `[audio-checks-only]` runs only the isolated
+  validation job. The production archive job is skipped, not called and discarded.
+  The validation script type-checks sources but creates no app archive or IPA.
+- **Actual checks:** the current local run uses Swift 6.2.1 Linux platform doubles,
+  1030 existing controller assertions, four worker-delegate checks and 103 recovery
+  assertions (including repeated 1000 decoder and 100 completion callbacks).
+  Counts include loop repetitions and are not independent physical-device tests.
+  The SDK/Combine-only CI outcome must be recorded after inspecting its artifacts.
+- **Not performed:** physical iOS 27 SideStore/LiveContainer installation or
+  interruption delivery, phone/Siri/Bluetooth/lock-screen tests, energy benchmarks,
+  and release/integrated merging. No claim that every OS signal is always delivered
+  or every attempted activation succeeds is made.
 
-Target use remains iOS 27.0 on a physical iPhone with SideStore standalone
-installation or LiveContainer guest execution. The configured minimum iOS remains
-17.2. This patch was checked using Swift 6.2.1 on Linux, controller/delegate platform
-doubles, raw WAV validation and source-diff checks. No iOS SDK compile, IPA build,
-SideStore installation, LiveContainer run or physical-device timing test was
-performed for this patch. These limits are separate from historical checks below.
+The added signal observers are a fixed-size list (13 session + four lifecycle
+checkpoints on iOS 27), not new polling. Extra state is three Booleans for in-flight
+invalidation and repeated-player-error pacing. Memory does not grow per event.
+Frequent external notifications can cause more than one immediate attempt per
+second; one second is the scheduled retry interval, not a global event-rate limit.
+No battery or CPU saving is asserted without measurement.
+
+The previous `f2b0ad7` update only reordered Audio and changed health checks to one
+second. Its old common composition checker still required the obsolete two-second
+literal and notification names physically in the view. That validator now checks
+the shared registry and one-second policy; it does not reintroduce obsolete code to
+satisfy string checks. Feature-specific validation is allowed to evolve, while
+engine pins, the committed framework and production build script remain locked.
+
+**README maintenance rule:** record minimum/target/tested OS separately, including
+OS build, SDK/Xcode, installer/host version when actually known, tested source
+commit/CI run, passed/failed/not-run scopes, costs and limitations. SDK type checking,
+scripted tests and Simulator evidence never substitute for physical SideStore or
+LiveContainer tests. Keep this README and its feature specification byte-identical;
+preserve historical results with their own source/version rather than relabeling
+old evidence as a new run.
 
 ## Validation
 
@@ -121,7 +199,12 @@ tests. The Apple audio decoder uses the real asset on macOS. iOS compilation che
 the actual framework APIs. Phone calls, Bluetooth routes, lock-screen scheduling,
 and energy consumption still require device tests.
 
-References:
+References (public API contracts, not device-test results):
+- https://developer.apple.com/documentation/avfaudio/avaudiosession/didbecomeinactivenotification
+- https://developer.apple.com/documentation/avfaudio/avaudiosession/resumptionrecommendationnotification
+- https://developer.apple.com/documentation/avfaudio/avaudiosession/didbecomeactivenotification
+- https://developer.apple.com/library/archive/qa/qa1882/_index.html
+- https://developer.apple.com/documentation/foundation/timer
 - https://developer.apple.com/documentation/corelocation/cllocationmanager/pauseslocationupdatesautomatically
 - https://developer.apple.com/documentation/avfaudio/avaudiosession/interruptionnotification
 - https://developer.apple.com/documentation/avfaudio/avaudioplayer/numberofloops

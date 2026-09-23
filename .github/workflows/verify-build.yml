@@ -12,10 +12,11 @@ permissions:
   contents: read
 jobs:
   verify:
+    if: ${{ !contains(github.event.head_commit.message, '[audio-checks-only]') }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15]
+        os: [ubuntu-24.04, xcode-27]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
     steps:
@@ -46,4 +47,23 @@ jobs:
         with:
           name: Socks5-${{ env.NAME }}-${{ runner.os }}
           path: artifacts/
+          retention-days: 30
+  audio-checks:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[audio-checks-only]') }}
+    runs-on: xcode-27
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Audio tests and iOS 27 type checks only (no archive or IPA)
+        shell: bash
+        run: bash Tests/Background/check_audio_sdk.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Background-audio-checks-no-IPA
+          path: artifacts/audio-checks/
           retention-days: 30

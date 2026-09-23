@@ -17,6 +17,44 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     private var requestedPermission = false
     private var player: AVAudioPlayer?
     private var audioCheck: Timer?
+    private var restoringAudio = false
+    private var invalidatedDuringRestore = false
+    private var playerFailurePending = false
+
+    // Both the subscriber and handler use this registry: no unhandled new names.
+    // Keep the legacy notification for compatibility alongside the iOS 27 signals.
+    private static let invalidatingAudioNotifications: [Notification.Name] = {
+        var names = [AVAudioSession.interruptionNotification,
+                     AVAudioSession.mediaServicesWereLostNotification,
+                     AVAudioSession.mediaServicesWereResetNotification]
+        if #available(iOS 27.0, *) {
+            names += [AVAudioSession.didBecomeInactiveNotification,
+                      AVAudioSession.resumptionRecommendationNotification]
+        }
+        return names
+    }()
+
+    static let audioNotifications: [Notification.Name] = {
+        var names = invalidatingAudioNotifications + [
+            AVAudioSession.routeChangeNotification,
+            AVAudioSession.silenceSecondaryAudioHintNotification,
+            AVAudioSession.spatialPlaybackCapabilitiesChangedNotification,
+            AVAudioSession.renderingModeChangeNotification,
+            AVAudioSession.renderingCapabilitiesChangeNotification,
+            UIApplication.willResignActiveNotification,
+            UIApplication.didEnterBackgroundNotification,
+            UIApplication.willEnterForegroundNotification,
+            UIApplication.protectedDataDidBecomeAvailableNotification
+        ]
+        if #available(iOS 26.0, *) {
+            names += [AVAudioSession.outputMuteStateChangeNotification,
+                      AVAudioSession.userIntentToUnmuteOutputNotification]
+        }
+        if #available(iOS 27.0, *) {
+            names.append(AVAudioSession.didBecomeActiveNotification)
+        }
+        return names
+    }()
 
     deinit { audioCheck?.invalidate() }
 
@@ -112,14 +150,25 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         } else {
             audioCheck?.invalidate()
             audioCheck = nil
+            playerFailurePending = false
             discardPlayer()
             try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
             audioState = "Off"
         }
     }
 
-    private func resumeAudio() {
+    private func resumeAudio(recreate: Bool = false) {
         guard audioEnabled else { return }
+        // A signal raised synchronously by setCategory/setActive/play invalidates
+        // this attempt; it must not recursively enter another activation/play.
+        guard !restoringAudio else {
+            if recreate { invalidatedDuringRestore = true }
+            return
+        }
+        restoringAudio = true
+        invalidatedDuringRestore = false
+        defer { restoringAudio = false }
+        if recreate { discardPlayer() }
         if player?.isPlaying == true {
             if audioCheck == nil { scheduleAudioCheck(after: 1) }
             return
@@ -135,6 +184,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
                 try? session.setPrefersNoInterruptionsFromSystemAlerts(true)
             }
             try session.setActive(true)
+            guard audioEnabled else { return }
             if player == nil {
                 guard let url = Bundle.main.url(forResource: "Silence", withExtension: "wav") else {
                     throw NSError(domain: "BackgroundKeepAlive", code: 1,
@@ -144,9 +194,10 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
                 player?.delegate = self
                 player?.numberOfLoops = -1
             }
-            guard player?.play() == true else {
+            guard let current = player, current.play(), current.isPlaying, audioEnabled,
+                  player === current, !invalidatedDuringRestore else {
                 throw NSError(domain: "BackgroundKeepAlive", code: 2,
-                              userInfo: [NSLocalizedDescriptionKey: "Audio playback could not start"])
+                              userInfo: [NSLocalizedDescriptionKey: "Audio playback could not start or was interrupted during recovery"])
             }
             audioState = "Playing silent WAV continuously"
             scheduleAudioCheck(after: 1)
@@ -157,9 +208,28 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
 
     private func retryAudio(_ error: Error?) {
         guard audioEnabled else { return }
+        let wasRestoring = restoringAudio
+        restoringAudio = true
+        defer { restoringAudio = wasRestoring }
         discardPlayer()
-        audioState = "Waiting to resume: \(error?.localizedDescription ?? "Audio decoder stopped")"
-        scheduleAudioCheck(after: 1)
+        audioState = "Waiting to resume: \(error?.localizedDescription ?? "Audio playback stopped")"
+        // Repeated failures must not postpone an already scheduled retry.
+        if audioCheck == nil { scheduleAudioCheck(after: 1) }
+    }
+
+    private func playerStopped(_ error: Error?) {
+        guard audioEnabled else { return }
+        if restoringAudio {
+            invalidatedDuringRestore = true
+            playerFailurePending = true
+        } else if playerFailurePending {
+            // Another failure before a healthy sample belongs to the same recovery
+            // episode. Preserve the one-second retry instead of a decoder spin.
+            retryAudio(error)
+        } else {
+            playerFailurePending = true
+            resumeAudio(recreate: true)
+        }
     }
 
     private func discardPlayer() {
@@ -175,6 +245,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
             MainActor.assumeIsolated {
                 guard let self, self.audioCheck === timer else { return }
                 self.audioCheck = nil
+                if self.player?.isPlaying == true { self.playerFailurePending = false }
                 self.resumeAudio()
             }
         }
@@ -183,28 +254,36 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     }
 
     func audioEvent(_ notification: Notification) {
-        guard audioEnabled else { return }
-        switch notification.name {
-        case AVAudioSession.interruptionNotification:
-            // Every interruption is actionable, including missing/unknown metadata.
-            // Recreate even if an interrupted player still reports isPlaying.
-            discardPlayer()
-        case AVAudioSession.mediaServicesWereLostNotification,
-             AVAudioSession.mediaServicesWereResetNotification:
-            discardPlayer()
-        case AVAudioSession.routeChangeNotification:
-            let reason = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
-            if reason == AVAudioSession.RouteChangeReason.categoryChange.rawValue {
-                let session = AVAudioSession.sharedInstance()
-                if session.category == .playback && session.mode == .default && session.categoryOptions == [.mixWithOthers] {
-                    if audioCheck == nil { scheduleAudioCheck(after: 1) }
-                    return
-                }
-                discardPlayer()
-            }
-        default:
+        guard audioEnabled, Self.audioNotifications.contains(notification.name) else { return }
+        if Self.invalidatingAudioNotifications.contains(notification.name) {
+            // No metadata/shouldResume gate: saved On means best-effort recovery,
+            // even with missing context or stale isPlaying. iOS can still refuse.
+            resumeAudio(recreate: true)
             return
         }
+        if notification.name == AVAudioSession.routeChangeNotification,
+           notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
+                == AVAudioSession.RouteChangeReason.categoryChange.rawValue {
+            let session = AVAudioSession.sharedInstance()
+            if session.category != .playback || session.mode != .default || session.categoryOptions != [.mixWithOthers] {
+                resumeAudio(recreate: true)
+                return
+            }
+            // Ignore our own normal configuration echo while waiting to create a
+            // player. A real stopped player must still be checked immediately.
+            if player == nil {
+                if audioCheck == nil, !restoringAudio { scheduleAudioCheck(after: 1) }
+                return
+            }
+        }
+        if #available(iOS 27.0, *), notification.name == AVAudioSession.didBecomeActiveNotification,
+           player == nil, restoringAudio || audioCheck != nil {
+            // Successful setActive can notify before player creation/play fails.
+            // Do not let its delayed echo turn one-second retries into a busy loop.
+            return
+        }
+        // Routes, rendering/mute hints and lifecycle transitions are checkpoints,
+        // not reasons to rebuild healthy playback or override the user's mute.
         resumeAudio()
     }
 
@@ -213,8 +292,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         onMain { [weak self] in
             guard let self, let current = self.player,
                   ObjectIdentifier(current) == id, self.audioEnabled else { return }
-            self.discardPlayer()
-            self.resumeAudio()
+            self.playerStopped(nil)
         }
     }
 
@@ -223,8 +301,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         onMain { [weak self] in
             guard let self, let current = self.player,
                   ObjectIdentifier(current) == id, self.audioEnabled else { return }
-            // Decoder failures can repeat immediately; pace retries rather than spin.
-            self.retryAudio(error)
+            self.playerStopped(error)
         }
     }
 

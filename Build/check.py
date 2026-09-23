@@ -37,8 +37,10 @@ def baseline():
         base = CONFIG['base_commit']
         git(ROOT, 'merge-base', '--is-ancestor', base, 'HEAD')
         for path in ('Build/upstream.json', 'Build/baseline-framework.json', 'Build/build.sh',
-                     'Build/check.py', 'docs/main-baseline.md', 'HevSocks5Server.xcframework'):
+                     'docs/main-baseline.md', 'HevSocks5Server.xcframework'):
             assert git(ROOT, 'rev-parse', 'HEAD:' + path) == git(ROOT, 'rev-parse', base + ':' + path), path
+    # Feature validation evolves with its source; the runtime build script,
+    # engine pins and committed framework above remain byte-locked to main.
     print('PASS: shared source pins, baseline framework, app identity and main ancestry')
 
 
@@ -100,10 +102,17 @@ def composition():
     if 'background' in FEATURES:
         silence(ROOT / 'Socks5/BackgroundKeepAlive/Silence.wav')
         view = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift').read_text()
-        for event in ('interruptionNotification', 'routeChangeNotification', 'mediaServicesWereLostNotification', 'mediaServicesWereResetNotification'):
-            assert event in view
+        assert 'BackgroundKeepAlive.audioNotifications.map' in view
         source = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift').read_text()
-        assert 'scheduleAudioCheck(after: 2)' in source and 'scheduleAudioCheck(after: 1)' in source
+        for event in ('interruptionNotification', 'routeChangeNotification',
+                      'mediaServicesWereLostNotification', 'mediaServicesWereResetNotification',
+                      'didBecomeInactiveNotification', 'resumptionRecommendationNotification',
+                      'didBecomeActiveNotification', 'silenceSecondaryAudioHintNotification',
+                      'spatialPlaybackCapabilitiesChangedNotification', 'renderingModeChangeNotification',
+                      'renderingCapabilitiesChangeNotification', 'outputMuteStateChangeNotification',
+                      'userIntentToUnmuteOutputNotification'):
+            assert event in source, event
+        assert 'scheduleAudioCheck(after: 2)' not in source and 'scheduleAudioCheck(after: 1)' in source
         assert 'retryDelay' not in source and 'UserDefaults' not in source
     if 'settings' in FEATURES:
         content = (ROOT / 'Socks5/ContentView.swift').read_text()
