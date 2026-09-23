@@ -94,3 +94,21 @@ Keep README and docs/features/integrated.md identical. Update target/tested vers
 exact source/build/run IDs, failed and unexecuted checks, installation scope and
 remaining limitations whenever the code or evidence changes. Feature documents
 retain their original audited versions; historical evidence is not relabeled.
+
+## Duplicate extraction reconciliation
+
+The alternative server-runtime/config-persistence branches were compared with the
+canonical server-control/settings-persistence pair. The execution state machine,
+server validator, storage and native cancellation patch contain no additional
+runtime fix; retain the canonical product code. Absorb the alternative's broader
+native CI matrix, compiled I/O-mode proof, negative import control and configuration
+boundary checks while preserving canonical parity/ownership tests.
+
+[Detailed comparison, decisions, source refs and limits](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/release/integrated/docs/reviews/duplicate-branch-comparison.md).
+All product files remain exact bytes from release `6ad54bdc`. A commit marked
+`[reconcile-duplicates]` runs checks only, skips app/IPA and Simulator creation, and
+then removes only the three reviewed obsolete refs with exact leases after checks
+pass. The older 1.1.0/build 6 IPA remains tied to run `35845223338`, whose product jobs
+succeeded but branch cleanup failed; it is not relabeled as a newly built artifact.
+Target iOS 27 + SideStore/LiveContainer and physical-test limitations above remain.
+Completed validation and the final remote branch count are recorded after execution.

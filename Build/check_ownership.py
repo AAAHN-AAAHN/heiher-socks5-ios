@@ -3,6 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
+import plistlib
 import re
 import subprocess
 
@@ -24,6 +25,9 @@ def content(path):
 
 def main():
     assert 'server' in FEATURES
+    assert 'settings' not in FEATURES or 'server' in FEATURES
+    base = CONFIG['base_commit']
+    subprocess.run(['git', '-C', str(ROOT), 'merge-base', '--is-ancestor', base, 'HEAD'], check=True)
     model = content('Socks5/Server/ServerSettings.swift')
     controller = content('Socks5/Server/ServerController.swift')
     editor = content('Socks5/ContentView.swift')
@@ -55,6 +59,19 @@ def main():
         assert root.count('.modifier(BackgroundKeepAliveEvents(keepAlive: keepAlive))') == 1
         assert 'keepAlive.setAudio(value.background.silentAudio)' in root
         assert 'keepAlive.setLocation(value.background.continuousLocation)' in root
+    # Complement owner hashes with the duplicate review's deployment/permission
+    # contracts. These are source declarations, not granted device permissions.
+    info = plistlib.loads((ROOT / 'Socks5/Info.plist').read_bytes())
+    assert info['UIApplicationSceneManifest']['UIApplicationSupportsMultipleScenes'] is False
+    assert not any(key.startswith('BGTask') for key in info)
+    assert set(info.get('UIBackgroundModes', [])) == ({'audio', 'location'} if 'background' in FEATURES else set())
+    project = content('Socks5.xcodeproj/project.pbxproj')
+    for key in ('IPHONEOS_DEPLOYMENT_TARGET', 'PRODUCT_BUNDLE_IDENTIFIER', 'CODE_SIGN_STYLE'):
+        pattern = r'^\s*' + key + r' = (.*);$'
+        assert re.findall(pattern, project, re.M) == re.findall(pattern, show(base, 'Socks5.xcodeproj/project.pbxproj').decode(), re.M), key
+    assert 'CODE_SIGN_ENTITLEMENTS' not in project
+    for path in ('Tests/server_lifecycle_host.c', 'Tests/server_lifecycle_regression.py'):
+        assert (ROOT / path).read_bytes() == show(INPUT, path), path
     manifest = json.loads((ROOT / 'docs/feature-membership.json').read_bytes())
     checked = 0
     for ref in manifest.get('branches', {}).values():

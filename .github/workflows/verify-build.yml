@@ -13,6 +13,8 @@ jobs:
         os: [ubuntu-24.04, xcode-27]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    env:
+      BUILD_IPA: ${{ contains(github.event.head_commit.message, '[reconcile-duplicates]') && '0' || '1' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -34,7 +36,13 @@ jobs:
             xcodebuild -version
             xcrun --sdk iphoneos --show-sdk-version | grep -E '^27\.'
           fi
-      - name: Verify all features and build release IPA on macOS
+      - name: Verify reviewed duplicate equivalence before reconciliation
+        if: ${{ contains(github.event.head_commit.message, '[reconcile-duplicates]') }}
+        shell: bash
+        run: |
+          mkdir -p artifacts/integrated
+          python3 Build/verify_duplicate_comparison.py > artifacts/integrated/duplicate-comparison.json
+      - name: Verify all features and optionally build release IPA on macOS
         shell: bash
         run: bash Build/build.sh
       - name: Check actual iOS 27 API and release package
@@ -43,9 +51,11 @@ jobs:
         run: |
           set -euo pipefail
           bash Build/check_swift_sdk.sh
-          python3 Build/verify_release.py > artifacts/integrated/package-review.log 2>&1
+          if [ "$BUILD_IPA" = 1 ]; then
+            python3 Build/verify_release.py > artifacts/integrated/package-review.log 2>&1
+          fi
       - name: Run production app with saved tabs and Start/Stop on iOS 27 Simulator
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && env.BUILD_IPA == '1'
         shell: bash
         run: python3 Build/simulator_review.py > artifacts/integrated/simulator-review.log 2>&1
       - name: Record exact source
@@ -59,7 +69,7 @@ jobs:
           retention-days: 30
   finish-requested-split:
     needs: verify
-    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[integrate-eight]') }}
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[reconcile-duplicates]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -69,7 +79,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - name: Remove only the superseded settings branch after successful verification
+      - name: Remove only reviewed obsolete branches after successful verification
         run: python3 Build/finish_branch_split.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

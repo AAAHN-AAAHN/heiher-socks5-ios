@@ -26,48 +26,10 @@ cp Build/features.json "$OUT/features.json"
     git -C "$CORE" submodule status --recursive
 } > "$OUT/build-info.txt"
 feature() { python3 -c 'import json,sys; sys.exit(sys.argv[1] not in json.load(open("Build/features.json"))["features"])' "$1"; }
-mode=buffered
-for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
-    if [ -n "$flags" ]; then
-        if [ "$(uname -s)" != Linux ] || ! feature statistics; then break; fi
-        mode=splice
-    fi
-    make -C "$CORE" -j3 CFLAGS="$flags" static exec > "$OUT/$mode-build.log" 2>&1
-    python3 Tests/tcp_smoke.py "$CORE/bin/hev-socks5-server" > "$OUT/$mode-tcp.log"
-    if feature udp; then
-        python3 Tests/udp_sockaddr_regression.py "$CORE/bin/hev-socks5-server" \
-            --output "$OUT/$mode-protocol.json" > "$OUT/$mode-protocol.log" 2>&1
-    fi
-    if feature statistics; then
-        cc -std=gnu11 -O2 -Wall -Werror -pthread -I"$CORE/src" Tests/traffic_stats_host.c \
-            "$CORE/bin/libhev-socks5-server.a" "$CORE/third-part/yaml/bin/libyaml.a" \
-            "$CORE/third-part/hev-task-system/bin/libhev-task-system.a" -o "$OUT/stats-host"
-        python3 Tests/traffic_stats_regression.py "$OUT/stats-host" \
-            > "$OUT/$mode-statistics.log" 2>&1
-        rm "$OUT/stats-host"
-    fi
-    if feature server; then
-        cc -std=gnu11 -O2 -Wall -Werror -pthread -I"$CORE/src" Tests/server_lifecycle_host.c \
-            "$CORE/bin/libhev-socks5-server.a" "$CORE/third-part/yaml/bin/libyaml.a" \
-            "$CORE/third-part/hev-task-system/bin/libhev-task-system.a" -o "$OUT/lifecycle-host"
-        python3 Tests/server_lifecycle_regression.py "$OUT/lifecycle-host" > "$OUT/$mode-lifecycle.log" 2>&1
-        rm "$OUT/lifecycle-host"
-        swiftc -swift-version 5 -warnings-as-errors Socks5/Server/ServerSettings.swift \
-            Tests/ServerControl/EmitConfiguration.swift -o "$OUT/emit-config"
-        "$OUT/emit-config" "$OUT/yaml"
-        cc -std=gnu11 -O2 -Wall -Werror -pthread -I"$CORE/src" Tests/ServerControl/configuration_probe.c \
-            "$CORE/bin/libhev-socks5-server.a" "$CORE/third-part/yaml/bin/libyaml.a" \
-            "$CORE/third-part/hev-task-system/bin/libhev-task-system.a" -o "$OUT/config-probe"
-        "$OUT/config-probe" "$OUT/yaml/defaults.yml" "$OUT/yaml/quoted.yml" > "$OUT/$mode-configuration.log"
-        rm "$OUT/emit-config" "$OUT/config-probe"
-    fi
-    make -C "$CORE" clean >> "$OUT/$mode-build.log" 2>&1
-done
-if feature statistics; then
-    swiftc Socks5/Statistics/TrafficStatistics.swift Tests/traffic_statistics_model.swift -o "$OUT/stats-model"
-    "$OUT/stats-model" > "$OUT/statistics-model.log"
-    rm "$OUT/stats-model"
-fi
+# The shared dispatcher exercises the actual compiled I/O mode and the full
+# retained UDP/statistics probes instead of inferring modes from CFLAGS labels.
+python3 Build/native_checks.py "$CORE" "$OUT/native" > "$OUT/native-checks.log" 2>&1
+make -C "$CORE" clean > "$OUT/native-clean.log" 2>&1
 if feature background; then
     python3 Tests/Background/run_checks.py > "$OUT/background.log" 2>&1
     if [ "$(uname -s)" = Darwin ]; then
@@ -80,6 +42,13 @@ if feature server; then
 fi
 if feature settings; then
     python3 Tests/Settings/run_checks.py > "$OUT/settings.log" 2>&1
+    python3 Tests/Settings/run_checks.py --baseline-import > "$OUT/original-import-negative.log" 2>&1
+fi
+if [ "$(uname -s)" = Darwin ]; then
+    MODULE="$ROOT/.build/typecheck-module"
+    mkdir -p "$MODULE"
+    cp "$CORE/src/hev-main.h" "$MODULE/hev-main.h"
+    printf 'module HevSocks5Server { header "hev-main.h" export * }\n' > "$MODULE/module.modulemap"
 fi
 if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
     (cd "$CORE" && ./build-apple.sh) > "$OUT/core-apple.log" 2>&1
