@@ -161,7 +161,7 @@ continues retrying when it can execute, but cannot override iOS audio priorities
   1030 existing controller assertions, four worker-delegate checks and 103 recovery
   assertions (including repeated 1000 decoder and 100 completion callbacks).
   Counts include loop repetitions and are not independent physical-device tests.
-  The SDK/Combine-only CI outcome must be recorded after inspecting its artifacts.
+  The same tests also passed in the test-only Xcode 27 run recorded below.
 - **Not performed:** physical iOS 27 SideStore/LiveContainer installation or
   interruption delivery, phone/Siri/Bluetooth/lock-screen tests, energy benchmarks,
   and release/integrated merging. No claim that every OS signal is always delivered
@@ -188,6 +188,51 @@ scripted tests and Simulator evidence never substitute for physical SideStore or
 LiveContainer tests. Keep this README and its feature specification byte-identical;
 preserve historical results with their own source/version rather than relabeling
 old evidence as a new run.
+
+## Completed no-IPA verification (2026-09-23)
+
+Tested commit: `c334ed060ac8d27081c74196dae544df5bff3a80`.
+Tested tree: `8995bd73aea2ce4df10ae9bd8641262262a56696`.
+GitHub Actions run: `35824844915`; test-only `audio-checks` job succeeded.
+The normal `verify` archive/IPA job was intentionally skipped by the commit marker.
+This completion text is a later documentation-only change, not another test run.
+
+The actual toolchain was Xcode 27.0 build 27A266a, iPhoneOS SDK 27.0. All five
+production Swift files passed `swiftc -typecheck -warnings-as-errors` for ARM64 with
+the unchanged iOS 17.2 deployment target. This validates API names, availability,
+types and SwiftUI wiring, but does not link an application or run it on an iPhone.
+The tests ran on the macOS runner; no Simulator or physical iOS runtime was used.
+
+The 1030 controller assertions, four off-main delegate checks and 103 recovery
+assertions passed. Recovery tests exercise each registered notification, unknown
+metadata, all known/unknown route reasons, immediate first decoder failure, repeated
+failure pacing, stale callbacks, synchronous re-entry, Off during activation, and
+single-timer ownership. The 1000 decoder/100 completion loops are scripted repeats,
+not that many independent interruption scenarios or OS-generated events.
+
+The actual production Combine publisher expression was also tested with real
+Foundation/Combine and scripted audio/device boundaries. All 17 names delivered
+once from main and once from a worker reached the handler on main: 34 deliveries.
+Subscription cancellation detached it. This checks forwarding, not OS delivery
+conditions or the lifetime of a hosted SwiftUI screen. Apple's AVAudioFile decoded
+the original WAV into 400 zero samples. Baseline pin/framework preservation,
+composition/style checks and whitespace checks passed.
+
+Artifact `10734727873` was downloaded and inspected. Its SHA-256 is
+`131d85c248b0fca074df347130eda5b7cfbe0a20cfe3a90703fb391fc20f05b5`.
+All 53 recorded source-file hashes match the reviewed source tree. The artifact
+contains logs and a source hash manifest, no IPA or app archive. Compared with
+`f2b0ad7`, 40 of 50 existing tracked files remain byte-identical; ten files changed
+and three test-only files were added. The location methods are byte-identical.
+Only controller and view are changed production Swift files; the Xcode project,
+Info.plist, AppRoot, server, WAV, source pins and build pipeline script are unchanged.
+`Build/check.py` itself is no longer byte-locked to the baseline because its
+feature checks were updated; the runtime/source/framework locks remain enforced.
+
+No physical-device phone/Siri/Bluetooth interruption, iOS delivery timing, SideStore
+signature/install, LiveContainer guest loading or actual audio priority arbitration
+was tested. No installer or host version is claimed tested. Successful scripted
+recovery is not proof that iOS will permit every activation or deliver every event.
 
 ## Validation
 
