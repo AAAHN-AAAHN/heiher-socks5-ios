@@ -9,8 +9,8 @@ other features, background keep-alive or traffic counters.
 
 `main -> feature/server-control -> feature/settings-persistence` is the declared
 stack. The server layer does not import or refer to AppSettings or SettingsStore.
-The persistence layer reuses this exact server layer instead of copying the engine
-controller. This dependency is a build/composition relationship, not an additional
+The persistence layer reuses its pinned server version instead of copying the engine
+controller; this audit does not automatically move that dependency pin. This dependency is a build/composition relationship, not an additional
 runtime service, process or dynamically loaded module.
 
 `ServerSettings.swift` defines the existing eleven options, their defaults, input
@@ -29,7 +29,9 @@ promise that an address was successfully bound.
 
 The existing `hev-server-startup-stop.patch` belongs here, together with its native
 regression. Its SYNC_ABRT correction prevents worker finalization from waiting
-forever when Stop predates multi-worker startup. The patch is unchanged.
+forever when Stop predates multi-worker startup. That correction is preserved.
+The final revalidation below also guards the worker I/O yield against sleeping
+after a pending Stop has already delivered its wakeup.
 
 The standalone AppRoot holds options and desired Start/Stop in memory only. Launch
 starts stopped with the existing defaults. The shared ContentView receives bindings
@@ -60,8 +62,8 @@ establish actual SideStore provisioning or LiveContainer loading/host arbitratio
 Full-repository checkout is required by provenance/parity checks, which read the
 original audited settings commit. Build: `BUILD_IPA=0 bash Build/build.sh` for native
 and model checks; `bash Build/check_swift_sdk.sh` uses the iPhoneOS 27 SDK. The
-production build script can package this standalone composition, but the requested
-new delivery is the integrated release IPA, not a replacement standalone app.
+production build script can package this standalone composition when explicitly
+requested. This revalidation does not produce an IPA or update the integrated release.
 
 ## Validation and costs
 
@@ -124,12 +126,42 @@ validator, YAML generation, error messages, defaults and Codable schema are unch
 Raw drafts also remain distinct, including canonically equivalent invalid drafts.
 The override is separate from the unchanged validation/YAML body.
 
-Only ServerSettings changes product behavior. The shared editor/root, native startup
-cancellation patch, engine/framework pins, Info.plist, signing settings, deployment
+Product changes are confined to ServerSettings equality and the existing lifecycle
+patch, preserving its original startup fix. The shared editor/root, engine/framework
+pins, Info.plist, signing settings, deployment
 target, server API and state machine remain the audited input. There is no new
 queue, timer, socket, background task, persistent data, host ID or permission. Option
-comparison is linear in the compared byte sequences, not per-packet work; energy,
-throughput and device storage behavior are not measured.
+comparison is linear in the compared byte sequences and occurs on option changes.
+The worker correction adds one existing run-flag read before an I/O yield, with no
+extra loop, task, allocation or synchronization object. Energy, throughput and device
+storage behavior are not measured.
+
+### Worker Stop before the first I/O wait
+
+The new real-controller/native-engine test also exposed multi-worker Stop or
+reconfiguration that failed to return. Runs 35903478155 and 35904315435 failed on
+both Linux and macOS; these were observed failures, not successful validations or
+assumed timeout-only infrastructure faults. The second run retained exact native
+source/build inputs for reproduction; that temporary archive step is removed from
+the final build script.
+
+The worker event task can process Stop and clear run before the accept task reaches
+its first cooperative I/O wait. The old yielder always suspended before inspecting
+run. A wakeup already sent to the not-yet-waiting task then cannot wake the new wait,
+so shutdown can remain blocked. A temporary local diagnostic observed stopped
+workers entering that yield in a reproduction. The permanent fix checks run before
+yielding, and retains the existing check after returning from yield. The four-line
+addition is in the already declared lifecycle patch; the main branch and native
+source pins are not changed.
+
+worker_stop_probe.c compiles the actual worker body with only its yield boundary
+substituted. The exact upstream worker blob is reconstructed and hash-checked:
+683a773999569784b2a42d1bab136ef1c44a8101. The original fails the already-stopped
+precondition; the fixed worker passes it plus normal-yield and Stop-during-yield
+postconditions. This is a deterministic boundary check, not a replacement for the
+real native controller/network test. Locally the full native test passed three
+successive runs after the guard; the final test also adds 20 active Stop/restart
+cycles with real authentication for each of one and four workers.
 
 ### Additional verification
 
@@ -144,8 +176,10 @@ Those are postconditions and repetitions, not 22 device bugs.
 The new native_controller_check.py links the production Swift controller and model
 to the actual patched Hev static library. Test-only stdin/stdout commands drive it;
 real TCP username/password handshakes check byte changes, 255-byte credentials,
-Stop socket release and same-port restart with one and four workers. The old model
-is separately linked as the negative control. This complements the existing native
+Stop socket release and same-port restart with one and four workers. Forty extra
+active Stop/restart cycles exercise the pending-wakeup correction. The old model
+is separately linked against the same corrected native library as the equality
+negative control, separating the two defects. This complements the existing native
 parser/TCP and 40 pre-start cancellation cycles, rather than replacing them with a
 mock. A successful invocation status is still not a listening-readiness guarantee.
 
@@ -166,3 +200,69 @@ retry policy, or host patch is added to hide those limits.
 Public contracts consulted:
 - https://docs.swift.org/swift-book/documentation/the-swift-programming-language/stringsandcharacters/#String-and-Character-Equality
 - https://www.rfc-editor.org/rfc/rfc1929
+
+
+### Completed revalidation evidence
+
+Tested commit: `65332eee821b4ce07174b8cb1df8ecf80138c8b7`.
+Tested tree: `b736cc761b2e08e6b315d228aec3c8b5f8fe50c7`.
+Run `35905542895`: both Linux and Xcode-27 verification jobs succeeded. The earlier
+runs `35903478155` and `35904315435` failed on the demonstrated native Stop race;
+they remain failure evidence, not prior successful versions or generic CI glitches.
+The temporary exact-native-input archive used for diagnosis is not in the final
+build path. No stop deadline was extended and neither multi-worker checks nor
+negative controls were removed to obtain a pass.
+
+Both final jobs passed the retained seven server scenarios, 84 new model/state
+assertions and 512 configuration/validation parity cases. The exact old Swift model
+still failed all 22 selected byte-sensitive postconditions as expected. The actual
+worker helper passed all three stop/yield postconditions; its exact upstream body
+failed the pre-yield-stop case while preserving the other two. Negative-control
+failures are intentional assertions about the old implementations, not failures of
+the current branch.
+
+The actual production Swift controller was linked to the real patched Hev library
+on both platforms. Each produced all 14 expected result records across the old/new
+model and one/four worker combinations: raw credential replacement, wrong/old bytes
+rejected, Latin and Korean equivalence cases, 255-byte credentials, socket release
+and same-port restart. Forty additional active Stop/restart cycles per platform
+completed with real authentication. The original 40 native Stop-before-Start cycles,
+TCP echo and actual parser fixtures also passed. Test command transports are not app
+UI; repeated cycles are not independent iPhone or installer trials.
+
+Xcode 27.0 `27A266a`, iPhoneOS SDK 27.0 typechecked all five production Swift files
+for ARM64 at the unchanged iOS 17.2 minimum, with warnings treated as errors and an
+empty diagnostic log. Native tests ran on Linux/macOS hosts; no app was linked for
+iPhone, archived, installed or run on a Simulator in this audit. The SDK check is
+not evidence of LiveContainer loader behavior or SideStore provisioning.
+
+Downloaded final artifacts and verified SHA-256:
+- Linux `10770803301`: `4f6e05cd0c4b93eb221cd90eae8d2c9b370e846197e4315ebbb835cef65f2e4b`
+- macOS `10770338977`: `9e452b056ceae11b2b791bb2c1665f25fcdc854f97e6a3a66d6de061865dbc35`
+
+All 61 source hashes in each artifact match the tested source tree. Format checks
+and forward/reverse patch application passed for both the retained proxy hunk and
+new worker hunk. The extended patch is explicitly locally owned/hash-locked in the
+membership manifest; the old proxy hunk and inherited native tests remain separately
+locked to their prior source. Removing the four-line guard reconstructs the exact
+upstream worker blob checked above. This completion is a later README/specification-
+only commit; production/build/test code stays byte-identical to the successful run.
+
+Relative to the input branch, product changes are the 18-line model equality override
+and four added native worker lines (including comment/spacing) in the existing patch.
+Other changes are tests, build-test wiring, ownership validation and documentation.
+There are eight changed existing files and four new test files; the other 49 input
+files are byte-identical. Controller, root/editor, project/plist, defaults, original
+native startup fix, immutable main and framework are not rewritten. The repository
+still has the requested eight branches; the other seven heads are not changed.
+
+IMPORTANT: `feature/settings-persistence` and `release/integrated` still pin the
+previous server-control version. This audit does not automatically merge changes
+into either branch. The previously provided 1.1.0(build 6) IPA does not contain these
+two corrections and was not rebuilt or relabeled. A later explicit dependency update
+and release verification/build are required to deliver them in the integrated IPA.
+
+No further failing condition remains in the executed current-version checks. This
+is not proof that every OS policy, app interruption, network interface or device
+installation works. Physical iOS 27 SideStore/LiveContainer execution, VPN/hotspot
+changes, suspend/termination behavior, UI interaction and energy remain untested.
