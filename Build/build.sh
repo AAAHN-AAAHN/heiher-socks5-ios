@@ -60,6 +60,11 @@ for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
             "$CORE/third-part/hev-task-system/bin/libhev-task-system.a" -o "$OUT/config-probe"
         "$OUT/config-probe" "$OUT/yaml/defaults.yml" "$OUT/yaml/quoted.yml" > "$OUT/$mode-configuration.log"
         rm "$OUT/emit-config" "$OUT/config-probe"
+        python3 Tests/ServerControl/native_controller_check.py "$CORE" "$OUT/native-controller" \
+            > "$OUT/native-controller.log" 2>&1
+        if feature settings; then
+            python3 Tests/Settings/native_persistence_check.py "$CORE" "$OUT/native-persistence" > "$OUT/native-persistence.log" 2>&1
+        fi
     fi
     make -C "$CORE" clean >> "$OUT/$mode-build.log" 2>&1
 done
@@ -80,6 +85,8 @@ if feature server; then
 fi
 if feature settings; then
     python3 Tests/Settings/run_checks.py > "$OUT/settings.log" 2>&1
+    python3 Tests/Settings/run_checks.py --baseline-import > "$OUT/original-import-negative.log" 2>&1
+    python3 Tests/Settings/run_checks.py --previous-store > "$OUT/previous-store-negative.log" 2>&1
 fi
 if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
     (cd "$CORE" && ./build-apple.sh) > "$OUT/core-apple.log" 2>&1

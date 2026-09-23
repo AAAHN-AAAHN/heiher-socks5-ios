@@ -13,3 +13,17 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
  
      atomic_fetch_or (&tsync, SYNC_CONT);
  
+diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c
+--- a/src/hev-socks5-worker.c
++++ b/src/hev-socks5-worker.c
+@@ -54,6 +54,10 @@
+ task_io_yielder (HevTaskYieldType type, void *data)
+ {
+     HevSocks5Worker *self = data;
++
++    /* A pending Stop can run before this task reaches its first wait. */
++    if (!READ_ONCE (self->run))
++        return -1;
+ 
+     hev_task_yield (type);
+ 

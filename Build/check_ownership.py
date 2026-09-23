@@ -24,6 +24,7 @@ def content(path):
 
 def main():
     assert 'server' in FEATURES
+    manifest = json.loads((ROOT / 'docs/feature-membership.json').read_bytes())
     model = content('Socks5/Server/ServerSettings.swift')
     controller = content('Socks5/Server/ServerController.swift')
     editor = content('Socks5/ContentView.swift')
@@ -38,11 +39,18 @@ def main():
         'func apply(_ settings: ServerSettings, running: Bool, retry: Bool = false)').replace(
         'desired = settings.serverRunning ? settings.server : nil', 'desired = running ? settings : nil')
     assert controller == expected, 'Server execution algorithm changed during extraction'
-    assert (ROOT / 'Patches/hev-server-startup-stop.patch').read_bytes() == show(INPUT, 'Patches/hev-server-startup-stop.patch')
+    lifecycle_patch = (ROOT / 'Patches/hev-server-startup-stop.patch').read_bytes()
+    original_patch = show(INPUT, 'Patches/hev-server-startup-stop.patch')
+    assert lifecycle_patch.startswith(original_patch), 'Original pre-start cancellation fix changed'
+    extra = lifecycle_patch[len(original_patch):]
+    assert extra.startswith(b'diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c\n')
+    assert extra.count(b'diff --git ') == 1
+    # The native probe also reconstructs the exact upstream worker blob and checks
+    # that this adds only the pre-yield Stop guard before compiling both versions.
     root = content('Socks5/AppRoot.swift')
     assert root.count('@StateObject private var server = ServerController()') == 1
     if 'settings' in FEATURES:
-        assert (ROOT / 'Socks5/Settings/SettingsStore.swift').read_bytes() == show(INPUT, 'Socks5/Settings/SettingsStore.swift')
+        assert 'Socks5/Settings/SettingsStore.swift' in manifest.get('files', {}), 'Store changes must be explicitly hash-locked'
         assert (ROOT / 'Socks5/Settings/SettingsView.swift').read_bytes() == show(INPUT, 'Socks5/Settings/SettingsView.swift')
         model_without_server = original[:original.index('struct ServerSettings:')] + original[original.index('enum SettingsError:'):]
         assert content('Socks5/Settings/AppSettings.swift') == model_without_server
@@ -55,7 +63,6 @@ def main():
         assert root.count('.modifier(BackgroundKeepAliveEvents(keepAlive: keepAlive))') == 1
         assert 'keepAlive.setAudio(value.background.silentAudio)' in root
         assert 'keepAlive.setLocation(value.background.continuousLocation)' in root
-    manifest = json.loads((ROOT / 'docs/feature-membership.json').read_bytes())
     checked = 0
     for ref in manifest.get('branches', {}).values():
         subprocess.run(['git', '-C', str(ROOT), 'merge-base', '--is-ancestor', ref, 'HEAD'], check=True)
@@ -65,6 +72,8 @@ def main():
         assert actual == expected, path
         assert hashlib.sha256(actual).hexdigest() == entry['sha256'], path
         checked += 1
+    for path, digest in manifest.get('files', {}).items():
+        assert hashlib.sha256((ROOT / path).read_bytes()).hexdigest() == digest, path
     own_doc = {'server-control': 'server-control', 'settings-persistence': 'settings-persistence', 'integrated': 'integrated'}[CONFIG['name']]
     assert (ROOT / 'README.md').read_bytes() == (ROOT / 'docs/features' / (own_doc + '.md')).read_bytes()
     print(f'PASS: server independent of storage; audited behavior preserved; {checked} exact owner files and pinned ancestors')

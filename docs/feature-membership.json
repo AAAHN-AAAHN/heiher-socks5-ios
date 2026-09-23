@@ -1,62 +1,80 @@
 {
   "base_commit": "d2534cd6bce7389fdf8f362bd8f681c0bd583eb1",
   "branches": {
-    "feature/server-control": "68599f96331f3f45e3fa271db02e6ede0fc35d73"
+    "feature/server-control": "011f7f61b2969f7a85708d535d3ad466a9ac148e"
   },
   "sources": {
     "Socks5/Server/ServerSettings.swift": {
-      "commit": "68599f96331f3f45e3fa271db02e6ede0fc35d73",
-      "sha256": "bde8e2e74ae9fdf2bb87207a229774807df1fe7a4fc35781a31d476d8464f546"
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
+      "sha256": "5d1a320ef1886d499839bc2bc0a211bd66513e6a86aac1aaa6ae87586617b7dc"
     },
     "Socks5/Server/ServerController.swift": {
-      "commit": "68599f96331f3f45e3fa271db02e6ede0fc35d73",
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
       "sha256": "f1e8630315c629fbda7ffb6928aed7d62511c20acf27864ff1030a1904070098"
     },
     "Socks5/ContentView.swift": {
-      "commit": "68599f96331f3f45e3fa271db02e6ede0fc35d73",
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
       "sha256": "0684c8be1fae897e045ca22471e33c26e1a5ed950c45c107ad04009742ea7208"
     },
     "Patches/hev-server-startup-stop.patch": {
-      "commit": "68599f96331f3f45e3fa271db02e6ede0fc35d73",
-      "sha256": "e914c247e4e7d541e510874315fc259abbf020d4c3954d17e4216ec7df6cc365"
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
+      "sha256": "2047ecc54abdc8f20341301fca3085cba63197f970dffdd09e8ee16d55c71814"
     },
     "Tests/server_lifecycle_host.c": {
-      "commit": "68599f96331f3f45e3fa271db02e6ede0fc35d73",
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
       "sha256": "294c6f41300beb8b33df3b37796a4b9a215c9161350b2e3ea722264519393cf4"
     },
     "Tests/server_lifecycle_regression.py": {
-      "commit": "68599f96331f3f45e3fa271db02e6ede0fc35d73",
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
       "sha256": "6705e3f54c41ec3e61929d2062cb3eae1d8b64841c40c170059bbe5d6ccd941d"
     },
     "docs/features/server-control.md": {
-      "commit": "68599f96331f3f45e3fa271db02e6ede0fc35d73",
-      "sha256": "0a71e63c66039c00622b1ccf9435d85055416d313495587dbc904edbfa638960"
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
+      "sha256": "c634d73d3fb00834220f6a8c8d12933ca6ee954cb9789030e8a1d24fc4d612a9"
     },
     "Tests/ServerControl/ConfigurationParity.swift": {
-      "commit": "68599f96331f3f45e3fa271db02e6ede0fc35d73",
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
       "sha256": "6e4acbcb6e1ece2952d61bca84a9849f9c9cd45acc4e662b7c0831167306a808"
     },
     "Tests/ServerControl/run_checks.py": {
-      "commit": "68599f96331f3f45e3fa271db02e6ede0fc35d73",
-      "sha256": "f598f4c0433f30aa5d62cd51f6d4767d233ccaef3cc432c1a2445494c65c213c"
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
+      "sha256": "4ab8f25b83b21f6f1325a30cc03e24a074ad832160c6735b62126b5dc3c3ad1b"
     },
     "Tests/ServerControl/ServerMocks.swift": {
-      "commit": "68599f96331f3f45e3fa271db02e6ede0fc35d73",
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
       "sha256": "126073913403a505b2db541bff324d422cfe37858cb106a9f3a48bc0f599dc27"
     },
     "Tests/ServerControl/configuration_probe.c": {
-      "commit": "68599f96331f3f45e3fa271db02e6ede0fc35d73",
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
       "sha256": "b7595cd1d6c1b042865e462a63c4306550e63692c1a2ddd4385d4aa507248203"
     },
     "Tests/ServerControl/EmitConfiguration.swift": {
-      "commit": "68599f96331f3f45e3fa271db02e6ede0fc35d73",
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
       "sha256": "040498c7bcc6656282148ee9790698dae873e25564647ec456ff9c2c3d8afbf2"
     },
     "Tests/ServerControl/ServerTests.swift": {
-      "commit": "68599f96331f3f45e3fa271db02e6ede0fc35d73",
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
       "sha256": "f36dc7ea29012b762249eda4613fc91c95fde88c8e7a9c710ea1dbcd0f6eb378"
+    },
+    "Tests/ServerControl/NativeControllerHost.swift": {
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
+      "sha256": "4eeb16146b8f5de006a389cc3f61eb4678335a561983ed3c30ab523fad956a94"
+    },
+    "Tests/ServerControl/RevalidationTests.swift": {
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
+      "sha256": "c2ea93f688072dcac29b15bfd5fdaf78e4977f2424280f6e6a0890ce4a4e2f37"
+    },
+    "Tests/ServerControl/native_controller_check.py": {
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
+      "sha256": "25c712f2cd0828ac8597998a8ce8a69d0bce739b1b75f12042d0809364adee5d"
+    },
+    "Tests/ServerControl/worker_stop_probe.c": {
+      "commit": "011f7f61b2969f7a85708d535d3ad466a9ac148e",
+      "sha256": "4460986fd3351e2080d9f545a56aaf5f53065e16d4adca285b34f31b776bd911"
     }
   },
-  "files": {},
-  "responsibility": "Persistence adds only durable settings and JSON management; server implementation is inherited byte-identically."
+  "files": {
+    "Socks5/Settings/SettingsStore.swift": "c84aa3256631c8f382c705b1737eb2316c751c32987152c07ad374ad7ce2f253"
+  },
+  "responsibility": "Persistence owns durable options and file handling; all 17 server-owned inputs are inherited byte-identically from the pinned latest server-control ancestor."
 }
