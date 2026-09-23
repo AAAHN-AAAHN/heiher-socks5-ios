@@ -1,5 +1,58 @@
 # UDP compatibility for the native iOS SOCKS5 relay
 
+## Supported versions, installation environments and verified scope
+
+Latest environment re-audit: **2026-09-23**. The intended support environment,
+configured minimum OS, SDK build and actual runtime tests are different claims.
+The native-only audit descriptions later in this document describe their own
+scoped checks; the separate re-audit below also built IPAs and ran Simulator tests.
+
+| Boundary | Version/environment and evidence |
+| --- | --- |
+| Configured minimum iOS | **17.2**, unchanged. This deployment target is not evidence that every iOS version from 17.2 onward was tested. |
+| Primary intended environment | **iOS 27.0 on a physical iPhone**, installed independently with **SideStore** or run as a **LiveContainer guest**. These are separate installation/execution paths, not interchangeable with Simulator or Xcode installation. |
+| Verified iPhone build | **Xcode 27.0 (27A266a), iPhoneOS SDK 27.0, ARM64**. The unchanged production build produced an IPA; archive identity, metadata, linkage and ZIP integrity passed. |
+| Verified runtime | **iOS 27.0 Simulator (24A434)**: the actual app launched with its original Bundle ID and a controlled remapped ID. The native-relay test shell used the same rebuilt library bytes as the app. This is not the owner's physical 27.0 (24A437) build. |
+| SideStore status | Installation-related source/dependency review and controlled ID-remap tests completed. Actual SideStore signing, provisioning, installation and physical-device launch were **not performed**; no specific installed SideStore version is certified. |
+| LiveContainer status | Host/guest dependencies were reviewed. Actual loader transformation, JIT-less signing, host permissions, installed version/options and physical guest execution were **not tested**. No blanket LiveContainer compatibility certification is claimed. |
+
+Verified functional scope: Linux and Darwin each passed **58/58** required UDP
+profile scenarios. Actual-source address/port probes, sanitizer and optimized
+strict-aliasing checks passed. The iOS 27 Simulator native fixture passed **36/36**
+scenario executions across original/remapped IDs and ephemeral/fixed-known-port
+profiles. These are scoped results, not whole-app UI or physical-network tests.
+
+The accepted fixed-port/multiple-unknown-client association limitation remains;
+use **UDP Listen Port = 0** for that workload. Local-network permission on the
+actual device/host, hotspot and concurrent VPN behavior, physical IPv4/IPv6 paths,
+production Start/Stop interactions, lock-screen survival and energy/throughput
+measurements remain outside this re-audit. Earlier owner observations below do not
+establish full coverage of both installation paths at this exact code revision.
+
+This UDP-only branch contains no statistics or Background feature. It makes no
+BGTask/NetworkExtension request and adds no feature-specific signing entitlement or
+host-ID requirement. No BGTask whitelist, forced LiveContainer Bundle ID option
+or host IPA edit is required by this implementation. Ordinary installer signing
+and local-network permissions still apply. Continuous background operation needs
+the separately maintained `feature/background` (silent audio/location) composition;
+this review neither merges it nor certifies `release/integrated` as a whole.
+
+Tested production revision: `49784b7c78a99dab824eceeb071e459bc94b2e90`.
+Evidence: [run 35815248222](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/actions/runs/35815248222)
+completed with **all four jobs successful**. Its audit-control commit is
+`c644dcfa8976094e8443511c3f4c869536a34d5b`, not the production revision above.
+The [immutable full review](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/7b397d0251ca0f167b93ed2e4a8713c3599e977c/Validation/FINAL-REVIEW.md)
+records toolchain, tests, known limits, artifact hashes and earlier failed attempts.
+Adding this support record changes documentation only, not the tested executable
+sources, deployment target or previously delivered IPA.
+
+**README maintenance rule:** for future code or verification changes, update this
+section and its identical feature-document copy with the minimum OS, intended
+installation paths, exact tested OS/build and tool/host versions (or explicitly
+unknown), tested commit/run, passed/failed/not-run scope and remaining limits.
+Keep SideStore standalone, LiveContainer guest, SDK/Simulator and physical-device
+evidence separate. Never promote a successful build into unperformed device tests.
+
 ## Scope and release qualification
 
 This is `feature/udp-compat`, not the complete application. It adds two small C
