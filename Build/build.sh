@@ -46,12 +46,20 @@ for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
             > "$OUT/$mode-statistics.log" 2>&1
         rm "$OUT/stats-host"
     fi
-    if feature settings; then
+    if feature server; then
         cc -std=gnu11 -O2 -Wall -Werror -pthread -I"$CORE/src" Tests/server_lifecycle_host.c \
             "$CORE/bin/libhev-socks5-server.a" "$CORE/third-part/yaml/bin/libyaml.a" \
             "$CORE/third-part/hev-task-system/bin/libhev-task-system.a" -o "$OUT/lifecycle-host"
         python3 Tests/server_lifecycle_regression.py "$OUT/lifecycle-host" > "$OUT/$mode-lifecycle.log" 2>&1
         rm "$OUT/lifecycle-host"
+        swiftc -swift-version 5 -warnings-as-errors Socks5/Server/ServerSettings.swift \
+            Tests/ServerControl/EmitConfiguration.swift -o "$OUT/emit-config"
+        "$OUT/emit-config" "$OUT/yaml"
+        cc -std=gnu11 -O2 -Wall -Werror -pthread -I"$CORE/src" Tests/ServerControl/configuration_probe.c \
+            "$CORE/bin/libhev-socks5-server.a" "$CORE/third-part/yaml/bin/libyaml.a" \
+            "$CORE/third-part/hev-task-system/bin/libhev-task-system.a" -o "$OUT/config-probe"
+        "$OUT/config-probe" "$OUT/yaml/defaults.yml" "$OUT/yaml/quoted.yml" > "$OUT/$mode-configuration.log"
+        rm "$OUT/emit-config" "$OUT/config-probe"
     fi
     make -C "$CORE" clean >> "$OUT/$mode-build.log" 2>&1
 done
@@ -63,13 +71,17 @@ fi
 if feature background; then
     python3 Tests/Background/run_checks.py > "$OUT/background.log" 2>&1
     if [ "$(uname -s)" = Darwin ]; then
+        python3 Tests/Background/check_subscription.py > "$OUT/background-subscription.log" 2>&1
         swift Tests/Background/check_silence.swift Socks5/BackgroundKeepAlive/Silence.wav > "$OUT/decoded-silence.log"
     fi
+fi
+if feature server; then
+    python3 Tests/ServerControl/run_checks.py > "$OUT/server-control.log" 2>&1
 fi
 if feature settings; then
     python3 Tests/Settings/run_checks.py > "$OUT/settings.log" 2>&1
 fi
-if [ "$(uname -s)" = Darwin ]; then
+if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
     (cd "$CORE" && ./build-apple.sh) > "$OUT/core-apple.log" 2>&1
     rm -rf HevSocks5Server.xcframework
     cp -R "$CORE/HevSocks5Server.xcframework" .
@@ -77,6 +89,8 @@ if [ "$(uname -s)" = Darwin ]; then
         -sdk iphoneos -destination 'generic/platform=iOS' \
         -archivePath "$ROOT/.build/$NAME.xcarchive" \
         CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+        SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+        MARKETING_VERSION=1.1.0 CURRENT_PROJECT_VERSION=6 \
         > "$OUT/app-build.log" 2>&1
     APP="$ROOT/.build/$NAME.xcarchive/Products/Applications/Socks5.app"
     xcrun lipo "$APP/Socks5" -verify_arch arm64

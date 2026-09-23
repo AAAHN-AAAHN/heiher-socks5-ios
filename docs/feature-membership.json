@@ -1,0 +1,22 @@
+{
+  "base_commit": "d2534cd6bce7389fdf8f362bd8f681c0bd583eb1",
+  "branches": {
+    "main": "d2534cd6bce7389fdf8f362bd8f681c0bd583eb1"
+  },
+  "sources": {
+    "Patches/hev-server-startup-stop.patch": {
+      "commit": "16689f780f3e0e0c9344397273528697f197c9e5",
+      "sha256": "e914c247e4e7d541e510874315fc259abbf020d4c3954d17e4216ec7df6cc365"
+    },
+    "Tests/server_lifecycle_host.c": {
+      "commit": "16689f780f3e0e0c9344397273528697f197c9e5",
+      "sha256": "294c6f41300beb8b33df3b37796a4b9a215c9161350b2e3ea722264519393cf4"
+    },
+    "Tests/server_lifecycle_regression.py": {
+      "commit": "16689f780f3e0e0c9344397273528697f197c9e5",
+      "sha256": "6705e3f54c41ec3e61929d2062cb3eae1d8b64841c40c170059bbe5d6ccd941d"
+    }
+  },
+  "files": {},
+  "responsibility": "Server control only; no persistent application settings. Historical source is retained by the downstream persistence merge."
+}

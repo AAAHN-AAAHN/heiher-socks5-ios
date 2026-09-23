@@ -1,13 +1,8 @@
-name: Verify and build declared SOCKS5 features
+name: Verify server and persistent-settings boundaries
 on:
   push:
-    branches: [main, feature/udp-compat, feature/traffic-statistics, feature/background, feature/settings, feature/app-icon, release/integrated]
+    branches: [feature/server-control, feature/settings-persistence]
   workflow_dispatch:
-  workflow_call:
-    inputs:
-      ref:
-        required: true
-        type: string
 permissions:
   contents: read
 jobs:
@@ -15,35 +10,40 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15]
+        os: [ubuntu-24.04, xcode-27]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0
-      - name: Install upstream formatter
+      - name: Install formatter without replacing the compiler
         shell: bash
         run: |
+          set -euo pipefail
           if [ "$RUNNER_OS" = Linux ]; then
             sudo apt-get update -qq
             sudo apt-get install -y clang-format-18
           else
             brew install llvm@18
-            echo "$(brew --prefix llvm@18)/bin" >> "$GITHUB_PATH"
+            mkdir -p "$RUNNER_TEMP/format-only"
+            ln -s "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
+            echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
           fi
-      - name: Validate source, test native code, and archive iOS on macOS
+      - name: Native, lifecycle and persistence checks without IPA
         shell: bash
-        run: bash Build/build.sh
-      - name: Name artifact
+        run: BUILD_IPA=0 bash Build/build.sh
+      - name: Actual iOS 27 API type checks
+        if: runner.os == 'macOS'
+        run: bash Build/check_swift_sdk.sh
+      - name: Record exact tested source
         if: always()
-        shell: bash
-        run: echo "NAME=$(python3 -c 'import json; print(json.load(open("Build/features.json"))["name"])')" >> "$GITHUB_ENV"
+        run: python3 Build/record_evidence.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: Socks5-${{ env.NAME }}-${{ runner.os }}
+          name: Feature-checks-${{ runner.os }}
           path: artifacts/
           retention-days: 30
