@@ -15,7 +15,9 @@ git rev-parse 'HEAD^{tree}' > "$OUT/tested-tree.txt"
 git archive --format=zip HEAD -o "$OUT/tested-source.zip"
 git archive --format=zip 9c2e76afcde7a20ff1bbdcf2a1f7e9092e1a98fd -o "$OUT/input-source.zip"
 git archive --format=zip d2534cd6bce7389fdf8f362bd8f681c0bd583eb1 -o "$OUT/main-source.zip"
-git diff --check d2534cd6bce7389fdf8f362bd8f681c0bd583eb1 HEAD > "$OUT/whitespace.log"
+# Patch context has leading spaces by design. Its actual payload is checked by
+# Build/check.py apply --whitespace=error-all below and byte-locked by check_scope.
+git diff --check d2534cd6bce7389fdf8f362bd8f681c0bd583eb1 HEAD -- . ':(exclude)Patches/*.patch' > "$OUT/whitespace.log"
 python3 Build/check.py baseline > "$OUT/baseline.log"
 python3 Build/check.py composition > "$OUT/composition.log"
 python3 Tests/Settings/check_scope.py > "$OUT/scope.json"
