@@ -67,9 +67,9 @@ new delivery is the integrated release IPA, not a replacement standalone app.
 
 Local Linux checks passed the retained seven server state scenarios and 512 exact
 old/new validation/YAML comparisons. Mock engine tests cover scheduling, while the
-real native stop-before-start and TCP checks cover the pinned engine. Actual new
-CI/SDK results are recorded after the shared release run completes; no unexecuted
-check is described as passed here. No physical device or installer test has been run.
+real native stop-before-start and TCP checks cover the pinned engine. The completed
+checks below are separate from the integrated release build. No physical device or
+installer test has been run.
 
 No new timer, queue, socket layer or polling mechanism is added by separating the
 branch. Configuration and lifecycle remain the same native calls. Energy and
@@ -80,3 +80,21 @@ record tested commit/run, toolchain, success/failure/not-run scopes and limitati
 Keep this README byte-identical to `docs/features/server-control.md`. Historical
 code remains reachable through the downstream persistence merge; no main history
 is rewritten. Ownership and exact dependency files are machine-checked.
+
+## Completed extraction verification (2026-09-23)
+
+Tested commit: `295e0f70082de1d8356aca4551eb7a396d557bdd`.
+Tested tree: `073b27583ef9f3152987168055907aa0dbdbc045`.
+Actions run `35842578898`: both Linux and Xcode-27 jobs succeeded on their first run.
+Each passed the seven server scenarios, 512 configuration parity cases, real TCP,
+real parser fixtures and 40 native Stop-before-Start cycles (20 each for one/four
+workers). Repetitions are not independent device tests. Xcode 27.0 `27A266a` and
+iPhoneOS SDK 27.0 typechecked all five production Swift files with warnings-as-errors;
+the diagnostic log is empty. No standalone app archive or IPA was built.
+
+Downloaded macOS artifact `10741802078` SHA-256:
+`ccf052572e8a5a25fdc363420958730e9a5a7679370aec4cf8c9e4214b908ed0`.
+Downloaded Linux artifact `10741348256` SHA-256:
+`43d8b7d0065d6a47790a0bee9d1208e2c0851d790fc4b888747e535072cedca2`.
+Both digests and all 57 source hashes were verified. This result section is a later
+documentation-only change; production/tests remain the exact successful source.
