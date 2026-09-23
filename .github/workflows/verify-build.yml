@@ -12,6 +12,7 @@ permissions:
   contents: read
 jobs:
   verify:
+    if: ${{ !contains(github.event.head_commit.message, '[icon-checks-only]') }}
     strategy:
       fail-fast: false
       matrix:
@@ -46,4 +47,23 @@ jobs:
         with:
           name: Socks5-${{ env.NAME }}-${{ runner.os }}
           path: artifacts/
+          retention-days: 30
+  icon-checks:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[icon-checks-only]') }}
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Audit icon source, compile assets and verify Simulator registration (no IPA)
+        shell: bash
+        run: bash Tests/AppIcon/run_checks.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: AppIcon-iOS27-audit
+          path: artifacts/icon-checks/
           retention-days: 30
