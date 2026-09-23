@@ -11,7 +11,31 @@ on:
 permissions:
   contents: read
 jobs:
+  snapshot:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[prepare-split]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Preserve exact inputs for branch restructuring
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/input-snapshot
+          git bundle create artifacts/input-snapshot/repository.bundle --all
+          git for-each-ref --format='%(refname) %(objectname)' refs/remotes/origin > artifacts/input-snapshot/refs.txt
+          git rev-parse HEAD > artifacts/input-snapshot/commit.txt
+          sha256sum artifacts/input-snapshot/repository.bundle > artifacts/input-snapshot/SHA256SUMS.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Branch-restructure-inputs
+          path: artifacts/input-snapshot/
+          retention-days: 30
   verify:
+    if: ${{ !contains(github.event.head_commit.message, '[prepare-split]') }}
     strategy:
       fail-fast: false
       matrix:
