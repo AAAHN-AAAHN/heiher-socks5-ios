@@ -74,7 +74,7 @@
     }
   },
   "files": {
-    "Socks5/Settings/SettingsStore.swift": "c84aa3256631c8f382c705b1737eb2316c751c32987152c07ad374ad7ce2f253"
+    "Socks5/Settings/SettingsStore.swift": "e13d64e5dda6923f105d93b2145733e94286339a370419699a48f3c432b0a7ef"
   },
   "responsibility": "Persistence owns durable options and file handling; all 17 server-owned inputs are inherited byte-identically from the pinned latest server-control ancestor."
 }

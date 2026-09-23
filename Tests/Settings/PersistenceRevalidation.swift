@@ -17,6 +17,20 @@ import Foundation
         let legacy = UserDefaults(suiteName: suite)!
         defer { try? FileManager.default.removeItem(at: root); legacy.removePersistentDomain(forName: suite) }
         let url = root.appendingPathComponent("store/settings.json")
+        // Apple Foundation and corelibs can use different documented absence codes.
+        // Record the actual open-error contract, rather than inferring absence from
+        // a false fileExists result or treating a permission error as a new file.
+        for missing in [url, root.appendingPathComponent("absent.json")] {
+            do {
+                let handle = try FileHandle(forReadingFrom: missing)
+                try handle.close()
+                preconditionFailure("Missing-file fixture unexpectedly exists")
+            } catch let error as CocoaError {
+                print("READ_ABSENCE: code=\(error.code.rawValue); path=\(missing.lastPathComponent)")
+                check(error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile,
+                      "Direct missing-file read uses an explicit Cocoa absence code")
+            }
+        }
         let store = SettingsStore(fileURL: url, legacy: legacy)
         check(store.errorMessage == nil && store.value == AppSettings(), "Missing file initializes the unchanged default schema")
         let binding = store.binding(\.server.authPassword)

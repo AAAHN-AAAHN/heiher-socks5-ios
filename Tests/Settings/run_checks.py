@@ -66,7 +66,7 @@ extension URL {
     groups = [(['SettingsTests.swift'], provider, None),
               (['ValidationTests.swift'], provider, None),
               (['CoordinationMocks.swift', 'ImportTests.swift'], [], None),
-              (['PersistenceRevalidation.swift'], provider, '31 persistence revalidation assertions; 4 failed'),
+              (['PersistenceRevalidation.swift'], provider, '33 persistence revalidation assertions; 4 failed'),
               (['LoadAccessTests.swift'], provider, '6 access-boundary assertions; 1 failed')]
     if baseline:
         groups = groups[2:3]

@@ -16,7 +16,7 @@ final class SettingsStore: ObservableObject {
         do {
             do {
                 value = try AppSettings.decoded(Self.read(self.fileURL))
-            } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
                 // An inaccessible existing file is not a first launch.
                 // Migrate the two settings saved by the preceding version once.
                 value.background.continuousLocation = legacy.bool(forKey: "background.continuousLocation")
