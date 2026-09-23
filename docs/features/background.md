@@ -292,8 +292,37 @@ working tree. Test subprocesses have finite deadlines.
 Only the Background controller changes in production. AppRoot, view, Info.plist,
 Xcode project, WAV, server and all inherited runtime files are retained. Tests and
 README/specification are updated; the existing checks-only CI path is reused.
-The final source/run/result evidence is recorded after its artifacts are inspected.
 No archive, IPA, physical iOS runtime or installer/host test is implied by type checks.
+
+### Completed audit evidence
+
+Tested commit: `247e91aacbe588cb1f39fdb5087d9608e91ade05`.
+Tested tree: `421794e2d397f55e081990502c458f9dbdf57bb4`.
+Run `35829002622`: `audio-checks` succeeded on the first run; the normal archive/IPA
+job was deliberately skipped. Xcode 27.0 (27A266a), iPhoneOS SDK 27.0 type-checked
+all five production Swift files for ARM64 at the unchanged iOS 17.2 minimum, with
+warnings treated as errors and an empty type-check diagnostic log.
+
+The runner passed 1030 controller, 103 recovery and 41 lifecycle assertions plus
+four worker-delegate checks. Real Foundation/Combine delivered all 17 registered
+names from main and worker threads (34 deliveries) and detached on cancellation.
+Apple AVAudioFile decoded the original 400 zero samples. Source boundary, project,
+permissions declarations, settings bindings, source locks and whitespace checks
+passed. Exactly 33 inherited main files were byte-identical; the six intentional
+main-file integration/configuration deltas were checked separately. The existing
+80-assertion final audio-contract test also passed locally against this controller;
+it was a local regression, not an additional CI or iPhone run.
+
+Downloaded artifact `10736291871` SHA-256:
+`4978c84d8f5a17d16728a8c68d91a52af296582722cc7326b8ae6e0b481dcbfd`.
+All 55 source hashes match the reviewed tested tree. The artifact contains checks
+and logs only, not an app archive or IPA. This completion text is a later
+README/specification-only commit; production and test code are the tested bytes.
+Relative to input `4b6f637e`, six existing files changed and two test files were
+added; the other 47 original files remain byte-identical. No additional known
+code-path defect was found within the reviewed scope. Physical interruption delivery,
+SideStore signing/install, LiveContainer loading/host arbitration, background timing
+and energy use remain untested; source verification is not device certification.
 
 ## Validation
 
