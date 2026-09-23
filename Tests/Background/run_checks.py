@@ -16,7 +16,7 @@ print('Controller SHA256:', hashlib.sha256(source.read_bytes()).hexdigest(), flu
 with tempfile.TemporaryDirectory() as temp:
     temp = Path(temp)
     (temp / 'BackgroundKeepAlive.swift').write_text(tested)
-    for name in ['ControllerTests', 'DelegateTests', 'RecoveryTests', 'LifecycleTests']:
+    for name in ['ControllerTests', 'DelegateTests', 'RecoveryTests', 'LifecycleTests', 'CallbackLifetimeTests']:
         subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
                         str(Path(__file__).with_name('PlatformMocks.swift')),
                         str(temp / 'BackgroundKeepAlive.swift'),

@@ -309,19 +309,17 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     }
 
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        let id = ObjectIdentifier(player)
-        onMain { [weak self] in
-            guard let self, let current = self.player,
-                  ObjectIdentifier(current) == id, self.audioEnabled else { return }
+        // Keep a weak object identity across the hop, not an address that may be reused.
+        onMain { [weak self, weak player] in
+            guard let self, let player, self.player === player, self.audioEnabled else { return }
             self.playerStopped(nil)
         }
     }
 
     nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
-        let id = ObjectIdentifier(player)
-        onMain { [weak self] in
-            guard let self, let current = self.player,
-                  ObjectIdentifier(current) == id, self.audioEnabled else { return }
+        // Keep a weak object identity across the hop, not an address that may be reused.
+        onMain { [weak self, weak player] in
+            guard let self, let player, self.player === player, self.audioEnabled else { return }
             self.playerStopped(error)
         }
     }
