@@ -60,6 +60,8 @@ for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
             "$CORE/third-part/hev-task-system/bin/libhev-task-system.a" -o "$OUT/config-probe"
         "$OUT/config-probe" "$OUT/yaml/defaults.yml" "$OUT/yaml/quoted.yml" > "$OUT/$mode-configuration.log"
         rm "$OUT/emit-config" "$OUT/config-probe"
+        python3 Tests/ServerControl/native_controller_check.py "$CORE" "$OUT/native-controller" \
+            > "$OUT/native-controller.log" 2>&1
     fi
     make -C "$CORE" clean >> "$OUT/$mode-build.log" 2>&1
 done
