@@ -130,7 +130,7 @@ footprint is preserved; test time and retained CI artifacts are the only added
 costs. Battery, memory and performance are not benchmarked. The inherited relay
 engine is not re-audited by an icon resource test.
 
-Actual commit/run/toolchain/results are appended only after inspecting the CI
+Actual commit/run/toolchain/results are recorded below from inspected CI
 outputs. Compiler success, Simulator registration and visual inspection must stay
 separate from iOS 27 device, SideStore and LiveContainer proof. No installer/host
 version, App Store validation, device icon-cache refresh or permission is presumed.
@@ -148,3 +148,68 @@ Primary sources used for design/platform context, not as test results:
 - https://developer.apple.com/documentation/xcode/creating-your-app-icon-using-icon-composer
 - https://developer.apple.com/documentation/xcode/build-settings-reference
 - https://github.com/LiveContainer/LiveContainer/blob/4dbe0f9a626de801184a42c0be8d2cb105058e3d/LiveContainerSwiftUI/Models/LCAppInfo.m
+
+## Completed iOS 27 icon verification
+
+Tested commit: `3250e7e77780aaa0d26c1107bcb7e52543e8b9a6`.
+Tested tree: `1236db49421edadaaaedf14b544db0dafb7ce209`.
+Run `35921655619`: `icon-checks` succeeded; the ordinary `verify` archive job was
+intentionally skipped. No iPhone app archive or IPA was produced. The Simulator
+product was built and executed, not merely typechecked. This completion record is
+a later documentation-only change; product/test bytes remain the tested bytes.
+
+| Verified layer | Actual result |
+| --- | --- |
+| Source integrity | Complete standard-library PNG decoding, all chunk CRCs, manifest reference and original artwork hash passed. Independent Pillow RGB and Apple ImageIO RGBA decoding agree with the corresponding local pixels. |
+| Resource regression | All 12 unittest methods passed, including the two actual old-validator false-accept controls. Subcases are not independent device tests. |
+| Target settings | Real Debug and Release settings selected AppIcon, both device families, unchanged iOS 17.2 minimum and hev.Socks5 identity. |
+| iPhoneOS asset compiler | Xcode 27 actool compiled the original full catalog for iPhone/iPad with no asset warnings or errors. Both CFBundleIcons dictionaries and generated PNG fallbacks were present. |
+| Compiled catalog | assetutil reported phone and pad AppIcon renditions at 1024 square, opaque, with the default Any appearance. No custom dark/tinted variants are claimed. |
+| Apple image decoding | Source 1024-square, generated 120-square phone and 152-square iPad PNGs fully decoded with all pixels opaque. Simulator-generated PNGs also decoded. |
+| Actual Simulator app | The unchanged product built successfully and registered/launched for hev.Socks5 and copied-test-bundle hev.Socks5.ICONREVIEW. Icon metadata remained intact after both installs. |
+| Visual observation | All four original/remapped, light/dark-system-UI home-screen captures visibly contain the Socks5 icon. Images are actual Simulator captures, not generated mockups. |
+
+Actual toolchain: Xcode 27.0 `27A266a`, iPhoneOS SDK 27.0, Apple Swift 6.4
+(`swiftlang-6.4.0.34.1`), macOS 27.0 `26A428`. The runtime was iOS 27.0
+`24A434`, iPhone 16 Simulator. This is not the user's earlier physical `24A437`
+OS build. The successful build log retains two non-asset warnings: multiple matching
+Simulator destinations (the selected SDK/architecture and actual runtime are recorded)
+and skipped AppIntents metadata extraction because no AppIntents dependency exists.
+They are not hidden or described as a completely warning-free app build. No Swift
+compiler error was present; Swift warnings were treated as errors.
+
+### Prior failures retained
+
+Run `35920386959` passed source/mutation checks and device asset compilation, then
+failed compiling the test-only single-file ImageIO helper: @main required
+`-parse-as-library`. Only that compiler flag was added; no image or assertion changed.
+Run `35920720449` then passed ImageIO and the actual Simulator product build, but
+Simulator installation exceeded 120 seconds and cleanup shutdown also timed out.
+That run does not prove installation or appearance. The exact internal simulator
+stall cause was not established. The checker now records timeouts and preserves the
+initial failure when cleanup also fails. No install deadline was extended, skip or
+automatic fallback added, or assertion weakened. The complete final run succeeded
+on a fresh runner/device with identical product bytes, including cleanup.
+
+Downloaded artifact hashes:
+- First failed run, `10776612962`: `2e17303c395da9131efacc55611785d83ba1f629e333f71221af50f499084c91`.
+- Installation-timeout run, `10777481226`: `b463ed867513dce394b99f57102154bcc811544bf99f17083a6a0f96409b4e35`.
+- Complete final run, `10776959486`: `e5fbb61dff90e9e111dd048b9b899dea4557560fa5737ebd391aedb670da2a05`.
+
+All 47 source-file hashes in the final artifact match the reviewed tested tree.
+Relative to the input, only workflow/README/specification change among existing
+files; five feature-owned test files are added and the other 39 files are byte-
+identical. Product changes are zero, including both icon files, app code, project,
+plist, native framework and shared build scripts. The test-only files are not in
+the app target. Existing integrated IPA artwork remains the same; release/integrated
+and the other seven branches are not changed or rebuilt. The repository retains the
+requested eight branches. No dependency on the deleted BGTask experiment is added.
+
+Remaining untested scope: physical SideStore signing/install, LiveContainer guest
+list/cache/web-clip rendering, actual iPhone icon-cache refresh, custom user-selected
+Dark/Tinted/clear modes, iPad runtime/UI and other iOS versions. The four screenshots
+exercise light/dark system UI, not every icon appearance selection. App Store upload
+and marketing approval are also not claimed. The code has no icon-related host
+permission request and the audit does not justify a host patch or Bundle ID change.
+No failing condition remains in the executed final resource checks; that conclusion
+is bounded by these actual compiler, decoder and Simulator observations.
