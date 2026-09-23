@@ -8,9 +8,11 @@ are preserved; this entry point reuses their real native cases for compositions.
 import importlib.util
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 if not __debug__:
     raise SystemExit('Assertions must be enabled.')
@@ -89,5 +91,17 @@ if 'statistics' in FEATURES:
          'Tests/traffic_statistics_model.swift', '-o', CORE / 'stats-model'], 'statistics-model-build.log')
     run([CORE / 'stats-model'], 'statistics-model.log')
 if 'udp' in FEATURES:
-    run([sys.executable, 'Tests/udp_audit_driver_regression.py'], 'udp-audit-driver.log')
+    # The audit-driver negative controls require the UDP-only declaration. Keep
+    # their exact source and gate intact in an isolated, pinned-source fixture;
+    # this does not relabel the integrated native core or suppress failed tests.
+    with tempfile.TemporaryDirectory() as directory:
+        fixture = Path(directory)
+        (fixture / 'Tests').mkdir()
+        (fixture / 'Build').mkdir()
+        owner = json.loads((ROOT / 'docs/feature-membership.json').read_text())['branches']['feature/udp-compat']
+        declaration = subprocess.check_output(['git', '-C', str(ROOT), 'show', owner + ':Build/features.json'])
+        (fixture / 'Build/features.json').write_bytes(declaration)
+        for name in ('udp_compat_audit.py', 'udp_audit_driver_regression.py'):
+            shutil.copyfile(ROOT / 'Tests' / name, fixture / 'Tests' / name)
+        run([sys.executable, fixture / 'Tests/udp_audit_driver_regression.py'], 'udp-audit-driver.log')
 print('PASS: declared native tests; fixed-unknown UDP observation failures remain separately recorded.')
