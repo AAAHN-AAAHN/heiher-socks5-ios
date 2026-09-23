@@ -10,6 +10,7 @@ from pathlib import Path
 import plistlib
 import shutil
 import subprocess
+import sys
 import time
 
 from check_icon import ROOT, CATALOG, IMAGE_HASH, require
@@ -20,9 +21,16 @@ WORK = ROOT / '.build/icon-checks'
 
 def run(*args, timeout=120):
     command = [str(a) for a in args]
-    result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
     with (OUT / 'commands.log').open('a') as log:
-        log.write(json.dumps(command) + '\n' + result.stderr + f'\nexit={result.returncode}\n')
+        log.write(json.dumps(command) + '\n')
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        with (OUT / 'commands.log').open('a') as log:
+            log.write(f'TIMEOUT after {timeout}s; command did not complete.\n')
+        raise
+    with (OUT / 'commands.log').open('a') as log:
+        log.write(result.stderr + f'\nexit={result.returncode}\n')
     if result.returncode:
         raise RuntimeError(f'{command}: {result.returncode}\n{result.stdout}\n{result.stderr}')
     return result.stdout.strip()
@@ -136,8 +144,18 @@ def main():
                             'physicalSideStoreOrLiveContainerTest': False})
             (OUT / 'simulator-results.json').write_text(json.dumps(results, indent=2) + '\n')
     finally:
+        # Preserve the test's original error even if Simulator cleanup also hangs.
+        failed = sys.exc_info()[0] is not None
+        cleanup_errors = []
         for action in ('shutdown', 'delete'):
-            subprocess.run(['xcrun', 'simctl', action, device], capture_output=True, timeout=30)
+            try:
+                run('xcrun', 'simctl', action, device, timeout=30)
+            except (RuntimeError, subprocess.TimeoutExpired) as error:
+                cleanup_errors.append(str(error))
+        if cleanup_errors:
+            (OUT / 'cleanup-errors.txt').write_text('\n'.join(cleanup_errors) + '\n')
+            if not failed:
+                raise RuntimeError('Simulator cleanup failed; see cleanup-errors.txt')
     print('PASS: device asset compilation, independent ImageIO decode, actual Simulator product and two identities.')
     print('SCOPE: screenshots change system UI appearance, not manual tinted/clear icon modes. No physical install, host or IPA test.')
 
