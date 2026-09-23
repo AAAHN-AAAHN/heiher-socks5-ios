@@ -123,7 +123,7 @@ fixes do not modify the inherited server files.
 
 | Boundary | Minimal correction |
 | --- | --- |
-| fileExists can return false for an inaccessible existing file, which the old initializer treated as first launch and used to restore legacy Background On values. | Read directly and migrate only for Cocoa fileReadNoSuchFile. Other read/decode failures leave safe defaults, report the error and do not remove the original file or old keys. Unknown access is not absence. |
+| fileExists can return false for an inaccessible existing file, which the old initializer treated as first launch and used to restore legacy Background On values. | Read directly and migrate only for the two documented Cocoa absence codes (fileReadNoSuchFile or fileNoSuchFile). Other read/decode failures leave safe defaults, report the error and do not remove the original file or old keys. Unknown access is not absence. |
 | After a failed explicit save, memory contained the user's Stop but disk still contained Start. Once storage recovered, repeating Stop was skipped because memory already matched. | Track one pending-save Boolean. An explicit identical choice retries only when an earlier save remains pending; success clears that state. Already durable identical choices still perform no write. |
 
 Pending initial migration saves use the same state. Migration keys are removed
@@ -148,7 +148,7 @@ iOS locked-device file-protection test.
 ### Verification layers
 
 The unchanged 39 settings, 116 boundary and 15 controlled import/migration assertions
-are retained. New tests exercise 31 persistence assertions and six access assertions
+are retained. New tests exercise 33 persistence assertions and six access assertions
 with real files, JSON, UserDefaults and bindings (Linux UI/provider APIs are small
 doubles). Their exact previous store is a negative control: four persistence
 postconditions and one access postcondition fail there and must pass in the current
@@ -181,3 +181,90 @@ Primary API contracts (not device-test results):
 - https://developer.apple.com/documentation/foundation/filemanager/fileexists(atpath:isdirectory:)
 - https://developer.apple.com/documentation/foundation/cocoaerror/code/filereadnosuchfile
 - https://docs.swift.org/swift-book/documentation/the-swift-programming-language/stringsandcharacters/
+
+
+### Completed dependency update and verification
+
+Tested commit: `680c28cbff108ad31b92720a09cb2a7ec4722a7e`.
+Tested tree: `86b5315b9cd71ed76064f917e6da984534c775bd`.
+Merge commit `6d3c05a2f8ce8952758cc405d176a5690975242b` has the original
+persistence and latest server-control commits as its two actual parents. All 17
+server-owned files, their hashes and ancestry checks pass without editing them.
+The historical server report's downstream-pin warning describes its own checkpoint;
+the current dependency for this branch is the explicit 011f7f61 pin above.
+
+Run `35914811946` completed successfully on Linux and Xcode-27. Each job passed the
+retained 39 settings, 116 validation and 15 coordinated-import/migration assertions,
+plus 33 persistence and six access-boundary assertions: 209 in these five suites.
+The same previous store failed four persistence and one access postconditions as
+expected; the earlier pre-audit store still failed the original 13 import conditions.
+The denied-access test ran without root bypass and confirmed fileExists=false did
+not establish absence. Actual FileHandle missing-file observations were Cocoa 260
+on Linux and Cocoa 4 on macOS, for both an absent leaf and absent parent.
+
+The first run `35913936943` had passed Linux and the real native integration on both
+hosts, but failed macOS first-file migration: the first correction recognized only
+Cocoa fileReadNoSuchFile (260), not Apple's fileNoSuchFile (4). That was a flaw in
+this candidate, not a CI infrastructure failure. The follow-up recognizes both
+explicit absence codes, retains access-error fail-closed behavior, and reruns all
+checks. No original assertion was removed. The first workflow remains a failure
+and its two source/log artifacts are retained; no failed SDK step is called a pass.
+
+Both final jobs linked the real SettingsStore, AppSettings, ServerSettings and
+ServerController with the actual patched Hev library. All 16 expected records per
+platform completed: coordinated import, binding credential replacement, byte-exact
+network authentication, fresh-process durable Start/Stop restoration, rejected
+import preservation, real Stop despite failed save and later explicit same-value
+save retry. File/provider and UI distinctions above still apply. These are native
+host programs, not an iPhone app or a SIGKILL durability experiment.
+
+The inherited seven server scenarios, 84 assertions, 512 configuration parity cases,
+old-model/worker negative controls, 14 native controller records, 40 active Stop/restart
+and 40 pre-start Stop cycles also passed per platform. Existing parser/TCP tests,
+forward/reverse patch application, formatting, source locks and composition checks
+passed. Repetitions are not independent physical-device trials. The local Swift 6.2.1
+Linux recheck used the same final store and repeated the 16 real native persistence
+records; it is separate from the CI and SDK evidence.
+
+Xcode 27.0 build `27A266a`, iPhoneOS SDK 27.0 typechecked all eight production Swift
+files for ARM64 at the unchanged iOS 17.2 minimum with warnings-as-errors; the
+compiler diagnostic log is empty. Exact native-host OS build and Swift compiler
+version were not captured by this workflow, so none are inferred. No Simulator,
+physical iOS runtime, installation, app archive or IPA was executed or produced.
+SideStore/LiveContainer versions and host permission behavior remain untested.
+
+Downloaded and verified final artifacts:
+- Linux `10774936556`: `40135d0038aa0973266bc32ccd929ea82b5039b3e4226e67f9023357dce7a753`
+- macOS `10775066097`: `91d2e05d32630f28a35029039a0cbaf3eeb54891dfbdfa68a9ebded285066951`
+First-run artifacts, retained with their failure scope:
+- Linux `10774406306`: `15b0a561630901d58f1c85da7b3d3fd4699070d6dd7144018e086231418afc2d`
+- macOS `10773854349`: `1c4f01f48e57daf80d964d22ac84bcd968be59e57afd8387a43630aa88cda0be`
+
+Both final source archives and all 75 source hashes match the tested tree. Relative
+to the previous persistence head, 12 existing files change and eight test files are
+added (four inherited server tests, four persistence tests); 55 old files remain
+byte-identical. The only persistence-owned production edit is SettingsStore:
+nine inserted/three deleted lines, including comments. The two other product
+changes are exact inherited ServerSettings equality and the native lifecycle patch.
+AppSettings, SettingsView, root/editor, schema, default settings, project, Info.plist,
+minimum OS, baseline framework and native source pins remain preserved.
+
+The final completion commit changes only this README and its byte-identical feature
+specification; product/build/test bytes remain the successful tested commit's bytes.
+Only feature/settings-persistence advances. There are still eight remote branches,
+and the other seven heads, including server-control and release/integrated, are not
+changed. The existing integrated IPA contains neither these persistence fixes nor
+the new server dependency; no new IPA is implied by this branch verification.
+
+There is no new Save/Retry button and no changed Start/Stop enabled-state policy.
+The pending-save correction operates when the existing setter is explicitly called
+again (same or changed value); it does not automatically retry after access returns
+or promise that a disabled Stop button can be pressed. A valid import remains another
+explicit replacement path. If no later successful save occurs, disk may still hold
+older intent. A corrupt/inaccessible initial load is not itself marked as a pending
+save, so an unchanged value cannot silently destroy the unreadable original.
+
+No failing condition remains in the executed current-version checks. File-provider
+UI, iOS protected-data timing, host-container mapping, actual app relaunch after a
+crash, remote interface/network permission and energy remain outside the tested
+scope. These limits do not justify private APIs, host edits or unrelated features.
