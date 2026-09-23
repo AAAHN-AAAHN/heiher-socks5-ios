@@ -81,8 +81,9 @@ bindings and action closures no longer depend directly on SettingsStore.
 Both new feature commits have separate successful Linux/macOS workflows. The
 release workflow builds this integrated composition on Linux and Xcode 27. A Simulator check loads each
 saved tab, launches the production app, and exercises saved Start and TCP echo.
-Results and screenshots will be recorded after actual execution. This paragraph
-describes the test plan, not an advance success claim.
+The historical build run `35845223338` completed its Linux/macOS product checks and
+Simulator step successfully, but failed its final branch cleanup. The new checks-
+only reconciliation below completes cleanup without reclassifying that old run.
 
 Known limits: fixed UDP port with concurrent unknown-client associations retains
 the documented limitation; use UDP port 0 for that scenario. Save failure permits
@@ -111,4 +112,27 @@ then removes only the three reviewed obsolete refs with exact leases after check
 pass. The older 1.1.0/build 6 IPA remains tied to run `35845223338`, whose product jobs
 succeeded but branch cleanup failed; it is not relabeled as a newly built artifact.
 Target iOS 27 + SideStore/LiveContainer and physical-test limitations above remain.
-Completed validation and the final remote branch count are recorded after execution.
+
+### Completed result (2026-09-24)
+
+Run `35896858501` at `0b5edb041a902ec3495468cac0015a4ece117e94` passed Linux,
+Xcode-27 and cleanup jobs. Exactly eight remote branches remain. Only the reviewed
+server-runtime/config-persistence and former settings refs were removed; their
+histories remain release ancestors. Main and all six canonical feature heads did
+not move. This final result text is a later documentation-only change.
+
+The final matrix passed 58 mandatory UDP cases and 20 statistics network executions
+per native configuration (Linux buffered/splice, Darwin buffered), counter/partial-
+I/O sanitizer tests, Darwin TSan, native TCP/parser/lifecycle, Background 1193,
+settings 39+116+15 and server/512 parity checks. Existing fixed-unknown UDP failures
+remain observation-only limitations, not claimed fixes. The first reconciliation
+run failed in a UDP-driver declaration fixture; the complete corrected run passed.
+Original tests and their wrong-composition rejection gate were not weakened.
+
+Xcode 27.0 `27A266a`, iPhoneOS SDK 27.0 typechecked 12 production Swift files with
+warnings-as-errors. Real Combine delivered 34 test notifications and AVAudioFile
+decoded 400 zero samples. No new IPA/Simulator/device execution occurred. The final
+artifacts' 121 source hashes and all 45 unchanged product files were verified;
+all 68 pinned feature-owner files remain intact. Full digests, comparison decisions,
+initial failure and final limits are in the linked review. Existing 1.1.0(build 6)
+remains the original IPA, not a newly built binary.

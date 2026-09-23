@@ -110,3 +110,67 @@ New validation, deletion and final remote ref results are recorded only after th
 operations finish. Physical iOS 27 SideStore/LiveContainer install, permissions,
 interruptions, VPN/hotspot/lock timing, native file-provider UI and energy remain
 unverified. No SDK or native-host success replaces those tests.
+
+
+## Initial combined-dispatcher failure and correction
+
+Run `35896296012` passed the actual integrated native matrix through UDP/statistics,
+lifecycle, parsers, counters and sanitizer checks, but both platforms then failed
+the UDP audit-driver self-test. That self-test intentionally expects a UDP-only
+manifest and rejects the integrated manifest before two failure-injection cases
+reach their mocked source command. This is a test orchestration mismatch in the
+adopted dispatcher, not a newly observed packet/runtime failure. Cleanup did not run.
+
+The correction runs the two unchanged audit-driver files in a temporary fixture
+with the exact pinned UDP owner's Build/features.json. The wrong-composition and
+other negative controls remain enabled and all five pass locally. The actual native
+integration tests still run on the full six-patch core, not this fixture. No product
+file or original test/gate is modified. The entire workflow is rerun; partial results
+from the failed run are not reported as a successful whole run.
+
+
+## Completed reconciliation verification (2026-09-24)
+
+Tested commit: `0b5edb041a902ec3495468cac0015a4ece117e94`.
+Tested tree: `bdc100e2ba7b52e950992f698898c9797339cb3d`.
+Run `35896858501`: Linux verification, Xcode-27 verification and exact-lease
+branch cleanup all succeeded. The cleanup recorded eleven refs before and exactly
+eight afterward, removing only old settings/server-runtime/config-persistence.
+All six canonical feature heads and main remain unchanged; all removed histories
+are actual release ancestors. The final documentation commit adds no runtime change.
+
+The final integrated native core passed 58 mandatory UDP cases per configuration
+(Linux buffered, Linux splice and Darwin buffered), plus 20 statistics network
+executions per configuration. Fixed-unknown-port limitations still failed in five
+of the six observation profiles; these are recorded limitations, not mandatory
+passes. Actual object symbols verify buffered/splice selection. Counter/partial-I/O
+sanitizer checks, Darwin counter TSan, native parser/TCP and 40 startup-cancellation
+cycles per configuration passed. Repetitions are not independent device tests.
+
+Both platforms passed the unchanged Background 1193 assertions, settings 39+116+15,
+server scenarios and canonical 512-case model/YAML parity checks. The original-store
+negative control reproduced its expected 13 failed postconditions while the current
+15 all passed. The five UDP driver controls passed in the pinned manifest fixture.
+Actual Foundation/Combine forwarded 34 events and Apple AVAudioFile verified the
+400 zero samples on macOS. Xcode 27.0 `27A266a` / iPhoneOS SDK 27.0 typechecked all
+12 production Swift files with warnings-as-errors; its diagnostic log was empty.
+No app archive, new IPA, Simulator or physical-device run was performed this time.
+
+The first reconciliation run `35896296012` failed in the UDP driver fixture setup;
+the complete later run above succeeded. Do not label the first run successful or
+remove its failure evidence. Downloaded final artifacts and SHA-256:
+
+- Linux `10767094129`: `6c4700adcdf189b8c7ab55150ba550217365faad3ce79e70feb3b30a8ff67998`
+- macOS `10766774031`: `3194e15f8af7234bbb953d7e3d17c76187eb358ed238b1d73e3e3942f2d26e2d`
+- Cleanup `10767207888`: `304e0539526f1f66dda4c87b0527200559d994d3514fdcc02f7668ca9860e488`
+
+Both final source archives and all 121 recorded file hashes match the tested tree.
+The 45 product files (Swift/assets/project/native patches/committed framework) are
+byte-identical to the existing 1.1.0(6) release. The 68 feature-owned files and their
+commit pins remain intact. A separate local test ran the exact cleanup script against
+disposable Git remotes: unexpected/advanced refs were preserved, reviewed eleven
+refs became eight atomically, and already-eight cleanup was idempotent.
+
+These are source, native-host, framework and cleanup results, not physical iOS 27
+SideStore/LiveContainer certification. The old IPA remains unchanged and identified
+by its original build commit/run/hash above; no reinstall is needed for CI-only edits.
