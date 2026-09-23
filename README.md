@@ -266,3 +266,32 @@ No further failing condition remains in the executed current-version checks. Thi
 is not proof that every OS policy, app interruption, network interface or device
 installation works. Physical iOS 27 SideStore/LiveContainer execution, VPN/hotspot
 changes, suspend/termination behavior, UI interaction and energy remain untested.
+
+
+## Six-feature closure recheck (2026-09-24)
+
+This is a fresh verification of the unchanged product/test tree, not another
+behavior change. Tested commit `92ac9aca5c1bdfca70875b2a5a437da7a447485a`,
+tree `21b8afcd16697044d4861eca7e068b4508cffc39`, run `35928295462`:
+both Linux and Xcode 27 jobs passed on their first attempt. Downloaded Linux
+artifact `10780495023` has SHA-256
+`97c4324279ab4bf6c7ab5aeb7eb798f06974e6e0b9e3b5db9a6620d11c3fc1b3`;
+macOS artifact `10779623178` has SHA-256
+`728f16bba4fb42da0555883918776d2c0d4df8e6c26744ba5e811b08c6ef7e9b`.
+All 61 source hashes in each artifact match the unchanged input tree.
+
+The seven server scenarios, 84 current assertions, 512 parity cases, 14 native
+controller result records, 40 active Stop/restarts and 40 pre-start cancellations
+per platform passed again. Expected failures of the old model/worker were retained.
+The Xcode 27.0 `27A266a` / iPhoneOS 27.0 ARM64 typecheck passed with an empty
+diagnostic log. There was no app archive, IPA, Simulator or physical-device run.
+
+The role remains server configuration and execution only, independent of JSON
+persistence, Background, statistics and icon resources. The six-feature closure
+updates the downstream settings-persistence pin separately after this commit is
+finalized; the older IMPORTANT paragraph above describes the prior audit, not
+that later dependency update. main and release/integrated remain excluded and
+unchanged. Physical iOS 27 SideStore/LiveContainer admission, UI/network-policy
+interactions and energy are still not certified by these host tests. No additional
+runtime defect was identified in the reviewed scope. This section and its mirror
+are documentation-only additions after inspecting the completed evidence.
