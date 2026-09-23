@@ -68,12 +68,12 @@ import Foundation
             AVAudioPlayer.instances.removeAll()
 
             app.setAudio(true)
-            weak var released = AVAudioPlayer.instances.last
-            let oldID = ObjectIdentifier(released!)
+            let oldID = ObjectIdentifier(AVAudioPlayer.instances.last!)
+            let isReleased = { [weak player = AVAudioPlayer.instances.last] in player == nil }
             enqueue(event)
             app.setAudio(false)
             AVAudioPlayer.instances.removeAll() // The old tests retained all instances.
-            check(released == nil, "Queued \(event) does not retain a discarded player")
+            check(isReleased(), "Queued \(event) does not retain a discarded player")
             var reused = false
             var attempts = 0
             for attempt in 1...20_000 {
