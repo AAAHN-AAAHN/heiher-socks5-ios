@@ -44,10 +44,12 @@ import Foundation
         var player = AVAudioPlayer.instances.last!
         check(player.isPlaying && player.numberOfLoops == -1, "Native infinite WAV playback")
         check(audio.category == .playback && audio.categoryOptions == [.mixWithOthers], "Mixing playback category")
-        check(Timer.live.count == 1 && Timer.live[0].interval == 2, "Two-second health check")
+        check(Timer.live.count == 1 && Timer.live[0].interval == 1, "One-second health check")
         let healthyActivations = audio.activations
         for _ in 0..<100 { Timer.live[0].fire(); app.restore() }
-        check(audio.activations == healthyActivations && AVAudioPlayer.instances.last === player, "100 healthy checks reuse the player without reactivation")
+        check(audio.activations == healthyActivations && AVAudioPlayer.instances.last === player
+              && Timer.live.count == 1 && Timer.live[0].interval == 1,
+              "100 healthy checks retain one-second monitoring without player reactivation")
         for info: [AnyHashable: Any]? in [
             [AVAudioSessionInterruptionTypeKey: UInt(1)],
             [AVAudioSessionInterruptionTypeKey: UInt(0)],
@@ -71,7 +73,7 @@ import Foundation
         check(audio.activations == beforeCategoryEvent && Timer.live.count == 1, "Own category event cannot create a recursive retry loop")
         audio.rejectActivation = false
         Timer.live[0].fire()
-        check(AVAudioPlayer.instances.last!.isPlaying && Timer.live[0].interval == 2, "Recovery returns to two-second monitoring")
+        check(AVAudioPlayer.instances.last!.isPlaying && Timer.live[0].interval == 1, "Recovery retains one-second monitoring")
         player = AVAudioPlayer.instances.last!
         player.isPlaying = false
         Timer.live[0].fire()

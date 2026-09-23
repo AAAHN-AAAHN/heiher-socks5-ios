@@ -121,7 +121,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     private func resumeAudio() {
         guard audioEnabled else { return }
         if player?.isPlaying == true {
-            if audioCheck == nil { scheduleAudioCheck(after: 2) }
+            if audioCheck == nil { scheduleAudioCheck(after: 1) }
             return
         }
         audioCheck?.invalidate()
@@ -149,7 +149,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
                               userInfo: [NSLocalizedDescriptionKey: "Audio playback could not start"])
             }
             audioState = "Playing silent WAV continuously"
-            scheduleAudioCheck(after: 2)
+            scheduleAudioCheck(after: 1)
         } catch {
             retryAudio(error)
         }
@@ -170,7 +170,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
 
     private func scheduleAudioCheck(after delay: TimeInterval) {
         audioCheck?.invalidate()
-        // One timer: two-second health checks or one-second retries until disabled.
+        // One timer: one-second health checks or retries until disabled.
         let timer = Timer(timeInterval: delay, repeats: false) { [weak self] timer in
             MainActor.assumeIsolated {
                 guard let self, self.audioCheck === timer else { return }
@@ -197,7 +197,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
             if reason == AVAudioSession.RouteChangeReason.categoryChange.rawValue {
                 let session = AVAudioSession.sharedInstance()
                 if session.category == .playback && session.mode == .default && session.categoryOptions == [.mixWithOthers] {
-                    if audioCheck == nil { scheduleAudioCheck(after: player?.isPlaying == true ? 2 : 1) }
+                    if audioCheck == nil { scheduleAudioCheck(after: 1) }
                     return
                 }
                 discardPlayer()

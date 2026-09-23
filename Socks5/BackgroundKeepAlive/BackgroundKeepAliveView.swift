@@ -12,6 +12,14 @@ struct BackgroundKeepAliveView: View {
         NavigationStack {
             Form {
                 Section {
+                    Toggle("Loop silent WAV", isOn: $audioEnabled)
+                    Text(keepAlive.audioState).font(.footnote)
+                } header: {
+                    Text("Audio")
+                } footer: {
+                    Text("Checks playback every second. Interruptions trigger immediate recovery; failures retry every second while On. Mixes with other audio.")
+                }
+                Section {
                     Toggle("Continuous location", isOn: $locationEnabled)
                 } header: {
                     Text("Location")
@@ -26,14 +34,6 @@ struct BackgroundKeepAliveView: View {
                     }
                     Text("Allow location access in Settings. Precise Location is not required.")
                         .font(.footnote)
-                }
-                Section {
-                    Toggle("Loop silent WAV", isOn: $audioEnabled)
-                    Text(keepAlive.audioState).font(.footnote)
-                } header: {
-                    Text("Audio")
-                } footer: {
-                    Text("Checks playback every 2 seconds. Interruptions trigger immediate recovery; failures retry every second while On. Mixes with other audio.")
                 }
                 Section {
                     Text("Background services are independent of Server Start/Stop. Recovery runs only while iOS allows the app to execute.")

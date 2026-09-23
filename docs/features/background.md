@@ -40,8 +40,8 @@ is used. System-alert interruption avoidance is requested as a best effort.
 
 The On choice is user intent, distinct from actual playback success. A single
 one-shot Timer on the main run loop in common modes performs a healthy `isPlaying`
-check after two seconds. If playback is stopped it attempts recovery. Failures retry
-after one second, without backoff or an attempt limit; success restores two-second
+check after one second. If playback is stopped it attempts recovery. Failures retry
+after one second, without backoff or an attempt limit; success retains one-second
 checks. There is no second polling timer during recovery and no timer for each WAV
 loop. Normal healthy checks do not reconstruct the player or reactivate the session.
 
@@ -68,6 +68,7 @@ bindings from SettingsStore. On first migration it consumes the two old keys and
 removes them only after a successful JSON save. It does not run both persistence
 systems in parallel. The controller itself contains no settings-file I/O.
 
+The Background screen places Audio above Location and Location state.
 `BackgroundKeepAliveView` receives the controller and two bindings. It does not own
 the server, statistics, JSON store, or whole tab hierarchy. `AppRoot` assembles the
 active features. This separation removes the former all-features root from the
@@ -86,6 +87,21 @@ the process, callbacks and retries cannot execute. Interruption delivery itself 
 be delayed until the app is scheduled. Saved On is reapplied on the next launch;
 the app does not relaunch itself. A call may or may not allow reactivation. The code
 continues retrying when it can execute, but cannot override iOS audio priorities.
+
+## Current scoped change and environment
+
+The 2026-09-23 update only moves Audio above Location and changes healthy playback
+checks from two seconds to one. Immediate event recovery and one-second failure
+retries remain unchanged. Healthy timer requests are twice as frequent; there is
+still only one timer, and no measured battery/CPU impact is claimed. This branch
+update is not merged into `release/integrated`.
+
+Target use remains iOS 27.0 on a physical iPhone with SideStore standalone
+installation or LiveContainer guest execution. The configured minimum iOS remains
+17.2. This patch was checked using Swift 6.2.1 on Linux, controller/delegate platform
+doubles, raw WAV validation and source-diff checks. No iOS SDK compile, IPA build,
+SideStore installation, LiveContainer run or physical-device timing test was
+performed for this patch. These limits are separate from historical checks below.
 
 ## Validation
 
