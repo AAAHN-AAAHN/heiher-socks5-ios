@@ -1,25 +1,36 @@
 import SwiftUI
 
-/// Standalone server control: options and intent are memory-only in this branch.
 @MainActor
 struct AppRoot: View {
-    @State private var configuration = ServerSettings()
-    @State private var requestedRunning = false
+    @StateObject private var settings = SettingsStore()
     @StateObject private var server = ServerController()
 
+    private var selectedTab: Binding<AppSettings.Tab> {
+        Binding(get: { settings.value.selectedTab == .settings ? .settings : .server },
+                set: { settings.set(\.selectedTab, $0) })
+    }
+
     var body: some View {
-        ScrollView {
-            ContentView(configuration: $configuration, server: server,
-                        start: {
-                            requestedRunning = true
-                            server.apply(configuration, running: true, retry: true)
-                        }, stop: {
-                            requestedRunning = false
-                            server.apply(configuration, running: false)
-                        }, stopEnabled: server.isRunning || requestedRunning)
+        TabView(selection: selectedTab) {
+            ScrollView {
+                ContentView(configuration: settings.binding(\.server), server: server,
+                            start: {
+                                settings.set(\.serverRunning, true)
+                                server.apply(settings.value.server, running: true, retry: true)
+                            }, stop: {
+                                settings.set(\.serverRunning, false)
+                                server.apply(settings.value.server, running: false)
+                            }, stopEnabled: server.isRunning || settings.value.serverRunning,
+                            errorMessage: settings.errorMessage)
+            }
+                .tabItem { Label("Server", systemImage: "network") }
+                .tag(AppSettings.Tab.server)
+            SettingsView(settings: settings)
+                .tabItem { Label("Settings", systemImage: "square.and.arrow.up") }
+                .tag(AppSettings.Tab.settings)
         }
-        .onChange(of: configuration) { _, value in
-            server.apply(value, running: requestedRunning)
+        .onChange(of: settings.value, initial: true) { _, value in
+            server.apply(value.server, running: value.serverRunning)
         }
     }
 }

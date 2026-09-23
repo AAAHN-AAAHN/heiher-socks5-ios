@@ -14,6 +14,9 @@
 		D30F96722C1809EB002DB6BF /* HevSocks5Server.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = D30F96712C1809EB002DB6BF /* HevSocks5Server.xcframework */; };
 		F0B49EF432005E531F41803A /* AppRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = F012CAD8EFF712318ABE3D46 /* AppRoot.swift */; };
 		F0D57C5237027ACBCE64F90B /* ServerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F04793A4BF6C0636DF8B45 /* ServerController.swift */; };
+		F0D050DCB12B402039CEFF21 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F233452FD39987C43481E6 /* AppSettings.swift */; };
+		F0F917C6383BD6F91F48D7EF /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F077C7B2DB94A69DFA51497B /* SettingsStore.swift */; };
+		F0BBB827AE9F43DAFEA2FBA4 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F0567B891CC8E45A81CFF8 /* SettingsView.swift */; };
 		79C209175522815501263791 /* ServerSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C209175522815501263790 /* ServerSettings.swift */; };
 /* End PBXBuildFile section */
 
@@ -27,6 +30,9 @@
 		F012CAD8EFF712318ABE3D46 /* AppRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppRoot.swift"; sourceTree = "<group>"; };
 		F03BEAAF29668CE70ACC7A54 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
 		F0F04793A4BF6C0636DF8B45 /* ServerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServerController.swift"; sourceTree = "<group>"; };
+		F0F233452FD39987C43481E6 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppSettings.swift"; sourceTree = "<group>"; };
+		F077C7B2DB94A69DFA51497B /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsStore.swift"; sourceTree = "<group>"; };
+		F0F0567B891CC8E45A81CFF8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsView.swift"; sourceTree = "<group>"; };
 		79C209175522815501263790 /* ServerSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSettings.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -66,6 +72,7 @@
 				F012CAD8EFF712318ABE3D46 /* AppRoot.swift */,
 				F03BEAAF29668CE70ACC7A54 /* Info.plist */,
 				F003C59DDD2068C6C3C435AE /* Server */,
+				F0359CD709105E8C2C7CB481 /* Settings */,
 				D30F965F2C18058B002DB6BF /* ContentView.swift */,
 				D30F96612C18058E002DB6BF /* Assets.xcassets */,
 				D30F96632C18058E002DB6BF /* Preview Content */,
@@ -88,6 +95,16 @@
 				79C209175522815501263790 /* ServerSettings.swift */,
 			);
 			path = "Server";
+			sourceTree = "<group>";
+		};
+		F0359CD709105E8C2C7CB481 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				F0F233452FD39987C43481E6 /* AppSettings.swift */,
+				F077C7B2DB94A69DFA51497B /* SettingsStore.swift */,
+				F0F0567B891CC8E45A81CFF8 /* SettingsView.swift */,
+			);
+			path = "Settings";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -165,6 +182,9 @@
 				F0B49EF432005E531F41803A /* AppRoot.swift in Sources */,
 				F0D57C5237027ACBCE64F90B /* ServerController.swift in Sources */,
 				79C209175522815501263791 /* ServerSettings.swift in Sources */,
+				F0D050DCB12B402039CEFF21 /* AppSettings.swift in Sources */,
+				F0F917C6383BD6F91F48D7EF /* SettingsStore.swift in Sources */,
+				F0BBB827AE9F43DAFEA2FBA4 /* SettingsView.swift in Sources */,
 				D30F965E2C18058B002DB6BF /* Socks5App.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
