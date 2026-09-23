@@ -418,3 +418,37 @@ References (public API contracts, not device-test results):
 - https://developer.apple.com/documentation/avfaudio/avaudiosession/interruptionnotification
 - https://developer.apple.com/documentation/avfaudio/avaudioplayer/numberofloops
 - https://developer.apple.com/documentation/swift/objectidentifier
+
+
+## Six-feature closure recheck (2026-09-24)
+
+Input product/test snapshot: `9227a03461e5f1a72a2ffbed75cdd7724c2175fc`.
+Fresh verification commit `22e284d4e86309be06b258a9f60f44bef8fc6351` has the
+same tree `1d389daa6d94475dab7efe3ee89f69d05ebed0e1`. Run `35928260734`
+passed on its first attempt; only the existing audio-checks job ran and the
+archive/IPA job was skipped. The downloaded artifact `10780062749` SHA-256 is
+`6709aacb2795fb7b4fc69b38169cc88c410213fd383eb62166dd2ae6aa9b2461`.
+All 56 source hashes match the unchanged input. No runtime or test edit was needed.
+
+The full 1193 assertions passed again: controller 1030, worker delegate 4,
+recovery 103, lifecycle 41 and callback lifetime 15. Real Foundation/Combine
+delivered all 34 main/worker notifications and detached on cancellation; Apple's
+decoder confirmed the existing 400 silent samples. Xcode 27.0 `27A266a` with
+iPhoneOS SDK 27.0 typechecked five production Swift files, with an empty diagnostic
+log. Exact main boundary, plist/root bindings, Audio-first order and resource
+identity checks passed. Repetitions are not independent physical-device trials.
+
+The controller remains responsible only for the independent location/audio
+services. The standalone root's two existing AppStorage keys supply user intent;
+the integrated root can instead supply persistence-owned bindings. Neither
+SettingsStore nor server-control is a dependency of this standalone feature.
+The 13 session notifications, four lifecycle checkpoints, immediate detected-stop
+recovery, one-second single-timer policy and bounded re-entry protections are
+unchanged. No host patch, extra scheduler, new observer or polling path is added.
+
+The repository-wide closure retains eight branches and leaves main/release
+unchanged; earlier seven-branch statements above describe their historical runs.
+Actual iOS 27 SideStore installation, LiveContainer host arbitration, telephone/
+Bluetooth notifications, process suspension and energy use remain untested.
+This result verifies the implemented paths and current SDK contracts, not
+guaranteed delivery/activation while iOS refuses or suspends execution.
