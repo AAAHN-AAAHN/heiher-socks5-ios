@@ -268,3 +268,44 @@ No failing condition remains in the executed current-version checks. File-provid
 UI, iOS protected-data timing, host-container mapping, actual app relaunch after a
 crash, remote interface/network permission and energy remain outside the tested
 scope. These limits do not justify private APIs, host edits or unrelated features.
+
+
+## Six-feature closure recheck (2026-09-24)
+
+The input was `65173b5ff9d81bc263cdc43325a6d96486b1ea67`. The latest
+server-control owner is now `9aa6ef6d1dd16e4fe15701311c0f0f69154e3945`.
+Merge/test commit `5fa32c25f6b549599860169f6d23f6448c389064` has both as
+actual parents; its tree is `d4a0979d5c065929066b153c806489105868b9ca`.
+All 17 declared server files remain byte-identical to that latest owner, including
+its completed documentation. The ownership refs and inherited report were updated;
+no runtime, schema, UI, patch, default, storage or test behavior changed.
+
+Run `35929400802` passed both Linux and Xcode27 jobs on the first attempt. All
+209 settings assertions passed again (39 + 116 + 15 + 33 + 6). Historical negative
+controls still reproduce the old failures. Actual store/controller/Hev integration
+produced 16 passing records per host; inherited server tests produced their 14
+old/current comparison records, seven scenarios, 84 assertions, 512 parity cases
+and 40 active plus 40 pre-start Stop cycles. These are host/file/network tests;
+the command adapter is not SwiftUI event delivery, device Files UI or crash testing.
+
+Xcode 27.0 `27A266a` / iPhoneOS SDK 27.0 ARM64 type checking of eight production
+Swift files passed with an empty diagnostic log and the unchanged iOS 17.2 minimum.
+The workflow does not record a native-host OS build or installer/host version, so
+none is inferred. No Simulator, app archive, IPA or physical-device run occurred.
+
+Downloaded Linux artifact `10781080389` SHA-256:
+`87ef59bd86fffa67a5965d3b8190c2089cf781e5118353209b8fcc2b1f80f099`.
+Downloaded macOS artifact `10780268238` SHA-256:
+`a09c0393f20859622243c9a1d2d0fea8fefd95005f789ebf6c2e8789ea578dba`.
+Both complete 75-file source archives and source manifests match the reviewed
+merge snapshot. This own README and its mirror are the only subsequent changes.
+
+Responsibility remains durable options and file handling on top of the latest
+server execution layer, not an additional server implementation. No reverse
+dependency or dependency on UDP, statistics, Background or app-icon is introduced.
+The older 011f7f61 references above describe the previous verification. Current
+ownership is the exact 9aa6ef6d pin, not merely equivalent product bytes from an
+older ancestor. The closure leaves main/release unchanged and retains eight branches.
+Physical iOS27 SideStore/LiveContainer storage policy, picker, permissions, host
+mapping, process termination and energy remain unverified. No additional runtime
+defect was found in this recheck; accepted limits are not converted into new code.
