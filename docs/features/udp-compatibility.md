@@ -348,3 +348,38 @@ not modified by this audit.
 
 The full build and common baseline policy remain in `docs/build-and-validation.md`
 and `docs/main-baseline.md`. Their paths are relative to the repository root.
+
+
+## Six-feature closure recheck (2026-09-24)
+
+The six-feature review found no new defect in the two scoped runtime repairs.
+It did find that this branch's regular macOS audit still selected macos-15 and
+exposed all of LLVM18/bin. The workflow now selects xcode-27, exposes only the
+required clang-format-18 executable, records/asserts iPhoneOS SDK 27 and adds an
+actual ARM64 Swift typecheck. Runtime C/Swift, assets, defaults, source pins,
+patches and existing test expectations are unchanged. No app or IPA is built.
+
+Tested commit `f5d9d32e8fe1ae743ed9647c589ca5fabf634502`,
+tree `62d426f35679d3be3af92ae77a106ddfb04fd9a4`, run `35928444327`:
+Linux and Xcode27 jobs both succeeded on the first attempt. Each platform passed
+58/58 mandatory protocol scenarios, the actual-source 65,536-port/caller probes
+with ASan/UBSan and optimized strict aliasing, driver failure controls and patch
+reversal. Fixed-port/multiple-unknown associations again failed observation-only
+profiles; their documented accepted limitation and port-zero recommendation remain.
+This result is not an unrestricted protocol/security approval.
+
+Xcode 27.0 `27A266a`, iPhoneOS 27.0, Apple Swift 6.4 and macOS 27.0 `26A428`
+were recorded. Actual C syntax and Swift typecheck logs contain no diagnostics.
+The Linux artifact `10778964876` SHA-256 is
+`e4b5bc541915b0f05b6d96b4fa300eddfe0528c76b64983b2f674f20c2626909`;
+macOS artifact `10780450446` SHA-256 is
+`492abfb41fde147aa3e46305b0ce21bb2fdaea700a3fab5a1166d9d11b3c9ff6`.
+Both 49-file tested source archives match the reviewed snapshot.
+
+The finalized UDP owner is then included as a real ancestor of traffic-statistics,
+with its current reusable workflow, exact dependency files and documentation.
+No dependency on server-control, persistence, Background or app-icon is introduced.
+main and release/integrated stay excluded. This fresh native/SDK recheck did not
+repeat the historical IPA/Simulator experiment or perform physical iOS 27
+SideStore/LiveContainer installation, VPN/hotspot, lock-screen, UI or energy tests.
+The section above dated 2026-09-23 remains evidence for that earlier, separate run.
