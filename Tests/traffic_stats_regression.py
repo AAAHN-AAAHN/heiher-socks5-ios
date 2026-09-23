@@ -3,6 +3,7 @@
 import concurrent.futures
 import contextlib
 import json
+import os
 import pathlib
 import select
 import socket
@@ -18,6 +19,7 @@ from udp_sockaddr_regression import association, echo_server, encode, exact, exc
 
 class Asymmetric(socketserver.BaseRequestHandler):
     def handle(self):
+        self.request.settimeout(5)
         received = bytearray()
         while True:
             chunk = self.request.recv(1021)
@@ -36,22 +38,39 @@ class Sink(socketserver.BaseRequestHandler):
 class Host:
     def __init__(self, binary, config):
         self.proc = subprocess.Popen([binary, str(config)], stdin=subprocess.PIPE,
-                                     stdout=subprocess.PIPE, stderr=sys.stderr, text=True,
-                                     bufsize=1)
-        assert self.proc.stdout.readline().strip() == 'LOCK_FREE 1'
+                                     stdout=subprocess.PIPE, stderr=sys.stderr, bufsize=0)
+        self.output = b''
+        try:
+            assert self.readline() == 'LOCK_FREE 1'
+        except BaseException:
+            self.close()
+            raise
 
     def stats(self, command='stats'):
-        self.proc.stdin.write(command + '\n')
+        self.proc.stdin.write((command + '\n').encode('ascii'))
         self.proc.stdin.flush()
-        if not select.select([self.proc.stdout], [], [], 5)[0]:
-            raise TimeoutError('Native statistics API timed out')
-        row = self.proc.stdout.readline().split()
-        assert row[0] == 'STATS', row
+        row = self.readline().split()
+        assert len(row) == 3 and row[0] == 'STATS', row
         return tuple(map(int, row[1:]))
+
+    def readline(self, timeout=5):
+        deadline = time.monotonic() + timeout
+        while b'\n' not in self.output:
+            if len(self.output) >= 4096:
+                raise ValueError('Native host response exceeds 4096 bytes')
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not select.select([self.proc.stdout], [], [], remaining)[0]:
+                raise TimeoutError('Native host response timed out')
+            chunk = os.read(self.proc.stdout.fileno(), 4096 - len(self.output))
+            if not chunk:
+                raise EOFError('Native host closed its output')
+            self.output += chunk
+        line, self.output = self.output.split(b'\n', 1)
+        return line.decode('ascii')
 
     def close(self):
         try:
-            self.proc.communicate('quit\n', timeout=5)
+            self.proc.communicate(b'quit\n', timeout=5)
         except subprocess.TimeoutExpired:
             self.proc.kill()
             self.proc.wait()
@@ -184,4 +203,6 @@ misc:
 
 
 if __name__ == '__main__':
+    if not __debug__:
+        raise SystemExit('Assertions are required; do not use Python -O.')
     main()

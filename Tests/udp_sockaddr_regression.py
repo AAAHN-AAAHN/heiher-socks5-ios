@@ -76,7 +76,7 @@ def encode(host, port):
 
 
 def decode_bytes(data):
-    size = {1: 4, 4: 16}.get(data[0])
+    size = {1: 4, 4: 16}.get(data[0]) if data else None
     if size is None or len(data) < size + 3:
         raise ValueError('Invalid address header')
     return (str(ipaddress.ip_address(data[1:1 + size])),
@@ -122,23 +122,22 @@ def exchange(udp, destination, size):
 
 
 @contextlib.contextmanager
-def proxy_server(binary, log_path):
+def proxy_server(binary, log_path, workers=1, fixed_udp_port=False, unbound=False):
     with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as reserve:
         reserve.bind(('::1', 0))
         port = reserve.getsockname()[1]
     with tempfile.TemporaryDirectory() as temp, open(log_path, 'wb') as log:
         conf = pathlib.Path(temp) / 'test.yml'
         conf.write_text('''main:
-  workers: 1
+  workers: %d
   port: %d
   listen-address: '::'
   listen-ipv6-only: false
-  udp-port: 0
-  bind-address-v4: '0.0.0.0'
-  bind-address-v6: '::'
-misc:
+  udp-port: %d
+%smisc:
   log-level: debug
-''' % port)
+''' % (workers, port, port if fixed_udp_port else 0,
+       '' if unbound else "  bind-address-v4: '0.0.0.0'\n  bind-address-v6: '::'\n"))
         proc = subprocess.Popen([binary, str(conf)], stdout=log, stderr=subprocess.STDOUT)
         try:
             for _ in range(100):
@@ -166,7 +165,15 @@ def main():
     parser.add_argument('binary')
     parser.add_argument('--output', required=True)
     parser.add_argument('--allow-failures', action='store_true')
+    parser.add_argument('--workers', type=int, choices=(1, 4), default=1)
+    parser.add_argument('--fixed-udp-port', action='store_true')
+    parser.add_argument('--known-concurrent', action='store_true',
+                        help='Advertise the actual ports in the multi-association case')
+    parser.add_argument('--unbound', action='store_true',
+                        help='Do not bind the outgoing socket to one address family')
     args = parser.parse_args()
+    if not __debug__:
+        parser.error('Run without -O: assertions are part of this test')
     output = pathlib.Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     results = []
@@ -186,7 +193,8 @@ def main():
         tcp4 = stack.enter_context(echo_server('127.0.0.1', udp=False))
         tcp6 = stack.enter_context(echo_server('::1', udp=False))
         port = stack.enter_context(proxy_server(str(pathlib.Path(args.binary).resolve()),
-                                                output.with_suffix('.server.log')))
+                                                output.with_suffix('.server.log'), args.workers,
+                                                args.fixed_udp_port, args.unbound))
         for host, hint in [('127.0.0.1', '0.0.0.0'), ('127.0.0.1', '::1'),
                            ('127.0.0.1', 'known'), ('::1', '::'), ('::1', 'known')]:
             destination = udp6 if ':' in host else udp4
@@ -199,7 +207,8 @@ def main():
 
         def concurrent():
             with contextlib.ExitStack() as associations:
-                items = [associations.enter_context(association(('127.0.0.1', port), '0.0.0.0'))
+                hint = 'known' if args.known_concurrent else '0.0.0.0'
+                items = [associations.enter_context(association(('127.0.0.1', port), hint))
                          for _ in range(3)]
                 payloads = [secrets.token_bytes(64) for _ in items]
                 for (_, udp), payload in zip(items, payloads):
@@ -215,6 +224,33 @@ def main():
                 for _, udp in items[1:]:
                     exchange(udp, udp4, 1200)
         check('UDP three associations and one closed', concurrent)
+
+        def burst():
+            with association(('127.0.0.1', port), '0.0.0.0') as (_, udp):
+                # Establish the peer before queuing a vector-sized burst.
+                exchange(udp, udp4, 64)
+                for _ in range(3):
+                    pending = {secrets.token_bytes(128) for _ in range(24)}
+                    for payload in pending:
+                        udp.send(b'\x00\x00\x00' + encode(*udp4) + payload)
+                    for _ in range(len(pending)):
+                        reply = udp.recv(65535)
+                        source, offset = decode_bytes(reply[3:])
+                        assert reply[:3] == b'\x00\x00\x00' and source == udp4
+                        payload = reply[3 + offset:]
+                        assert payload in pending, 'Duplicate or foreign burst payload'
+                        pending.remove(payload)
+                    assert not pending
+        check('UDP three 24-datagram bursts, unordered replies', burst)
+
+        if args.unbound:
+            for first, second in ((udp4, udp6), (udp6, udp4)):
+                def mixed(first=first, second=second):
+                    with association(('127.0.0.1', port), '0.0.0.0') as (_, udp):
+                        for _ in range(6):
+                            exchange(udp, first, 64)
+                            exchange(udp, second, 512)
+                check('UDP mixed external families, first=' + first[0], mixed)
 
         for destination in (tcp4, tcp6):
             def tcp_test(destination=destination):

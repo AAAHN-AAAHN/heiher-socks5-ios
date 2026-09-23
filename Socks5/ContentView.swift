@@ -6,8 +6,12 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject private var settings: SettingsStore
-    @EnvironmentObject private var server: ServerController
+    @Binding var configuration: ServerSettings
+    @ObservedObject var server: ServerController
+    let start: () -> Void
+    let stop: () -> Void
+    let stopEnabled: Bool
+    var errorMessage: String? = nil
 
     var body: some View {
         VStack {
@@ -15,7 +19,7 @@ struct ContentView: View {
                 .font(.headline)
                 .padding(.bottom, 0)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            TextField("", text: settings.binding(\.server.workers))
+            TextField("", text: $configuration.workers)
                 .padding(.top, 0)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .autocapitalization(.none)
@@ -27,7 +31,7 @@ struct ContentView: View {
                 .font(.headline)
                 .padding(.bottom, 0)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            TextField("", text: settings.binding(\.server.listenAddress))
+            TextField("", text: $configuration.listenAddress)
                 .padding(.top, 0)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .autocapitalization(.none)
@@ -38,7 +42,7 @@ struct ContentView: View {
                 .font(.headline)
                 .padding(.bottom, 0)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            TextField("", text: settings.binding(\.server.listenPort))
+            TextField("", text: $configuration.listenPort)
                 .padding(.top, 0)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .autocapitalization(.none)
@@ -50,7 +54,7 @@ struct ContentView: View {
                 .font(.headline)
                 .padding(.bottom, 0)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            TextField("Optional", text: settings.binding(\.server.udpListenAddress))
+            TextField("Optional", text: $configuration.udpListenAddress)
                 .padding(.top, 0)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .autocapitalization(.none)
@@ -61,7 +65,7 @@ struct ContentView: View {
                 .font(.headline)
                 .padding(.bottom, 0)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            TextField("", text: settings.binding(\.server.udpListenPort))
+            TextField("", text: $configuration.udpListenPort)
                 .padding(.top, 0)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .autocapitalization(.none)
@@ -73,7 +77,7 @@ struct ContentView: View {
                 .font(.headline)
                 .padding(.bottom, 0)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            TextField("", text: settings.binding(\.server.bindIPv4Address))
+            TextField("", text: $configuration.bindIPv4Address)
                 .padding(.top, 0)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .autocapitalization(.none)
@@ -84,7 +88,7 @@ struct ContentView: View {
                 .font(.headline)
                 .padding(.bottom, 0)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            TextField("", text: settings.binding(\.server.bindIPv6Address))
+            TextField("", text: $configuration.bindIPv6Address)
                 .padding(.top, 0)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .autocapitalization(.none)
@@ -95,7 +99,7 @@ struct ContentView: View {
                 .font(.headline)
                 .padding(.bottom, 0)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            TextField("Optional", text: settings.binding(\.server.bindInterface))
+            TextField("Optional", text: $configuration.bindInterface)
                 .padding(.top, 0)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .autocapitalization(.none)
@@ -106,7 +110,7 @@ struct ContentView: View {
                 .font(.headline)
                 .padding(.bottom, 0)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            TextField("Optional", text: settings.binding(\.server.authUsername))
+            TextField("Optional", text: $configuration.authUsername)
                 .padding(.top, 0)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .autocapitalization(.none)
@@ -117,14 +121,14 @@ struct ContentView: View {
                 .font(.headline)
                 .padding(.bottom, 0)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            SecureField("Optional", text: settings.binding(\.server.authPassword))
+            SecureField("Optional", text: $configuration.authPassword)
                 .padding(.top, 0)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .autocapitalization(.none)
                 .frame(maxWidth: .infinity)
                 .disabled(server.isRunning)
 
-            Toggle(isOn: settings.binding(\.server.listenIPv6Only)) {
+            Toggle(isOn: $configuration.listenIPv6Only) {
                 Text("Listen IPv6 only")
                     .font(.headline)
             }
@@ -133,30 +137,24 @@ struct ContentView: View {
             .disabled(server.isRunning)
 
             HStack {
-                Button(action: {
-                    settings.set(\.serverRunning, true)
-                    server.apply(settings.value, retry: true)
-                }) {
+                Button(action: start) {
                     Text("Start")
                     .font(.headline)
                     .padding()
                     .cornerRadius(10)
                 }
                 .disabled(server.isRunning)
-                Button(action: {
-                    settings.set(\.serverRunning, false)
-                    server.apply(settings.value)
-                }) {
+                Button(action: stop) {
                     Text("Stop")
                     .font(.headline)
                     .padding()
                     .cornerRadius(10)
                 }
-                .disabled(!server.isRunning && !settings.value.serverRunning)
+                .disabled(!stopEnabled)
             }
 
             Text(server.status).font(.footnote)
-            if let error = settings.errorMessage { Text(error).font(.footnote) }
+            if let errorMessage { Text(errorMessage).font(.footnote) }
             Spacer()
         }
         .padding()
@@ -164,5 +162,6 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView().environmentObject(SettingsStore()).environmentObject(ServerController())
+    ContentView(configuration: .constant(ServerSettings()), server: ServerController(),
+                start: {}, stop: {}, stopEnabled: false)
 }

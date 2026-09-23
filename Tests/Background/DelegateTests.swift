@@ -22,6 +22,13 @@ import Foundation
         for _ in 0..<20 { await Task.yield() }
         precondition(AVAudioSession.shared.activations == activations && Timer.live.isEmpty)
         print("PASS: an off-main stale delegate cannot restart disabled audio")
+        app.setAudio(true)
+        let firstDecoder = AVAudioPlayer.instances.last!
+        await Task.detached { app.audioPlayerDecodeErrorDidOccur(firstDecoder, error: nil) }.value
+        await waitUntil { AVAudioPlayer.instances.last !== firstDecoder }
+        precondition(AVAudioPlayer.instances.last!.isPlaying && Timer.live.count == 1)
+        print("PASS: first off-main decoder failure recovers immediately on MainActor")
+        app.setAudio(false)
     }
 
     @MainActor static func waitUntil(_ condition: () -> Bool) async {

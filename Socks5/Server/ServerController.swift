@@ -11,8 +11,8 @@ final class ServerController: ObservableObject {
     private var stopping = false
     private var attempted: ServerSettings?
 
-    func apply(_ settings: AppSettings, retry: Bool = false) {
-        desired = settings.serverRunning ? settings.server : nil
+    func apply(_ settings: ServerSettings, running: Bool, retry: Bool = false) {
+        desired = running ? settings : nil
         if desired == nil { attempted = nil }
         if let current {
             if current != desired && !stopping {

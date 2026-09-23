@@ -12,6 +12,14 @@ struct BackgroundKeepAliveView: View {
         NavigationStack {
             Form {
                 Section {
+                    Toggle("Loop silent WAV", isOn: $audioEnabled)
+                    Text(keepAlive.audioState).font(.footnote)
+                } header: {
+                    Text("Audio")
+                } footer: {
+                    Text("Checks playback every second. Interruption and stop signals trigger immediate recovery; repeated failures retry every second while On. Mixes with other audio.")
+                }
+                Section {
                     Toggle("Continuous location", isOn: $locationEnabled)
                 } header: {
                     Text("Location")
@@ -28,14 +36,6 @@ struct BackgroundKeepAliveView: View {
                         .font(.footnote)
                 }
                 Section {
-                    Toggle("Loop silent WAV", isOn: $audioEnabled)
-                    Text(keepAlive.audioState).font(.footnote)
-                } header: {
-                    Text("Audio")
-                } footer: {
-                    Text("Checks playback every 2 seconds. Interruptions trigger immediate recovery; failures retry every second while On. Mixes with other audio.")
-                }
-                Section {
                     Text("Background services are independent of Server Start/Stop. Recovery runs only while iOS allows the app to execute.")
                         .font(.footnote)
                 }
@@ -49,13 +49,9 @@ struct BackgroundKeepAliveView: View {
 @MainActor
 struct BackgroundKeepAliveEvents: ViewModifier {
     let keepAlive: BackgroundKeepAlive
-    private let audioEvents = Publishers.MergeMany([
-        AVAudioSession.interruptionNotification,
-        AVAudioSession.routeChangeNotification,
-        AVAudioSession.mediaServicesWereLostNotification,
-        AVAudioSession.mediaServicesWereResetNotification
-    ].map { NotificationCenter.default.publisher(for: $0) })
-        .receive(on: RunLoop.main)
+    private let audioEvents = Publishers.MergeMany(
+        BackgroundKeepAlive.audioNotifications.map { NotificationCenter.default.publisher(for: $0) }
+    ).receive(on: RunLoop.main)
 
     func body(content: Content) -> some View {
         content

@@ -28,7 +28,10 @@ struct CLError: Error {
 @MainActor final class CLLocationManager {
     static var initialAuthorization = CLAuthorizationStatus.authorizedAlways
     static var instances: [CLLocationManager] = []
-    weak var delegate: CLLocationManagerDelegate?
+    static var notifyOnDelegate = false
+    weak var delegate: CLLocationManagerDelegate? {
+        didSet { if Self.notifyOnDelegate { delegate?.locationManagerDidChangeAuthorization(self) } }
+    }
     var authorizationStatus = initialAuthorization
     var desiredAccuracy = 0.0
     var distanceFilter = 0.0
@@ -38,9 +41,17 @@ struct CLError: Error {
     var starts = 0
     var stops = 0
     var requests = 0
+    var accuracyAtStart = 0.0
+    var backgroundAtStart = false
+    var pausingAtStart = true
     init() { Self.instances.append(self) }
     func requestAlwaysAuthorization() { requests += 1 }
-    func startUpdatingLocation() { starts += 1 }
+    func startUpdatingLocation() {
+        starts += 1
+        accuracyAtStart = desiredAccuracy
+        backgroundAtStart = allowsBackgroundLocationUpdates
+        pausingAtStart = pausesLocationUpdatesAutomatically
+    }
     func stopUpdatingLocation() { stops += 1 }
 }
 
@@ -48,6 +59,11 @@ struct CLError: Error {
     enum State { case active, inactive, background }
     static let shared = UIApplication()
     var applicationState = State.active
+    static let willResignActiveNotification = Notification.Name("WillResignActive")
+    static let didEnterBackgroundNotification = Notification.Name("DidEnterBackground")
+    static let willEnterForegroundNotification = Notification.Name("WillEnterForeground")
+    static let protectedDataDidBecomeAvailableNotification = Notification.Name("ProtectedDataAvailable")
+    static let didBecomeActiveNotification = Notification.Name("AppDidBecomeActive")
 }
 
 let AVAudioSessionInterruptionTypeKey = "InterruptionType"
@@ -71,6 +87,15 @@ let AVAudioSessionRouteChangeReasonKey = "RouteChangeReason"
     static let routeChangeNotification = Notification.Name("RouteChange")
     static let mediaServicesWereLostNotification = Notification.Name("ServicesLost")
     static let mediaServicesWereResetNotification = Notification.Name("ServicesReset")
+    static let silenceSecondaryAudioHintNotification = Notification.Name("SecondaryAudioHint")
+    static let spatialPlaybackCapabilitiesChangedNotification = Notification.Name("SpatialCapabilities")
+    static let renderingModeChangeNotification = Notification.Name("RenderingMode")
+    static let renderingCapabilitiesChangeNotification = Notification.Name("RenderingCapabilities")
+    static let outputMuteStateChangeNotification = Notification.Name("OutputMute")
+    static let userIntentToUnmuteOutputNotification = Notification.Name("UnmuteIntent")
+    static let didBecomeActiveNotification = Notification.Name("SessionActive")
+    static let didBecomeInactiveNotification = Notification.Name("SessionInactive")
+    static let resumptionRecommendationNotification = Notification.Name("ResumptionRecommendation")
     static let shared = AVAudioSession()
     static func sharedInstance() -> AVAudioSession { shared }
     var category = Category.ambient
@@ -80,25 +105,33 @@ let AVAudioSessionRouteChangeReasonKey = "RouteChangeReason"
     var rejectActivation = false
     var rejectCategory = false
     var rejectPreference = false
+    var isActive = false
     var activations = 0
     var deactivations = 0
     var configurations = 0
+    var onCategory: (() -> Void)?
+    var onActivation: (() -> Void)?
+    var onPreference: (() -> Void)?
     func setCategory(_ category: Category, mode: Mode, options: CategoryOptions) throws {
         if rejectCategory { throw NSError(domain: "MockCategory", code: 1) }
         configurations += 1
         self.category = category
         self.mode = mode
         categoryOptions = options
+        onCategory?()
     }
     func setPrefersNoInterruptionsFromSystemAlerts(_ value: Bool) throws {
         if rejectPreference { throw NSError(domain: "MockPreference", code: 1) }
         prefersNoInterruptionsFromSystemAlerts = value
+        onPreference?()
     }
     func setActive(_ active: Bool, options: SetActiveOptions = []) throws {
         if active {
             activations += 1
+            onActivation?()
             if rejectActivation { throw NSError(domain: "MockAudioPriority", code: 1) }
-        } else { deactivations += 1 }
+            isActive = true
+        } else { deactivations += 1; isActive = false }
     }
 }
 
@@ -106,6 +139,8 @@ let AVAudioSessionRouteChangeReasonKey = "RouteChangeReason"
     static var instances: [AVAudioPlayer] = []
     static var rejectInit = false
     static var rejectPlay = false
+    static var onPlay: ((AVAudioPlayer) -> Void)?
+    static var onStop: (() -> Void)?
     weak var delegate: AVAudioPlayerDelegate?
     var numberOfLoops = 0
     var isPlaying = false
@@ -118,9 +153,11 @@ let AVAudioSessionRouteChangeReasonKey = "RouteChangeReason"
     func play() -> Bool {
         plays += 1
         isPlaying = !Self.rejectPlay
-        return isPlaying
+        let result = isPlaying
+        Self.onPlay?(self)
+        return result
     }
-    func stop() { stops += 1; isPlaying = false }
+    func stop() { stops += 1; isPlaying = false; Self.onStop?() }
 }
 
 @MainActor enum Bundle {

@@ -11,7 +11,17 @@ struct AppRoot: View {
             TrafficStatisticsView(isVisible: settings.value.selectedTab == .statistics)
                 .tabItem { Label("Statistics", systemImage: "chart.bar") }
                 .tag(AppSettings.Tab.statistics)
-            ScrollView { ContentView() }
+            ScrollView {
+                ContentView(configuration: settings.binding(\.server), server: server,
+                            start: {
+                                settings.set(\.serverRunning, true)
+                                server.apply(settings.value.server, running: true, retry: true)
+                            }, stop: {
+                                settings.set(\.serverRunning, false)
+                                server.apply(settings.value.server, running: false)
+                            }, stopEnabled: server.isRunning || settings.value.serverRunning,
+                            errorMessage: settings.errorMessage)
+            }
                 .tabItem { Label("Server", systemImage: "network") }
                 .tag(AppSettings.Tab.server)
             BackgroundKeepAliveView(keepAlive: keepAlive,
@@ -23,8 +33,6 @@ struct AppRoot: View {
                 .tabItem { Label("Settings", systemImage: "square.and.arrow.up") }
                 .tag(AppSettings.Tab.settings)
         }
-        .environmentObject(settings)
-        .environmentObject(server)
         .onChange(of: settings.value, initial: true) { _, value in
             if keepAlive.locationEnabled != value.background.continuousLocation {
                 keepAlive.setLocation(value.background.continuousLocation)
@@ -32,7 +40,7 @@ struct AppRoot: View {
             if keepAlive.audioEnabled != value.background.silentAudio {
                 keepAlive.setAudio(value.background.silentAudio)
             }
-            server.apply(value)
+            server.apply(value.server, running: value.serverRunning)
         }
         .modifier(BackgroundKeepAliveEvents(keepAlive: keepAlive))
     }

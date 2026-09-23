@@ -22,6 +22,7 @@
 		F0BBB827AE9F43DAFEA2FBA4 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F0567B891CC8E45A81CFF8 /* SettingsView.swift */; };
 		F01458C735412E0D383C0D64 /* TrafficStatistics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F2AD6594E2C498AD1D258B /* TrafficStatistics.swift */; };
 		F0304AB3D1EBB5612B39426F /* TrafficStatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F029B5868B1526CF1898650C /* TrafficStatisticsView.swift */; };
+		79C209175522815501263791 /* ServerSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C209175522815501263790 /* ServerSettings.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 		F0F0567B891CC8E45A81CFF8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsView.swift"; sourceTree = "<group>"; };
 		F0F2AD6594E2C498AD1D258B /* TrafficStatistics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrafficStatistics.swift"; sourceTree = "<group>"; };
 		F029B5868B1526CF1898650C /* TrafficStatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrafficStatisticsView.swift"; sourceTree = "<group>"; };
+		79C209175522815501263790 /* ServerSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSettings.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -112,6 +114,7 @@
 			isa = PBXGroup;
 			children = (
 				F0F04793A4BF6C0636DF8B45 /* ServerController.swift */,
+				79C209175522815501263790 /* ServerSettings.swift */,
 			);
 			path = "Server";
 			sourceTree = "<group>";
@@ -211,6 +214,7 @@
 				F0301EB5F2CF2B728DA9BA91 /* BackgroundKeepAlive.swift in Sources */,
 				F024F5BAEE919A12B6FB1D80 /* BackgroundKeepAliveView.swift in Sources */,
 				F0D57C5237027ACBCE64F90B /* ServerController.swift in Sources */,
+				79C209175522815501263791 /* ServerSettings.swift in Sources */,
 				F0D050DCB12B402039CEFF21 /* AppSettings.swift in Sources */,
 				F0F917C6383BD6F91F48D7EF /* SettingsStore.swift in Sources */,
 				F0BBB827AE9F43DAFEA2FBA4 /* SettingsView.swift in Sources */,
