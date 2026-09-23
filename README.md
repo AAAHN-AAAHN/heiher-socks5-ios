@@ -213,3 +213,47 @@ and marketing approval are also not claimed. The code has no icon-related host
 permission request and the audit does not justify a host patch or Bundle ID change.
 No failing condition remains in the executed final resource checks; that conclusion
 is bounded by these actual compiler, decoder and Simulator observations.
+
+
+## Six-feature closure recheck (2026-09-24)
+
+Input `8c8b071b238b7c0c0a5fd1946c18263c5bd0f1bd` and fresh verification
+commit `c47acc5296d33ba4cefa1bbe233f8d1a9977e3ee` have the identical tree
+`758c9c60e590a06b9fcae05a098a3c9e0e41c9e5`. No product, artwork, catalog,
+project, test or workflow change was required for this rerun. The sole later
+changes are this README and its identical specification.
+
+Run `35928328152` passed its complete icon-checks job on attempt 3; ordinary
+archive/IPA verify remained intentionally skipped. Attempts 1 and 2 passed source,
+mutation, asset compilation, ImageIO and Simulator product building but timed out
+installing the original app after 120 seconds. Cleanup also stalled. These remain
+failed attempts; the exact internal simulator-service stall cause was not proven.
+Two explicit reruns used identical source and limits on fresh runners/devices.
+No assertion, installation step, timeout or failure handling was relaxed. Attempt 3
+completed both identities, all four screenshots and cleanup successfully.
+
+The 12 mutation/resource tests, actual Debug/Release settings, iPhone/iPad actool,
+CAR metadata and independent Apple image decoding passed. The real Simulator app
+registered and launched under hev.Socks5 and the copied test ID
+hev.Socks5.ICONREVIEW. All four new light/dark-system-UI screenshots were inspected
+and visibly contain the preserved Socks5 icon; none is a generated mockup.
+This does not exercise every custom tinted/clear icon setting or the iPad runtime.
+
+The successful runner recorded Xcode27.0 `27A266a`, iPhoneOS SDK27.0, Apple Swift6.4
+and macOS27.0 `26A5406e`; the actual iPhone16 Simulator was iOS27.0 `24A434`.
+The unchanged iOS17.2 deployment target is separate from those executed versions.
+The two non-asset build warnings (matching destinations and unused AppIntents
+metadata extraction) remain visible; asset compilation had no warning/error.
+SideStore or LiveContainer was not installed or executed.
+
+Inspected artifacts and SHA-256:
+- Attempt 1 `10780520415`: `7d121ca632518aede02af41074640f95f455ff598bc1a62c512bc2f70ed04974`.
+- Attempt 2 `10780557241`: `75f22d18508900c1ae0013f2e6ca47c4f46e10691b72775cfe6a914ac7c6bc9d`.
+- Successful attempt 3 `10781231723`: `08bce9bf855af335cf3d4dc39d72bf30c0bbf5ce8a8931a1f77b2d1d200caeca`.
+
+All 47 final source hashes match the reviewed unchanged snapshot. This feature
+remains presentation-only on main, with no dependency on the other five features,
+no runtime workload, no host changes and no new IPA/archive. Eight branches remain;
+main/release are excluded. Physical iOS27 SideStore signing/display, LiveContainer
+guest/cache/web-clip behavior and untested appearance modes remain outside this
+evidence. The transient failed attempts are not erased by the final success.
