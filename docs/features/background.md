@@ -111,8 +111,8 @@ second. A delayed own-category/active echo with no player does not bypass an alr
 scheduled failure retry. These are re-entry/echo protections, not ignored external
 stopped-player events. Explicit Off wins even if it occurs during activation.
 
-Delegate callbacks off-main are routed to MainActor. Player identity rejects stale
-callbacks; timer identity rejects cancelled callbacks. Off cancels the timer,
+Delegate callbacks off-main are routed to MainActor. Weak player identity rejects
+stale callbacks even after deallocation and address reuse; timer identity rejects cancelled callbacks. Off cancels the timer,
 clears recovery pacing/player/delegate state, and deactivates audio. Initial/repeated
 Off is a no-op when this controller is already disabled: applying saved Off must not
 deactivate an existing LiveContainer host session. Off during category/preference
@@ -171,7 +171,8 @@ continues retrying when it can execute, but cannot override iOS audio priorities
   The validation script type-checks sources but creates no app archive or IPA.
 - **Actual checks:** the current local run uses Swift 6.2.1 Linux platform doubles,
   1030 existing controller assertions, four worker-delegate checks, 103 recovery
-  assertions and 41 branch-wide lifecycle assertions (including scripted repeated
+  assertions, 41 branch-wide lifecycle assertions and 15 callback-lifetime assertions
+  (including scripted repeated
   decoder/completion callbacks and 2000 deterministic mixed state transitions).
   Counts include loop repetitions and are not independent physical-device tests.
   Historical and current SDK/CI results are recorded separately below.
@@ -324,6 +325,77 @@ code-path defect was found within the reviewed scope. Physical interruption deli
 SideStore signing/install, LiveContainer loading/host arbitration, background timing
 and energy use remain untested; source verification is not device certification.
 
+## Final revalidation: queued callback identity (2026-09-23)
+
+Input: `fde5746be7d29113c8581d90385b252391f002c1`. The scope remains the Background
+implementation relative to main, not the relay, other features or integrated release.
+
+A further lifetime defect was reproduced: a worker delegate stored only the old
+player's `ObjectIdentifier` while waiting for MainActor. After that object was
+released, the allocator could reuse its address for a new player. The queued old
+callback then passed the address comparison and unnecessarily restarted the healthy
+replacement. Swift guarantees ObjectIdentifier comparisons only during the object's
+lifetime. This is a code-path reproduction, not an observed user-device failure.
+The previous mocks retained every player in an instances array, masking this case.
+
+Only the completion and decoder delegate bodies change in production. Each captures
+the callback player weakly and, on MainActor, checks the surviving actual object
+against the current player with `===`. A deallocated player yields nil; a different
+living player fails identity comparison. Current-player callbacks retain the same
+immediate recovery, Off checks and repeated-failure pacing. No unsafe pointer, new
+identity counter, unchecked Sendable wrapper, actor bypass, timer or persistent state
+is added. Weak capture has normal ARC bookkeeping until callback disposal; discarded
+players are not kept alive. No energy or CPU improvement is claimed measured.
+
+`CallbackLifetimeTests.swift` adds 15 assertions with real worker/actor scheduling
+and scripted audio objects. It explicitly releases the old test player, checks
+current/living-stale/released-stale/Off paths and preserves the existing timer.
+Allocator reuse is measured rather than required on every platform. Locally, reuse
+occurred and the old controller failed the completion regression; a separate old
+controller decoder probe also restarted the replacement. Both corrected paths
+passed. Optimized local builds also passed the lifetime and 80-assertion audio
+contract tests. These tests do not inject telephone or Bluetooth events on an iPhone.
+
+Tested commit: `758a550aab7b8c6fb18d5a2b4c00f5cb936cde7e`.
+Tested tree: `b5671a81f5eff4299bed3dfa411d4e034616f0e2`.
+Run `35832101248`: `audio-checks` succeeded; archive/IPA `verify` was intentionally
+skipped. Xcode 27.0 (27A266a), iPhoneOS SDK 27.0 type-checked all five production
+Swift files at the unchanged ARM64 iOS 17.2 deployment target with warnings-as-errors.
+The type-check and commit-whitespace logs are empty. The unchanged main-boundary,
+source-pin, project/plist/root/settings checks passed, including 33 byte-preserved
+main files. No app link, archive or IPA was performed.
+
+The runner passed 1030 controller, four worker-delegate, 103 recovery, 41 lifecycle
+and 15 new lifetime assertions: 1193 total, including scripted repetition. The 2000
+mixed transitions and existing decoder/completion repetition remain part of those
+scenarios, not independent device trials. Actual Foundation/Combine again delivered
+34 registered events and detached on cancellation; AVAudioFile decoded 400 zero
+samples. In the runner lifetime test, decoder address reuse occurred after one
+allocation; completion address reuse was not observed within 20,000 allocations.
+Both postconditions passed. This explicitly distinguishes observed reuse from the
+non-reuse case rather than counting both as reproduced collisions.
+
+Earlier run `35831753584` failed while compiling the new test's never-mutated local
+weak variable under Xcode 27 warnings-as-errors. An immutable weak-capture probe
+replaced that variable without dropping the deallocation assertion or suppressing
+warnings. Production code did not change between that failed run and the successful
+run. Its failure artifact is retained as failure evidence, not an SDK success.
+
+Successful artifact `10737043024` SHA-256:
+`5c136da52c4f217178462ad280acf97d70548b5358b0b7115bc5f2065415b665`.
+All 56 recorded source hashes match the reviewed tested tree. This record is added
+in a later README/specification-only commit; those two documents remain byte-identical.
+The 13 session notifications, four lifecycle checkpoints, one-second polling/retry,
+location policy, WAV, UI, AppRoot, plist, project, build pipeline and main engine
+remain unchanged by the lifetime fix. Only this existing feature branch is updated;
+no new branch, host change, BGTask experiment or integrated merge is introduced.
+
+No other reproducible defect was found in the exercised revalidation paths. Actual
+iOS 27 SideStore signing/install, LiveContainer guest execution and host arbitration,
+OS-originated interruptions, lock-screen timing and power use remain untested. No
+installer/host version or physical-device pass is claimed. Source and SDK checks
+cannot establish that the system always delivers an event or permits playback.
+
 ## Validation
 
 `Tests/Background` compiles the controller body against platform doubles to exercise
@@ -345,3 +417,4 @@ References (public API contracts, not device-test results):
 - https://developer.apple.com/documentation/corelocation/cllocationmanagerdelegate/locationmanagerdidchangeauthorization(_:)
 - https://developer.apple.com/documentation/avfaudio/avaudiosession/interruptionnotification
 - https://developer.apple.com/documentation/avfaudio/avaudioplayer/numberofloops
+- https://developer.apple.com/documentation/swift/objectidentifier
