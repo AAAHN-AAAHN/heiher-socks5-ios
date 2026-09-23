@@ -78,3 +78,24 @@ and pinned dependency files are enforced by Build/check_ownership.py. Keep this
 README and docs/features/settings-persistence.md identical. Always separate
 minimum/target/tested OS, SDK, device/installer versions, tested commits/runs and
 pass/fail/not-run scope; never replace physical validation with compilation claims.
+
+## Completed extraction verification (2026-09-23)
+
+Tested commit: `2c186d71be950fd258cfc1fc0dcaebc31388480e`.
+Tested tree: `40a7d92ce0ea88c28a9a917295d4ed766d8880b8`.
+Actions run `35843705592`: Linux and Xcode-27 jobs both succeeded on their first
+run. Each passed the retained 39 settings, 116 boundary and 15 import/migration
+assertions, plus the inherited seven server scenarios and 512 exact model/YAML
+parity cases. Native parser, TCP and 40 pre-start cancellation cycles also passed.
+The macOS job used Xcode 27.0 `27A266a`, iPhoneOS SDK 27.0 and typechecked all eight
+production Swift files with warnings-as-errors and an empty diagnostic log.
+No standalone IPA or app archive was built. These are not installer/device tests.
+
+Downloaded Linux artifact `10742562023` SHA-256:
+`4a10a9335d076d3bf9a308202dd04187198e56a6198b04c803ea314ece4caa6e`.
+Downloaded macOS artifact `10741664357` SHA-256:
+`a6612c66486f86fdec858c4dccadaa531d497026b21cbc8086a4c3fa1c65e9d1`.
+Both digests and all 67 source hashes were checked against the exact tested Git
+commit. This section is a later documentation-only update; runtime and tests remain
+the successful source. Historical settings and the server dependency are both
+retained as actual commit ancestors, not merely named in this document.
