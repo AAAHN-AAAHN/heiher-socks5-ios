@@ -1,0 +1,42 @@
+{
+  "base_commit": "d2534cd6bce7389fdf8f362bd8f681c0bd583eb1",
+  "branches": {
+    "feature/server-runtime": "0ab3c33a667cd7fabf6b0683d98c619d2bff169c"
+  },
+  "files": {
+    "Build/build.sh": "1a3a7f6ca1ce4f4b8522d39733135e1a42351c2ff591007102cc9a60ad59fd86",
+    "Build/check.py": "6c3cf75c087bcc67fee6bcc783a6483fb1b682d1c529824aee83ea94f46d1040",
+    "Build/check_release_package.py": "f6b39e19936c4e6717715172073e7c9951a3a0a301747ea3524555abb42666c2",
+    "Build/native_checks.py": "b7277a49709e15311e9c7d07faed4f380e053cf8b74985d3900466644930c1bc",
+    "Build/verify_split.py": "75557d0b1f773f737a719798bcb5c9c6fc54d3d3fc8cd5b4c9add08263930bbd",
+    "Patches/hev-server-startup-stop.patch": "e914c247e4e7d541e510874315fc259abbf020d4c3954d17e4216ec7df6cc365",
+    "Socks5/ContentView.swift": "5aec4ffdc80df1a8830000239e90f89789be561a760108cf1acda75ce1837711",
+    "Socks5/Server/ServerController.swift": "6f06f5c63482490f003f9eaa927cd40663bf537ea528e4ba899ab2e61beaa047",
+    "Socks5/Server/ServerSettings.swift": "13bd64ee2a4c6cb31b71149c722f49ca81e1401898ba4ec8b3d295aa161bba88",
+    "Tests/ServerRuntime/EmitConfiguration.swift": "040498c7bcc6656282148ee9790698dae873e25564647ec456ff9c2c3d8afbf2",
+    "Tests/ServerRuntime/ServerMocks.swift": "126073913403a505b2db541bff324d422cfe37858cb106a9f3a48bc0f599dc27",
+    "Tests/ServerRuntime/ServerTests.swift": "faebc971b0d14d23f6567fec89ab7b4368a8decac6563015c6f9a61e39d3c37a",
+    "Tests/ServerRuntime/configuration_probe.c": "b7595cd1d6c1b042865e462a63c4306550e63692c1a2ddd4385d4aa507248203",
+    "Tests/ServerRuntime/run_checks.py": "b43995821cc0f115cece6e108cfedd55f3be0a4a60f86c55a4ad00337e582053",
+    "Tests/server_lifecycle_host.c": "294c6f41300beb8b33df3b37796a4b9a215c9161350b2e3ea722264519393cf4",
+    "Tests/server_lifecycle_regression.py": "6705e3f54c41ec3e61929d2062cb3eae1d8b64841c40c170059bbe5d6ccd941d"
+  },
+  "owners": {
+    "Build/build.sh": "feature/server-runtime",
+    "Build/check.py": "feature/server-runtime",
+    "Build/check_release_package.py": "feature/server-runtime",
+    "Build/native_checks.py": "feature/server-runtime",
+    "Build/verify_split.py": "feature/server-runtime",
+    "Patches/hev-server-startup-stop.patch": "feature/server-runtime",
+    "Socks5/ContentView.swift": "feature/server-runtime",
+    "Socks5/Server/ServerController.swift": "feature/server-runtime",
+    "Socks5/Server/ServerSettings.swift": "feature/server-runtime",
+    "Tests/ServerRuntime/EmitConfiguration.swift": "feature/server-runtime",
+    "Tests/ServerRuntime/ServerMocks.swift": "feature/server-runtime",
+    "Tests/ServerRuntime/ServerTests.swift": "feature/server-runtime",
+    "Tests/ServerRuntime/configuration_probe.c": "feature/server-runtime",
+    "Tests/ServerRuntime/run_checks.py": "feature/server-runtime",
+    "Tests/server_lifecycle_host.c": "feature/server-runtime",
+    "Tests/server_lifecycle_regression.py": "feature/server-runtime"
+  }
+}

@@ -1,9 +1,10 @@
 {
   "base_commit": "d2534cd6bce7389fdf8f362bd8f681c0bd583eb1",
   "features": [
-    "server-runtime"
+    "server-runtime",
+    "config-persistence"
   ],
-  "name": "server-runtime",
+  "name": "config-persistence",
   "patches": [
     {
       "file": "hev-server-startup-stop.patch",
