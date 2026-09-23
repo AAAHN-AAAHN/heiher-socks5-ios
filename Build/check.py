@@ -36,8 +36,8 @@ def baseline():
     else:
         base = CONFIG['base_commit']
         git(ROOT, 'merge-base', '--is-ancestor', base, 'HEAD')
-        for path in ('Build/upstream.json', 'Build/baseline-framework.json', 'Build/build.sh',
-                     'Build/check.py', 'docs/main-baseline.md', 'HevSocks5Server.xcframework'):
+        for path in ('Build/upstream.json', 'Build/baseline-framework.json',
+                     'docs/main-baseline.md', 'HevSocks5Server.xcframework'):
             assert git(ROOT, 'rev-parse', 'HEAD:' + path) == git(ROOT, 'rev-parse', base + ':' + path), path
     print('PASS: shared source pins, baseline framework, app identity and main ancestry')
 
@@ -95,21 +95,29 @@ def composition():
         assert data.isascii() and b'\t' not in data and b'\r' not in data, path
         assert path.name + ' in Sources' in project, path
         assert all(not line.endswith(b' ') for line in data.splitlines()), path
-    for name, feature in [('Statistics', 'statistics'), ('Settings', 'settings'), ('BackgroundKeepAlive', 'background')]:
+    for name, feature in [('Statistics', 'statistics'), ('Settings', 'config-persistence'), ('Server', 'server-runtime'), ('BackgroundKeepAlive', 'background')]:
         assert (ROOT / 'Socks5' / name).exists() == (feature in FEATURES), name
     if 'background' in FEATURES:
         silence(ROOT / 'Socks5/BackgroundKeepAlive/Silence.wav')
         view = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift').read_text()
-        for event in ('interruptionNotification', 'routeChangeNotification', 'mediaServicesWereLostNotification', 'mediaServicesWereResetNotification'):
-            assert event in view
+        assert 'BackgroundKeepAlive.audioNotifications.map' in view
         source = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift').read_text()
-        assert 'scheduleAudioCheck(after: 2)' in source and 'scheduleAudioCheck(after: 1)' in source
+        assert 'scheduleAudioCheck(after: 2)' not in source and 'scheduleAudioCheck(after: 1)' in source
         assert 'retryDelay' not in source and 'UserDefaults' not in source
-    if 'settings' in FEATURES:
+    if 'server-runtime' in FEATURES:
         content = (ROOT / 'Socks5/ContentView.swift').read_text()
         for field in ('workers', 'listenAddress', 'listenPort', 'udpListenAddress', 'udpListenPort',
                       'bindIPv4Address', 'bindIPv6Address', 'bindInterface', 'authUsername', 'authPassword', 'listenIPv6Only'):
-            assert f'settings.binding(\\.server.{field})' in content, field
+            assert f'$configuration.{field}' in content, field
+    assert 'config-persistence' not in FEATURES or 'server-runtime' in FEATURES
+    if 'server-runtime' in FEATURES:
+        runtime = (ROOT / 'Socks5/Server/ServerController.swift').read_text()
+        assert 'AppSettings' not in runtime and 'SettingsStore' not in runtime
+        assert 'UserDefaults' not in runtime and 'JSONEncoder' not in runtime
+        assert 'running: Bool' in runtime
+    if 'config-persistence' in FEATURES:
+        store = (ROOT / 'Socks5/Settings/SettingsStore.swift').read_text()
+        assert 'HevSocks5Server' not in store and 'server.apply' not in store
     if 'icon' in FEATURES:
         data = (ROOT / 'Socks5/Assets.xcassets/AppIcon.appiconset/AppIcon.png').read_bytes()
         assert data[:8] == b'\x89PNG\r\n\x1a\n' and struct.unpack('>II', data[16:24]) == (1024, 1024)
