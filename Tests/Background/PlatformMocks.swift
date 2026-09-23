@@ -28,7 +28,10 @@ struct CLError: Error {
 @MainActor final class CLLocationManager {
     static var initialAuthorization = CLAuthorizationStatus.authorizedAlways
     static var instances: [CLLocationManager] = []
-    weak var delegate: CLLocationManagerDelegate?
+    static var notifyOnDelegate = false
+    weak var delegate: CLLocationManagerDelegate? {
+        didSet { if Self.notifyOnDelegate { delegate?.locationManagerDidChangeAuthorization(self) } }
+    }
     var authorizationStatus = initialAuthorization
     var desiredAccuracy = 0.0
     var distanceFilter = 0.0
@@ -38,9 +41,17 @@ struct CLError: Error {
     var starts = 0
     var stops = 0
     var requests = 0
+    var accuracyAtStart = 0.0
+    var backgroundAtStart = false
+    var pausingAtStart = true
     init() { Self.instances.append(self) }
     func requestAlwaysAuthorization() { requests += 1 }
-    func startUpdatingLocation() { starts += 1 }
+    func startUpdatingLocation() {
+        starts += 1
+        accuracyAtStart = desiredAccuracy
+        backgroundAtStart = allowsBackgroundLocationUpdates
+        pausingAtStart = pausesLocationUpdatesAutomatically
+    }
     func stopUpdatingLocation() { stops += 1 }
 }
 
@@ -94,11 +105,13 @@ let AVAudioSessionRouteChangeReasonKey = "RouteChangeReason"
     var rejectActivation = false
     var rejectCategory = false
     var rejectPreference = false
+    var isActive = false
     var activations = 0
     var deactivations = 0
     var configurations = 0
     var onCategory: (() -> Void)?
     var onActivation: (() -> Void)?
+    var onPreference: (() -> Void)?
     func setCategory(_ category: Category, mode: Mode, options: CategoryOptions) throws {
         if rejectCategory { throw NSError(domain: "MockCategory", code: 1) }
         configurations += 1
@@ -110,13 +123,15 @@ let AVAudioSessionRouteChangeReasonKey = "RouteChangeReason"
     func setPrefersNoInterruptionsFromSystemAlerts(_ value: Bool) throws {
         if rejectPreference { throw NSError(domain: "MockPreference", code: 1) }
         prefersNoInterruptionsFromSystemAlerts = value
+        onPreference?()
     }
     func setActive(_ active: Bool, options: SetActiveOptions = []) throws {
         if active {
             activations += 1
             onActivation?()
             if rejectActivation { throw NSError(domain: "MockAudioPriority", code: 1) }
-        } else { deactivations += 1 }
+            isActive = true
+        } else { deactivations += 1; isActive = false }
     }
 }
 

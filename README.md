@@ -23,16 +23,20 @@ and last callback time remain visible. Coordinates are neither retained nor sent
 ## Location implementation
 
 One CLLocationManager exists while enabled. It is created on MainActor and delegates
-on that run loop. It requests `kCLLocationAccuracyThreeKilometers`, has no distance
-filter, permits background updates, shows the location indicator, and disables
+on that run loop. Coarse/background options are configured before assigning its
+delegate, so an initial authorization callback cannot start an unconfigured manager.
+It requests `kCLLocationAccuracyThreeKilometers`, has no distance filter, permits background updates, shows the location indicator, and disables
 automatic pausing. It calls `startUpdatingLocation()` only when needed, not on a
 polling timer. iOS determines actual callback cadence and sensor use; coarse accuracy
 is not a command to turn the physical GPS off or sample at an exact interval.
 
 Permission requests are made only while the application is active, with a flag to
 avoid duplicate requests. Both authorized-when-in-use and authorized-always states
-can start the configured session. Permission denial stops updates but preserves
-user intent. Authorization changes can resume the existing manager. Off stops it,
+can use the configured session. A new When-In-Use session waits until the app is
+active; the root activation callback then starts it. A session already started in
+foreground continues in background without a restart. Always authorization retains
+its existing background-start behavior; actual OS delivery is not guaranteed.
+Permission denial stops updates but preserves user intent. Authorization changes can resume the existing manager. Off stops it,
 clears its delegate, and rejects stale callbacks by manager identity. Temporary
 errors report status rather than disabling the saved preference.
 
@@ -109,8 +113,13 @@ stopped-player events. Explicit Off wins even if it occurs during activation.
 
 Delegate callbacks off-main are routed to MainActor. Player identity rejects stale
 callbacks; timer identity rejects cancelled callbacks. Off cancels the timer,
-clears recovery pacing/player/delegate state, and deactivates audio. Recovery may
-fail during a call or while iOS denies activation; it does not defeat that policy.
+clears recovery pacing/player/delegate state, and deactivates audio. Initial/repeated
+Off is a no-op when this controller is already disabled: applying saved Off must not
+deactivate an existing LiveContainer host session. Off during category/preference
+configuration, player disposal or activation also wins; a successful activation
+that returns after Off is deactivated again before returning. The old player is
+detached before stop can call back. Recovery may fail during a call or while iOS
+denies activation; it does not defeat that policy.
 
 ## Persistence and integration
 
@@ -150,18 +159,22 @@ continues retrying when it can execute, but cannot override iOS audio priorities
   that every OS release has been tested. New 26/27 notifications are runtime-gated.
 - **Build requirement for these symbols:** Xcode 27 / iPhoneOS 27 SDK. The branch's
   macOS CI runner now selects that toolchain. The app identity, entitlements,
-  permissions, audio options, location behavior and WAV are unchanged.
-- **Scope:** add the public playback signals above and fix stopped-category and
-  first-decoder recovery. Audio remains above Location. No BGTask, host patch,
-  ID rewrite, extra timer, persistent diagnostic log or relay change is introduced.
+  permissions, audio options, coarse-location parameters and WAV are unchanged.
+- **Scope:** all Background-owned additions relative to main, including the public
+  signals, audio/location lifecycle, root bindings, project/plist, asset, tests and
+  README. The current audit also repairs initial Off/shared-session interference,
+  Off during recovery and new When-In-Use foreground startup. Audio remains above
+  Location. No BGTask, host patch, ID rewrite, extra timer, persistent diagnostic
+  log or relay change is introduced.
 - **No IPA requested:** a commit marked `[audio-checks-only]` runs only the isolated
   validation job. The production archive job is skipped, not called and discarded.
   The validation script type-checks sources but creates no app archive or IPA.
 - **Actual checks:** the current local run uses Swift 6.2.1 Linux platform doubles,
-  1030 existing controller assertions, four worker-delegate checks and 103 recovery
-  assertions (including repeated 1000 decoder and 100 completion callbacks).
+  1030 existing controller assertions, four worker-delegate checks, 103 recovery
+  assertions and 41 branch-wide lifecycle assertions (including scripted repeated
+  decoder/completion callbacks and 2000 deterministic mixed state transitions).
   Counts include loop repetitions and are not independent physical-device tests.
-  The same tests also passed in the test-only Xcode 27 run recorded below.
+  Historical and current SDK/CI results are recorded separately below.
 - **Not performed:** physical iOS 27 SideStore/LiveContainer installation or
   interruption delivery, phone/Siri/Bluetooth/lock-screen tests, energy benchmarks,
   and release/integrated merging. No claim that every OS signal is always delivered
@@ -189,7 +202,7 @@ LiveContainer tests. Keep this README and its feature specification byte-identic
 preserve historical results with their own source/version rather than relabeling
 old evidence as a new run.
 
-## Completed no-IPA verification (2026-09-23)
+## Historical no-IPA verification: c334ed0 (2026-09-23)
 
 Tested commit: `c334ed060ac8d27081c74196dae544df5bff3a80`.
 Tested tree: `8995bd73aea2ce4df10ae9bd8641262262a56696`.
@@ -234,6 +247,54 @@ signature/install, LiveContainer guest loading or actual audio priority arbitrat
 was tested. No installer or host version is claimed tested. Successful scripted
 recovery is not proof that iOS will permit every activation or deliver every event.
 
+## Complete Background-only audit (2026-09-23)
+
+The input feature commit is `4b6f637eefb8a07547d63a17d5407cb4b9cd9f19`.
+The excluded main baseline is `d2534cd6bce7389fdf8f362bd8f681c0bd583eb1`.
+This audit reviews the Background delta, not the inherited SOCKS5 engine or unrelated
+UDP/statistics/settings/icon features. It does not merge into `release/integrated`.
+The seven existing branches remain the only branches; no audit branch is added.
+
+### Reproduced defects and narrowly scoped corrections
+
+| Finding | Correction and reason |
+| --- | --- |
+| Initial saved Audio Off called setActive(false), even when the controller had never used audio; repeated Off did so again. | Disabled-to-disabled updates now do nothing. Explicit On-to-Off still stops and deactivates. This avoids an unnecessary shared-session side effect in LiveContainer without changing the host or adding ownership hooks. |
+| Off raised during category/preference setup, orphan disposal or a successful activation could be followed by another activation. Off during retry disposal could be overwritten with Waiting state and a timer. | Recheck intent at those boundaries, detach the old player before stop, and compensate an activation that completes after Off. No new persistent state or retry timer is required. |
+| Delegate assignment preceded location configuration. An immediate authorization callback could start with defaults. | Apply the existing accuracy/background/pause options before attaching the delegate. No settings values are changed. |
+| A new When-In-Use session could be started while backgrounded. | Defer that start to the existing foreground restore event. Do not stop an already running session or impose this restriction on Always authorization. |
+
+These were reproduced with the actual old controller and strengthened scripted
+boundaries: nine failing lifecycle assertions. This is code-path evidence, not a
+claim that all nine failures were observed on the user's iPhone. The strengthened
+session double tracks final active state, not just call counts; earlier tests had
+missed active-after-Off even when the controller's switch and timer looked stopped.
+The initial-delegate case intentionally exercises synchronous delivery as a boundary
+condition, not a claim about every Core Location implementation's scheduling.
+
+`LifecycleTests.swift` now covers the corrections, permission transitions, temporary
+errors, stale delegates, repeated On/Off, configuration/activation/init/play failures,
+independent audio/location switches and 2000 deterministic mixed transitions.
+Existing 13 session/four lifecycle notifications, immediate new-event recovery,
+one-second health/retry cadence, failure pacing and original WAV remain intact.
+No diagnostic UI, disk logging, extra timer, thread, socket or global host patch is
+added. Extra runtime work is a few intent checks at transition boundaries and, only
+if activation succeeds after Off, one compensating deactivation. Energy is unmeasured.
+
+`check_scope.py` verifies every unmodified main file byte-for-byte, the sole app
+entry-point substitution, native source pins and unchanged native checker helpers,
+project identity/deployment settings, two AppStorage bindings, one root subscriber,
+plist modes/permissions/single-scene configuration, Audio-first order and README
+mirror. This is source configuration verification, not proof of granted device
+permissions. Commit-wide whitespace is checked against main, not just a clean
+working tree. Test subprocesses have finite deadlines.
+
+Only the Background controller changes in production. AppRoot, view, Info.plist,
+Xcode project, WAV, server and all inherited runtime files are retained. Tests and
+README/specification are updated; the existing checks-only CI path is reused.
+The final source/run/result evidence is recorded after its artifacts are inspected.
+No archive, IPA, physical iOS runtime or installer/host test is implied by type checks.
+
 ## Validation
 
 `Tests/Background` compiles the controller body against platform doubles to exercise
@@ -251,5 +312,7 @@ References (public API contracts, not device-test results):
 - https://developer.apple.com/library/archive/qa/qa1882/_index.html
 - https://developer.apple.com/documentation/foundation/timer
 - https://developer.apple.com/documentation/corelocation/cllocationmanager/pauseslocationupdatesautomatically
+- https://developer.apple.com/documentation/corelocation/cllocationmanager/allowsbackgroundlocationupdates
+- https://developer.apple.com/documentation/corelocation/cllocationmanagerdelegate/locationmanagerdidchangeauthorization(_:)
 - https://developer.apple.com/documentation/avfaudio/avaudiosession/interruptionnotification
 - https://developer.apple.com/documentation/avfaudio/avaudioplayer/numberofloops

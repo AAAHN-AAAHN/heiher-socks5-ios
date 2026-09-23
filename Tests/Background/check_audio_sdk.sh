@@ -7,9 +7,11 @@ mkdir -p "$OUT"
 xcodebuild -version | tee "$OUT/toolchain.txt"
 xcrun --sdk iphoneos --show-sdk-version | tee -a "$OUT/toolchain.txt" | grep -E '^27\.'
 git rev-parse HEAD > "$OUT/tested-commit.txt"
-git diff --check > "$OUT/whitespace.log"
+BASE=$(python3 -c 'import json; print(json.load(open("Build/features.json"))["base_commit"])')
+git diff --check "$BASE" HEAD > "$OUT/whitespace.log"
 python3 Build/check.py baseline > "$OUT/baseline.log"
 python3 Build/check.py composition > "$OUT/composition.log"
+python3 Tests/Background/check_scope.py > "$OUT/background-scope.json"
 python3 Tests/Background/run_checks.py > "$OUT/controller-tests.log" 2>&1
 python3 Tests/Background/check_subscription.py > "$OUT/subscription-tests.log" 2>&1
 swift Tests/Background/check_silence.swift Socks5/BackgroundKeepAlive/Silence.wav > "$OUT/apple-wav.log" 2>&1

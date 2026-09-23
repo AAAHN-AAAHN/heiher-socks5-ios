@@ -83,13 +83,14 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         if locationManager == nil {
             let manager = CLLocationManager()
             locationManager = manager
-            manager.delegate = self
             // Coordinates are discarded; navigation-grade accuracy is unnecessary.
             manager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
             manager.distanceFilter = kCLDistanceFilterNone
             manager.allowsBackgroundLocationUpdates = true
             manager.showsBackgroundLocationIndicator = true
             manager.pausesLocationUpdatesAutomatically = false
+            // A delegate may report authorization immediately; configure first.
+            manager.delegate = self
         }
         if let manager = locationManager { authorizeAndStart(manager) }
     }
@@ -106,6 +107,13 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         case .authorizedAlways, .authorizedWhenInUse:
             requestedPermission = false
             guard !updating else { return }
+            // A new When-In-Use background session must be started in foreground.
+            // Do not interrupt a session that was already started there.
+            if manager.authorizationStatus == .authorizedWhenInUse,
+               UIApplication.shared.applicationState != .active {
+                locationState = "Return to the app to start the location session"
+                return
+            }
             updating = true
             locationState = "Waiting for a location update"
             manager.startUpdatingLocation()
@@ -144,6 +152,9 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     }
 
     func setAudio(_ enabled: Bool) {
+        // Applying saved Off at launch must not deactivate a host's shared audio.
+        // Repeated On still reconciles an interrupted or failed session.
+        guard enabled || audioEnabled else { return }
         audioEnabled = enabled
         if enabled {
             resumeAudio()
@@ -169,6 +180,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         invalidatedDuringRestore = false
         defer { restoringAudio = false }
         if recreate { discardPlayer() }
+        guard audioEnabled else { return }
         if player?.isPlaying == true {
             if audioCheck == nil { scheduleAudioCheck(after: 1) }
             return
@@ -180,11 +192,17 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
             if player == nil || session.category != .playback || session.mode != .default || session.categoryOptions != [.mixWithOthers] {
                 try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
             }
+            guard audioEnabled else { return }
             if player == nil || !session.prefersNoInterruptionsFromSystemAlerts {
                 try? session.setPrefersNoInterruptionsFromSystemAlerts(true)
             }
-            try session.setActive(true)
             guard audioEnabled else { return }
+            try session.setActive(true)
+            guard audioEnabled else {
+                // Off may arrive inside activation before that call completes.
+                try? session.setActive(false, options: [.notifyOthersOnDeactivation])
+                return
+            }
             if player == nil {
                 guard let url = Bundle.main.url(forResource: "Silence", withExtension: "wav") else {
                     throw NSError(domain: "BackgroundKeepAlive", code: 1,
@@ -212,6 +230,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         restoringAudio = true
         defer { restoringAudio = wasRestoring }
         discardPlayer()
+        guard audioEnabled else { return }
         audioState = "Waiting to resume: \(error?.localizedDescription ?? "Audio playback stopped")"
         // Repeated failures must not postpone an already scheduled retry.
         if audioCheck == nil { scheduleAudioCheck(after: 1) }
@@ -233,9 +252,11 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     }
 
     private func discardPlayer() {
-        player?.delegate = nil
-        player?.stop()
+        // Detach first so callbacks raised by stop cannot see the old player.
+        let previous = player
         player = nil
+        previous?.delegate = nil
+        previous?.stop()
     }
 
     private func scheduleAudioCheck(after delay: TimeInterval) {
