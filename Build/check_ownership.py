@@ -38,7 +38,14 @@ def main():
         'func apply(_ settings: ServerSettings, running: Bool, retry: Bool = false)').replace(
         'desired = settings.serverRunning ? settings.server : nil', 'desired = running ? settings : nil')
     assert controller == expected, 'Server execution algorithm changed during extraction'
-    assert (ROOT / 'Patches/hev-server-startup-stop.patch').read_bytes() == show(INPUT, 'Patches/hev-server-startup-stop.patch')
+    lifecycle_patch = (ROOT / 'Patches/hev-server-startup-stop.patch').read_bytes()
+    original_patch = show(INPUT, 'Patches/hev-server-startup-stop.patch')
+    assert lifecycle_patch.startswith(original_patch), 'Original pre-start cancellation fix changed'
+    extra = lifecycle_patch[len(original_patch):]
+    assert extra.startswith(b'diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c\n')
+    assert extra.count(b'diff --git ') == 1
+    # The native probe also reconstructs the exact upstream worker blob and checks
+    # that this adds only the pre-yield Stop guard before compiling both versions.
     root = content('Socks5/AppRoot.swift')
     assert root.count('@StateObject private var server = ServerController()') == 1
     if 'settings' in FEATURES:
@@ -65,6 +72,8 @@ def main():
         assert actual == expected, path
         assert hashlib.sha256(actual).hexdigest() == entry['sha256'], path
         checked += 1
+    for path, digest in manifest.get('files', {}).items():
+        assert hashlib.sha256((ROOT / path).read_bytes()).hexdigest() == digest, path
     own_doc = {'server-control': 'server-control', 'settings-persistence': 'settings-persistence', 'integrated': 'integrated'}[CONFIG['name']]
     assert (ROOT / 'README.md').read_bytes() == (ROOT / 'docs/features' / (own_doc + '.md')).read_bytes()
     print(f'PASS: server independent of storage; audited behavior preserved; {checked} exact owner files and pinned ancestors')

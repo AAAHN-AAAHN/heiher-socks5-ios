@@ -5,6 +5,7 @@ No sockets or engine functions are mocked. The command transport and clients are
 CI-only. This is native-host execution, not an iPhone/SideStore/LiveContainer test.
 """
 import json
+import hashlib
 import os
 from pathlib import Path
 import select
@@ -140,11 +141,45 @@ def compile_host(core, folder, old, log):
     return executable
 
 
+def worker_stop_check(core, output, folder):
+    """Exercise the actual old/new worker helper with only yield scheduling replaced."""
+    patched = (core / 'src/hev-socks5-worker.c').read_bytes()
+    guard = (b'    /* A pending Stop can run before this task reaches its first wait. */\n'
+             b'    if (!READ_ONCE (self->run))\n        return -1;\n\n')
+    if patched.count(guard) != 1:
+        raise AssertionError('Missing/duplicated worker Stop guard')
+    original = patched.replace(guard, b'', 1)
+    identity = hashlib.sha1(b'blob ' + str(len(original)).encode() + b'\0' + original).hexdigest()
+    if identity != '683a773999569784b2a42d1bab136ef1c44a8101':
+        raise AssertionError('Worker changed beyond the reviewed four-line Stop guard')
+    old = folder / 'upstream-worker'; old.mkdir()
+    (old / 'hev-socks5-worker.c').write_bytes(original)
+    libraries = [core / 'bin/libhev-socks5-server.a', core / 'third-part/yaml/bin/libyaml.a',
+                 core / 'third-part/hev-task-system/bin/libhev-task-system.a']
+    for name, source in [('original', old), ('current', core / 'src')]:
+        executable = folder / ('worker-stop-' + name)
+        with (output / ('worker-stop-' + name + '-build.log')).open('wb') as log:
+            subprocess.run(['clang', '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread',
+                            '-I' + str(source), '-I' + str(core / 'src'),
+                            '-I' + str(core / 'src/misc'), '-I' + str(core / 'src/core/include'),
+                            '-I' + str(core / 'third-part/hev-task-system/include'),
+                            str(Path(__file__).with_name('worker_stop_probe.c')),
+                            *map(str, libraries), '-o', str(executable)],
+                           stdout=log, stderr=subprocess.STDOUT, check=True, timeout=90)
+        result = subprocess.run([str(executable)], capture_output=True, text=True, timeout=10)
+        (output / ('worker-stop-' + name + '.log')).write_text(result.stdout + result.stderr)
+        expected = 1 if name == 'original' else 0
+        if result.returncode != expected or f'three worker-yield postconditions; {expected} failed' not in result.stdout:
+            raise AssertionError('Worker Stop boundary did not match the old/new contract')
+    print('PASS: exact upstream worker attempts a wait after Stop; corrected worker does not. Normal and resumed waits preserved.')
+
+
 def main():
     core = Path(sys.argv[1]).resolve()
     output = Path(sys.argv[2]).resolve(); output.mkdir(parents=True, exist_ok=True)
     results = []
     with tempfile.TemporaryDirectory() as temp:
+        worker_stop_check(core, output, Path(temp))
         for old in (True, False):
             label = 'original' if old else 'current'
             folder = Path(temp) / label; folder.mkdir()
@@ -197,8 +232,22 @@ def main():
                         wait_auth(port, changed['authUsername'], changed['authPassword'])
                         stop(host, changed, port)
                         results.append(dict(model=label, workers=workers, observed='Stop releases socket; same-port restart succeeds'))
+                        if not old:
+                            for _ in range(20):
+                                host.request('apply', settings=changed, running=True)
+                                wait_auth(port, changed['authUsername'], changed['authPassword'])
+                                stop(host, changed, port)
+                            results.append(dict(model=label, workers=workers, observed='20 active Stop/restart cycles complete with real authentication'))
                     finally:
-                        host.close()
+                        # Preserve the first failing condition even when cleanup
+                        # independently fails for an already-stuck native engine.
+                        if sys.exc_info()[0] is None:
+                            host.close()
+                        else:
+                            try:
+                                host.close()
+                            except Exception as error:
+                                print('Additional native cleanup failure:', error, file=sys.stderr)
     (output / 'results.json').write_text(json.dumps(results, indent=2) + '\n')
     print(json.dumps(results, indent=2))
     print('PASS: actual Swift controller + native Hev. Original missed byte changes reproduced; corrected updates accepted.')

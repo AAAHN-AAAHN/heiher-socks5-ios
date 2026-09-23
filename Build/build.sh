@@ -60,8 +60,6 @@ for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
             "$CORE/third-part/hev-task-system/bin/libhev-task-system.a" -o "$OUT/config-probe"
         "$OUT/config-probe" "$OUT/yaml/defaults.yml" "$OUT/yaml/quoted.yml" > "$OUT/$mode-configuration.log"
         rm "$OUT/emit-config" "$OUT/config-probe"
-        # Temporary, exact inputs for diagnosing the real multi-worker Stop stall.
-        tar --exclude=.git -czf "$OUT/native-debug-inputs.tar.gz" -C "$CORE" .
         python3 Tests/ServerControl/native_controller_check.py "$CORE" "$OUT/native-controller" \
             > "$OUT/native-controller.log" 2>&1
     fi
