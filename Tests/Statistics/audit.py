@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
-UDP = 'd3c4f45fe60e12e0eb2b1857d4ca70240fb3552b'
+UDP = '66e7196ef5faccc43d9b154cab21a94e4466a77e'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 UDP_FILES = {
     '.github/workflows/udp-compat-audit.yml': '.github/workflows/verify-build.yml',
