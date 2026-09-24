@@ -83,7 +83,7 @@ audit_recv (int fd, void *messages, unsigned int num, int flags,
         if (fd == 10) {
             memcpy (iov->iov_base, header, sizeof (header));
             audit_getpeername (fd, vec[i].msg_hdr.msg_name,
-                              &vec[i].msg_hdr.msg_namelen);
+                               &vec[i].msg_hdr.msg_namelen);
         } else {
             struct sockaddr_in6 addr = { 0 };
             assert (fd == 11);
