@@ -62,6 +62,8 @@ for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
         rm "$OUT/emit-config" "$OUT/config-probe"
         python3 Tests/ServerControl/native_controller_check.py "$CORE" "$OUT/native-controller" \
             > "$OUT/native-controller.log" 2>&1
+        python3 Tests/ServerControl/active_clients_check.py "$CORE" "$OUT/active-clients" \
+            > "$OUT/active-clients.log" 2>&1
     fi
     make -C "$CORE" clean >> "$OUT/$mode-build.log" 2>&1
 done
