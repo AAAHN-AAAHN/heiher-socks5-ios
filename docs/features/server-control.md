@@ -295,3 +295,59 @@ unchanged. Physical iOS 27 SideStore/LiveContainer admission, UI/network-policy
 interactions and energy are still not certified by these host tests. No additional
 runtime defect was identified in the reviewed scope. This section and its mirror
 are documentation-only additions after inspecting the completed evidence.
+
+## Concurrent-work reconciliation and late-Stop correction (2026-09-24)
+
+The independently observed `f1f588b199df0a570b2aae8bdb650392d66075ed`
+added active-client tests and their build invocation, not a runtime change. They
+are retained: six simultaneous incomplete/active/backpressured clients and a reset
+client exercise Stop and credential reconfiguration with one/four workers, three
+repeats each. Attribution to a particular ChatGPT session is not established by
+commit metadata; content and evidence, rather than assumed authorship, decide retention.
+
+The separate local adversarial review found a real invocation-boundary defect.
+A native startup failure can return before MainActor receives finished(). A Stop
+or new configuration accepted in that gap calls quit against an already idle
+engine. Its pending Stop can then cancel the next valid invocation. The existing
+active-client tests do not cover this completed-native/pending-actor interval.
+
+The final controller calls the project-specific hev_socks5_server_prepare() after
+validation and before publishing/scheduling the next invocation. Its documented
+precondition is that the previous native call has returned and new Stop requests
+have not yet been accepted for the next invocation. The helper clears only the
+obsolete SYNC_STOP bit. Stop accepted after this boundary retains the original
+cancellation semantics, including Stop before native startup. Existing C callers
+that never call prepare retain their legacy behavior. The original proxy and worker
+fixes, equality, options, defaults and user-facing status policy are preserved.
+
+This adds one C call/atomic operation per actual start, not a timer, thread, lock,
+polling loop, settings field or host modification. It is not an Apple private API.
+The committed unpatched baseline XCFramework does not export this symbol: a real
+application build must use the patched rebuilt framework. No-IPA type checks now
+use the actual patched headers captured before reverse verification, not a pretend
+baseline declaration. The existing archive path rebuilds the framework when requested.
+
+Tested commit: `888081a3b389cccefc31774cb3cf58031710dfc8`.
+Tested tree: `a2eb8650bb446706c5d6ee8fe228397c7b10a2c7`.
+Run `35946398798` passed Linux and Xcode 27 jobs on the first attempt. Per host,
+the new eight current delayed-delivery schedules passed; the exact old controller
+failed six expected schedules and passed two final-Stop controls. One hundred
+legacy/prepared pre-start cancellations also returned. The retained twelve active-
+client cases, original server scenarios, 84 assertions, 512 parity cases, fourteen
+native result records, forty active and forty original pre-start Stop cycles passed.
+A 300 ms test-only actor hold creates the delivery boundary; this is not evidence
+that the user's iPhone experienced that exact stall. Repetitions are not device trials.
+
+Xcode 27.0 `27A266a`, iPhoneOS SDK 27.0 typechecked five production Swift files
+with the unchanged ARM64/iOS17.2 target and warnings-as-errors; diagnostic log empty.
+Both downloaded artifacts contain all 65 matching source hashes:
+- Linux `10787246118`: `440a8ef5e30f5da95432a80d6fc21214212212b96c0af755a25376434180523f`
+- macOS `10787061201`: `1e1d28bfcd921f470608f93ab6211594032a154df6012146d56a44970a88b6c6`
+
+This completion changes only README and its identical specification after the
+successful run. The source is ready for an explicit downstream persistence merge;
+that child must pin this completed owner and include the added tests. main and
+release/integrated remain unchanged; no new branch, app archive or IPA was produced.
+Physical SideStore/LiveContainer installation, host state, permissions, UI, lock,
+VPN/hotspot and energy remain untested. The prior review's local-only publication
+limitation is superseded by the actual commit/run above, not retrospectively erased.
