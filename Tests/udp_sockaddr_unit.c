@@ -1,9 +1,13 @@
 /* Exercise the actual patched translation unit; replace only OS I/O boundaries. */
+#define recv audit_control_recv
+#define hev_socks5_task_io_yielder audit_yield
 #define connect audit_connect
 #define getpeername audit_getpeername
 #define hev_task_io_socket_recvmmsg audit_recv
 #define hev_task_io_socket_sendmmsg audit_send
 #include "hev-socks5-udp.c"
+#undef recv
+#undef hev_socks5_task_io_yielder
 #undef connect
 #undef getpeername
 #undef hev_task_io_socket_recvmmsg
@@ -12,6 +16,11 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+
+static int foreign_batches;
+static int retry_yields;
+static int empty_after_foreign;
+static int cancel_yield;
 
 static int family = AF_INET;
 static int receive_error;
@@ -34,6 +43,30 @@ get_iface (HevObject *self, void *type)
     (void)self;
     (void)type;
     return &iface;
+}
+
+ssize_t
+audit_control_recv (int fd, void *buf, size_t length, int flags)
+{
+    (void)fd;
+    (void)buf;
+    (void)length;
+    (void)flags;
+    errno = EAGAIN;
+    return -1;
+}
+
+int
+audit_yield (HevTaskYieldType type, void *data)
+{
+    (void)data;
+    assert (type == HEV_TASK_YIELD);
+    retry_yields++;
+    if (cancel_yield) {
+        errno = ECANCELED;
+        return -1;
+    }
+    return 0;
 }
 
 int
@@ -100,9 +133,14 @@ audit_recv (int fd, void *messages, unsigned int num, int flags,
         if (fd == 11)
             assert (vec[i].msg_hdr.msg_namelen == sizeof (v6));
     }
-    if (receive_error) {
+    if (receive_error || (empty_after_foreign && !foreign_batches)) {
         errno = EAGAIN;
         return -1;
+    }
+    if (foreign_batches) {
+        foreign_batches--;
+        v4.sin_addr.s_addr = htonl (0x7f000002);
+        v6.sin6_addr.s6_addr[15] = 2;
     }
     if (vec[0].msg_hdr.msg_name) {
         assert (vec[0].msg_hdr.msg_namelen == sizeof (v6));
@@ -234,6 +272,35 @@ main (void)
     }
     puts (
         "PASS: actual first-peer receive path; EAGAIN/connect failure preserve state");
+    for (pass = 0; pass < 2; pass++) {
+        family = pass ? AF_INET6 : AF_INET;
+        for (i = 0; i < 3; i++) {
+            int before = connect_calls;
+            int result;
+
+            self.udp_associated = 0;
+            msgs[0].buf = buffers[0];
+            msgs[0].len = sizeof (buffers[0]);
+            foreign_batches = 2;
+            retry_yields = 0;
+            empty_after_foreign = i == 1;
+            cancel_yield = i == 2;
+            result = hev_socks5_udp_recvmmsg_udp (&self, msgs, 1, 1);
+            if (i == 0) {
+                assert (result == 1 && retry_yields == 2);
+                assert (connect_calls == before + 1 && msgs[0].len == 1);
+            } else if (i == 1) {
+                assert (result == -1 && errno == EAGAIN && retry_yields == 2);
+                assert (connect_calls == before && !self.udp_associated);
+            } else {
+                assert (result == -1 && errno == ECANCELED && retry_yields == 1);
+                assert (connect_calls == before && !self.udp_associated);
+            }
+        }
+    }
+    foreign_batches = empty_after_foreign = cancel_yield = 0;
+    puts (
+        "PASS: rejected batches yield and drain; only real empty queues return EAGAIN; cancellation wins");
     for (i = 0; i < 10; i++) {
         iov[i].iov_base = buffers[i];
         iov[i].iov_len = sizeof (buffers[i]);

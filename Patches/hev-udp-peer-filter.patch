@@ -1,7 +1,8 @@
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
+index 5016df6..a4ee285 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
-@@ -256,10 +256,11 @@
+@@ -256,19 +256,21 @@ static int
  hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
                               unsigned int num, int nonblock)
  {
@@ -15,9 +16,10 @@ diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
  
      fd = hev_socks5_udp_get_fd (self);
  
-@@ -267,8 +268,8 @@
+     if (nonblock)
          nonblock = MSG_DONTWAIT;
  
++retry:
      for (i = 0; i < num; i++) {
 -        mvec[i].msg_hdr.msg_name = NULL;
 -        mvec[i].msg_hdr.msg_namelen = 0;
@@ -26,19 +28,19 @@ diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
          mvec[i].msg_hdr.msg_control = NULL;
          mvec[i].msg_hdr.msg_controllen = 0;
          mvec[i].msg_hdr.msg_iov = &iov[i];
-@@ -276,11 +277,6 @@
- 
-         iov[i].iov_base = msgv[i].buf;
+@@ -278,11 +280,6 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          iov[i].iov_len = msgv[i].len;
--    }
--
+     }
+ 
 -    if (!HEV_SOCKS5 (self)->udp_associated) {
 -        mvec[0].msg_hdr.msg_name = &taddr;
 -        mvec[0].msg_hdr.msg_namelen = sizeof (taddr);
-     }
- 
+-    }
+-
      res = hev_task_io_socket_recvmmsg (fd, mvec, num, nonblock, task_io_yielder,
-@@ -291,25 +287,43 @@
+                                        self);
+     if (res <= 0) {
+@@ -291,25 +288,43 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          return res;
      }
  
@@ -60,7 +62,7 @@ diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
 -        int addrlen = hev_socks5_addr_len (&udp->addr);
 +        int addrlen;
          int doff;
-+
+ 
 +        hev_socks5_udp_addr_normalize (&taddr[i]);
 +        if (memcmp (&peer.sin6_addr, &taddr[i].sin6_addr,
 +                    sizeof (peer.sin6_addr)) ||
@@ -70,13 +72,13 @@ diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
 +            continue;
 +
 +        if (!HEV_SOCKS5 (self)->udp_associated) {
-+            if (connect (fd, (struct sockaddr *)&taddr[i],
-+                         sizeof (taddr[i])) < 0)
++            if (connect (fd, (struct sockaddr *)&taddr[i], sizeof (taddr[i])) <
++                0)
 +                return -1;
 +            peer = taddr[i];
 +            HEV_SOCKS5 (self)->udp_associated = 1;
 +        }
- 
++
          msgv[i].len = mvec[i].msg_len;
          if (msgv[i].len < 4) {
              msgv[i].addr = NULL;
@@ -89,19 +91,19 @@ diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
          if (addrlen <= 0) {
              LOG_D ("%p socks5 udp addr", self);
              return -1;
-@@ -324,9 +338,14 @@
+@@ -324,9 +339,16 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          msgv[i].addr = &udp->addr;
          msgv[i].buf += doff;
          msgv[i].len -= doff;
--    }
--
--    return res;
 +        msgv[count++] = msgv[i];
-+    }
-+
+     }
+ 
+-    return res;
 +    if (!count) {
-+        errno = EAGAIN;
-+        return -1;
++        /* A discarded batch does not mean the socket queue is empty. */
++        if (task_io_yielder (HEV_TASK_YIELD, self))
++            return -1;
++        goto retry;
 +    }
 +    return count;
  }
