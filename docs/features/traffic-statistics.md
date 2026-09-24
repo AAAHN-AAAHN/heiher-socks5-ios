@@ -1,5 +1,15 @@
 # Traffic statistics for the native iOS SOCKS5 relay
 
+## Latest final audit: actual UI interaction (2026-09-25)
+
+Run `36068755469` at `57acbb8d55023cfefca3bb6964eea3a46227ac15` passed
+all four native/SDK jobs and the added actual iOS27 Simulator UI test. The unchanged
+Server controls were reachable by scrolling and operated the native listener in
+portrait and landscape. This supersedes only the older lack of interaction evidence
+for that tested configuration, not physical SideStore/LiveContainer verification
+or every layout/keyboard/accessibility configuration. See the final section below.
+
+
 ## Supported versions, installation environments and verified scope
 
 Historical environment re-audit: **2026-09-23**; current closure is recorded below. The intended support environment,
@@ -546,3 +556,95 @@ permissions, UI, VPN/hotspot, lock-screen and energy behavior are not newly veri
 The iOS17.2 minimum remains unchanged. No server-control/persistence/Background/icon
 dependency is added; main, release/integrated, branch count and existing IPA remain
 unchanged. Source and SDK success do not certify all physical deployment conditions.
+
+## Final source audit and actual UI verification (2026-09-25)
+
+Input: `44e80c8d87eb85c9ba603a753040967efd353572`. No further production defect
+was reproduced in the reviewed native/model/lifecycle paths. The residual gap was
+verification: the historical Server-tab image did not establish whether scrolling
+exposed the bottom controls or actual taps operated the server. It did not justify
+speculative padding, a rewritten root, host changes or a new runtime controller.
+
+Two test-only files close that gap: StatisticsUITests.swift and ui_audit.py under
+Tests/Statistics. A four-line macOS workflow step runs them after all existing
+statistics checks. The Python entry copies the exact source, rebuilds the six
+pinned patches for the Simulator, and adds a test target/scheme only to that copy.
+The committed app project, five production Swift files, baseline XCFramework,
+resources, defaults, source pins and native patches remain byte-identical. No test
+source is registered in the committed production target. The test target depends
+explicitly on Socks5 and uses dependency-ordered builds, not deprecated manual order.
+Test execution remains nonparallel, bounded, and does not suppress failed assertions.
+
+The actual XCTest launches hev.Socks5 and, in portrait and landscape, scrolls until
+Start/Stop are hittable, checks their enabled states, taps Start, obtains a real
+SOCKS greeting from the native listener, taps Stop and verifies that greeting is no
+longer available. It navigates to Statistics and back in both orientations. These
+are actual UI interactions, not a reimplementation of the view in a model test.
+The scope is bottom-control access, button/native response and tab navigation;
+it does not measure live throughput presentation, every field edit, keyboard,
+Dynamic Type, iPad UI, or all possible app/OS/network states.
+
+The first run `36066838676` at `59990ed44f06b41365d3076a2691f0320a0f5934`
+passed the functional test, but two landscape app-element images were clipped.
+They remain limited visual evidence, not proof of a production rendering failure.
+Commit `2648b6153e32abd59efd05a4c34cfd0c164002b6` changed only the two capture
+expressions to XCUIScreen.main.screenshot(); run `36068543565` passed again with
+complete screen captures. The generated scheme's manual-order warning was then
+removed by changing only its dependency-order flag. No timeout, UI assertion,
+production layout or native behavior was changed to obtain a pass.
+
+Final tested commit: `57acbb8d55023cfefca3bb6964eea3a46227ac15`.
+Final tested tree: `5f4c15dc85a966fa710a76715ef64b45548cc1fc`.
+Run `36068755469`, attempt 1: all four jobs passed. The actual UI test executed once
+with zero failures in 54.799 seconds; both orientations and four full-screen images
+were inspected. Start/Stop were visible above the floating tab bar after scrolling.
+Simulator shutdown/deletion and native reverse-patch cleanup completed without error.
+Xcode's manual-order warning is absent. Existing AppIntents metadata warnings and
+Simulator debugger/accessibility diagnostic messages remain in the logs; this is
+not described as a completely warning-free platform execution.
+
+All existing native checks also passed: 58 required UDP profiles, eight peer/queue
+cases and seven driver methods per prerequisite host; statistics' 20 network
+executions in each Linux buffered/splice and Darwin buffered mode, eight peer cases
+per mode, eight-writer/800000-update counter stress, I/O ASan/UBSan, Darwin counter
+TSan, 10000 generated model samples, six pipe cases and three stale-driver cases.
+Actual object symbols distinguish I/O modes. Nine C/header and five production
+Swift SDK checks passed with empty diagnostics. Counts include repetitions and
+synthetic accounting, not independent physical-device or large real-traffic trials.
+
+The latest UDP owner remains `66e7196ef5faccc43d9b154cab21a94e4466a77e`, an
+actual ancestor with all fifteen mapped paths identical. No dependency on server
+control, persistence, Background or icon was introduced. Runtime sampling, units,
+process-lifetime counters, accepted fixed-port limits and port-zero guidance remain.
+
+Final downloaded artifacts passed ZIP/digest checks and reconstructed exact Git
+trees, including modes. Statistics archives contain 75 files; the UI manifest has
+75 matching hashes. Both prerequisite archives identify the completed 52-file UDP
+owner, not the statistics triggering commit.
+- Statistics Linux `10837432664`: `1f2f9dbd0961bb2bea9762d96796293a2eb2ed937f39c1fc347c53b1d810bb32`.
+- Statistics macOS `10837468645`: `e3372e2f3b7499290ca380615287273c3f331c1e622be64a15ec39836b0fa554`.
+- UDP Linux `10836613923`: `aa1c1507461a693faef86b8b0d14040d4145202b9b9b1d55c9aa45612c1d1be6`.
+- UDP macOS `10837730385`: `ea0232a89de342a4fec57f9057092387679d6d82e5cffaed4b8a25db0f936d6f`.
+The tested Simulator app SHA-256 is
+`f28d40a9655e11b982ec68c7a5a661100120497721578994ad4e4b64fa9969d2`;
+the combined Simulator library is
+`f232644e0b3d7b7a6cf7a21a3086034d77b2708cfd8d534604776b610675ef7f`.
+These identify test products, not a delivered IPA or a reproducible-binary guarantee.
+
+Actual environment: Xcode27.0 `27A266a`, iPhoneOS27.0 SDK, Apple Swift6.4,
+macOS27.0 `26A428`, iPhone16 Simulator running iOS27.0 `24A434`. Configured minimum
+remains iOS17.2. Target physical iOS27 SideStore standalone and LiveContainer guest
+execution remain separate and unperformed here. No installer/host version, signing,
+permission, real phone/Bluetooth interruption, VPN/hotspot, lock-screen or energy
+result is inferred from this Simulator test. No iPhone archive/IPA was generated.
+
+The added work is confined to tests, temporary Simulator products, CI time and
+evidence storage; it adds no runtime timer, observer, socket path, state or memory
+to the production app. The final README and its identical feature copy are updated
+after successful verification while preserving all historical text. main, release,
+the other five feature heads, branch count and the existing IPA remain unchanged.
+
+Relevant public test/build contracts (not physical-device results):
+- https://developer.apple.com/documentation/xcuiautomation/xcuielement/ishittable
+- https://developer.apple.com/documentation/xcuiautomation/xcuiscreenshotproviding
+- https://help.apple.com/xcode/mac/current/en.lproj/dev6a2c4394f.html
