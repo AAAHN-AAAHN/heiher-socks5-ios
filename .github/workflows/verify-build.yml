@@ -55,6 +55,10 @@ jobs:
       - name: Verify statistics-only sources, native accounting and Swift types
         shell: bash
         run: python3 Tests/Statistics/audit.py
+      - name: Exercise actual Server controls and tabs on iOS 27 Simulator
+        if: runner.os == 'macOS'
+        shell: bash
+        run: python3 Tests/Statistics/ui_audit.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
