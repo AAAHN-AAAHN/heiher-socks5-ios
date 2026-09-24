@@ -96,6 +96,14 @@ def main():
     run(['make', 'clean'], 'clean.log', CORE)
     patch('hev-udp-port-zero.patch', CORE)
     build()
+    run([sys.executable, 'Tests/udp_peer_regression.py', CORE / 'bin/hev-socks5-server',
+         '--expect-vulnerable', '--output', OUT / 'peer-original.json'],
+        'peer-original.log', timeout=45)
+    run(['make', 'clean'], 'clean.log', CORE)
+    patch('hev-udp-peer-filter.patch', CORE / 'src/core')
+    build()
+    run([sys.executable, 'Tests/udp_peer_regression.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / 'peer-filtered.json'], 'peer-filtered.log', timeout=45)
 
     formatter = shutil.which('clang-format-18') or shutil.which('clang-format')
     if not formatter:

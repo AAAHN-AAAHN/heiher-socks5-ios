@@ -1,9 +1,11 @@
 /* Exercise the actual patched translation unit; replace only OS I/O boundaries. */
 #define connect audit_connect
+#define getpeername audit_getpeername
 #define hev_task_io_socket_recvmmsg audit_recv
 #define hev_task_io_socket_sendmmsg audit_send
 #include "hev-socks5-udp.c"
 #undef connect
+#undef getpeername
 #undef hev_task_io_socket_recvmmsg
 #undef hev_task_io_socket_sendmmsg
 
@@ -32,6 +34,28 @@ get_iface (HevObject *self, void *type)
     (void)self;
     (void)type;
     return &iface;
+}
+
+int
+audit_getpeername (int fd, struct sockaddr *addr, socklen_t *length)
+{
+    struct sockaddr_in6 expected = { 0 };
+    assert (fd == 0 || fd == 10);
+    assert (*length >= sizeof (expected));
+    expected.sin6_family = AF_INET6;
+    expected.sin6_port = htons (fd == 10 ? 5300 : 33000);
+#if defined(__APPLE__)
+    expected.sin6_len = sizeof (expected);
+#endif
+    if (family == AF_INET) {
+        expected.sin6_addr.s6_addr[10] = 0xff;
+        expected.sin6_addr.s6_addr[11] = 0xff;
+        expected.sin6_addr.s6_addr[12] = 127;
+    }
+    expected.sin6_addr.s6_addr[15] = 1;
+    memcpy (addr, &expected, sizeof (expected));
+    *length = sizeof (expected);
+    return 0;
 }
 
 int

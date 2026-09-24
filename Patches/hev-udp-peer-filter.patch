@@ -1,0 +1,109 @@
+diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
+--- a/src/hev-socks5-udp.c
++++ b/src/hev-socks5-udp.c
+@@ -256,10 +256,11 @@
+ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+                              unsigned int num, int nonblock)
+ {
+-    struct sockaddr_in6 taddr;
++    struct sockaddr_in6 taddr[num], peer;
++    socklen_t alen = sizeof (peer);
+     struct mmsghdr mvec[num];
+     struct iovec iov[num];
+-    int i, fd, res;
++    int i, fd, res, count = 0;
+ 
+     fd = hev_socks5_udp_get_fd (self);
+ 
+@@ -267,8 +268,8 @@
+         nonblock = MSG_DONTWAIT;
+ 
+     for (i = 0; i < num; i++) {
+-        mvec[i].msg_hdr.msg_name = NULL;
+-        mvec[i].msg_hdr.msg_namelen = 0;
++        mvec[i].msg_hdr.msg_name = &taddr[i];
++        mvec[i].msg_hdr.msg_namelen = sizeof (taddr[i]);
+         mvec[i].msg_hdr.msg_control = NULL;
+         mvec[i].msg_hdr.msg_controllen = 0;
+         mvec[i].msg_hdr.msg_iov = &iov[i];
+@@ -276,11 +277,6 @@
+ 
+         iov[i].iov_base = msgv[i].buf;
+         iov[i].iov_len = msgv[i].len;
+-    }
+-
+-    if (!HEV_SOCKS5 (self)->udp_associated) {
+-        mvec[0].msg_hdr.msg_name = &taddr;
+-        mvec[0].msg_hdr.msg_namelen = sizeof (taddr);
+     }
+ 
+     res = hev_task_io_socket_recvmmsg (fd, mvec, num, nonblock, task_io_yielder,
+@@ -291,25 +287,43 @@
+         return res;
+     }
+ 
+-    if (!HEV_SOCKS5 (self)->udp_associated) {
+-        hev_socks5_udp_addr_normalize (&taddr);
+-        if (connect (fd, (struct sockaddr *)&taddr, sizeof (taddr)) < 0)
+-            return -1;
+-        HEV_SOCKS5 (self)->udp_associated = 1;
+-    }
++    /* Port-zero discovery must retain the control connection's peer IP.
++     * Check connected batches too: datagrams queued before connect may remain. */
++    i = HEV_SOCKS5 (self)->udp_associated ? fd : HEV_SOCKS5 (self)->fd;
++    if (getpeername (i, (struct sockaddr *)&peer, &alen) < 0)
++        return -1;
++    hev_socks5_udp_addr_normalize (&peer);
+ 
+     for (i = 0; i < res; i++) {
+         HevSocks5UDPHdr *udp = msgv[i].buf;
+-        int addrlen = hev_socks5_addr_len (&udp->addr);
++        int addrlen;
+         int doff;
++
++        hev_socks5_udp_addr_normalize (&taddr[i]);
++        if (memcmp (&peer.sin6_addr, &taddr[i].sin6_addr,
++                    sizeof (peer.sin6_addr)) ||
++            peer.sin6_scope_id != taddr[i].sin6_scope_id ||
++            (HEV_SOCKS5 (self)->udp_associated &&
++             peer.sin6_port != taddr[i].sin6_port))
++            continue;
++
++        if (!HEV_SOCKS5 (self)->udp_associated) {
++            if (connect (fd, (struct sockaddr *)&taddr[i],
++                         sizeof (taddr[i])) < 0)
++                return -1;
++            peer = taddr[i];
++            HEV_SOCKS5 (self)->udp_associated = 1;
++        }
+ 
+         msgv[i].len = mvec[i].msg_len;
+         if (msgv[i].len < 4) {
+             msgv[i].addr = NULL;
+             msgv[i].len = 0;
++            msgv[count++] = msgv[i];
+             continue;
+         }
+ 
++        addrlen = hev_socks5_addr_len (&udp->addr);
+         if (addrlen <= 0) {
+             LOG_D ("%p socks5 udp addr", self);
+             return -1;
+@@ -324,9 +338,14 @@
+         msgv[i].addr = &udp->addr;
+         msgv[i].buf += doff;
+         msgv[i].len -= doff;
+-    }
+-
+-    return res;
++        msgv[count++] = msgv[i];
++    }
++
++    if (!count) {
++        errno = EAGAIN;
++        return -1;
++    }
++    return count;
+ }
+ 
+ int

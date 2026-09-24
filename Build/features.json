@@ -12,6 +12,10 @@
     {
       "file": "hev-udp-sockaddr.patch",
       "repository": "src/core"
+    },
+    {
+      "file": "hev-udp-peer-filter.patch",
+      "repository": "src/core"
     }
   ],
   "sources": {
