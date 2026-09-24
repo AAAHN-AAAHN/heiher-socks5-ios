@@ -74,9 +74,10 @@ The main baseline is `d2534cd6bce7389fdf8f362bd8f681c0bd583eb1`. It combines iOS
 `Build/upstream.json`; `Build/features.json` selects UDP plus statistics and six
 ordered patches. These are reproducible pins, not automatic upstream tracking.
 
-The current UDP prerequisite is `34cc49f01bbbcb4cc1ed9b7e050640f7cae14c72`.
-The preceding closure used `05524e3fb917f2a0e5264bc9919118fcc484cb11`;
-`49784b7c78a99dab824eceeb071e459bc94b2e90` belongs to older verification.
+The current UDP prerequisite is `66e7196ef5faccc43d9b154cab21a94e4466a77e`.
+The preceding reconciliation used `34cc49f01bbbcb4cc1ed9b7e050640f7cae14c72`;
+`05524e3fb917f2a0e5264bc9919118fcc484cb11` and
+`49784b7c78a99dab824eceeb071e459bc94b2e90` belong to older verification.
 The earlier prerequisite `ae466dab1a394af0c83f3dc36e51755f25f91910` was merged by
 `d34e49478d7e061b8824e9f431b40998db25f8b2`, the original statistics-review start.
 The current prerequisite is also merged as a Git ancestor, not merely cited in a
@@ -492,3 +493,56 @@ permissions, VPN/hotspot, lock-screen behavior and energy use remain unverified.
 These limits must not be relabelled as passed tests. No runtime overhead is added by
 the formatting/documentation completion. main/release remain unchanged and exactly
 eight branches are retained. The existing release IPA is not updated by this closure.
+
+## Final six-feature composition closure (2026-09-25)
+
+The current prerequisite is completed UDP
+`66e7196ef5faccc43d9b154cab21a94e4466a77e`. Merge/test commit
+`0f58e4ddcf3d56a961b075c22ac446e9611c84a2` includes it as an actual second
+parent; tested tree `ce46e3420ffd46c847a7ec527c784f2a95dd9585`.
+All fifteen mapped UDP paths match the owner exactly. This includes the two
+corrected UDP test files, its full completed documentation and unchanged workflow.
+The prerequisite checkout and audit constant agree. Statistics production code,
+all six native patches, own test assertions, original UI sampling and units remain
+unchanged. The inherited test-port reservation does not change the app's UDP policy.
+
+The preceding run `36057681338` failed the Linux UDP test server's startup before
+one required profile; macOS UDP passed and statistics jobs were skipped. Its exit254
+and empty server log did not identify the original OS errno. The owner independently
+reproduced and corrected an IPv6-loopback versus dual-stack-wildcard port-reservation
+mismatch, retaining the exact-old-code control. No test retry, skip, extra timeout
+or production workaround was added. That failed run remains failed evidence.
+
+Run `36059988736` passed all four jobs on its first attempt: current-UDP Linux and
+Xcode27 prerequisites followed by Linux and Xcode27 statistics. Each prerequisite
+passed58 mandatory scenarios, eight peer/queue cases and seven driver methods,
+with retained negative controls, sanitizers and reverse checks. Statistics passed
+20 network executions per native mode (Linux buffered/splice, Darwin buffered),
+eight real peer/queued-continuation cases in each mode, 800000-update/eight-writer
+counter stress, partial/error/retry I/O probes under ASan/UBSan, Darwin counter TSan,
+10000 generated model samples, six pipe-reader cases and three stale-driver cases.
+Actual compiled symbols distinguish buffered and splice. Synthetic byte additions
+are not measured petabytes of network traffic or independent device trials.
+
+All nine affected C/header files and five production Swift files passed the actual
+iPhoneOS27 syntax/type checks with empty diagnostic logs. Recorded toolchain:
+Xcode27.0 `27A266a`, iPhoneOS27.0, Apple Swift6.4, macOS27.0 `26A428`.
+No app link/archive, IPA, XCFramework, Simulator or physical-device run occurred.
+
+Downloaded ZIPs passed integrity checks. Both 73-file statistics source archives
+reconstruct the tested tree; both 52-file prerequisite archives reconstruct the
+completed UDP owner's tree, including modes. The mapped dependency hashes agree.
+- Statistics Linux `10834316581`: `c093d8223efbb82f9fd8443c3dffeac929e1b64e9785dcfb6372483b4a6fb32c`.
+- Statistics macOS `10834262403`: `d98271ddc6798ae0d98685f923079f605d498eabfa58d0fc659d8afc070bfc4e`.
+- UDP Linux `10833882488`: `e9daf292459f3c34cd9311ba46eccd0c3e6442e825a9cd2c88a8d3fc416873e6`.
+- UDP macOS `10834395950`: `8ef5372eb2816bb0eba02e8b92070ff545bd141dfef498ab44552fd28754cd18`.
+
+This completion updates only README and its identical specification after the
+successful run, making the current prerequisite explicit while retaining historical
+results. No newly reproduced mandatory-check failure remains. Accepted fixed-port/
+unknown-client limitations retain the UDP Listen Port=0 guidance. The historical
+Server-tab layout observation and physical iOS27 SideStore/LiveContainer install,
+permissions, UI, VPN/hotspot, lock-screen and energy behavior are not newly verified.
+The iOS17.2 minimum remains unchanged. No server-control/persistence/Background/icon
+dependency is added; main, release/integrated, branch count and existing IPA remain
+unchanged. Source and SDK success do not certify all physical deployment conditions.
