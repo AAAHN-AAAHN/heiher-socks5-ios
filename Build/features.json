@@ -15,6 +15,10 @@
       "repository": "src/core"
     },
     {
+      "file": "hev-udp-peer-filter.patch",
+      "repository": "src/core"
+    },
+    {
       "file": "hev-stats-task-io.patch",
       "repository": "third-part/hev-task-system"
     },

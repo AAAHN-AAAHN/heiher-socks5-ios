@@ -60,6 +60,18 @@ jobs:
             -I HevSocks5Server.xcframework/ios-arm64/Headers \
             Socks5/Socks5App.swift Socks5/ContentView.swift \
             > artifacts/udp-final-audit/ios-swift-typecheck.log 2>&1
+      - name: Record native queue behavior and formatter output without changing code
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/udp-final-audit
+          python3 Tests/udp_queue_observation.py > artifacts/udp-final-audit/os-queue-observation.json
+          CORE=.build/udp-final-audit/core
+          if [ -f "$CORE/src/core/src/hev-socks5-udp.c" ]; then
+            clang-format-18 "$CORE/src/core/src/hev-socks5-udp.c" > artifacts/udp-final-audit/expected-core-format.c
+            clang-format-18 --style="file:$CORE/.clang-format" Tests/udp_sockaddr_unit.c > artifacts/udp-final-audit/expected-unit-format.c
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

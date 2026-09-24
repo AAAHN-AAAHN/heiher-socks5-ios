@@ -1,9 +1,11 @@
 /* Count at the actual forwarders; replace only their socket I/O boundaries. */
 #define hev_task_io_socket_recvmmsg audit_recv
 #define hev_task_io_socket_sendmmsg audit_send
+#define getpeername audit_getpeername
 #include "hev-socks5-udp.c"
 #undef hev_task_io_socket_recvmmsg
 #undef hev_task_io_socket_sendmmsg
+#undef getpeername
 
 #include <assert.h>
 #include <stdio.h>
@@ -39,6 +41,25 @@ bind_socket (HevSocks5 *self, int fd, const struct sockaddr *addr)
     return bind_error ? -1 : 0;
 }
 
+/* Model the client-facing socket identity used by the inherited peer filter.
+ * Forwarders and counter assertions below remain the actual production paths. */
+int
+audit_getpeername (int fd, struct sockaddr *address, socklen_t *length)
+{
+    struct sockaddr_in6 peer = { 0 };
+
+    assert (fd == 10 && *length >= sizeof (peer));
+    peer.sin6_family = AF_INET6;
+    peer.sin6_port = htons (40000);
+    peer.sin6_addr.s6_addr[15] = 1;
+#if defined(__APPLE__)
+    peer.sin6_len = sizeof (peer);
+#endif
+    memcpy (address, &peer, sizeof (peer));
+    *length = sizeof (peer);
+    return 0;
+}
+
 int
 audit_recv (int fd, void *messages, unsigned int num, int flags,
             HevTaskIOYielder yielder, void *data)
@@ -61,6 +82,8 @@ audit_recv (int fd, void *messages, unsigned int num, int flags,
         assert (offset + lengths[i] <= iov->iov_len);
         if (fd == 10) {
             memcpy (iov->iov_base, header, sizeof (header));
+            audit_getpeername (fd, vec[i].msg_hdr.msg_name,
+                              &vec[i].msg_hdr.msg_namelen);
         } else {
             struct sockaddr_in6 addr = { 0 };
             assert (fd == 11);
