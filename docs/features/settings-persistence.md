@@ -359,3 +359,42 @@ scheduling remain untested. Saved intent is not proof of OS permission. main and
 release/integrated remain unchanged, there are eight branches and no IPA/archive
 was produced. The previous local-only limitation is superseded by this inspected
 remote merge and CI evidence, not by a fabricated installation or success claim.
+
+## Final current-owner and audit-driver closure (2026-09-25)
+
+The completed server owner is now `b4d20f8402cdcd5ee687d17f46bf71d38a9febb5`.
+Merge/test commit `4f6a1108773adc739e077f0f2900443e625535f2` includes it as its
+actual second parent; tested tree `5fa6a571c62b8bf8e60b22b1cafb6c739d20d607`.
+All 23 declared owner paths match byte-for-byte, including the corrected SDK entry,
+new shell-failure regression and completed server documentation. The composition
+build applies the same marker invalidation and runs the inherited test. There is
+no duplicated controller, changed native patch or persistence runtime correction.
+
+The reproduced residual defect was audit evidence: failed retries left prior
+SUCCESS.txt/sdk-success.txt files. The corresponding entry points now remove only
+old pass markers before their checks and retain diagnostics. Six bounded old/current
+shell controls per host verify the actual native/SDK entry points, first failures,
+failed retries and diagnostic preservation. An old-code expected failure is not a
+failed current implementation or a physical-device test.
+
+Run `36056599615` passed Linux and Xcode27 on its first attempt. All 209 settings
+assertions (39+116+15+33+6), historical import/store/access negative controls, 16 real
+native persistence records and four old/current delayed-persistence records passed.
+The full inherited server suites, active-client and delayed-completion checks,
+cancellation/format/reverse checks and 23-path ownership validation also passed.
+Xcode27.0 `27A266a` / iPhoneOS27.0 typechecked eight production Swift files at the
+unchanged ARM64/iOS17.2 minimum with warnings-as-errors and an empty diagnostic log.
+
+Downloaded ZIPs passed integrity checks; all 82 source-manifest hashes in each
+matched and both source archives reconstructed the tested Git tree including modes:
+- Linux `10832298506`: `0fb05c538086fea5089a61bc1a9182aaded224f0b285390ea3a3238ceb945b7e`.
+- macOS `10833175425`: `4b171d4ee1d251baec2c20ae7762d9a0e56989039d3407d8f1db225b13d530d8`.
+
+All app sources, resources, native patches, schema/defaults, storage path, source
+pins and baseline framework remain byte-identical to the input composition. This
+completion changes only README and its identical feature specification after the
+successful run. The updated parent is a build/test provenance dependency, not a
+new runtime service or timer. The physical iOS27 SideStore/LiveContainer targets
+remain separate from host/SDK evidence; installer versions, provider UI, protected
+data timing, real power loss, permissions, lock/VPN/hotspot and energy are untested.
+No main/release update, additional branch, app archive or IPA was produced.
