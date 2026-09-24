@@ -452,3 +452,45 @@ Actual iOS 27 SideStore installation, LiveContainer host arbitration, telephone/
 Bluetooth notifications, process suspension and energy use remain untested.
 This result verifies the implemented paths and current SDK contracts, not
 guaranteed delivery/activation while iOS refuses or suspends execution.
+
+## Retained independent real-scheduling verification (2026-09-24)
+
+The subsequently observed scheduling harness and its test-only compiler corrections
+are retained, not reverted. Their purpose is distinct from scripted timer firing:
+use actual Foundation Timer/RunLoop and Combine scheduling around the unchanged
+production controller body and actual publisher expression. Audio and location
+remain explicit doubles. No production observer, timer, thread, setting or recovery
+state was added, and this test does not claim background execution permission.
+
+Tested commit: `da9a8b615be0132097103118f65020ba76bf9a7e`.
+Tested tree: `04140706a9350a38b033984f8901a0f0aed06859`.
+Run `35941608803` succeeded; the normal app archive/IPA job was skipped. The five
+new scheduling postconditions passed: failed activation retries with a real timer;
+new queued resumption before the pending retry; no reactivation from healthy samples
+or 100 restores; Off wins before worker-notification delivery; independent location,
+canceled observers and controller release stay inactive. Recorded initial attempts
+were approximately 0.0012, 1.0379 and 2.0458 seconds. These are host observations,
+not a one-second real-time guarantee on a suspended iPhone.
+
+The existing 1193 assertions, 34 real Combine deliveries/cancellation, 400 zero
+WAV samples, source boundaries and actual Xcode 27.0 `27A266a` / iPhoneOS SDK 27.0
+five-file ARM64 typecheck also passed. The first harness compilation had diagnosed
+a test weak local and an actor-isolated notification referenced from a worker;
+those test declarations were corrected without suppressing warnings, removing
+assertions or editing production logic. The earlier failure is not an executed
+successful scheduling test.
+
+Downloaded artifact `10784863270` SHA-256:
+`33500b40a820499c590134d33146d20ffead120aea9158408864a52f98ab3922`.
+The recorded 57 source hashes identify the exact tested files. This completion
+updates only README and its identical specification; the successful test/production
+bytes are retained. Session attribution cannot be established from commit authorship,
+so the retention decision follows source scope and executable evidence instead.
+
+The original immediate detected-stop recovery, one-second health/retry schedule,
+weak callback identity, Off priority and coarse-location startup policy remain.
+No extra runtime cost is introduced by retaining test-only code; energy is still
+unmeasured. Physical iOS27 SideStore/LiveContainer installation, real phone/Siri/
+Bluetooth interruptions, lock-screen scheduling, host arbitration and OS refusal
+remain outside these checks. No main/release change, new branch, app archive or
+IPA is part of this closure, and the repository still has eight branches.
