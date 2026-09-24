@@ -351,3 +351,40 @@ release/integrated remain unchanged; no new branch, app archive or IPA was produ
 Physical SideStore/LiveContainer installation, host state, permissions, UI, lock,
 VPN/hotspot and energy remain untested. The prior review's local-only publication
 limitation is superseded by the actual commit/run above, not retrospectively erased.
+
+## Final audit-driver closure (2026-09-25)
+
+A failed repeat could retain an earlier SUCCESS.txt or sdk-success.txt. This was
+reproduced by executing the exact old shell blobs with a controlled first-check
+failure. Build/build.sh now invalidates both markers before native validation;
+the separate SDK entry invalidates its own marker before checking the toolchain.
+Only obsolete pass markers are removed. Existing diagnostic logs, nonzero exits,
+all production code, native patches and every previous check are retained.
+
+Tests/ServerControl/audit_driver_check.py executes six bounded shell-boundary
+cases per host: old-code controls, current retries and first failures for the two
+entry points. The old controls must retain stale markers to demonstrate the defect;
+current failed attempts must not. This is validation-driver testing, not six
+additional iPhone/network defects. The downstream persistence composition reuses
+this test and the corrected SDK entry rather than weakening the owner checks.
+
+Tested commit: `c638553a7135c6a5e124b18e7700cdcfefab4b41`.
+Tested tree: `8380dc7f526a92cc4a6a6c3b7e19e7be04bbf315`.
+Run `36055737535` passed both Linux and Xcode 27 jobs on its first attempt.
+All existing controller, parity, native authentication, active-client, delayed
+completion, early-cancellation, patch-format and reverse checks passed again.
+Xcode 27.0 `27A266a` / iPhoneOS SDK 27.0 typechecked five production Swift files
+for ARM64/iOS17.2 with warnings-as-errors and an empty diagnostic log.
+
+Downloaded artifacts were ZIP-checked and their complete 66-file source archives
+reconstructed the tested tree; all source-manifest hashes matched:
+- Linux `10831694547`: `e3c1a320011701a64d3031fe1261aa00f3bf28da93f9ff7f6ddced299bd57aab`.
+- macOS `10832163467`: `2a0fa9705d82d89e3b0eaeac4ff9d5adead8507fc409a9ee84868b1477dbe3b7`.
+
+No runtime source or resource changes were necessary. This final record and its
+identical feature copy are documentation-only additions after the successful run.
+The intended physical iOS27 SideStore/LiveContainer paths, unchanged iOS17.2 minimum,
+and unperformed installer/UI/lock-screen/VPN/hotspot/energy tests remain distinct
+from these native/SDK results. No app archive, IPA, new branch or main/release
+change occurred. Native and SDK success markers represent their respective checks,
+not universal platform or device certification; all historical failures remain.
