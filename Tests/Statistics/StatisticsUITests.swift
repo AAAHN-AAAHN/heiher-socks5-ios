@@ -24,7 +24,7 @@ final class StatisticsUITests: XCTestCase {
             XCTAssertTrue(stop.isHittable, "Stop must not remain covered by the floating tab bar")
             XCTAssertTrue(start.isEnabled)
             XCTAssertFalse(stop.isEnabled)
-            let capture = XCTAttachment(screenshot: app.screenshot())
+            let capture = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             capture.name = "server-controls-\(orientation.rawValue)"
             capture.lifetime = .keepAlways
             add(capture)
@@ -36,7 +36,7 @@ final class StatisticsUITests: XCTestCase {
             XCTAssertTrue(waitUntil { !Self.handshake() }, "Stop must release the real native listener")
             app.tabBars.buttons["Statistics"].tap()
             XCTAssertTrue(app.navigationBars["Statistics"].waitForExistence(timeout: 5))
-            let statistics = XCTAttachment(screenshot: app.screenshot())
+            let statistics = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             statistics.name = "statistics-tab-\(orientation.rawValue)"
             statistics.lifetime = .keepAlways
             add(statistics)
