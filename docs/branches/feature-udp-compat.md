@@ -457,3 +457,34 @@ No main/release update, new branch, IPA, host patch or implicit device certifica
 is part of this reconciliation. Physical iOS 27 SideStore/LiveContainer execution,
 VPN/hotspot, permissions, same-IP adversaries and all protocol edge cases remain
 outside the executed evidence. The eight-branch ownership boundary is preserved.
+
+## Final six-feature verification closure (2026-09-25)
+
+The current three-patch implementation required no further runtime change. Fresh
+verification commit `f85cce5818ca1ea448f699e7bb73c550d6c047af` uses exactly the
+input owner's tree `8ebafb9784d62d670e49375dc0a5d4f97468a53c`. Run
+`36055973873` passed Linux and Xcode 27 on its first attempt. All 58 mandatory
+compatibility scenarios and eight peer/queued-continuation cases passed per host.
+The existing five audit-driver controls, old-code comparisons, address/cancellation
+sanitizers, strict formatter and exact reverse-patch checks also passed. Accepted
+observation-only fixed-port/unknown-client failures remain observations, not passes.
+
+Both downloaded artifact ZIPs passed integrity checks. Their complete 52-file
+Git source archives independently reconstruct the tested tree, including executable
+modes; the archives identify the matching tested commit. This verification does
+not invent a source-manifest file that the UDP artifact does not contain.
+- Linux `10831884151`: `391b398d44cc45bfb72bf09d726a91a3e0851e1cef67f46754d508a4966a3cf4`.
+- macOS `10831874251`: `841612bda5cac742143c287eaee1e45eb4c8b60952bbb44fe64d82621d1d70f9`.
+
+The macOS job recorded Xcode 27.0 `27A266a`, iPhoneOS SDK 27.0, Apple Swift 6.4
+and macOS 27.0 `26A428`. The unchanged app passed its actual iOS27 type check.
+No Simulator, physical device, app archive, IPA or XCFramework was built here.
+The iOS17.2 deployment minimum, intended physical iOS27 SideStore/LiveContainer
+paths and previously unperformed permission/UI/VPN/hotspot/lock/energy tests remain
+separate claims. Source-IP filtering does not certify same-IP first-port races.
+
+This completion appends only to README and its identical feature specification;
+all preceding evidence and all production/test/workflow bytes are preserved.
+Statistics must inherit this completed owner as an actual ancestor and match its
+fifteen mapped files. The accepted UDP Listen Port=0 operating guidance, baseline
+source pins, branch count, main, release/integrated and existing IPA are unchanged.
