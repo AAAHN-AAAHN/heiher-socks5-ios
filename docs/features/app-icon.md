@@ -298,3 +298,35 @@ host cache/guest-list/web-clip rendering, actual iPhone icon-cache refresh, iPad
 runtime and manual Dark/Tinted/clear modes remain untested. Earlier failed runs
 and these limits remain explicit; a successful asset/Simulator test is not a
 universal installation or appearance guarantee.
+
+## Final stale-success repair and resource verification (2026-09-25)
+
+The actual old resource-audit shell retained SUCCESS.txt when its first command
+failed. The entry now removes only that marker before beginning. Three bounded
+old/current-retry/current-first-failure controls prove the nonzero exit, corrected
+marker state and retained diagnostic log. This changes audit evidence handling,
+not the artwork, catalog, application code, native engine or Simulator deadlines.
+
+Tested commit: `8a25bc4d5b43e5dcc1044c004442f962ef9f46a7`.
+Tested tree: `c994280dd93273f34ee753e45af34bb13bb0daaf`.
+Run `36055937895` passed icon-checks on its first attempt; ordinary archive/IPA
+verification was intentionally skipped. All thirteen resource methods, including
+30728 one-bit mutations and old-validator controls, passed with the three new
+shell cases. Actual phone/iPad asset compilation, ImageIO decoding and Simulator
+registration/launch for both original/remapped IDs passed. All four new light/dark
+system-home screenshots were inspected and visibly contain the preserved icon.
+This is not manual coverage of every clear/tinted appearance or physical install.
+
+Downloaded artifact `10833195483` SHA-256:
+`71c82aeedc78927e42c4357acc310eded204cc4e3656015f2f21fae673b8ae61`.
+The ZIP passed integrity; all 48 source-manifest hashes matched and the source
+archive reconstructed the exact tested tree. Xcode27.0 `27A266a`, iPhoneOS27.0,
+Apple Swift6.4 and macOS27.0 `26A428` were recorded. The runtime was the iPhone16
+iOS27.0 `24A434` Simulator, not the owner's physical device. Existing non-asset
+Simulator-destination/AppIntents warnings remain visible, not described as absent.
+
+Only this README and its identical feature copy change after the successful run.
+The original PNG, catalog, project/plist, source pins and runtime bytes are intact.
+The iOS17.2 minimum, intended physical SideStore/LiveContainer paths and untested
+host/cache/web-clip, iPad runtime and installer behavior remain separate boundaries.
+No new branch, main/release change, production work, iPhone archive or IPA occurred.
