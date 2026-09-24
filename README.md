@@ -1,5 +1,20 @@
 # UDP compatibility for the native iOS SOCKS5 relay
 
+## Current disposition: reconciled peer filtering (2026-09-24)
+
+The current feature applies **three** ordered patches: the two preserved port-zero
+and address-normalization repairs, followed by `hev-udp-peer-filter.patch`.
+The new source-IP/established-port filter is retained, but not the first unfinished
+implementation: its all-discarded-batch path has been corrected to yield, observe
+cancellation and keep draining the existing receive queue. No new dispatcher,
+listener, automatic port fallback or change to the fixed-port policy is introduced.
+
+Current tested source is `e29458bc58cba822c31a0106a29f291cc34d6170`, run
+`35947538898`, with successful Linux and Xcode 27 jobs. Read the final reconciliation
+section below for behavior, cost, controls and limits. The intervening earlier
+records describe their original two-patch snapshots, not today's three-patch
+implementation. Historical IPA/Simulator results are not new peer-filter device tests.
+
 ## Supported versions, installation environments and verified scope
 
 Latest environment re-audit: **2026-09-23**. The intended support environment,
@@ -383,3 +398,62 @@ main and release/integrated stay excluded. This fresh native/SDK recheck did not
 repeat the historical IPA/Simulator experiment or perform physical iOS 27
 SideStore/LiveContainer installation, VPN/hotspot, lock-screen, UI or energy tests.
 The section above dated 2026-09-23 remains evidence for that earlier, separate run.
+
+## Reconciled foreign-peer and queue handling: final evidence
+
+The separate work beginning at `d5b5bad3` and `bfa4c606` was reviewed by content.
+Its useful change is accepted: an unknown-port association must not learn a first
+UDP sender from a different IP than its TCP control peer. After establishment,
+source IP, scope and port are checked for each received descriptor, including
+packets queued before connect. The two original patch files remain byte-identical.
+This explicitly supersedes the historical unchecked-first-IP row above, but is not
+cryptographic authentication, protection against a same-IP first-port race, or a
+complete RFC/security approval. Clients must send UDP from the expected source IP;
+a deployment with unrelated TCP/UDP egress IPs is not silently exempted.
+
+The first candidate's all-discarded batch incorrectly signaled an empty receive
+queue. On Darwin, a legitimate datagram could remain behind rejected queued packets
+without a new readiness wakeup. The accepted implementation uses the existing
+coroutine yielder (including stop/cancellation handling), then retries the same
+receive operation. A real empty queue still yields its real I/O result. It does not
+sleep on a timer, allocate another socket, invent EAGAIN, increase deadlines or
+remove the queued-continuation assertion. The final unit covers repeated rejected
+batches, subsequent genuine EAGAIN and cancellation, in sanitizer and optimized
+builds. The raw-socket queue observation remains test-only evidence, not a production
+workaround or an assertion that every OS queue must behave identically.
+
+`getpeername` is added once per nonempty received batch; stack source-address storage
+scales with the existing fixed batch size. Each candidate source is normalized and
+compared; accepted descriptors are compacted without copying payload bytes. This
+adds real CPU/stack/syscall work, but no heap history, new worker, timer, lock,
+dispatcher, saved option or per-packet logging. No energy/throughput benchmark is
+claimed. Source-IP validation belongs to this existing UDP receive boundary, not to
+Settings, Background or a new cross-feature manager.
+
+Tested commit: `e29458bc58cba822c31a0106a29f291cc34d6170`.
+Tested tree: `ced588e00b2d114d002471b4c3a95f74b693aae3`.
+Run `35947538898`: Linux and Xcode 27 jobs both succeeded. Per host, 58 required
+legacy scenarios and all eight new actual peer/queued-continuation cases passed.
+Four old-code peer controls reproduce the previously accepted foreign sender.
+The fixed-port/multiple-unknown limitation remains a separate failing observation.
+Actual C normalization/caller/sender/cancellation probes passed ASan/UBSan and
+optimized strict-aliasing builds. Patch format and reverse checks passed. The
+recorded Xcode 27.0 `27A266a`/iPhoneOS 27.0 C syntax and two-file Swift ARM64
+checks passed; their logs are empty. No app archive, IPA or new Simulator test ran.
+
+The initial peer candidate's Linux formatter failure and Darwin queued-continuation
+failure are not erased. The next queue-corrected revision still failed a new unit
+assertion's formatting. The last change split only that assertion to match the
+existing formatter. Final success is not a claim that all earlier runs succeeded.
+Both downloaded final artifacts were checked against these digests and exact source:
+- Linux `10786914702`: `eea1c93267a80f4aa387c6c4b9db38c11b9069f975a5e55298ec7c1b4b1d827a`
+- macOS `10787258304`: `54f980d14f6ad658ae3a92ee5016d41f742ff5e0bd815912b71c1e63bf491840`
+
+This final record changes only README and its identical feature specification;
+production/test/workflow bytes remain the successful revision above. The completed
+owner must be explicitly included by statistics; its prior two-patch pin is not
+considered current merely because the original compatibility repairs are unchanged.
+No main/release update, new branch, IPA, host patch or implicit device certification
+is part of this reconciliation. Physical iOS 27 SideStore/LiveContainer execution,
+VPN/hotspot, permissions, same-IP adversaries and all protocol edge cases remain
+outside the executed evidence. The eight-branch ownership boundary is preserved.
