@@ -69,8 +69,9 @@ PUBLISHER
 
         let queued = DispatchGroup()
         queued.enter()
+        let interruption = AVAudioSession.interruptionNotification
         DispatchQueue.global().async {
-            NotificationCenter.default.post(name: AVAudioSession.interruptionNotification, object: nil)
+            NotificationCenter.default.post(name: interruption, object: nil)
             queued.leave()
         }
         precondition(queued.wait(timeout: .now() + 2) == .success)
@@ -92,6 +93,7 @@ PUBLISHER
         runFor(1.1)
         precondition(received == deliveries && weakApp == nil && session.activations == healthy)
         print("PASS: location independence, observer cancellation and controller release with real timers")
+        weakApp = nil
         session.onActivation = nil
         print("SCOPE: native Foundation/Combine execution with audio/device doubles; measured timing is not an iOS real-time guarantee")
     }
