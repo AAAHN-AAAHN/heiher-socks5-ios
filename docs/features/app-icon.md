@@ -257,3 +257,44 @@ no runtime workload, no host changes and no new IPA/archive. Eight branches rema
 main/release are excluded. Physical iOS27 SideStore signing/display, LiveContainer
 guest/cache/web-clip behavior and untested appearance modes remain outside this
 evidence. The transient failed attempts are not erased by the final success.
+
+
+## Retained exhaustive resource check: final closure (2026-09-25)
+
+The independently observed commit `43993ab7aef5480a74876a3233011c446046001f`
+is retained. It adds only an exhaustive mutation property to the existing test suite:
+each of the 3841 source bytes has each bit flipped in isolation (30728 mutations),
+every corrupted result is rejected, and the original bytes are restored. It neither
+replaces the approved artwork nor adds code/resources to the application target.
+There are now thirteen unittest methods; mutation repetitions are not device tests.
+The earlier twelve-method records above remain accurate for their earlier versions.
+
+Tested commit: `43993ab7aef5480a74876a3233011c446046001f`.
+Tested tree: `8b07ce8c87041ff5a7b7bc83917338d459f92f57`.
+Run `35941057588` succeeded: thirteen source/mutation methods, actual iPhoneOS27
+asset compilation for phone/pad, Apple ImageIO decoding, and the unchanged iPhone16
+iOS27 Simulator product registration/launch for original and remapped test IDs.
+The normal iPhone archive/IPA job was skipped. The icon metadata and four captured
+light/dark-system-UI home screens remain evidence for those two Simulator installs,
+not authored tinted/clear variants or physical SideStore/LiveContainer rendering.
+
+The recorded toolchain was Xcode27.0 `27A266a`, iPhoneOS27.0, Apple Swift6.4 and
+macOS27.0 `26A5406e`; the Simulator runtime was iOS27.0 `24A434`. Minimum iOS17.2,
+Bundle ID, project/plist, source image and catalog are unchanged. This runner's OS
+build is distinct from the previous run's 26A428 and from the user's physical OS.
+
+Downloaded artifact `10785356428` SHA-256:
+`dae18ef7a1980dbf88a8a2b86eef113c4d7576b0fb59ddebf4c8b083da8c4d1d`.
+The 47-file source archive reconstructs the tested tree and all 47 recorded source
+hashes match. The thirteen-method suite was also rerun locally during this closure;
+that Linux resource check is not another Apple/Simulator execution. Retention is
+based on the code's scope and observed results, not attribution to a particular
+ChatGPT session. Existing runtime work/resource usage is unchanged.
+
+Only README and its identical feature specification are updated by this completion.
+No production change, new branch, main/release update, app archive or IPA is made.
+Exactly eight branches remain. Physical SideStore signing/install, LiveContainer
+host cache/guest-list/web-clip rendering, actual iPhone icon-cache refresh, iPad
+runtime and manual Dark/Tinted/clear modes remain untested. Earlier failed runs
+and these limits remain explicit; a successful asset/Simulator test is not a
+universal installation or appearance guarantee.
