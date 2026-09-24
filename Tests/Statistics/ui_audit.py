@@ -78,7 +78,7 @@ def add_test_target(app):
     test_ref = ref(test, 'StatisticsUITests', 'StatisticsUITests.xctest')
     scheme.write_text(f'''<?xml version="1.0" encoding="UTF-8"?>
 <Scheme LastUpgradeVersion="2700" version="1.3">
-<BuildAction parallelizeBuildables="NO" buildImplicitDependencies="YES"><BuildActionEntries>
+<BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES"><BuildActionEntries>
 <BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="YES">{app_ref}</BuildActionEntry>
 <BuildActionEntry buildForTesting="YES" buildForRunning="NO" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="YES">{test_ref}</BuildActionEntry>
 </BuildActionEntries></BuildAction>
