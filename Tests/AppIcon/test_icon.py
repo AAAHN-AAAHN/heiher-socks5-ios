@@ -31,6 +31,17 @@ class IconTests(unittest.TestCase):
         self.assertEqual(sum(result['pixelCounts']), 1024 * 1024)
         self.assertEqual(len([n for n in result['pixelCounts'] if n]), 4)
 
+    def test_every_single_bit_corruption(self):
+        damaged = bytearray(self.data)
+        for index in range(len(damaged)):
+            for bit in range(8):
+                damaged[index] ^= 1 << bit
+                with self.assertRaises((ValueError, zlib.error)):
+                    audit.png(damaged)
+                damaged[index] ^= 1 << bit
+        self.assertEqual(damaged, self.data)
+        print(f"PASS: all {len(damaged) * 8} one-bit mutations rejected; original bytes restored")
+
     def test_truncation(self):
         for length in (0, 8, 29, 53, len(self.data) - 1):
             with self.subTest(length=length), self.assertRaises(ValueError):
