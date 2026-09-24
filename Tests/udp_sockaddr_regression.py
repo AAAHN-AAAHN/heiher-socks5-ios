@@ -124,7 +124,9 @@ def exchange(udp, destination, size):
 @contextlib.contextmanager
 def proxy_server(binary, log_path, workers=1, fixed_udp_port=False, unbound=False):
     with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as reserve:
-        reserve.bind(('::1', 0))
+        # Reserve the same dual-stack wildcard scope used by the actual server.
+        reserve.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        reserve.bind(('::', 0))
         port = reserve.getsockname()[1]
     with tempfile.TemporaryDirectory() as temp, open(log_path, 'wb') as log:
         conf = pathlib.Path(temp) / 'test.yml'
