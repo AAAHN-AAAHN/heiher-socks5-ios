@@ -37,13 +37,18 @@ def main():
     expected = original_controller.replace('func apply(_ settings: AppSettings, retry: Bool = false)',
         'func apply(_ settings: ServerSettings, running: Bool, retry: Bool = false)').replace(
         'desired = settings.serverRunning ? settings.server : nil', 'desired = running ? settings : nil')
-    assert controller == expected, 'Server execution algorithm changed during extraction'
+    expected = expected.replace('            current = desired\n',
+        '            // The prior native call has returned before this new intent begins.\n'
+        '            hev_socks5_server_prepare()\n            current = desired\n', 1)
+    assert controller == expected, 'Unexpected server lifecycle change outside the idle prepare boundary'
     lifecycle_patch = (ROOT / 'Patches/hev-server-startup-stop.patch').read_bytes()
     original_patch = show(INPUT, 'Patches/hev-server-startup-stop.patch')
     assert lifecycle_patch.startswith(original_patch), 'Original pre-start cancellation fix changed'
     extra = lifecycle_patch[len(original_patch):]
     assert extra.startswith(b'diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c\n')
-    assert extra.count(b'diff --git ') == 1
+    assert re.findall(rb'^diff --git a/(\S+) b/', extra, re.M) == [
+        b'src/hev-socks5-worker.c', b'src/hev-socks5-proxy.c',
+        b'src/hev-socks5-proxy.h', b'src/hev-main.c', b'src/hev-main.h']
     # The native probe also reconstructs the exact upstream worker blob and checks
     # that this adds only the pre-yield Stop guard before compiling both versions.
     root = content('Socks5/AppRoot.swift')

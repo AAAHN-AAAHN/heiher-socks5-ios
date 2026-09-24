@@ -30,6 +30,8 @@ final class ServerController: ObservableObject {
         guard let desired else { status = "Stopped"; return }
         do {
             let configuration = try desired.configuration()
+            // The prior native call has returned before this new intent begins.
+            hev_socks5_server_prepare()
             current = desired
             isRunning = true
             status = "Running"

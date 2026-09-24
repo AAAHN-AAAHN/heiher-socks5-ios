@@ -62,6 +62,10 @@ for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
         rm "$OUT/emit-config" "$OUT/config-probe"
         python3 Tests/ServerControl/native_controller_check.py "$CORE" "$OUT/native-controller" \
             > "$OUT/native-controller.log" 2>&1
+        python3 Tests/ServerControl/delayed_completion_check.py "$CORE" "$OUT/delayed-completion" \
+            > "$OUT/delayed-completion.log" 2>&1
+        mkdir -p "$OUT/compiled-headers"
+        cp "$CORE/src/hev-main.h" "$CORE/module.modulemap" "$OUT/compiled-headers/"
         python3 Tests/ServerControl/active_clients_check.py "$CORE" "$OUT/active-clients" \
             > "$OUT/active-clients.log" 2>&1
     fi

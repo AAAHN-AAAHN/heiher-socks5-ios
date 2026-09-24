@@ -43,3 +43,10 @@ func hev_socks5_server_quit() {
     EngineProbe.condition.broadcast()
     EngineProbe.condition.unlock()
 }
+
+func hev_socks5_server_prepare() {
+    EngineProbe.condition.lock()
+    precondition(EngineProbe.active == 0)
+    EngineProbe.stopped = false
+    EngineProbe.condition.unlock()
+}
