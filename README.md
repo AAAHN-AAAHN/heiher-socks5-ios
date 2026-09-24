@@ -494,3 +494,38 @@ unmeasured. Physical iOS27 SideStore/LiveContainer installation, real phone/Siri
 Bluetooth interruptions, lock-screen scheduling, host arbitration and OS refusal
 remain outside these checks. No main/release change, new branch, app archive or
 IPA is part of this closure, and the repository still has eight branches.
+
+## Final audit-driver and evidence closure (2026-09-25)
+
+A failed checks-only retry could retain a prior SUCCESS.txt. The actual old shell
+was executed with a deterministic first-toolchain failure and reproduced that
+stale marker. The entry now removes only its old success marker before validation.
+Three isolated old/current-retry/current-first-failure cases check the nonzero exit,
+marker state and preservation of prior diagnostic logs. No controller or resource
+change is needed. The artifact now also contains source.zip, a Git source archive
+rather than an application archive, so its full source manifest is reconstructable.
+
+Tested commit: `3307a5fc1008c6f9aa7042a4abe854d705d9e154`.
+Tested tree: `9cb37faa36840b1676c33e60c6ae072d356d0af5`.
+Run `36055863671` passed audio-checks on its first attempt; the ordinary archive/IPA
+job was intentionally skipped. All 1193 retained controller/recovery/lifecycle/
+callback assertions, 34 real Combine deliveries and cancellation, five real
+Timer/RunLoop scheduling postconditions and the three new driver cases passed.
+The Apple decoder again confirmed 400 zero samples. Both released-player address-
+reuse observations occurred in this run; these are scripted object-lifetime cases,
+not phone interruptions. Five production Swift files passed Xcode 27.0 `27A266a`
+and iPhoneOS SDK27.0 ARM64/iOS17.2 type checking with an empty diagnostic log.
+
+Artifact `10832780858` SHA-256:
+`ffbe79d98295eb19396df631b7a04ad90031be97370f76321ec3192689e93e4b`.
+The downloaded ZIP passed integrity checks; all 58 source-manifest hashes matched,
+and its source archive reconstructed the exact tested Git tree, including modes.
+The runtime files and original WAV are byte-identical to the preceding owner.
+Only test-driver/evidence handling changed before this successful run; this final
+README and its identical feature copy add documentation after that run.
+
+The target physical iOS27 SideStore and LiveContainer paths remain distinct from
+native host/SDK tests. Installer/host versions, actual phone/Siri/Bluetooth events,
+permissions, lock-screen survival and energy remain untested. The unchanged iOS17.2
+minimum is not an all-version execution claim. No new polling, observer, production
+state, host patch, main/release update, branch, app archive or IPA was introduced.
