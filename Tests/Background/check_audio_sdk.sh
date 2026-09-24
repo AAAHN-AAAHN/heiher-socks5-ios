@@ -14,6 +14,7 @@ python3 Build/check.py composition > "$OUT/composition.log"
 python3 Tests/Background/check_scope.py > "$OUT/background-scope.json"
 python3 Tests/Background/run_checks.py > "$OUT/controller-tests.log" 2>&1
 python3 Tests/Background/check_subscription.py > "$OUT/subscription-tests.log" 2>&1
+python3 Tests/Background/check_live_scheduling.py > "$OUT/live-scheduling.log" 2>&1
 swift Tests/Background/check_silence.swift Socks5/BackgroundKeepAlive/Silence.wav > "$OUT/apple-wav.log" 2>&1
 SDK=$(xcrun --sdk iphoneos --show-sdk-path)
 xcrun swiftc -typecheck -swift-version 5 -warnings-as-errors \
