@@ -488,3 +488,47 @@ all preceding evidence and all production/test/workflow bytes are preserved.
 Statistics must inherit this completed owner as an actual ancestor and match its
 fifteen mapped files. The accepted UDP Listen Port=0 operating guidance, baseline
 source pins, branch count, main, release/integrated and existing IPA are unchanged.
+
+## Completed dual-stack test-fixture correction (2026-09-25)
+
+The next combined run `36057681338` failed its Linux UDP prerequisite before the
+fixed-known/one-worker profile could begin: the test server exited 254 and its log
+was empty. The macOS prerequisite passed; statistics jobs did not execute. Exit254
+is the native CLI's generic negative-initialization result, not proof of a specific
+OS errno. This historical failure is retained, not relabeled as a successful run.
+
+Investigation independently reproduced a concrete fixture mismatch: reserving a
+TCP port only on IPv6 loopback can accept a port occupied by an IPv4 listener,
+whereas the actual proxy binds a dual-stack wildcard. The test now reserves `::`
+with IPV6_V6ONLY=0, matching the server's actual scope. Two actual-socket regression
+cases execute the extracted old/current reservation statement. The exact old blob
+accepts the occupied IPv4 port; the corrected reservation rejects it with EADDRINUSE
+and reserves free ports with the required scope. This does not prove that the
+original failed runner encountered that errno, nor eliminate every release-to-bind
+race. There is no automatic retry, longer timeout, dropped profile or runtime patch.
+The existing five driver tests remain: the suite now has seven methods.
+
+Tested commit: `3fe27bfb764e9bbb75c6dd36a02ada392a32cc76`.
+Tested tree: `4878592e823d6d0ab0f77fd2a141f5dc71b3131d`.
+Run `36058757006` passed Linux and Xcode27 on its first attempt. Each host passed
+all 58 mandatory profiles, eight peer/queued-continuation cases, all seven driver
+methods, original-code controls, sanitizer/optimized address probes, formatter and
+exact reverse checks. Both iOS27 C syntax and two-file Swift typecheck logs were
+empty. The accepted fixed-port/unknown-client limitation still has failing
+observation-only cases and is not repaired by this test allocator correction.
+
+Downloaded, integrity-checked artifacts; both 52-file source archives reconstruct
+the exact tested tree including modes:
+- Linux `10832969471`: `6819e4e49bfda53fbab4ad94de5eca0cced94d26e4ce8f4e1fae0cbb96ab1c16`.
+- macOS `10833701362`: `0172dcdf47400fa245aab537d17add7c47a500209bad0c4eb30922d027503001`.
+Failed prerequisite Linux artifact `10832933419` remains failure evidence:
+`e05dbecad9f0d504980a53e28c7c4e0fd89755a1a3a7993bc960ae92ece56e35`.
+
+Actual Apple toolchain: Xcode27.0 `27A266a`, iPhoneOS27.0, Swift6.4, macOS27.0
+`26A428`. Minimum iOS17.2 and intended physical SideStore/LiveContainer paths are
+unchanged; no Simulator, physical installation, app archive or IPA ran here.
+Only two test files changed before this successful run; all production patches,
+Swift, resources, source pins and workflow remained byte-identical. This completion
+appends to the two identical documents. The child statistics branch must inherit
+this completed owner and all fifteen mapped files. main/release and branch count
+remain unchanged; physical permissions/UI/VPN/hotspot/lock/energy remain untested.
