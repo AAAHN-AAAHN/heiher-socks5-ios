@@ -309,3 +309,53 @@ older ancestor. The closure leaves main/release unchanged and retains eight bran
 Physical iOS27 SideStore/LiveContainer storage policy, picker, permissions, host
 mapping, process termination and energy remain unverified. No additional runtime
 defect was found in this recheck; accepted limits are not converted into new code.
+
+## Reconciled latest server dependency: completion (2026-09-24)
+
+The current owner is `9f6055c99ba5325231c56250b18687b465a07979`, not the
+older historical pins above. Merge/test commit
+`ece6f21f77c9b911e9982ccb737cb919cf065d7a` has that completed server as its
+actual second parent and tree `c4f5e2619443c9110fb44e15b6f90e04297d7ef1`.
+All 22 declared server-owned paths match their source bytes and hashes, including
+the active-client tests and late-Stop preparation boundary. Reconciliation retains
+useful independently observed tests; it does not attribute their execution to a
+particular ChatGPT session or discard them because their origin was uncertain.
+
+No persistence-owned production file was changed: AppSettings, SettingsStore,
+SettingsView, root wiring, schema v1, file path, default options, import revision,
+cancellation checks, migration cleanup and pending-save behavior are preserved.
+The inherited prepare API fixes the interval where an already-returned native
+invocation still looks current to MainActor. Settings correctly saved in that gap
+must reach the new engine invocation rather than being canceled by an obsolete Stop.
+This branch reuses that server correction instead of adding its own execution state.
+
+Run `35948361471` passed both Linux and Xcode 27 jobs. The 209 existing store
+assertions and their historical negative controls passed; all 16 real native
+persistence result records per host completed. The new delayed-persistence fixture
+produced four old/current records per host: both old worker configurations failed
+as expected while their JSON was already correct, and both current configurations
+kept the new saved settings running. Real JSON, Foundation files, production store,
+controller and patched Hev are used; the command adapter is not a SwiftUI UI test.
+
+Inherited verification also passed: seven controller scenarios, 84 assertions,
+512 option/YAML parity cases, 14 native comparison records, 12 active-client Stop/
+reconfiguration scenarios, eight repaired delayed-completion schedules with old
+negative controls, and legacy/prepared cancellation tests. Counts include controlled
+repetitions, not independent physical iPhone trials. Actual Xcode 27.0 `27A266a` /
+iPhoneOS SDK 27.0 typechecked eight production Swift files at ARM64/iOS17.2 against
+the real patched headers, with warnings-as-errors and no diagnostic output.
+
+Both downloaded ZIPs passed integrity and every one of their 81 source hashes:
+- Linux `10787995316`: `06da2f76a7fd6127541cd6de6b228c9e23a99ac40a5a446242a8cf8c3cdfd209`
+- macOS `10787473656`: `56fadaccf237dfec3680375ec6636dc04301be99c1b26c381663887067ffb018`
+The inspected source tree and current owner agree; this completion changes only
+README and its identical feature specification after the successful run.
+
+No extra persistence timer, queue, file or host permission was introduced. The new
+per-start cost belongs to the inherited server prepare call/atomic operation, not
+periodic storage. Energy is unmeasured. Physical SideStore installation, LiveContainer
+sandbox mapping, Files/iCloud UI, locked-device protection, power loss and UI event
+scheduling remain untested. Saved intent is not proof of OS permission. main and
+release/integrated remain unchanged, there are eight branches and no IPA/archive
+was produced. The previous local-only limitation is superseded by this inspected
+remote merge and CI evidence, not by a fabricated installation or success claim.
