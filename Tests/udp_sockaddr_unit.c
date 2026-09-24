@@ -293,7 +293,8 @@ main (void)
                 assert (result == -1 && errno == EAGAIN && retry_yields == 2);
                 assert (connect_calls == before && !self.udp_associated);
             } else {
-                assert (result == -1 && errno == ECANCELED && retry_yields == 1);
+                assert (result == -1 && errno == ECANCELED &&
+                        retry_yields == 1);
                 assert (connect_calls == before && !self.udp_associated);
             }
         }
