@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 NAME=$(python3 -c 'import json; print(json.load(open("Build/features.json"))["name"])')
 OUT="$PWD/artifacts/$NAME"
 mkdir -p "$OUT"
+rm -f "$OUT/sdk-success.txt"
 xcodebuild -version | tee "$OUT/toolchain.txt"
 xcrun --sdk iphoneos --show-sdk-version | tee -a "$OUT/toolchain.txt" | grep -E '^27\.'
 SDK=$(xcrun --sdk iphoneos --show-sdk-path)

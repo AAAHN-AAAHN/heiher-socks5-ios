@@ -7,7 +7,10 @@ NAME=$(python3 -c 'import json; print(json.load(open("Build/features.json"))["na
 OUT="$ROOT/artifacts/$NAME"
 CORE="$ROOT/.build/core"
 mkdir -p "$OUT"
+# A failed retry must not leave prior native/SDK success evidence usable.
+rm -f "$OUT/SUCCESS.txt" "$OUT/sdk-success.txt"
 python3 Build/check.py baseline > "$OUT/baseline-audit.log"
+python3 Tests/ServerControl/audit_driver_check.py > "$OUT/audit-driver.log"
 SERVER_REF=$(python3 -c 'import json; print(json.load(open("Build/upstream.json"))["sources"]["."])')
 if [ ! -d "$CORE/.git" ]; then
     git clone --no-checkout https://github.com/heiher/hev-socks5-server.git "$CORE"
