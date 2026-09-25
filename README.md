@@ -7,8 +7,11 @@ storage or the integrated application. The final review starts at
 `b4d20f8402cdcd5ee687d17f46bf71d38a9febb5`. No additional runtime defect was reproduced
 in the reviewed model/controller/native boundaries. The changes below repair audit
 input identity and the native-header/SDK handoff without modifying production code.
-New native and SDK execution is pending publication of this exact candidate; the
-previous green runs do not validate the new audit entry points.
+New run `36201868398` at `1a236645b55712eb5aed80454102b30fb5b8a5bb` passed
+both Linux and Xcode27 jobs on attempt 1. The inspected source tree is
+`f6b6456343c4451ea4f58824fa4eafaeea332f95`. Earlier green runs were not used
+instead of this new verification. The final documentation update changes only this
+README and its identical specification; the other 66 files match the tested input.
 
 The complete preceding README is preserved byte-for-byte in
 `docs/history/server-control-before-final-audit-20260926.md`, including original
@@ -169,3 +172,51 @@ features, release/integrated, branch count and existing build 7 IPA remain uncha
 Primary contracts, not device execution evidence:
 - https://docs.swift.org/swift-book/documentation/the-swift-programming-language/stringsandcharacters/#String-and-Character-Equality
 - https://www.rfc-editor.org/rfc/rfc1929
+
+
+## Completed final-audit evidence — 2026-09-26
+
+Run 36201868398 executed the exact 68-file source above; both jobs completed
+successfully on their first attempt. Existing seven scenarios,84 current assertions,
+512 validation/YAML parity cases and22 expected old-model failures passed as designed.
+Actual patched Hev/Swift tests produced14 native-controller records and40 active
+Stop/restarts per host,12 active-client schedules,8 current delayed schedules plus
+6 expected old failures and2 old final-Stop controls. The40 original pre-start and
+100 legacy/prepared cancellation cycles, worker-body controls, TCP/parser fixtures,
+formatting, baseline/composition/ownership and exact reverse patch checks passed.
+
+All26 new input/header boundary cases and the6 existing marker controls passed
+on each host. Source worktree/index logs are empty at both boundaries. The macOS
+SDK check accepted the same tested commit and verified both copied header hashes;
+all5 production Swift files typechecked at ARM64/iOS17.2 with warnings-as-errors and
+an empty diagnostic log. Linux does not run the Apple-only step. Native SUCCESS and
+SDK success are separately inspected, not counted as installer or UI evidence.
+
+The saved toolchain file records Xcode27.0 `27A266a` and iPhoneOS SDK27.0. It does
+not record the Swift compiler version or macOS host build, so those values are not
+inferred from another feature's runner. No Simulator app, UI test, physical install,
+iPhone archive or IPA was produced in this run. No timeout/assertion/worker profile
+was weakened. No failing workflow attempt occurred in this server run.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Linux10892282349 | f9cdfe5bbaa8f49b13c41c979f25339f8c432e0a692cba822457a9555cd339d0 |
+| macOS10892317402 | 708bef5c0afe7fecd7eb444b8652dea5eef0ec8f30e63da83fff0adc6c9e4950 |
+
+Both original ZIP digests/CRCs, source archive commit comments, all68 paths/bytes/
+modes, full68-entry manifests and source tree were checked. Compiled-header commit
+and hashes match the SDK input. The previous README is preserved exactly. Four
+existing paths changed and two were added; the other62 starting files are unchanged.
+All production, native patch, project, defaults, source pins and baseline framework
+are byte-identical to the audit start. Forward/reverse patch checks in the companion
+evidence restore both68-file current and66-file original trees. A tree snapshot is
+not full Git ancestry; remote parent relationships are checked separately.
+
+Local container clone failed because github.com DNS was unavailable; original
+connector source archives and verified blobs supplied the local reconstruction.
+Local7/84 tests and input fixtures are supplementary, not claimed local Hev rebuilds.
+An early combined fixture invocation exceeded its external tool limit and was rerun
+to completion without changing internal tests; partial logs are not counted as pass.
+The companion offline verifier checks identities, not a new native/Apple execution.
+The finalized owner is ready for the requested downstream persistence merge; main,
+release/integrated, other features, branch count and build7 IPA remain unchanged.
