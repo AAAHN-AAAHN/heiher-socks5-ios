@@ -7,8 +7,11 @@ controller. The review starts at `f7713811c9668c5bb9000b1f9ec32523e5c7bc67`.
 No new production defect was reproduced in the reviewed store/model/root/native
 boundaries. The changes bind audit inputs and compiled SDK headers to the recorded
 revision and inherit the completed server owner `52251e1229cd7b91d15320f93e57fde7ce1142da`.
-New native and SDK execution is pending for this exact composition; the previous
-successful runs are not verification of these audit entry-point changes.
+New run `36202559261` at `28a639148d9fa72c430449c7457862fe8ddc5d12` passed
+Linux and Xcode27 on attempt 1; tested tree `61d4eda9ffb6269d0874670e1ab7975776879653`.
+Earlier and parent successes were not substituted. This final documentation update
+changes only the README/specification pair; the other 83 files remain identical
+to the tested 85-file source, including executable modes.
 
 The entire preceding specification is preserved without byte changes in
 `docs/history/settings-persistence-before-final-audit-20260926.md`. The server's
@@ -193,3 +196,62 @@ Primary contracts, not execution evidence:
 - https://developer.apple.com/documentation/foundation/nsfilecoordinator/coordinate(readingitemat:options:error:byaccessor:)
 - https://developer.apple.com/documentation/swift/task/cancel()
 - https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/
+
+
+## Completed final-review evidence — 2026-09-26
+
+Both jobs in run36202559261 completed on their first attempt. The final candidate
+is the actual merge of f7713811 and server52251e12. Remote ancestry and all25 source/
+hash/mode mappings match the finalized server, not an earlier owner snapshot.
+The server branch has its own successful run36201868398; this persistence run
+independently repeats its inherited tests against the current composition.
+
+Each host passed the209 current settings assertions,16 real JSON/store/controller/
+Hev records and4 old/current delayed-persistence records. Tests include byte-exact
+credential changes,255-byte credentials, actual process relaunch restoring Start,
+invalid imports preserving live/disk state, failed writes still stopping Hev, repeated
+same Stop committing a pending save, and a new process respecting the saved Stop.
+Old imports still fail13 designated postconditions; the previous store fails4 pending-
+save and1 inaccessible-file condition as expected. These are negative controls,
+not new defects or failing conditions in the current implementation. Filesystem
+permission checks are not iOS file-protection or physical file-provider UI tests.
+
+All inherited server suites passed:7 scenarios,84 current assertions,512 parity
+cases,22 expected old-model failures,14 native-controller records,40 active Stop/
+restarts,12 active-client cases,8 current delayed schedules plus8 original controls,
+40 pre-start and100 legacy/prepared cancellations, worker controls and TCP/parser
+fixtures. All26 new source/header cases and6 original marker controls passed on
+each host. Formatting, native patch reversal, source pins, composition and ownership
+checks passed. Counts include repetitions and controlled events, not device trials.
+
+Native and SDK source/index diff logs are empty. Both compiled-header digests and
+their commit match the actual SDK input. Xcode27.0 `27A266a` / iPhoneOS SDK27.0
+successfully typechecked8 production Swift files at ARM64/iOS17.2 with warnings-as-
+errors and a zero-byte diagnostic log. The saved toolchain file does not independently
+record Swift compiler version or macOS build; neither is inferred from another run.
+Linux skips the Apple-only step. No Simulator/UI test, iPhone archive or IPA was
+produced. No limits, postconditions or error paths were weakened to obtain success.
+There was no failed workflow attempt in either new final-review run.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Linux10893115547 | 8422dbf84547d24606e2f51cd25071d93278a65a00feb5d6c7a10b2f8fe59398 |
+| macOS10892248649 | f02bc15698fba14ed49b0f419241c9bf146ef2f89dfcc1e45488130a92316533 |
+
+Both original ZIPs passed digest/CRC checks. Genuine source comments identify the
+tested commit; all85 files, executable modes, full85-entry manifests and reconstructed
+trees match. Header attestations and phase-specific success were inspected. Final
+README and own specification are identical; their post-test update changes no other
+file. Six existing paths changed and three were added relative to the audit input;
+the other76 starting files remain unchanged. All app code, schema/defaults, native
+patch, root/editor/project/plist, framework and source pins are preserved.
+
+The complete audit patch applies and reverses to the exact85-file final and82-file
+original trees. The companion verifier repeats file/tree/hash/header/patch identities,
+not native or Apple execution. Local clone was unavailable due to container DNS;
+source reconstruction used original connector archives and verified Git objects,
+not an invented full clone. Local fixture/setup limits and completed logs remain
+separate from remote evidence. The two canonical feature heads are complete within
+these executed boundaries; main, unrelated features, release, branch count and old
+build7 are unchanged. Physical SideStore/LiveContainer and all unperformed limits
+above remain explicit, not replaced by these successful native/SDK results.
