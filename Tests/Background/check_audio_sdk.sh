@@ -16,10 +16,16 @@ python3 Build/check.py composition > "$OUT/composition.log"
 python3 Tests/Background/check_scope.py > "$OUT/background-scope.json"
 python3 Tests/Background/audit_driver_check.py > "$OUT/audit-driver.log"
 python3 Tests/Background/run_checks.py > "$OUT/controller-tests.log" 2>&1
+python3 Tests/Background/check_async_session.py > "$OUT/async-session-tests.log" 2>&1
 python3 Tests/Background/check_subscription.py > "$OUT/subscription-tests.log" 2>&1
 python3 Tests/Background/check_live_scheduling.py > "$OUT/live-scheduling.log" 2>&1
 swift Tests/Background/check_silence.swift Socks5/BackgroundKeepAlive/Silence.wav > "$OUT/apple-wav.log" 2>&1
 SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+xcrun swiftc --version >> "$OUT/toolchain.txt"
+sw_vers >> "$OUT/toolchain.txt"
+# Retain the actual SDK declarations/availability used by this compile.
+grep -n -A8 -B4 -E 'activateWithOptions:|deactivateWithOptions:' \
+  "$SDK/System/Library/Frameworks/AVFAudio.framework/Headers/AVAudioSession.h" > "$OUT/session-api-declarations.txt"
 xcrun swiftc -typecheck -swift-version 5 -warnings-as-errors \
   -sdk "$SDK" -target arm64-apple-ios17.2 \
   -I HevSocks5Server.xcframework/ios-arm64/Headers \

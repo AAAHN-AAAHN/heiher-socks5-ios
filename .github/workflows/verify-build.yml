@@ -67,3 +67,23 @@ jobs:
           name: Background-audio-checks-no-IPA
           path: artifacts/audio-checks/
           retention-days: 30
+  audio-async-ui:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[audio-checks-only]') }}
+    needs: audio-checks
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Actual iOS 27 async audio UI and runtime advisory checks (no IPA)
+        shell: bash
+        run: python3 Tests/Background/check_async_ui.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Background-async-audio-Simulator
+          path: artifacts/audio-async-ui/
+          retention-days: 30

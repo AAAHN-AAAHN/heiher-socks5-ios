@@ -20,6 +20,9 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     private var restoringAudio = false
     private var invalidatedDuringRestore = false
     private var playerFailurePending = false
+    private enum SessionTransition { case activating, deactivating }
+    private var sessionTransition: SessionTransition?
+    private var deactivationPending = false
 
     // Both the subscriber and handler use this registry: no unhandled new names.
     // Keep the legacy notification for compatibility alongside the iOS 27 signals.
@@ -152,9 +155,9 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     }
 
     func setAudio(_ enabled: Bool) {
-        // Applying saved Off at launch must not deactivate a host's shared audio.
-        // Repeated On still reconciles an interrupted or failed session.
-        guard enabled || audioEnabled else { return }
+        // Initial/repeated Off must not deactivate a host's unused shared session.
+        // An explicitly repeated Off may retry this controller's failed release.
+        guard enabled || audioEnabled || deactivationPending else { return }
         audioEnabled = enabled
         if enabled {
             resumeAudio()
@@ -162,27 +165,34 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
             audioCheck?.invalidate()
             audioCheck = nil
             playerFailurePending = false
-            discardPlayer()
-            try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+            deactivationPending = true
+            invalidatedDuringRestore = true
             audioState = "Off"
+            // Stop locally now, even when a system activation is still pending.
+            let wasRestoring = restoringAudio
+            restoringAudio = true
+            discardPlayer()
+            restoringAudio = wasRestoring
+            deactivateAudio()
         }
     }
 
     private func resumeAudio(recreate: Bool = false) {
         guard audioEnabled else { return }
-        // A signal raised synchronously by setCategory/setActive/play invalidates
-        // this attempt; it must not recursively enter another activation/play.
-        guard !restoringAudio else {
+        // One transition at a time, including the callback's hop to MainActor.
+        // Invalidations during activation must not publish stale playback success.
+        guard !restoringAudio, sessionTransition == nil else {
             if recreate { invalidatedDuringRestore = true }
             return
         }
+        guard !deactivationPending else { deactivateAudio(); return }
         restoringAudio = true
         invalidatedDuringRestore = false
-        defer { restoringAudio = false }
         if recreate { discardPlayer() }
-        guard audioEnabled else { return }
+        guard audioEnabled, !deactivationPending else { finishAudioRestore(); return }
         if player?.isPlaying == true {
             if audioCheck == nil { scheduleAudioCheck(after: 1) }
+            finishAudioRestore()
             return
         }
         audioCheck?.invalidate()
@@ -192,16 +202,30 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
             if player == nil || session.category != .playback || session.mode != .default || session.categoryOptions != [.mixWithOthers] {
                 try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
             }
-            guard audioEnabled else { return }
+            guard audioEnabled, !deactivationPending else { finishAudioRestore(); return }
             if player == nil || !session.prefersNoInterruptionsFromSystemAlerts {
                 try? session.setPrefersNoInterruptionsFromSystemAlerts(true)
             }
-            guard audioEnabled else { return }
-            try session.setActive(true)
-            guard audioEnabled else {
-                // Off may arrive inside activation before that call completes.
-                try? session.setActive(false, options: [.notifyOthersOnDeactivation])
-                return
+            guard audioEnabled, !deactivationPending else { finishAudioRestore(); return }
+            audioState = "Activating audio session"
+            beginSessionTransition(active: true)
+        } catch {
+            retryAudio(error)
+            finishAudioRestore()
+        }
+    }
+
+    private func audioActivated(_ success: Bool, error: Error?) {
+        guard sessionTransition == .activating else { return }
+        sessionTransition = nil
+        defer { finishAudioRestore() }
+        // An Off must be drained even after Off-On: a prior release must never
+        // complete after the next activation and disable the new session.
+        guard audioEnabled, !deactivationPending else { return }
+        do {
+            guard success, error == nil, !invalidatedDuringRestore else {
+                throw error ?? NSError(domain: "BackgroundKeepAlive", code: 3,
+                                       userInfo: [NSLocalizedDescriptionKey: "Audio session activation failed or was interrupted during recovery"])
             }
             if player == nil {
                 guard let url = Bundle.main.url(forResource: "Silence", withExtension: "wav") else {
@@ -224,11 +248,79 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         }
     }
 
+    private func finishAudioRestore() {
+        restoringAudio = false
+        if deactivationPending { deactivateAudio() }
+    }
+
+    private func deactivateAudio() {
+        guard deactivationPending, !restoringAudio, sessionTransition == nil else { return }
+        deactivationPending = false
+        beginSessionTransition(active: false)
+    }
+
+    private func audioDeactivated(_ success: Bool, error: Error?) {
+        guard sessionTransition == .deactivating else { return }
+        sessionTransition = nil
+        // Playback is already stopped. Do not spin or start a timer while Off.
+        deactivationPending = !audioEnabled && (!success || error != nil)
+        if audioEnabled {
+            resumeAudio()
+        } else if deactivationPending {
+            audioState = "Off; session release failed: \(error?.localizedDescription ?? "Deactivation was not accepted")"
+        } else {
+            audioState = "Off"
+        }
+    }
+
+    private func beginSessionTransition(active: Bool) {
+        sessionTransition = active ? .activating : .deactivating
+        Self.changeAudioSession(active) { [weak self] success, error in
+            Self.onMain { [weak self] in
+                guard let self else {
+                    // A released controller must not leave its late activation on.
+                    if active, success { Self.changeAudioSession(false) { _, _ in } }
+                    return
+                }
+                if active { self.audioActivated(success, error: error) }
+                else { self.audioDeactivated(success, error: error) }
+            }
+        }
+    }
+
+    private nonisolated static func changeAudioSession(_ active: Bool,
+                                                       completion: @escaping @Sendable (Bool, Error?) -> Void) {
+        if #available(iOS 27.0, *) {
+            let session = AVAudioSession.sharedInstance()
+            if active { session.activate(options: [], completionHandler: completion) }
+            else { session.deactivate(options: [.notifyOthersOnDeactivation], completionHandler: completion) }
+        } else {
+            changeLegacyAudioSession(active, completion: completion)
+        }
+    }
+
+    private nonisolated static func changeLegacyAudioSession(_ active: Bool,
+                                                             completion: @escaping @Sendable (Bool, Error?) -> Void) {
+        // The same in-flight gate serializes the compatibility path. Never wait
+        // on MainActor, and obtain the system session on the worker itself.
+        DispatchQueue.global(qos: .utility).async {
+            do {
+                try AVAudioSession.sharedInstance().setActive(active, options: active ? [] : [.notifyOthersOnDeactivation])
+                completion(true, nil)
+            } catch {
+                completion(false, error)
+            }
+        }
+    }
+
     private func retryAudio(_ error: Error?) {
         guard audioEnabled else { return }
         let wasRestoring = restoringAudio
         restoringAudio = true
-        defer { restoringAudio = wasRestoring }
+        defer {
+            restoringAudio = wasRestoring
+            if deactivationPending { deactivateAudio() }
+        }
         discardPlayer()
         guard audioEnabled else { return }
         audioState = "Waiting to resume: \(error?.localizedDescription ?? "Audio playback stopped")"
@@ -293,13 +385,13 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
             // Ignore our own normal configuration echo while waiting to create a
             // player. A real stopped player must still be checked immediately.
             if player == nil {
-                if audioCheck == nil, !restoringAudio { scheduleAudioCheck(after: 1) }
+                if audioCheck == nil, !restoringAudio, sessionTransition == nil { scheduleAudioCheck(after: 1) }
                 return
             }
         }
         if #available(iOS 27.0, *), notification.name == AVAudioSession.didBecomeActiveNotification,
            player == nil, restoringAudio || audioCheck != nil {
-            // Successful setActive can notify before player creation/play fails.
+            // Successful activation can notify before player creation/play fails.
             // Do not let its delayed echo turn one-second retries into a busy loop.
             return
         }
@@ -310,7 +402,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
 
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         // Keep a weak object identity across the hop, not an address that may be reused.
-        onMain { [weak self, weak player] in
+        Self.onMain { [weak self, weak player] in
             guard let self, let player, self.player === player, self.audioEnabled else { return }
             self.playerStopped(nil)
         }
@@ -318,13 +410,13 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
 
     nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
         // Keep a weak object identity across the hop, not an address that may be reused.
-        onMain { [weak self, weak player] in
+        Self.onMain { [weak self, weak player] in
             guard let self, let player, self.player === player, self.audioEnabled else { return }
             self.playerStopped(error)
         }
     }
 
-    private nonisolated func onMain(_ action: @escaping @MainActor @Sendable () -> Void) {
+    private nonisolated static func onMain(_ action: @escaping @MainActor @Sendable () -> Void) {
         if Thread.isMainThread {
             MainActor.assumeIsolated { action() }
         } else {

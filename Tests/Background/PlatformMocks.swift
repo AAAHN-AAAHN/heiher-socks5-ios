@@ -70,7 +70,15 @@ let AVAudioSessionInterruptionTypeKey = "InterruptionType"
 let AVAudioSessionInterruptionOptionKey = "InterruptionOption"
 let AVAudioSessionRouteChangeReasonKey = "RouteChangeReason"
 
-@MainActor final class AVAudioSession {
+struct AVAudioSessionActivationOptions: OptionSet {
+    let rawValue: Int
+}
+struct AVAudioSessionDeactivationOptions: OptionSet {
+    let rawValue: Int
+    static let notifyOthersOnDeactivation = Self(rawValue: 1)
+}
+
+final class AVAudioSession {
     enum Category { case playback, ambient }
     enum Mode { case `default`, voiceChat }
     enum InterruptionType: UInt { case ended = 0, began = 1 }
@@ -125,7 +133,59 @@ let AVAudioSessionRouteChangeReasonKey = "RouteChangeReason"
         prefersNoInterruptionsFromSystemAlerts = value
         onPreference?()
     }
+    struct Request {
+        let active: Bool
+        let success: Bool
+        let error: Error?
+        let completion: @Sendable (Bool, Error?) -> Void
+    }
+    var deferTransitions = false
+    var rejectDeactivation = false
+    var pending: [Request] = []
+    var maxPending = 0
+    var synchronousCalls = 0
+    var synchronousOnMain = false
+    var synchronousDelay: TimeInterval = 0
+    var onDeactivation: (() -> Void)?
+
+    func activate(options: AVAudioSessionActivationOptions = [],
+                  completionHandler: @escaping @Sendable (Bool, Error?) -> Void) {
+        precondition(options.isEmpty)
+        request(true, completion: completionHandler)
+    }
+
+    func deactivate(options: AVAudioSessionDeactivationOptions = [],
+                    completionHandler: @escaping @Sendable (Bool, Error?) -> Void) {
+        precondition(options == [.notifyOthersOnDeactivation])
+        request(false, completion: completionHandler)
+    }
+
+    private func request(_ active: Bool, completion: @escaping @Sendable (Bool, Error?) -> Void) {
+        if active { activations += 1; onActivation?() }
+        else { deactivations += 1; onDeactivation?() }
+        let failed = active ? rejectActivation : rejectDeactivation
+        let error: Error? = failed ? NSError(domain: "MockAudioPriority", code: 1) : nil
+        let request = Request(active: active, success: !failed, error: error, completion: completion)
+        if deferTransitions {
+            pending.append(request)
+            maxPending = max(maxPending, pending.count)
+        } else {
+            if !failed { isActive = active }
+            completion(!failed, error)
+        }
+    }
+
+    func completeNext(success: Bool? = nil, error: Error? = nil) {
+        let request = pending.removeFirst()
+        let accepted = success ?? request.success
+        if accepted { isActive = request.active }
+        request.completion(accepted, error ?? request.error)
+    }
+
     func setActive(_ active: Bool, options: SetActiveOptions = []) throws {
+        synchronousCalls += 1
+        synchronousOnMain = Thread.isMainThread
+        if synchronousDelay > 0 { Thread.sleep(forTimeInterval: synchronousDelay) }
         if active {
             activations += 1
             onActivation?()

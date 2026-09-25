@@ -14,7 +14,7 @@ import Foundation
         }
     }
 
-    @MainActor static func main() async {
+    @MainActor static func main() {
         var checks = 0
         func check(_ value: @autoclosure () -> Bool, _ message: String) {
             precondition(value(), message)
@@ -39,15 +39,16 @@ import Foundation
             precondition(done.wait(timeout: .now() + 2) == .success)
             queue.sync {} // Also wait for the worker closure to release old.
         }
-        func drain() async {
-            for _ in 0..<100 { await Task.yield() }
-            try? await Task.sleep(for: .milliseconds(20))
+        func drain() {
+            // Keep this synchronous fixture on the actual main run loop. Session
+            // completions and worker delegates now have independent actor hops.
+            Foundation.RunLoop.main.run(until: Date().addingTimeInterval(0.02))
         }
         for event in Event.allCases {
             app.setAudio(true)
             let beforeCurrent = session.activations
             enqueue(event)
-            await drain()
+            drain()
             check(session.activations == beforeCurrent + 1 && AVAudioPlayer.instances.last!.isPlaying,
                   "Current \(event) still recovers on MainActor without an initial timer delay")
             app.setAudio(false)
@@ -59,7 +60,7 @@ import Foundation
             app.audioEvent(Notification(name: AVAudioSession.interruptionNotification))
             let replacement = AVAudioPlayer.instances.last!
             let beforeStale = session.activations
-            await drain()
+            drain()
             check(session.activations == beforeStale && AVAudioPlayer.instances.last === replacement,
                   "Queued \(event) for a replaced but living player is ignored")
             check(stillAlive !== replacement && !stillAlive.isPlaying,
@@ -92,7 +93,7 @@ import Foundation
             let current = AVAudioPlayer.instances.last!
             let timer = Timer.live[0]
             let beforeReleased = session.activations
-            await drain()
+            drain()
             print("OBSERVATION: \(event) released-address-reused=\(reused); allocations=\(attempts)")
             check(session.activations == beforeReleased && AVAudioPlayer.instances.last === current,
                   "Released \(event) callback cannot restart the new player, including address reuse")
@@ -106,7 +107,7 @@ import Foundation
             app.setAudio(false)
             let beforeOff = session.activations
             AVAudioPlayer.instances.removeAll()
-            await drain()
+            drain()
             check(!app.audioEnabled && session.activations == beforeOff && Timer.live.isEmpty,
                   "Queued \(event) after Off is inert even after the player is deallocated")
         }
