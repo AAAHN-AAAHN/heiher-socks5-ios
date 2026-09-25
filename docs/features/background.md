@@ -2,11 +2,16 @@
 
 ## Current status and scope — 2026-09-26
 
-This final audit starts from `f4098d14fa8dbf357bf5fd885fd10473b8b7aac3` on
-`feature/background`. The local regression and negative controls described below
-passed. The new Apple SDK/Simulator run is pending; the earlier successful run
-36138588562 does not validate these new changes. Physical installation and execution
-remain unperformed. No release integration or new IPA is part of this audit.
+This final audit is complete within the source, regression, SDK and Simulator
+boundaries below. The corrected source is
+`ac1af90e67f3bb760729ea95370536bb95fa8151`, tree
+`d7c8567532e21d4f726abdde8918d9dfd3fdba48`, on `feature/background`.
+New run **36153834876** passed: SDK/controller in attempt 1 and the same-source
+Simulator UI retry in attempt 2. The earlier run 36138588562 was not reused as
+validation of these changes. Physical installation and execution remain unperformed.
+No release integration or new IPA is part of this audit. This final documentation
+update changes only the identical README/specification pair; the other 65 files
+remain byte-for-byte and mode-for-mode identical to the tested 67-file source.
 
 The complete preceding README is preserved byte-for-byte in
 `docs/history/background-before-final-audit-20260926.md`.
@@ -54,7 +59,8 @@ When an already-started manager returned to `notDetermined`, the old controller
 kept `updating = true`. A late location batch could still increment its diagnostics,
 and reauthorization was blocked by the existing already-updating guard. The exact
 old controller blob `63e9e895ed6141e2b021ba80742cbddb13d04052` fails 28 of the 49
-new authorization assertions; the corrected controller passes all 49 locally.
+new authorization assertions; the corrected controller passes all 49 locally
+and in the new Apple host run.
 These callbacks are platform doubles, not a claim that a physical permission reset
 was executed. Apple's authorization callback contract includes user privacy resets
 and expiry of temporary authorization.
@@ -74,7 +80,9 @@ the stable `background.audioState` accessibility identifier on its existing text
 There is no label/layout/control change. The test waits for that element's exact
 Playing/Off label after normal toggles, rapid changes and relaunch. A negative-selector
 control also confirms that generic Off exists while the identified audio is Playing.
-Actual execution of this strengthened UI test is pending the new Simulator run.
+The new Simulator run passed this strengthened test and its negative-selector
+control. The original screenshots show audio Playing with Location Off, followed
+by the final identified audio Off state; they are not physical-device captures.
 
 ### 3. Working source and archived HEAD were not required to match
 
@@ -190,10 +198,63 @@ and runtime results. Test deadlines, warning reporting and all existing postcond
 remain enabled. Optional bulk system diagnostics stay disabled as previously
 recorded; that is not suppression of the targeted warning or XCTest results.
 
-Local results currently include preserved 1193 regressions, complete async suites,
-49 new permission checks (also optimized), exact-old 28-failure control and 16
-audit-entry cases. Current Apple and Simulator results must be added only after the
-new revision is actually executed and its source/artifacts are inspected.
+Local results include preserved 1193 regressions, complete async suites, 49 new
+permission checks (also optimized), the exact-old 28-failure control and 16 audit-entry
+cases. A supplemental optimized host test enumerated all 32768 length-five sequences
+of eight selected events and checked 231780 invariant boundaries. It used the exact
+tested controller and existing deferred platform doubles without OS rejection.
+This finite model is not full state-space or physical-event coverage, and it was
+not added to CI. Its source and reproducible runner are in the companion evidence.
+
+## Inspected final execution evidence
+
+Run `36153834876` executed the exact source/tree identified above. SDK/controller
+attempt 1 passed all retained 1193 assertions, 49 new authorization assertions,
+the exact-old 28-failure negative control, all session/preparation suites in debug
+and optimized modes, the 16 audit-entry cases, the three original shell controls,
+34 Combine deliveries/cancellation, five real Timer/RunLoop conditions and Apple
+WAV decoding of 400 zero samples. Baseline/composition/scope checks passed.
+The five production Swift files passed the actual ARM64/iOS17.2 typecheck with
+warnings-as-errors and an empty diagnostic log. Tracked-source diff logs are empty.
+
+UI attempt 1 failed before XCTest because Simulator bootstatus exceeded 120 seconds.
+Shutdown and delete cleanup each exceeded 30 seconds. The failed original ZIP was
+preserved; it contains no XCTest verdict, overall success, advisory or product marker.
+The precise CoreSimulator stall cause is not established. Only that failed UI job
+was rerun normally on identical source, with all deadlines and assertions unchanged.
+The SDK success displayed in attempt 2 is carried forward from attempt 1, not a
+second independent SDK execution.
+
+UI attempt 2 passed one XCTest with zero failures or skips; the test case took
+110.656 seconds, not the entire workflow. It checked the identified audio Playing/Off
+state, the ambiguous old-selector counterexample, repeated/rapid intent changes,
+tab navigation and stored On/Off after process relaunch. Both original full-screen
+attachments were inspected. xcodebuild exited successfully, cleanup.json is [],
+runtimeWarnings is [], and the original main-thread audio advisory is absent from
+both the console and xcresult JSON. AppIntents/debugger diagnostics remain in the
+logs; absence of the targeted advisory is not a universally warning-free or hang-free
+execution. No synthetic audio/location callback is presented as a real OS interruption.
+
+Actual SDK environment: Xcode 27.0 `27A266a`, iPhoneOS 27.0, Apple Swift 6.4
+(`swiftlang-6.4.0.34.1`), macOS 27.0 `26A428`. Actual UI: iPhone 16 Simulator,
+iOS 27.0 `24A434`. The ordinary archive/IPA workflow job was skipped.
+
+| Original artifact | Attempt | SHA-256 |
+| --- | --- | --- |
+| SDK/controller 10873136052 | 1 | 30345383f7e84bcb31b9a36f9e4e50e582b339c9e51e29f111f66f6efd7e23a3 |
+| UI boot failure 10872389189 | 1 | fc7f54125ff6a61f82dd95d89ea124d86c7b57d6b0668be4743a54823a6cb397 |
+| UI success 10873467349 | 2 | 0f9557b0f216bd63cdb1f58f42cf5f831c50868aca768dfb4c3e8f2a5a5900a1 |
+
+All three downloaded ZIPs passed digest/CRC checks. Each genuine Git source archive
+has the correct commit comment, and all 67 paths, modes, bytes, source hashes and
+the reconstructed Git tree match the tested source. Forward/reverse application of
+the audit patch reconstructs the corrected 67-file and original 64-file trees.
+Nine existing paths change and three are added; 55 existing files are unchanged.
+The only production delta is five controller lines and one accessibility identifier;
+all audio methods, the fixed registry, WAV, root, project, plist, native framework and
+source pins are preserved. Main, release and the other five feature heads remain
+unchanged. The companion offline verifier checks these source/artifact identities;
+it is not a new Apple or physical-device execution.
 
 ## Explicitly unperformed and unchanged boundaries
 
