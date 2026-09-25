@@ -1,3 +1,93 @@
+# Background services — upload recovery and current verification
+
+## Authoritative status: 2026-09-25
+
+**The previously blocked preparation successor is now completely published.**
+Normal UTF-8 GitHub writes succeeded; this is no longer a local-only candidate.
+The exact supplied six-path patch was committed as
+`4df634780783ef5c426e1a1c9059a7391d9c1f52`, with 64-file tree
+`3b7d0d2f7d62b69418e3004a161e3bd1762852bb`, on `feature/background`.
+Its parent is `46849ba34fd6e07edc23e5c56a88be642c279656`.
+The requested upload is complete. **The same-source SDK checks and uninstrumented Simulator UI/advisory gate passed; physical-device behavior remains untested.**
+
+This dated section supersedes the old publication and execution status in the
+verbatim pre-publication snapshot below. Earlier successes and advisory failures
+remain evidence for their own source revisions, not results for this successor.
+The final status update changes only this README and its identical feature copy;
+all other files remain byte-identical to the tested 4df6347 source.
+
+### Exact recovery and preservation
+
+The supplied patch SHA-256 is
+`970b59ca04d6395517230f91864318b564f9fa1f5720eca15bfba3cf7b334145`.
+Forward application reconstructed the exact retained 64-file candidate; reverse
+application reconstructed the original 63-file tree
+`97b7e2b7ae3a4b7a140d782a4faf1eda3f186cd1`. File modes were checked too.
+The new PlatformMocks blob is
+`f4243209df5faa22777a7ad715c30a61a7b20386`, not the older 8fa0ba2a blob.
+The controller, PreparationTests and async test-driver objects already uploaded
+in the prior session were reused only after complete candidate parity checks.
+
+Only the supplied six paths changed in the source commit: README.md,
+Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift,
+Tests/Background/PlatformMocks.swift, Tests/Background/PreparationTests.swift,
+Tests/Background/check_async_session.py and docs/features/background.md.
+The other 58 existing files stayed byte-for-byte unchanged. Production changes
+are confined to the controller; location, registry, root/view, plist/project,
+WAV, native framework and pins remain unchanged. No warning gate, test deadline,
+workflow, ordinary archive/IPA, release integration or other branch was changed.
+
+### Actual same-source checks: run 36138588562
+
+Source: `4df634780783ef5c426e1a1c9059a7391d9c1f52` throughout both attempts.
+
+| Boundary | Observed result |
+| --- | --- |
+| SDK/controller, attempt 1 | PASS. Xcode 27.0 27A266a, iPhoneOS 27.0, Apple Swift 6.4, macOS 27.0 26A428. Five production Swift files typechecked with an empty diagnostic log. |
+| Retained controller coverage | All 1193 assertions passed; existing postconditions were not removed. |
+| Session/preparation coverage | 38 session assertions plus 3000 transitions and 22 preparation assertions plus 3000 transitions, each in debug and optimized builds. Exact-old blocking/implicit-preparation controls and actual worker helpers passed. |
+| Existing runtime-boundary checks | Actual Foundation/Combine: 34 deliveries and cancellation; five real Timer/RunLoop conditions; three audit-driver negative controls; Apple WAV decoder: 400 zero samples; source/baseline/scope checks passed. Audio/platform doubles are not physical OS-event tests. |
+| Simulator, attempt 1 | NOT RUN: bootstatus exceeded 120 seconds before XCTest; shutdown cleanup also exceeded 30 seconds. Failure ZIP preserved. No UI/advisory verdict is inferred from this infrastructure failure. |
+| Simulator, attempt 2 | PASS: iPhone 16 Simulator, iOS 27.0 24A434; one XCTest passed, zero failures, 96.648 seconds. The original advisory was absent from both console and xcresult; cleanup.json contains []. |
+| Ordinary archive/IPA job | SKIPPED by the existing audio-checks-only workflow condition. |
+| Physical SideStore/LiveContainer | NOT RUN. No claim about real calls, background survival, signing/host arbitration, permissions, battery or earlier devices. |
+
+Only the failed UI job was retried using the normal rerun action on the identical
+source. The SDK success displayed with attempt 2 is carried forward from attempt 1,
+not a second independent SDK execution. The original XCTest result, two full-screen Playing/Off attachments, SUCCESS marker and advisory-check marker were inspected. runtimeWarnings is empty. The targeted advisory is absent, not a claim that every unrelated runner/debugger diagnostic is absent or that all device hangs are impossible.
+
+The Linux Swift 6.2.1 regression and complete async/preparation rerun also passed.
+An initial local tool execution ended at its 45-second external limit; that partial
+log is retained separately and is not counted as a completed pass. No source or
+internal test timeout was modified to obtain the later complete result.
+
+### Inspected immutable artifacts
+
+| Run 36138588562 artifact | SHA-256 |
+| --- | --- |
+| SDK/controller 10864844254 | 1f34d8606623e2d3b8944ded5e7572043e5c0b4c429bf3e594c705f322d43214 |
+| Attempt 1 boot failure 10866380938 | 2758b1ea04deada6cdc4a59f8e9b64838fe8a62dd4f5fded167e1d4726ab2de5 |
+| Attempt 2 UI 10866696419 | 55abf9d23e04ae93fe2219b10e4d5febe091b053e1089042fc5bec9b91a96d57 |
+
+Downloaded ZIP digests and CRCs were checked. Each included source archive,
+Git commit comment, all 64 paths/modes/bytes and complete SHA-256 manifest matched
+the tested candidate. The companion offline verifier reproduces patch forward/
+reverse, file/tree and artifact-integrity checks; it does not execute new Apple
+or physical-device tests. Main, release/integrated, five other features and the
+eight-branch count remain unchanged. Existing build7 is not updated by this work.
+
+Source commit: https://github.com/AAAHN-AAAHN/heiher-socks5-ios/commit/4df634780783ef5c426e1a1c9059a7391d9c1f52
+
+Executed workflow: https://github.com/AAAHN-AAAHN/heiher-socks5-ios/actions/runs/36138588562
+
+---
+
+## Historical pre-publication snapshot — preserved verbatim
+
+The following complete submitted document is retained without byte changes.
+Its local/unpublished/blocked statements are historical and are superseded by the
+revision-linked current status above; they are not descriptions of the current HEAD.
+
 # Background services: asynchronous audio and continuous coarse location
 
 > **Unpublished preparation successor.** This local source includes worker-side
