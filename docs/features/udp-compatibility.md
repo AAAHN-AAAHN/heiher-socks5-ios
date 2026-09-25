@@ -5,8 +5,9 @@
 This is the independent `feature/udp-compat`, not an integrated application.
 The three established native patches are unchanged. This revision repairs a
 remaining peer-test port-reservation mismatch and binds audit inputs to their Git
-revision. Local old/current controls passed; a new native/Apple CI run is required
-before this revision is recorded as verified. Earlier passes are historical results.
+revision. The new native/Apple run 36196306325 passed on both hosts; the
+revision-linked results and observed fixed-port limits are recorded below. Earlier
+passes remain historical results, not substitutes for this new execution.
 
 The complete preceding README is preserved byte-for-byte in
 `docs/history/udp-before-final-audit-20260926.md`. It retains the original user
@@ -162,3 +163,34 @@ remain explicit even when every required host test passes.
 Primary protocol/address contracts, not execution evidence:
 - https://www.rfc-editor.org/rfc/rfc1928
 - https://pubs.opengroup.org/onlinepubs/9699919799/functions/recvmsg.html
+
+## Completed re-audit evidence — 2026-09-26
+
+Tested commit `a70172f8f91f0a3e579d728f7a2203317c94f5cf`, tree
+`3f99e02ba421c5ae6b7a7b25c9ab69168487b12d`, ran in **36196306325**, attempt 1.
+Both Linux and macOS jobs completed successfully. Each host passed 58 mandatory
+profiles, eight peer/queue cases, four expected old-peer controls, all ten audit-
+driver methods, address/capacity/canary ASan/UBSan and optimized strict-aliasing
+checks, formatter, pins/composition and exact patch reversal. Input and final
+working/index diff logs are empty. Darwin C and app Swift SDK logs are empty.
+
+The observation-only fixed-port/unknown-client profiles were **8/9 for workers 1
+and 4 on both hosts**, with a timeout in the three-associations/one-closed scenario.
+This is retained failure evidence for the accepted limit, not a failed mandatory
+profile, repaired condition or proof that every failure is exclusively upstream.
+
+Actual Apple environment: Xcode 27.0 `27A266a`, iPhoneOS SDK 27.0, Swift 6.4
+`swiftlang-6.4.0.34.1`, macOS 27.0 `26A428`. No new Simulator, SideStore,
+LiveContainer, iPhone archive or IPA execution occurred in this UDP run.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Linux 10889674441 | d89562d314fb8ee52f85a9b4eef0e29751a76269c948e84c0284c3ff735d2e18 |
+| macOS 10890067460 | 706e4cf95a5122ab1ed2cd4bbfb651ad02176ef1ce0df9d8fa6ecd7f7cd93b84 |
+
+Both downloaded ZIP digests/CRCs and genuine source-archive commit comments were
+checked. All 53 paths, contents and executable modes match the tested tree. The
+final README/specification update is documentation only; the other 51 files remain
+identical to that executed source. Native patches and all application/build inputs
+are unchanged from the review start. Full original logs and source/patch/tree
+verification are retained in the companion evidence, not only this summary.
