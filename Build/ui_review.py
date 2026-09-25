@@ -54,9 +54,12 @@ def main():
     try:
         run(['xcrun', 'simctl', 'boot', identifier], 'boot.log')
         run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'ready.log', timeout=120)
+        # Keep test failures, runtime warnings and explicit attachments; avoid the
+        # optional bulk system-diagnostic collection that stalled after runner exit.
         run(['xcodebuild', 'test', '-project', app / 'Socks5.xcodeproj', '-scheme', 'StatisticsUIAudit',
              '-destination', 'platform=iOS Simulator,id=' + identifier, '-parallel-testing-enabled', 'NO',
              '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
+             '-collect-test-diagnostics', 'never',
              'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES',
              'MARKETING_VERSION=1.1.0', 'CURRENT_PROJECT_VERSION=7'], 'ui-test.log', timeout=900)
         run(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', OUT / 'UI.xcresult'], 'test-summary.json')
