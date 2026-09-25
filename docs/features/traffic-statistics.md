@@ -8,9 +8,9 @@ all production Swift remain unchanged. This revision strengthens native/UI sourc
 identity, UI working-directory binding and failed-attempt product markers, and
 inherits the corrected UDP peer-test reservation. The statistics network fixture
 also now reserves the dual-stack wildcard it launches, not just IPv4 loopback.
-Local controls passed; new
-combined native/SDK/Simulator execution must finish before reporting this revision
-as verified. Earlier green runs are not substituted for new results.
+The new combined native/SDK/Simulator run 36197421806 passed all four jobs.
+Revision-linked outcomes, earlier failure evidence and preserved limits are recorded
+below; older green runs are not substituted for this new execution.
 
 The preceding complete specification is preserved verbatim in
 `docs/history/statistics-before-final-audit-20260926.md`, including all historical
@@ -189,3 +189,73 @@ survival, Files UI, power/throughput and every supported OS/device remain separa
 unperformed tests for this revision. Standalone statistics includes no keep-alive.
 Main, unrelated feature refs, integrated release, branch count and existing IPAs
 remain unchanged. The detailed historical evidence remains in the archived spec.
+
+## Completed final re-audit — 2026-09-26
+
+Final tested source: `e90faf827611a72abf0a4e6994d99cb43ea1e671`, tree
+`6a53de56c3dbdcf9963fb828d927548ec670a928`, 78 files. Run **36197421806**,
+attempt 1, completed successfully in all four jobs: the exact UDP prerequisite
+on Linux/macOS, then statistics Linux and statistics macOS including actual UI.
+No earlier success or partially completed job was substituted for this matrix.
+
+The prerequisite archives contain the completed **UDP 7f603a7e** source, not the
+statistics trigger SHA. All sixteen owner mappings and source modes match it.
+Each prerequisite passed 58 required UDP profiles, eight peer/queue cases and all
+ten driver methods. In its observation-only fixed-unknown profiles Linux workers 1
+passed 9/9, Linux workers 4 and macOS workers 1/4 passed 8/9 with the retained
+concurrent-close timeout. A single 9/9 observation does not remove that limitation.
+The independent UDP run 36196306325 recorded 8/9 for both worker counts on both hosts.
+
+Statistics passed twenty network executions and eight peer/queue cases in each of
+Linux buffered, Linux splice and Darwin buffered modes, identified from actual
+object symbols. Eight-writer/800000-update counter checks, partial/error/cancel
+I/O probes with ASan/UBSan, Darwin production-counter TSan, 10000 model samples,
+six pipe-reader cases, three existing audit-driver cases and all 26 new input/cwd/
+marker/reservation cases passed. Pins, composition, formatting and exact patch
+reversal passed. Input/final working-tree and index logs are empty. The nine affected
+C/header files and five production Swift files passed actual iPhoneOS 27 SDK checks
+at the unchanged ARM64/iOS17.2 target; compiler diagnostic logs are empty.
+
+The original Simulator XCTest passed **one test, zero failures and zero skips**
+in **130.416 seconds** (test case time, not workflow duration). Actual scrolling,
+Start/Stop taps, SOCKS greeting availability/cessation, and both tabs in portrait/
+landscape were exercised. Four full-screen original attachments and the stored
+xcresult root/test records were inspected. xcodebuild exited successfully and
+cleanup.json is []. Two AppIntents metadata-extraction warnings and debugger/
+Simulator diagnostics remain; this is not a claim of universally warning-free or
+hang-free execution. No test assertion, 900-second test deadline or optional
+system-diagnostic collection setting was changed to produce this success.
+
+The intermediate candidate `d9fac7e788f8449a25302466db5ffbc2caa48c34` in run
+36197029599 had native/SDK success but failed before XCTest on a 120-second
+Simulator bootstatus timeout; shutdown/delete each exceeded 30 seconds. Its original
+failure artifact is preserved, with native SUCCESS but no UI SUCCESS or app hash.
+Its completed Simulator-library phase hash is not an overall success. The subsequent
+source adds the independently reproduced statistics-reservation correction and four
+controls. The final run is a new-source execution, not a same-source retry or proof
+that the port change caused the unrelated CoreSimulator boot recovery. The internal
+boot-stall cause remains unestablished.
+
+Actual Apple environment: Xcode 27.0 `27A266a`, iPhoneOS 27.0, Apple Swift 6.4
+`swiftlang-6.4.0.34.1`, macOS 27.0 `26A428`. Actual UI: iPhone 16 Simulator,
+iOS 27.0 `24A434`. SideStore/LiveContainer and physical runtime remain unperformed.
+
+| Original final-run artifact | SHA-256 |
+| --- | --- |
+| UDP prerequisite Linux 10890696359 | 465413617d6c7a85f59104eae2e361ec6b140c6418db4b534f068800260a39d8 |
+| UDP prerequisite macOS 10890479416 | 224812616f356f98ad67215af221ba3186f6fadd2990f8274c81447795a89a56 |
+| Statistics Linux 10890960240 | 901b6aa1b4895c3b9db22f486e8a2be883a94054473d50a18de2c52530b22b6f |
+| Statistics macOS/UI 10891760071 | 74b6124075ec74a7e9e1032f5eea2bdb176c9658ca7169bdb9c77592cadc38df |
+
+Intermediate failure artifact 10890598987 has SHA-256
+`003c5966c0f1ecf94c201a2819f980934ed68660dfdd828684fbea5efe2a1978`.
+All downloaded ZIP CRCs/digests and genuine source comments were checked. Native and
+UI archives match all 78 tested paths, modes and bytes, and all 78 UI source hashes
+match. The final documentation-only commit changes this README and its identical
+feature specification; the other 76 files remain identical to the executed source.
+The previous 75-file source is recovered by exact reverse application of the
+complete audit patch. All native patches, application code, project, plist, baseline
+framework, build inputs and source pins are unchanged from the review start.
+Main, Background, server/persistence/icon, release and the eight-branch count remain
+unchanged. No IPA is built or relabeled. The offline companion verifier checks
+source/artifact identity and patch round trips, not a new native or Apple execution.
