@@ -105,8 +105,9 @@ def main():
 
     with contextlib.ExitStack() as stack:
         temp = stack.enter_context(tempfile.TemporaryDirectory())
-        with socket.socket() as reserve:
-            reserve.bind(('127.0.0.1', 0))
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as reserve:
+            reserve.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            reserve.bind(('::', 0))
             port = reserve.getsockname()[1]
         config = pathlib.Path(temp) / 'test.yml'
         config.write_text("""main:

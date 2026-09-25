@@ -6,7 +6,9 @@ This independent feature measures successful external socket I/O and explicitly
 inherits the completed UDP compatibility owner. The three statistics patches and
 all production Swift remain unchanged. This revision strengthens native/UI source
 identity, UI working-directory binding and failed-attempt product markers, and
-inherits the corrected UDP peer-test reservation. Local controls passed; new
+inherits the corrected UDP peer-test reservation. The statistics network fixture
+also now reserves the dual-stack wildcard it launches, not just IPv4 loopback.
+Local controls passed; new
 combined native/SDK/Simulator execution must finish before reporting this revision
 as verified. Earlier green runs are not substituted for new results.
 
@@ -131,9 +133,17 @@ HEAD; the current query stays bound to its own source root. UI retries clear onl
 SUCCESS and the two old Simulator app/library hash markers before rejection paths,
 retaining diagnostic logs. Product markers identify their phase, not whole-run success.
 
+The original statistics network fixture reserved only IPv4 loopback while starting
+a dual-stack wildcard listener. Its exact reservation accepts a port occupied on
+IPv6; the corrected reservation uses AF_INET6, IPV6_V6ONLY=0 and `::`, matching
+the server without retrying or weakening test deadlines. Four actual-socket
+old/current free/conflicting-port cases establish that mismatch and correction.
+Reservation release-to-bind races are not claimed eliminated.
+
 Tests/Statistics/input_probe.py executes exact old/current entry points with isolated
 real Git fixtures. Sixteen native/UI clean/unstaged/staged/index-only cases, two cwd
-controls and four workspace/optimized failure-marker cases pass locally. The fixtures
+controls, four workspace/optimized failure-marker cases and four reservation cases
+pass locally: 26 cases in four test methods. The fixtures
 stop intentionally at a downstream source/SDK boundary and never claim to execute
 Hev, Apple SDK or Simulator. Existing three native stale-success tests and all prior
 network/model/sanitizer/UI assertions and deadlines remain unchanged.
