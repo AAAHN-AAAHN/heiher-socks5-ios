@@ -19,7 +19,7 @@ WORK = ROOT / '.build/audio-async-ui'
 
 
 def output(*args):
-    return subprocess.check_output(list(map(str, args)), text=True, timeout=60)
+    return subprocess.check_output(list(map(str, args)), text=True, cwd=ROOT, timeout=60)
 
 
 def run(args, log, timeout=180):
@@ -88,9 +88,11 @@ def add_test_target(app):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / 'SUCCESS.txt').unlink(missing_ok=True)
+    for marker in ('SUCCESS.txt', 'advisory-check.txt', 'app-sha256.txt'):
+        (OUT / marker).unlink(missing_ok=True)
     if not __debug__ or WORK.exists():
         raise SystemExit('Assertions and a clean workspace are required')
+    run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'working-tree.log')
     if not output('xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version').startswith('27.'):
         raise SystemExit('Actual iOS27 Simulator SDK required')
     paths = output('git', 'ls-files').splitlines()

@@ -102,6 +102,11 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         guard manager === locationManager, locationEnabled else { return }
         switch manager.authorizationStatus {
         case .notDetermined:
+            // Authorization can return here after a reset or temporary grant.
+            if updating {
+                updating = false
+                manager.stopUpdatingLocation()
+            }
             locationState = "Waiting for location permission"
             if !requestedPermission, UIApplication.shared.applicationState == .active {
                 requestedPermission = true

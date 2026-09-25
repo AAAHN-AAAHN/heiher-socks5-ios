@@ -51,7 +51,8 @@ def main():
                  'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift',
                  'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift',
                  'Socks5/BackgroundKeepAlive/Silence.wav', 'docs/features/background.md',
-                 'docs/history/background-before-async-20260925.md'}
+                 'docs/history/background-before-async-20260925.md',
+                 'docs/history/background-before-final-audit-20260926.md'}
     assert set(base_paths) <= set(current_paths), 'A main file was removed'
     for path in set(current_paths) - set(base_paths):
         assert path in additions or path.startswith('Tests/Background/'), path
