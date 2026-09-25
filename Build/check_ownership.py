@@ -3,7 +3,6 @@
 import hashlib
 import json
 from pathlib import Path
-import plistlib
 import re
 import subprocess
 
@@ -25,9 +24,7 @@ def content(path):
 
 def main():
     assert 'server' in FEATURES
-    assert 'settings' not in FEATURES or 'server' in FEATURES
-    base = CONFIG['base_commit']
-    subprocess.run(['git', '-C', str(ROOT), 'merge-base', '--is-ancestor', base, 'HEAD'], check=True)
+    manifest = json.loads((ROOT / 'docs/feature-membership.json').read_bytes())
     model = content('Socks5/Server/ServerSettings.swift')
     controller = content('Socks5/Server/ServerController.swift')
     editor = content('Socks5/ContentView.swift')
@@ -41,12 +38,24 @@ def main():
     expected = original_controller.replace('func apply(_ settings: AppSettings, retry: Bool = false)',
         'func apply(_ settings: ServerSettings, running: Bool, retry: Bool = false)').replace(
         'desired = settings.serverRunning ? settings.server : nil', 'desired = running ? settings : nil')
-    assert controller == expected, 'Server execution algorithm changed during extraction'
-    assert (ROOT / 'Patches/hev-server-startup-stop.patch').read_bytes() == show(INPUT, 'Patches/hev-server-startup-stop.patch')
+    expected = expected.replace('            current = desired\n',
+        '            // The prior native call has returned before this new intent begins.\n'
+        '            hev_socks5_server_prepare()\n            current = desired\n', 1)
+    assert controller == expected, 'Unexpected server lifecycle change outside the idle prepare boundary'
+    lifecycle_patch = (ROOT / 'Patches/hev-server-startup-stop.patch').read_bytes()
+    original_patch = show(INPUT, 'Patches/hev-server-startup-stop.patch')
+    assert lifecycle_patch.startswith(original_patch), 'Original pre-start cancellation fix changed'
+    extra = lifecycle_patch[len(original_patch):]
+    assert extra.startswith(b'diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c\n')
+    assert re.findall(rb'^diff --git a/(\S+) b/', extra, re.M) == [
+        b'src/hev-socks5-worker.c', b'src/hev-socks5-proxy.c',
+        b'src/hev-socks5-proxy.h', b'src/hev-main.c', b'src/hev-main.h']
+    # The native probe also reconstructs the exact upstream worker blob and checks
+    # that this adds only the pre-yield Stop guard before compiling both versions.
     root = content('Socks5/AppRoot.swift')
     assert root.count('@StateObject private var server = ServerController()') == 1
     if 'settings' in FEATURES:
-        assert (ROOT / 'Socks5/Settings/SettingsStore.swift').read_bytes() == show(INPUT, 'Socks5/Settings/SettingsStore.swift')
+        assert 'Socks5/Settings/SettingsStore.swift' in manifest.get('files', {}), 'Store changes must be explicitly hash-locked'
         assert (ROOT / 'Socks5/Settings/SettingsView.swift').read_bytes() == show(INPUT, 'Socks5/Settings/SettingsView.swift')
         model_without_server = original[:original.index('struct ServerSettings:')] + original[original.index('enum SettingsError:'):]
         assert content('Socks5/Settings/AppSettings.swift') == model_without_server
@@ -59,20 +68,6 @@ def main():
         assert root.count('.modifier(BackgroundKeepAliveEvents(keepAlive: keepAlive))') == 1
         assert 'keepAlive.setAudio(value.background.silentAudio)' in root
         assert 'keepAlive.setLocation(value.background.continuousLocation)' in root
-    # Complement owner hashes with the duplicate review's deployment/permission
-    # contracts. These are source declarations, not granted device permissions.
-    info = plistlib.loads((ROOT / 'Socks5/Info.plist').read_bytes())
-    assert info['UIApplicationSceneManifest']['UIApplicationSupportsMultipleScenes'] is False
-    assert not any(key.startswith('BGTask') for key in info)
-    assert set(info.get('UIBackgroundModes', [])) == ({'audio', 'location'} if 'background' in FEATURES else set())
-    project = content('Socks5.xcodeproj/project.pbxproj')
-    for key in ('IPHONEOS_DEPLOYMENT_TARGET', 'PRODUCT_BUNDLE_IDENTIFIER', 'CODE_SIGN_STYLE'):
-        pattern = r'^\s*' + key + r' = (.*);$'
-        assert re.findall(pattern, project, re.M) == re.findall(pattern, show(base, 'Socks5.xcodeproj/project.pbxproj').decode(), re.M), key
-    assert 'CODE_SIGN_ENTITLEMENTS' not in project
-    for path in ('Tests/server_lifecycle_host.c', 'Tests/server_lifecycle_regression.py'):
-        assert (ROOT / path).read_bytes() == show(INPUT, path), path
-    manifest = json.loads((ROOT / 'docs/feature-membership.json').read_bytes())
     checked = 0
     for ref in manifest.get('branches', {}).values():
         subprocess.run(['git', '-C', str(ROOT), 'merge-base', '--is-ancestor', ref, 'HEAD'], check=True)
@@ -82,6 +77,8 @@ def main():
         assert actual == expected, path
         assert hashlib.sha256(actual).hexdigest() == entry['sha256'], path
         checked += 1
+    for path, digest in manifest.get('files', {}).items():
+        assert hashlib.sha256((ROOT / path).read_bytes()).hexdigest() == digest, path
     own_doc = {'server-control': 'server-control', 'settings-persistence': 'settings-persistence', 'integrated': 'integrated'}[CONFIG['name']]
     assert (ROOT / 'README.md').read_bytes() == (ROOT / 'docs/features' / (own_doc + '.md')).read_bytes()
     print(f'PASS: server independent of storage; audited behavior preserved; {checked} exact owner files and pinned ancestors')

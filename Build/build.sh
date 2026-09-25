@@ -7,7 +7,10 @@ NAME=$(python3 -c 'import json; print(json.load(open("Build/features.json"))["na
 OUT="$ROOT/artifacts/$NAME"
 CORE="$ROOT/.build/core"
 mkdir -p "$OUT"
+# A new attempt cannot inherit obsolete pass markers or package attestations.
+rm -f "$OUT/SUCCESS.txt" "$OUT/sdk-success.txt" "$OUT/package-review.json"
 python3 Build/check.py baseline > "$OUT/baseline-audit.log"
+python3 Build/integration_checks.py > "$OUT/integration-source-checks.log" 2>&1
 SERVER_REF=$(python3 -c 'import json; print(json.load(open("Build/upstream.json"))["sources"]["."])')
 if [ ! -d "$CORE/.git" ]; then
     git clone --no-checkout https://github.com/heiher/hev-socks5-server.git "$CORE"
@@ -34,6 +37,7 @@ if feature background; then
     python3 Tests/Background/run_checks.py > "$OUT/background.log" 2>&1
     if [ "$(uname -s)" = Darwin ]; then
         python3 Tests/Background/check_subscription.py > "$OUT/background-subscription.log" 2>&1
+        python3 Tests/Background/check_live_scheduling.py > "$OUT/background-live-scheduling.log" 2>&1
         swift Tests/Background/check_silence.swift Socks5/BackgroundKeepAlive/Silence.wav > "$OUT/decoded-silence.log"
     fi
 fi
@@ -43,9 +47,10 @@ fi
 if feature settings; then
     python3 Tests/Settings/run_checks.py > "$OUT/settings.log" 2>&1
     python3 Tests/Settings/run_checks.py --baseline-import > "$OUT/original-import-negative.log" 2>&1
+    python3 Tests/Settings/run_checks.py --previous-store > "$OUT/previous-store-negative.log" 2>&1
 fi
 if [ "$(uname -s)" = Darwin ]; then
-    MODULE="$ROOT/.build/typecheck-module"
+    MODULE="$OUT/compiled-headers"
     mkdir -p "$MODULE"
     cp "$CORE/src/hev-main.h" "$MODULE/hev-main.h"
     printf 'module HevSocks5Server { header "hev-main.h" export * }\n' > "$MODULE/module.modulemap"
@@ -59,13 +64,15 @@ if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
         -archivePath "$ROOT/.build/$NAME.xcarchive" \
         CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
         SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
-        MARKETING_VERSION=1.1.0 CURRENT_PROJECT_VERSION=6 \
+        MARKETING_VERSION=1.1.0 CURRENT_PROJECT_VERSION=7 \
         > "$OUT/app-build.log" 2>&1
     APP="$ROOT/.build/$NAME.xcarchive/Products/Applications/Socks5.app"
     xcrun lipo "$APP/Socks5" -verify_arch arm64
     python3 Build/check.py package "$APP" > "$OUT/package.log"
+    rm -rf "$ROOT/.build/package-$NAME"
     mkdir -p "$ROOT/.build/package-$NAME/Payload"
     ditto "$APP" "$ROOT/.build/package-$NAME/Payload/Socks5.app"
+    rm -f "$OUT/Socks5-$NAME-unsigned.ipa"
     (cd "$ROOT/.build/package-$NAME" && zip -qr "$OUT/Socks5-$NAME-unsigned.ipa" Payload)
     unzip -t "$OUT/Socks5-$NAME-unsigned.ipa" >> "$OUT/package.log"
     ditto -c -k --keepParent "$ROOT/.build/$NAME.xcarchive/dSYMs" "$OUT/Socks5-dSYMs.zip"

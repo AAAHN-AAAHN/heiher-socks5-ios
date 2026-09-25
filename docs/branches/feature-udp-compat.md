@@ -1,5 +1,20 @@
 # UDP compatibility for the native iOS SOCKS5 relay
 
+## Current disposition: reconciled peer filtering (2026-09-24)
+
+The current feature applies **three** ordered patches: the two preserved port-zero
+and address-normalization repairs, followed by `hev-udp-peer-filter.patch`.
+The new source-IP/established-port filter is retained, but not the first unfinished
+implementation: its all-discarded-batch path has been corrected to yield, observe
+cancellation and keep draining the existing receive queue. No new dispatcher,
+listener, automatic port fallback or change to the fixed-port policy is introduced.
+
+Current tested source is `e29458bc58cba822c31a0106a29f291cc34d6170`, run
+`35947538898`, with successful Linux and Xcode 27 jobs. Read the final reconciliation
+section below for behavior, cost, controls and limits. The intervening earlier
+records describe their original two-patch snapshots, not today's three-patch
+implementation. Historical IPA/Simulator results are not new peer-filter device tests.
+
 ## Supported versions, installation environments and verified scope
 
 Latest environment re-audit: **2026-09-23**. The intended support environment,
@@ -348,3 +363,172 @@ not modified by this audit.
 
 The full build and common baseline policy remain in `docs/build-and-validation.md`
 and `docs/main-baseline.md`. Their paths are relative to the repository root.
+
+
+## Six-feature closure recheck (2026-09-24)
+
+The six-feature review found no new defect in the two scoped runtime repairs.
+It did find that this branch's regular macOS audit still selected macos-15 and
+exposed all of LLVM18/bin. The workflow now selects xcode-27, exposes only the
+required clang-format-18 executable, records/asserts iPhoneOS SDK 27 and adds an
+actual ARM64 Swift typecheck. Runtime C/Swift, assets, defaults, source pins,
+patches and existing test expectations are unchanged. No app or IPA is built.
+
+Tested commit `f5d9d32e8fe1ae743ed9647c589ca5fabf634502`,
+tree `62d426f35679d3be3af92ae77a106ddfb04fd9a4`, run `35928444327`:
+Linux and Xcode27 jobs both succeeded on the first attempt. Each platform passed
+58/58 mandatory protocol scenarios, the actual-source 65,536-port/caller probes
+with ASan/UBSan and optimized strict aliasing, driver failure controls and patch
+reversal. Fixed-port/multiple-unknown associations again failed observation-only
+profiles; their documented accepted limitation and port-zero recommendation remain.
+This result is not an unrestricted protocol/security approval.
+
+Xcode 27.0 `27A266a`, iPhoneOS 27.0, Apple Swift 6.4 and macOS 27.0 `26A428`
+were recorded. Actual C syntax and Swift typecheck logs contain no diagnostics.
+The Linux artifact `10778964876` SHA-256 is
+`e4b5bc541915b0f05b6d96b4fa300eddfe0528c76b64983b2f674f20c2626909`;
+macOS artifact `10780450446` SHA-256 is
+`492abfb41fde147aa3e46305b0ce21bb2fdaea700a3fab5a1166d9d11b3c9ff6`.
+Both 49-file tested source archives match the reviewed snapshot.
+
+The finalized UDP owner is then included as a real ancestor of traffic-statistics,
+with its current reusable workflow, exact dependency files and documentation.
+No dependency on server-control, persistence, Background or app-icon is introduced.
+main and release/integrated stay excluded. This fresh native/SDK recheck did not
+repeat the historical IPA/Simulator experiment or perform physical iOS 27
+SideStore/LiveContainer installation, VPN/hotspot, lock-screen, UI or energy tests.
+The section above dated 2026-09-23 remains evidence for that earlier, separate run.
+
+## Reconciled foreign-peer and queue handling: final evidence
+
+The separate work beginning at `d5b5bad3` and `bfa4c606` was reviewed by content.
+Its useful change is accepted: an unknown-port association must not learn a first
+UDP sender from a different IP than its TCP control peer. After establishment,
+source IP, scope and port are checked for each received descriptor, including
+packets queued before connect. The two original patch files remain byte-identical.
+This explicitly supersedes the historical unchecked-first-IP row above, but is not
+cryptographic authentication, protection against a same-IP first-port race, or a
+complete RFC/security approval. Clients must send UDP from the expected source IP;
+a deployment with unrelated TCP/UDP egress IPs is not silently exempted.
+
+The first candidate's all-discarded batch incorrectly signaled an empty receive
+queue. On Darwin, a legitimate datagram could remain behind rejected queued packets
+without a new readiness wakeup. The accepted implementation uses the existing
+coroutine yielder (including stop/cancellation handling), then retries the same
+receive operation. A real empty queue still yields its real I/O result. It does not
+sleep on a timer, allocate another socket, invent EAGAIN, increase deadlines or
+remove the queued-continuation assertion. The final unit covers repeated rejected
+batches, subsequent genuine EAGAIN and cancellation, in sanitizer and optimized
+builds. The raw-socket queue observation remains test-only evidence, not a production
+workaround or an assertion that every OS queue must behave identically.
+
+`getpeername` is added once per nonempty received batch; stack source-address storage
+scales with the existing fixed batch size. Each candidate source is normalized and
+compared; accepted descriptors are compacted without copying payload bytes. This
+adds real CPU/stack/syscall work, but no heap history, new worker, timer, lock,
+dispatcher, saved option or per-packet logging. No energy/throughput benchmark is
+claimed. Source-IP validation belongs to this existing UDP receive boundary, not to
+Settings, Background or a new cross-feature manager.
+
+Tested commit: `e29458bc58cba822c31a0106a29f291cc34d6170`.
+Tested tree: `ced588e00b2d114d002471b4c3a95f74b693aae3`.
+Run `35947538898`: Linux and Xcode 27 jobs both succeeded. Per host, 58 required
+legacy scenarios and all eight new actual peer/queued-continuation cases passed.
+Four old-code peer controls reproduce the previously accepted foreign sender.
+The fixed-port/multiple-unknown limitation remains a separate failing observation.
+Actual C normalization/caller/sender/cancellation probes passed ASan/UBSan and
+optimized strict-aliasing builds. Patch format and reverse checks passed. The
+recorded Xcode 27.0 `27A266a`/iPhoneOS 27.0 C syntax and two-file Swift ARM64
+checks passed; their logs are empty. No app archive, IPA or new Simulator test ran.
+
+The initial peer candidate's Linux formatter failure and Darwin queued-continuation
+failure are not erased. The next queue-corrected revision still failed a new unit
+assertion's formatting. The last change split only that assertion to match the
+existing formatter. Final success is not a claim that all earlier runs succeeded.
+Both downloaded final artifacts were checked against these digests and exact source:
+- Linux `10786914702`: `eea1c93267a80f4aa387c6c4b9db38c11b9069f975a5e55298ec7c1b4b1d827a`
+- macOS `10787258304`: `54f980d14f6ad658ae3a92ee5016d41f742ff5e0bd815912b71c1e63bf491840`
+
+This final record changes only README and its identical feature specification;
+production/test/workflow bytes remain the successful revision above. The completed
+owner must be explicitly included by statistics; its prior two-patch pin is not
+considered current merely because the original compatibility repairs are unchanged.
+No main/release update, new branch, IPA, host patch or implicit device certification
+is part of this reconciliation. Physical iOS 27 SideStore/LiveContainer execution,
+VPN/hotspot, permissions, same-IP adversaries and all protocol edge cases remain
+outside the executed evidence. The eight-branch ownership boundary is preserved.
+
+## Final six-feature verification closure (2026-09-25)
+
+The current three-patch implementation required no further runtime change. Fresh
+verification commit `f85cce5818ca1ea448f699e7bb73c550d6c047af` uses exactly the
+input owner's tree `8ebafb9784d62d670e49375dc0a5d4f97468a53c`. Run
+`36055973873` passed Linux and Xcode 27 on its first attempt. All 58 mandatory
+compatibility scenarios and eight peer/queued-continuation cases passed per host.
+The existing five audit-driver controls, old-code comparisons, address/cancellation
+sanitizers, strict formatter and exact reverse-patch checks also passed. Accepted
+observation-only fixed-port/unknown-client failures remain observations, not passes.
+
+Both downloaded artifact ZIPs passed integrity checks. Their complete 52-file
+Git source archives independently reconstruct the tested tree, including executable
+modes; the archives identify the matching tested commit. This verification does
+not invent a source-manifest file that the UDP artifact does not contain.
+- Linux `10831884151`: `391b398d44cc45bfb72bf09d726a91a3e0851e1cef67f46754d508a4966a3cf4`.
+- macOS `10831874251`: `841612bda5cac742143c287eaee1e45eb4c8b60952bbb44fe64d82621d1d70f9`.
+
+The macOS job recorded Xcode 27.0 `27A266a`, iPhoneOS SDK 27.0, Apple Swift 6.4
+and macOS 27.0 `26A428`. The unchanged app passed its actual iOS27 type check.
+No Simulator, physical device, app archive, IPA or XCFramework was built here.
+The iOS17.2 deployment minimum, intended physical iOS27 SideStore/LiveContainer
+paths and previously unperformed permission/UI/VPN/hotspot/lock/energy tests remain
+separate claims. Source-IP filtering does not certify same-IP first-port races.
+
+This completion appends only to README and its identical feature specification;
+all preceding evidence and all production/test/workflow bytes are preserved.
+Statistics must inherit this completed owner as an actual ancestor and match its
+fifteen mapped files. The accepted UDP Listen Port=0 operating guidance, baseline
+source pins, branch count, main, release/integrated and existing IPA are unchanged.
+
+## Completed dual-stack test-fixture correction (2026-09-25)
+
+The next combined run `36057681338` failed its Linux UDP prerequisite before the
+fixed-known/one-worker profile could begin: the test server exited 254 and its log
+was empty. The macOS prerequisite passed; statistics jobs did not execute. Exit254
+is the native CLI's generic negative-initialization result, not proof of a specific
+OS errno. This historical failure is retained, not relabeled as a successful run.
+
+Investigation independently reproduced a concrete fixture mismatch: reserving a
+TCP port only on IPv6 loopback can accept a port occupied by an IPv4 listener,
+whereas the actual proxy binds a dual-stack wildcard. The test now reserves `::`
+with IPV6_V6ONLY=0, matching the server's actual scope. Two actual-socket regression
+cases execute the extracted old/current reservation statement. The exact old blob
+accepts the occupied IPv4 port; the corrected reservation rejects it with EADDRINUSE
+and reserves free ports with the required scope. This does not prove that the
+original failed runner encountered that errno, nor eliminate every release-to-bind
+race. There is no automatic retry, longer timeout, dropped profile or runtime patch.
+The existing five driver tests remain: the suite now has seven methods.
+
+Tested commit: `3fe27bfb764e9bbb75c6dd36a02ada392a32cc76`.
+Tested tree: `4878592e823d6d0ab0f77fd2a141f5dc71b3131d`.
+Run `36058757006` passed Linux and Xcode27 on its first attempt. Each host passed
+all 58 mandatory profiles, eight peer/queued-continuation cases, all seven driver
+methods, original-code controls, sanitizer/optimized address probes, formatter and
+exact reverse checks. Both iOS27 C syntax and two-file Swift typecheck logs were
+empty. The accepted fixed-port/unknown-client limitation still has failing
+observation-only cases and is not repaired by this test allocator correction.
+
+Downloaded, integrity-checked artifacts; both 52-file source archives reconstruct
+the exact tested tree including modes:
+- Linux `10832969471`: `6819e4e49bfda53fbab4ad94de5eca0cced94d26e4ce8f4e1fae0cbb96ab1c16`.
+- macOS `10833701362`: `0172dcdf47400fa245aab537d17add7c47a500209bad0c4eb30922d027503001`.
+Failed prerequisite Linux artifact `10832933419` remains failure evidence:
+`e05dbecad9f0d504980a53e28c7c4e0fd89755a1a3a7993bc960ae92ece56e35`.
+
+Actual Apple toolchain: Xcode27.0 `27A266a`, iPhoneOS27.0, Swift6.4, macOS27.0
+`26A428`. Minimum iOS17.2 and intended physical SideStore/LiveContainer paths are
+unchanged; no Simulator, physical installation, app archive or IPA ran here.
+Only two test files changed before this successful run; all production patches,
+Swift, resources, source pins and workflow remained byte-identical. This completion
+appends to the two identical documents. The child statistics branch must inherit
+this completed owner and all fifteen mapped files. main/release and branch count
+remain unchanged; physical permissions/UI/VPN/hotspot/lock/energy remain untested.

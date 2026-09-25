@@ -13,12 +13,14 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
-UDP = '49784b7c78a99dab824eceeb071e459bc94b2e90'
+UDP = '66e7196ef5faccc43d9b154cab21a94e4466a77e'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 UDP_FILES = {
     '.github/workflows/udp-compat-audit.yml': '.github/workflows/verify-build.yml',
     'docs/branches/feature-udp-compat.md': 'README.md',
     **{p: p for p in ('Patches/hev-udp-port-zero.patch', 'Patches/hev-udp-sockaddr.patch',
+                     'Patches/hev-udp-peer-filter.patch', 'Tests/udp_peer_regression.py',
+                     'Tests/udp_queue_observation.py',
                      'Tests/udp_compat_audit.py', 'Tests/udp_sockaddr_regression.py',
                      'Tests/udp_sockaddr_unit.c', 'Tests/udp_audit_driver_regression.py',
                      'docs/reviews/udp-compat-20260923.md', 'docs/features/udp-compatibility.md',
@@ -53,8 +55,15 @@ def inspect_sources():
         data = (ROOT / target).read_bytes()
         assert data == git('show', UDP + ':' + source), target
         preserved[target] = hashlib.sha256(data).hexdigest()
-    # Read-only dependencies and production implementation remain at their reviewed state.
-    git('diff', '--exit-code', START, 'HEAD', '--', 'Socks5', 'Socks5.xcodeproj', 'Patches', 'Build')
+    # Update only the inherited UDP boundary, not statistics production or build logic.
+    # Exact prefix ownership above and the original suffix below reject missing,
+    # reordered, extra or silently edited patches without freezing an obsolete parent.
+    original = json.loads(git('show', START + ':Build/features.json'))
+    statistics_patches = [p for p in original['patches'] if p['file'].startswith('hev-stats-')]
+    assert CONFIG == dict(original, patches=udp_config['patches'] + statistics_patches)
+    git('diff', '--exit-code', START, 'HEAD', '--', 'Socks5', 'Socks5.xcodeproj',
+        'Patches/hev-stats-core.patch', 'Patches/hev-stats-server.patch',
+        'Patches/hev-stats-task-io.patch', 'Build', ':(exclude)Build/features.json')
     git('merge-base', '--is-ancestor', UDP, 'HEAD')
     run([sys.executable, 'Build/check.py', 'baseline'], 'baseline.log')
     run([sys.executable, 'Build/check.py', 'composition'], 'composition.log')
@@ -72,7 +81,7 @@ def inspect_sources():
         'base': CONFIG['base_commit'], 'start': START, 'udp': UDP,
         'files_vs_main': inventory, 'excluded_udp_files': preserved,
         'statistics_owned_paths': [p for p in inventory if p not in UDP_FILES],
-        'production_unchanged': True}, indent=2) + '\n')
+        'statistics_production_unchanged': True, 'udp_dependency_updated': True}, indent=2) + '\n')
     run(['git', 'diff', CONFIG['base_commit'], 'HEAD'], 'main-to-feature.diff')
     run(['git', 'diff', UDP, 'HEAD'], 'udp-to-statistics.diff')
     run(['git', 'rev-parse', 'HEAD'], 'tested-commit.txt')
@@ -101,6 +110,9 @@ def native_checks(mode):
     host = OUT / 'host'
     run([*common, '-I' + str(CORE / 'src'), 'Tests/traffic_stats_host.c', *libs,
          '-o', host], mode + '-host-build.log')
+    # Exercise peer rejection and queued continuation with the real stats-linked core.
+    run([sys.executable, 'Tests/udp_peer_regression.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / (mode + '-peer.json')], mode + '-peer.log', timeout=45)
     for repeat in (1, 2):
         run([sys.executable, '-u', 'Tests/traffic_stats_regression.py', host],
             mode + '-network-' + str(repeat) + '.log', timeout=120)

@@ -1,4 +1,4 @@
-name: Verify and build integrated eight-branch release
+name: Verify and build current integrated release
 on:
   push:
     branches: [release/integrated]
@@ -14,7 +14,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
-      BUILD_IPA: ${{ contains(github.event.head_commit.message, '[reconcile-duplicates]') && '0' || '1' }}
+      BUILD_IPA: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -33,32 +33,28 @@ jobs:
             mkdir -p "$RUNNER_TEMP/format-only"
             ln -s "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
             echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
-            xcodebuild -version
-            xcrun --sdk iphoneos --show-sdk-version | grep -E '^27\.'
+            mkdir -p artifacts/integrated
+            xcodebuild -version | tee artifacts/integrated/environment.txt
+            xcrun --sdk iphoneos --show-sdk-version | tee -a artifacts/integrated/environment.txt | grep -E '^27\.'
+            xcrun swiftc --version >> artifacts/integrated/environment.txt
+            sw_vers >> artifacts/integrated/environment.txt
           fi
-      - name: Verify reviewed duplicate equivalence before reconciliation
-        if: ${{ contains(github.event.head_commit.message, '[reconcile-duplicates]') }}
-        shell: bash
-        run: |
-          mkdir -p artifacts/integrated
-          python3 Build/verify_duplicate_comparison.py > artifacts/integrated/duplicate-comparison.json
-      - name: Verify all features and optionally build release IPA on macOS
-        shell: bash
+      - name: Exact latest composition, native and model checks; ARM64 archive on macOS
         run: bash Build/build.sh
-      - name: Check actual iOS 27 API and release package
+      - name: Actual iOS 27 type check and archived IPA validation
         if: runner.os == 'macOS'
         shell: bash
         run: |
           set -euo pipefail
           bash Build/check_swift_sdk.sh
-          if [ "$BUILD_IPA" = 1 ]; then
-            python3 Build/verify_release.py > artifacts/integrated/package-review.log 2>&1
-          fi
-      - name: Run production app with saved tabs and Start/Stop on iOS 27 Simulator
-        if: runner.os == 'macOS' && env.BUILD_IPA == '1'
-        shell: bash
+          python3 Build/verify_release.py > artifacts/integrated/package-review.log 2>&1
+      - name: Original and remapped Simulator installs, saved tabs and real TCP
+        if: runner.os == 'macOS'
         run: python3 Build/simulator_review.py > artifacts/integrated/simulator-review.log 2>&1
-      - name: Record exact source
+      - name: Actual integrated UI, saved intent and native response
+        if: runner.os == 'macOS'
+        run: python3 Build/ui_review.py > artifacts/integrated/ui-review.log 2>&1
+      - name: Record exact source independently of generated products
         if: always()
         run: python3 Build/record_evidence.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -66,23 +62,4 @@ jobs:
         with:
           name: Integrated-release-${{ runner.os }}
           path: artifacts/
-          retention-days: 30
-  finish-requested-split:
-    needs: verify
-    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[reconcile-duplicates]') }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-      - name: Remove only reviewed obsolete branches after successful verification
-        run: python3 Build/finish_branch_split.py
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: Final-eight-branch-layout
-          path: artifacts/branch-layout/
           retention-days: 30

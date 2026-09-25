@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the declared native composition; retain branch audits as separate evidence.
 
-Adapted from 0ab3c33a's dispatcher after duplicate-branch comparison. Only feature
-and test-owner names are changed. Production modules and standalone audit gates
+Adapted from 0ab3c33a's dispatcher after duplicate-branch comparison. Updated to the finalized six owners with combined lifecycle/persistence cases. Production modules and standalone audit gates
 are preserved; this entry point reuses their real native cases for compositions.
 """
 import importlib.util
@@ -84,6 +83,14 @@ for mode in (('buffered', 'splice') if sys.platform == 'linux' and 'statistics' 
         run(['clang', '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread', '-I' + str(CORE / 'src'),
              'Tests/ServerControl/configuration_probe.c', *libraries, '-o', CORE / 'config-probe'], 'configuration-probe-build.log')
         run([CORE / 'config-probe', OUT / 'yaml/defaults.yml', OUT / 'yaml/quoted.yml'], mode + '-configuration.log')
+        for script in ('native_controller_check', 'delayed_completion_check', 'active_clients_check'):
+            run([sys.executable, 'Tests/ServerControl/' + script + '.py', CORE, OUT / (mode + '-' + script)],
+                mode + '-' + script + '.log', timeout=300)
+        if 'settings' in FEATURES:
+            for script in ('native_persistence_check', 'delayed_persistence_check'):
+                run([sys.executable, 'Tests/Settings/' + script + '.py', CORE, OUT / (mode + '-' + script)],
+                    mode + '-' + script + '.log', timeout=300)
+
 if 'statistics' in FEATURES:
     for script in ('audit_driver_probe.py', 'host_probe.py'):
         run([sys.executable, 'Tests/Statistics/' + script], script + '.log')
@@ -101,7 +108,8 @@ if 'udp' in FEATURES:
         owner = json.loads((ROOT / 'docs/feature-membership.json').read_text())['branches']['feature/udp-compat']
         declaration = subprocess.check_output(['git', '-C', str(ROOT), 'show', owner + ':Build/features.json'])
         (fixture / 'Build/features.json').write_bytes(declaration)
-        for name in ('udp_compat_audit.py', 'udp_audit_driver_regression.py'):
+        for name in ('udp_compat_audit.py', 'udp_audit_driver_regression.py', 'udp_sockaddr_regression.py'):
             shutil.copyfile(ROOT / 'Tests' / name, fixture / 'Tests' / name)
-        run([sys.executable, fixture / 'Tests/udp_audit_driver_regression.py'], 'udp-audit-driver.log')
+        run([sys.executable, fixture / 'Tests/udp_audit_driver_regression.py'], 'udp-audit-driver.log',
+            env=dict(os.environ, GIT_DIR=str(ROOT / '.git')))
 print('PASS: declared native tests; fixed-unknown UDP observation failures remain separately recorded.')

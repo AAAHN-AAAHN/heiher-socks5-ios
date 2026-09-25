@@ -418,3 +418,114 @@ References (public API contracts, not device-test results):
 - https://developer.apple.com/documentation/avfaudio/avaudiosession/interruptionnotification
 - https://developer.apple.com/documentation/avfaudio/avaudioplayer/numberofloops
 - https://developer.apple.com/documentation/swift/objectidentifier
+
+
+## Six-feature closure recheck (2026-09-24)
+
+Input product/test snapshot: `9227a03461e5f1a72a2ffbed75cdd7724c2175fc`.
+Fresh verification commit `22e284d4e86309be06b258a9f60f44bef8fc6351` has the
+same tree `1d389daa6d94475dab7efe3ee89f69d05ebed0e1`. Run `35928260734`
+passed on its first attempt; only the existing audio-checks job ran and the
+archive/IPA job was skipped. The downloaded artifact `10780062749` SHA-256 is
+`6709aacb2795fb7b4fc69b38169cc88c410213fd383eb62166dd2ae6aa9b2461`.
+All 56 source hashes match the unchanged input. No runtime or test edit was needed.
+
+The full 1193 assertions passed again: controller 1030, worker delegate 4,
+recovery 103, lifecycle 41 and callback lifetime 15. Real Foundation/Combine
+delivered all 34 main/worker notifications and detached on cancellation; Apple's
+decoder confirmed the existing 400 silent samples. Xcode 27.0 `27A266a` with
+iPhoneOS SDK 27.0 typechecked five production Swift files, with an empty diagnostic
+log. Exact main boundary, plist/root bindings, Audio-first order and resource
+identity checks passed. Repetitions are not independent physical-device trials.
+
+The controller remains responsible only for the independent location/audio
+services. The standalone root's two existing AppStorage keys supply user intent;
+the integrated root can instead supply persistence-owned bindings. Neither
+SettingsStore nor server-control is a dependency of this standalone feature.
+The 13 session notifications, four lifecycle checkpoints, immediate detected-stop
+recovery, one-second single-timer policy and bounded re-entry protections are
+unchanged. No host patch, extra scheduler, new observer or polling path is added.
+
+The repository-wide closure retains eight branches and leaves main/release
+unchanged; earlier seven-branch statements above describe their historical runs.
+Actual iOS 27 SideStore installation, LiveContainer host arbitration, telephone/
+Bluetooth notifications, process suspension and energy use remain untested.
+This result verifies the implemented paths and current SDK contracts, not
+guaranteed delivery/activation while iOS refuses or suspends execution.
+
+## Retained independent real-scheduling verification (2026-09-24)
+
+The subsequently observed scheduling harness and its test-only compiler corrections
+are retained, not reverted. Their purpose is distinct from scripted timer firing:
+use actual Foundation Timer/RunLoop and Combine scheduling around the unchanged
+production controller body and actual publisher expression. Audio and location
+remain explicit doubles. No production observer, timer, thread, setting or recovery
+state was added, and this test does not claim background execution permission.
+
+Tested commit: `da9a8b615be0132097103118f65020ba76bf9a7e`.
+Tested tree: `04140706a9350a38b033984f8901a0f0aed06859`.
+Run `35941608803` succeeded; the normal app archive/IPA job was skipped. The five
+new scheduling postconditions passed: failed activation retries with a real timer;
+new queued resumption before the pending retry; no reactivation from healthy samples
+or 100 restores; Off wins before worker-notification delivery; independent location,
+canceled observers and controller release stay inactive. Recorded initial attempts
+were approximately 0.0012, 1.0379 and 2.0458 seconds. These are host observations,
+not a one-second real-time guarantee on a suspended iPhone.
+
+The existing 1193 assertions, 34 real Combine deliveries/cancellation, 400 zero
+WAV samples, source boundaries and actual Xcode 27.0 `27A266a` / iPhoneOS SDK 27.0
+five-file ARM64 typecheck also passed. The first harness compilation had diagnosed
+a test weak local and an actor-isolated notification referenced from a worker;
+those test declarations were corrected without suppressing warnings, removing
+assertions or editing production logic. The earlier failure is not an executed
+successful scheduling test.
+
+Downloaded artifact `10784863270` SHA-256:
+`33500b40a820499c590134d33146d20ffead120aea9158408864a52f98ab3922`.
+The recorded 57 source hashes identify the exact tested files. This completion
+updates only README and its identical specification; the successful test/production
+bytes are retained. Session attribution cannot be established from commit authorship,
+so the retention decision follows source scope and executable evidence instead.
+
+The original immediate detected-stop recovery, one-second health/retry schedule,
+weak callback identity, Off priority and coarse-location startup policy remain.
+No extra runtime cost is introduced by retaining test-only code; energy is still
+unmeasured. Physical iOS27 SideStore/LiveContainer installation, real phone/Siri/
+Bluetooth interruptions, lock-screen scheduling, host arbitration and OS refusal
+remain outside these checks. No main/release change, new branch, app archive or
+IPA is part of this closure, and the repository still has eight branches.
+
+## Final audit-driver and evidence closure (2026-09-25)
+
+A failed checks-only retry could retain a prior SUCCESS.txt. The actual old shell
+was executed with a deterministic first-toolchain failure and reproduced that
+stale marker. The entry now removes only its old success marker before validation.
+Three isolated old/current-retry/current-first-failure cases check the nonzero exit,
+marker state and preservation of prior diagnostic logs. No controller or resource
+change is needed. The artifact now also contains source.zip, a Git source archive
+rather than an application archive, so its full source manifest is reconstructable.
+
+Tested commit: `3307a5fc1008c6f9aa7042a4abe854d705d9e154`.
+Tested tree: `9cb37faa36840b1676c33e60c6ae072d356d0af5`.
+Run `36055863671` passed audio-checks on its first attempt; the ordinary archive/IPA
+job was intentionally skipped. All 1193 retained controller/recovery/lifecycle/
+callback assertions, 34 real Combine deliveries and cancellation, five real
+Timer/RunLoop scheduling postconditions and the three new driver cases passed.
+The Apple decoder again confirmed 400 zero samples. Both released-player address-
+reuse observations occurred in this run; these are scripted object-lifetime cases,
+not phone interruptions. Five production Swift files passed Xcode 27.0 `27A266a`
+and iPhoneOS SDK27.0 ARM64/iOS17.2 type checking with an empty diagnostic log.
+
+Artifact `10832780858` SHA-256:
+`ffbe79d98295eb19396df631b7a04ad90031be97370f76321ec3192689e93e4b`.
+The downloaded ZIP passed integrity checks; all 58 source-manifest hashes matched,
+and its source archive reconstructed the exact tested Git tree, including modes.
+The runtime files and original WAV are byte-identical to the preceding owner.
+Only test-driver/evidence handling changed before this successful run; this final
+README and its identical feature copy add documentation after that run.
+
+The target physical iOS27 SideStore and LiveContainer paths remain distinct from
+native host/SDK tests. Installer/host versions, actual phone/Siri/Bluetooth events,
+permissions, lock-screen survival and energy remain untested. The unchanged iOS17.2
+minimum is not an all-version execution claim. No new polling, observer, production
+state, host patch, main/release update, branch, app archive or IPA was introduced.

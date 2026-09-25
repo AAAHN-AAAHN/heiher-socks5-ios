@@ -1,8 +1,18 @@
 # Traffic statistics for the native iOS SOCKS5 relay
 
+## Latest final audit: actual UI interaction (2026-09-25)
+
+Run `36068755469` at `57acbb8d55023cfefca3bb6964eea3a46227ac15` passed
+all four native/SDK jobs and the added actual iOS27 Simulator UI test. The unchanged
+Server controls were reachable by scrolling and operated the native listener in
+portrait and landscape. This supersedes only the older lack of interaction evidence
+for that tested configuration, not physical SideStore/LiveContainer verification
+or every layout/keyboard/accessibility configuration. See the final section below.
+
+
 ## Supported versions, installation environments and verified scope
 
-Latest environment re-audit: **2026-09-23**. The intended support environment,
+Historical environment re-audit: **2026-09-23**; current closure is recorded below. The intended support environment,
 configured minimum OS, SDK build and actual runtime tests are different claims.
 The native-only audit descriptions later in this document describe their own
 scoped checks; the separate re-audit below also built IPAs and ran Simulator tests.
@@ -21,9 +31,10 @@ executions on Linux (buffered/splice) and **20/20** on Darwin (buffered). Counte
 partial/error/retry I/O, sanitizer, Swift model and type checks passed. The iOS 27
 Simulator native fixture passed **20/20** scenario executions across original and
 remapped IDs. Its test shell did not exercise production Start/Stop buttons or
-Statistics-tab transitions. The final UDP implementation remains included at
-`49784b7c78a99dab824eceeb071e459bc94b2e90`; later documentation-only UDP commits do
-not change that pinned runtime prerequisite or its preserved dependency copies.
+Statistics-tab transitions. That historical run used UDP at
+`49784b7c78a99dab824eceeb071e459bc94b2e90`. The current dependency and its
+workflow/document copies were subsequently updated again in the reconciliation
+record below. The original two UDP repairs remain; an inherited peer filter was added.
 
 Known limits remain explicit: use **UDP Listen Port = 0** for concurrent
 unknown-client associations. The Simulator screenshot also shows the inherited
@@ -70,16 +81,19 @@ new traffic category.
 The main baseline is `d2534cd6bce7389fdf8f362bd8f681c0bd583eb1`. It combines iOS app
 `180012e8b9dbaa2002a68ebd2c75bccebcfb789c` with unpatched server
 `b3585289622561caf4b8789b436cc8820ecd6be0`. Exact submodules are in
-`Build/upstream.json`; `Build/features.json` selects UDP plus statistics and five
+`Build/upstream.json`; `Build/features.json` selects UDP plus statistics and six
 ordered patches. These are reproducible pins, not automatic upstream tracking.
 
-The current UDP prerequisite is `49784b7c78a99dab824eceeb071e459bc94b2e90`.
+The current UDP prerequisite is `66e7196ef5faccc43d9b154cab21a94e4466a77e`.
+The preceding reconciliation used `34cc49f01bbbcb4cc1ed9b7e050640f7cae14c72`;
+`05524e3fb917f2a0e5264bc9919118fcc484cb11` and
+`49784b7c78a99dab824eceeb071e459bc94b2e90` belong to older verification.
 The earlier prerequisite `ae466dab1a394af0c83f3dc36e51755f25f91910` was merged by
 `d34e49478d7e061b8824e9f431b40998db25f8b2`, the original statistics-review start.
 The current prerequisite is also merged as a Git ancestor, not merely cited in a
-README. Twelve inherited files, including the follow-up audit correction and its
-regression/review, are preserved byte-for-byte. The original production-code
-freeze is unchanged. The retained UDP recommendation is local **UDP Listen Port = 0**.
+README. Fifteen inherited files, including the peer-filter/queue correction and
+its tests, workflow and completed reviews, are preserved byte-for-byte. The original
+statistics production-code freeze is unchanged. The retained UDP recommendation is local **UDP Listen Port = 0**.
 The known fixed-port / unknown-client / concurrent-association limitation is not
 declared repaired. The combined workflow checks the exact UDP-only checkout first,
 then the statistics composition; neither runtime implementation is rewritten.
@@ -158,7 +172,7 @@ changes behind a runtime-only list.
 
 | Statistics-owned path | Purpose |
 | --- | --- |
-| `Build/features.json` | Select the three statistics patches after the two frozen UDP repairs and declare the common main baseline. |
+| `Build/features.json` | Select the three statistics patches after the three inherited UDP patches and declare the common main baseline. |
 | `Patches/hev-stats-task-io.patch` | Optional byte-report callback in the existing buffered/Linux splice implementation; preserve the legacy API. |
 | `Patches/hev-stats-core.patch` | External-side TCP/UDP wiring and two relaxed atomic counters. |
 | `Patches/hev-stats-server.patch` | Small public C query API used by Swift. |
@@ -183,8 +197,8 @@ changes behind a runtime-only list.
 | `docs/reviews/traffic-statistics-20260923.md` | Follow-up final review, stale-success regression and matching completion evidence. |
 | `docs/reviews/udp-statistics-alignment-20260923.md` | Latest-UDP merge, complete dependency map, preserved runtime and joint verification evidence. |
 
-The following twelve files are dependencies, not independent statistics edits:
-both UDP patches; four `Tests/udp_*` files; `Socks5/Info.plist`; the UDP feature
+The following fifteen files are dependencies, not independent statistics edits:
+three UDP patches; six `Tests/udp_*` files; `Socks5/Info.plist`; the UDP feature
 specification and both dated UDP reviews; `docs/branches/feature-udp-compat.md`
 (verbatim UDP root README); and `.github/workflows/udp-compat-audit.yml` (verbatim
 UDP workflow under another name). The mixed build manifest still selects UDP plus
@@ -202,7 +216,7 @@ not an automatic promise to follow future remote branch movement.
 Common baseline build scripts, source locks and the committed unpatched framework
 are also unchanged. New tests and documents are not app target sources/resources.
 The original Server screen, including its upstream lifecycle behavior, is not
-rewritten by this feature; the separate settings feature owns its later controller.
+rewritten by this feature; the separate server-control feature owns its later controller.
 
 ## C implementation, correctness and standard style
 
@@ -294,7 +308,7 @@ on its pinned checkout when reproducing the complete two-branch verification.
 The audit checks main and current UDP ancestry, all source pins, frozen UDP blobs, all unchanged
 production files, the entire main-to-feature diff, statistics registration/wiring,
 and exact upstream formatting of the nine affected C/header files. It applies the
-five ordered patches to freshly fetched pinned code and reverses them afterward.
+six ordered patches to freshly fetched pinned code and reverses them afterward.
 
 A review finding concerned the inherited build script's Linux mode labels.
 HevTaskSystem defaults `ENABLE_IO_SPLICE_SYSCALL` to 1. Merely using empty CFLAGS
@@ -344,7 +358,8 @@ source.zip and inventory.json, not to a reused historical build badge.
 ## Disposition and primary references
 
 The retained scope is successful external socket I/O. No production accounting,
-UDP behavior, DNS policy, UI mode or unit definition is changed in this review.
+DNS policy, UI mode or unit definition is changed in this review. The separately
+owned UDP peer/queue correction is inherited exactly, not reimplemented here.
 The necessary improvements are reproducible statistics-only checks, accurate
 coverage/limits documentation and bounded test failure behavior. Known UDP limits
 remain accepted and explicitly inherited; functional review is not universal
@@ -362,3 +377,274 @@ security, protocol, battery or future-iOS certification.
 Repository paths above are root-relative. The root README and this feature's copy
 are intentionally identical; neither replaces or edits the separately preserved
 UDP README and its historical evidence.
+
+
+## Six-feature closure recheck (2026-09-24)
+
+Input: `63f7689fbcff6cd195e8816eeca556f4cb890311`. The prior branch kept the
+correct UDP repair bytes but pinned an older owner commit and copied workflow/docs.
+This closure includes final UDP `05524e3fb917f2a0e5264bc9919118fcc484cb11`
+as the actual second parent of test commit
+`16fb2f2ffcadcd4e0c248850a3670bf2e44b74af`, tree
+`5dbb0f57676ddb941b6df539d70f9b95710f6028`. All twelve dependency files match
+that owner's exact paths/bytes. The prerequisite checkout and audit constant agree.
+This corrects dependency freshness, not a difference in the working UDP algorithm.
+
+Both workflows now select Xcode27 instead of macos-15 and put only clang-format-18,
+not all of LLVM18/bin, ahead of the default tools. The actual SDK is recorded and
+required to be 27.x. No native patch, app source/resource/project, baseline lock,
+runtime sampling or model-test behavior changes. The audit Python delta is only
+its UDP commit constant; all source-freeze and negative-control gates remain.
+
+Run `35929832540` passed all four jobs on the first attempt: Linux/Xcode27 UDP
+prerequisites followed by Linux/Xcode27 statistics. Latest-owner UDP profiles passed
+58/58 mandatory scenarios per host. Statistics passed 40 network executions on
+Linux (buffered/splice) and 20 on Darwin (buffered), with actual object-symbol mode
+checks, counter stress, partial/error I/O ASan/UBSan, Darwin counter TSan, 10000 model
+samples, driver-failure controls and exact patch reversal. The compiled counter
+stress remains synthetic accounting, not measured petabytes of network traffic.
+iPhoneOS 27 C syntax and five production Swift typechecks passed without diagnostics.
+
+Xcode 27.0 `27A266a`, iPhoneOS 27.0, Apple Swift 6.4 and macOS 27.0 `26A428`
+were recorded for the statistics job. Source archives contain 70 exact files.
+Own Linux artifact `10780911174` SHA-256:
+`ccb80a507aa76e5d8820fe3dd609f0ecbcbc62406cfc3f46ce2d683138251c4b`.
+Own macOS artifact `10780224484` SHA-256:
+`eacb5684c0874d8647f097cef944742a5bae08eb72a555b48a6fe51f53bcd9f1`.
+Prerequisite Linux artifact `10780199520` SHA-256:
+`c3248b13f246d2ad5ca78786b3a67ff328271559f0c5cafe7c3353728876ed49`.
+Prerequisite macOS artifact `10780841062` SHA-256:
+`42afdd76f5e332972cf58f457d027d39144d0d8b4fe12d05164eac7b73ab00ed`.
+Both prerequisite source archives contain the final UDP owner's exact 49 files,
+including the final documentation, rather than just similar runtime patches.
+
+The independent responsibility remains successful external-facing socket-byte
+accounting and visible/active UI sampling. No server-control, persistence,
+Background, icon, resolver replacement or whole-interface accounting is added.
+Known fixed-port/unknown-client observations remain failures outside the mandatory
+profiles, under the accepted port-zero operating guidance. The earlier Server-tab
+layout observation is not declared resolved: this fresh run did not perform UI
+taps, scrolling or a new Simulator layout review. None of these native/type checks
+certifies physical iOS27 SideStore/LiveContainer installation, local-network policy,
+host behavior, VPN/hotspot, lock-screen scheduling or energy use.
+
+No additional scoped runtime defect was identified. main/release are unchanged;
+eight branches remain. The final own README/specification update is documentation
+only, and the successful source/test/workflow bytes are retained. No app archive,
+IPA, XCFramework build or physical-device execution occurred in this closure.
+
+
+## Reconciliation completed: current UDP and statistics (2026-09-25)
+
+The independently observed UDP peer-filter work is retained only in its corrected,
+verified owner `34cc49f01bbbcb4cc1ed9b7e050640f7cae14c72`. That owner is an
+actual second parent of `af5525667db079c241462bad635d19748c16a721`, not a
+README-only dependency. All fifteen UDP dependency files and the ordered three-patch
+prefix match it. The original three statistics patches, five production Swift files,
+project, app metadata, measurement units and visibility-scoped sampling are unchanged.
+Statistics does not gain a dependency on server-control, persistence, Background
+or app-icon. Source-IP filtering is not reimplemented in this feature.
+
+The inherited receive path now needs source addresses and getpeername at its I/O
+boundary. Tests/Statistics/udp_probe.c supplies those values through its existing
+socket doubles while still executing the actual production forwarders and retaining
+all successful-prefix, failed-I/O and external-side byte-count assertions. Each real
+native statistics mode also executes the eight inherited peer/queued-continuation
+cases. This preserves the repaired receive behavior and the original accounting
+contract together, rather than treating separate successful branch tests as enough.
+
+The merge's inspected run 36017573747 failed its strict formatter gate,
+not an observed production counter failure. The latter's saved formatter output
+identified exactly one missing continuation-indent space in udp_probe.c. Commit
+`804770ab94f53c4e2149e24fb9db77cfdf56cfc4` adds that one ASCII space only.
+It does not disable the gate, weaken assertions, change timeouts, suppress warnings
+or modify a product file. The complete workflow was then executed again.
+
+Tested commit: `804770ab94f53c4e2149e24fb9db77cfdf56cfc4`.
+Tested tree: `7f2cf559a7bb074d088a72c87fb9c8e3966123ea`.
+Run `36023663389` succeeded in all four jobs: current-UDP Linux/Xcode27 prerequisites,
+then Linux/Xcode27 statistics. The old failed runs remain failed historical evidence.
+
+| Current verification | Observed result |
+| --- | --- |
+| UDP prerequisite | Each host passed 58 required compatibility scenarios and eight new peer/queue cases, with old-code controls, address/cancellation sanitizer checks and exact patch reversal. |
+| Statistics native modes | Linux buffered and splice each passed 20 scenario executions; Darwin buffered passed 20. Actual compiled object symbols distinguished modes. |
+| Peer filtering with counters | Eight real peer/queued-continuation scenarios passed in each of the three native modes; legitimate queued traffic continues after rejected packets. |
+| Counter and I/O boundaries | Eight writers/800000 updates, partial writes, failed receives/sends, cancellation, header exclusion and retry checks passed; ASan/UBSan probes and Darwin counter TSan passed. |
+| Model and test-driver behavior | 10000 generated model samples, six pipe-framing cases and three stale-success/failure-driver cases passed. These are not device trial counts. |
+| Actual iOS 27 SDK | The affected C/header syntax checks and all five production Swift ARM64 type checks passed with no diagnostic output; Swift warnings were errors. |
+
+The statistics macOS job recorded Xcode 27.0 `27A266a`, iPhoneOS SDK 27.0,
+Apple Swift 6.4 (`swiftlang-6.4.0.34.1`) and macOS 27.0 `26A428`. The minimum
+remains iOS 17.2. No Simulator, physical device, app archive, IPA or XCFramework
+was built in this run. The word archive in source.zip logs means a Git source
+archive, not an iPhone application archive.
+
+Inspected current artifacts and SHA-256:
+- Statistics Linux `10819365758`: `6d4b9beae3fb64a37764c1cca9636dc2679696add05482078f69d030363bc6bb`.
+- Statistics macOS `10819255865`: `0b2d8d7224d697819e3d6413dcdd39a202bcabbd96d9c92a27f4537038424d75`.
+- UDP prerequisite Linux `10819580126`: `22174958197a4eb5245c6a14256ef939f9dcb14077adbb2411ac67796bd25c9d`.
+- UDP prerequisite macOS `10819150548`: `ffaf5724e0478d1d5dcf113b5947d224808e98873fddcfd5ec8c0b9d104667aa`.
+
+Both 73-file statistics source archives reconstruct the tested Git tree; both
+52-file prerequisite archives reconstruct the current UDP owner's tree. The failed
+and successful statistics product files are byte-identical. All fifteen inherited
+paths match their exact owner, including its completed README under the mapped path.
+This completion changes only the root README and its identical feature specification.
+The test/production/workflow bytes are those of the successful run above.
+
+No newly reproduced mandatory-check failure remains. The known fixed-port/multiple-
+unknown association limitation still requires the documented port-zero operating
+choice; it was not removed by peer filtering. Same-IP first-port races, complete
+protocol/security certification and all deployment topologies are not claimed solved.
+The historical Server-tab layout observation has not been retested with real UI
+interaction. Physical iOS27 SideStore/LiveContainer installation, host policy,
+permissions, VPN/hotspot, lock-screen behavior and energy use remain unverified.
+These limits must not be relabelled as passed tests. No runtime overhead is added by
+the formatting/documentation completion. main/release remain unchanged and exactly
+eight branches are retained. The existing release IPA is not updated by this closure.
+
+## Final six-feature composition closure (2026-09-25)
+
+The current prerequisite is completed UDP
+`66e7196ef5faccc43d9b154cab21a94e4466a77e`. Merge/test commit
+`0f58e4ddcf3d56a961b075c22ac446e9611c84a2` includes it as an actual second
+parent; tested tree `ce46e3420ffd46c847a7ec527c784f2a95dd9585`.
+All fifteen mapped UDP paths match the owner exactly. This includes the two
+corrected UDP test files, its full completed documentation and unchanged workflow.
+The prerequisite checkout and audit constant agree. Statistics production code,
+all six native patches, own test assertions, original UI sampling and units remain
+unchanged. The inherited test-port reservation does not change the app's UDP policy.
+
+The preceding run `36057681338` failed the Linux UDP test server's startup before
+one required profile; macOS UDP passed and statistics jobs were skipped. Its exit254
+and empty server log did not identify the original OS errno. The owner independently
+reproduced and corrected an IPv6-loopback versus dual-stack-wildcard port-reservation
+mismatch, retaining the exact-old-code control. No test retry, skip, extra timeout
+or production workaround was added. That failed run remains failed evidence.
+
+Run `36059988736` passed all four jobs on its first attempt: current-UDP Linux and
+Xcode27 prerequisites followed by Linux and Xcode27 statistics. Each prerequisite
+passed58 mandatory scenarios, eight peer/queue cases and seven driver methods,
+with retained negative controls, sanitizers and reverse checks. Statistics passed
+20 network executions per native mode (Linux buffered/splice, Darwin buffered),
+eight real peer/queued-continuation cases in each mode, 800000-update/eight-writer
+counter stress, partial/error/retry I/O probes under ASan/UBSan, Darwin counter TSan,
+10000 generated model samples, six pipe-reader cases and three stale-driver cases.
+Actual compiled symbols distinguish buffered and splice. Synthetic byte additions
+are not measured petabytes of network traffic or independent device trials.
+
+All nine affected C/header files and five production Swift files passed the actual
+iPhoneOS27 syntax/type checks with empty diagnostic logs. Recorded toolchain:
+Xcode27.0 `27A266a`, iPhoneOS27.0, Apple Swift6.4, macOS27.0 `26A428`.
+No app link/archive, IPA, XCFramework, Simulator or physical-device run occurred.
+
+Downloaded ZIPs passed integrity checks. Both 73-file statistics source archives
+reconstruct the tested tree; both 52-file prerequisite archives reconstruct the
+completed UDP owner's tree, including modes. The mapped dependency hashes agree.
+- Statistics Linux `10834316581`: `c093d8223efbb82f9fd8443c3dffeac929e1b64e9785dcfb6372483b4a6fb32c`.
+- Statistics macOS `10834262403`: `d98271ddc6798ae0d98685f923079f605d498eabfa58d0fc659d8afc070bfc4e`.
+- UDP Linux `10833882488`: `e9daf292459f3c34cd9311ba46eccd0c3e6442e825a9cd2c88a8d3fc416873e6`.
+- UDP macOS `10834395950`: `8ef5372eb2816bb0eba02e8b92070ff545bd141dfef498ab44552fd28754cd18`.
+
+This completion updates only README and its identical specification after the
+successful run, making the current prerequisite explicit while retaining historical
+results. No newly reproduced mandatory-check failure remains. Accepted fixed-port/
+unknown-client limitations retain the UDP Listen Port=0 guidance. The historical
+Server-tab layout observation and physical iOS27 SideStore/LiveContainer install,
+permissions, UI, VPN/hotspot, lock-screen and energy behavior are not newly verified.
+The iOS17.2 minimum remains unchanged. No server-control/persistence/Background/icon
+dependency is added; main, release/integrated, branch count and existing IPA remain
+unchanged. Source and SDK success do not certify all physical deployment conditions.
+
+## Final source audit and actual UI verification (2026-09-25)
+
+Input: `44e80c8d87eb85c9ba603a753040967efd353572`. No further production defect
+was reproduced in the reviewed native/model/lifecycle paths. The residual gap was
+verification: the historical Server-tab image did not establish whether scrolling
+exposed the bottom controls or actual taps operated the server. It did not justify
+speculative padding, a rewritten root, host changes or a new runtime controller.
+
+Two test-only files close that gap: StatisticsUITests.swift and ui_audit.py under
+Tests/Statistics. A four-line macOS workflow step runs them after all existing
+statistics checks. The Python entry copies the exact source, rebuilds the six
+pinned patches for the Simulator, and adds a test target/scheme only to that copy.
+The committed app project, five production Swift files, baseline XCFramework,
+resources, defaults, source pins and native patches remain byte-identical. No test
+source is registered in the committed production target. The test target depends
+explicitly on Socks5 and uses dependency-ordered builds, not deprecated manual order.
+Test execution remains nonparallel, bounded, and does not suppress failed assertions.
+
+The actual XCTest launches hev.Socks5 and, in portrait and landscape, scrolls until
+Start/Stop are hittable, checks their enabled states, taps Start, obtains a real
+SOCKS greeting from the native listener, taps Stop and verifies that greeting is no
+longer available. It navigates to Statistics and back in both orientations. These
+are actual UI interactions, not a reimplementation of the view in a model test.
+The scope is bottom-control access, button/native response and tab navigation;
+it does not measure live throughput presentation, every field edit, keyboard,
+Dynamic Type, iPad UI, or all possible app/OS/network states.
+
+The first run `36066838676` at `59990ed44f06b41365d3076a2691f0320a0f5934`
+passed the functional test, but two landscape app-element images were clipped.
+They remain limited visual evidence, not proof of a production rendering failure.
+Commit `2648b6153e32abd59efd05a4c34cfd0c164002b6` changed only the two capture
+expressions to XCUIScreen.main.screenshot(); run `36068543565` passed again with
+complete screen captures. The generated scheme's manual-order warning was then
+removed by changing only its dependency-order flag. No timeout, UI assertion,
+production layout or native behavior was changed to obtain a pass.
+
+Final tested commit: `57acbb8d55023cfefca3bb6964eea3a46227ac15`.
+Final tested tree: `5f4c15dc85a966fa710a76715ef64b45548cc1fc`.
+Run `36068755469`, attempt 1: all four jobs passed. The actual UI test executed once
+with zero failures in 54.799 seconds; both orientations and four full-screen images
+were inspected. Start/Stop were visible above the floating tab bar after scrolling.
+Simulator shutdown/deletion and native reverse-patch cleanup completed without error.
+Xcode's manual-order warning is absent. Existing AppIntents metadata warnings and
+Simulator debugger/accessibility diagnostic messages remain in the logs; this is
+not described as a completely warning-free platform execution.
+
+All existing native checks also passed: 58 required UDP profiles, eight peer/queue
+cases and seven driver methods per prerequisite host; statistics' 20 network
+executions in each Linux buffered/splice and Darwin buffered mode, eight peer cases
+per mode, eight-writer/800000-update counter stress, I/O ASan/UBSan, Darwin counter
+TSan, 10000 generated model samples, six pipe cases and three stale-driver cases.
+Actual object symbols distinguish I/O modes. Nine C/header and five production
+Swift SDK checks passed with empty diagnostics. Counts include repetitions and
+synthetic accounting, not independent physical-device or large real-traffic trials.
+
+The latest UDP owner remains `66e7196ef5faccc43d9b154cab21a94e4466a77e`, an
+actual ancestor with all fifteen mapped paths identical. No dependency on server
+control, persistence, Background or icon was introduced. Runtime sampling, units,
+process-lifetime counters, accepted fixed-port limits and port-zero guidance remain.
+
+Final downloaded artifacts passed ZIP/digest checks and reconstructed exact Git
+trees, including modes. Statistics archives contain 75 files; the UI manifest has
+75 matching hashes. Both prerequisite archives identify the completed 52-file UDP
+owner, not the statistics triggering commit.
+- Statistics Linux `10837432664`: `1f2f9dbd0961bb2bea9762d96796293a2eb2ed937f39c1fc347c53b1d810bb32`.
+- Statistics macOS `10837468645`: `e3372e2f3b7499290ca380615287273c3f331c1e622be64a15ec39836b0fa554`.
+- UDP Linux `10836613923`: `aa1c1507461a693faef86b8b0d14040d4145202b9b9b1d55c9aa45612c1d1be6`.
+- UDP macOS `10837730385`: `ea0232a89de342a4fec57f9057092387679d6d82e5cffaed4b8a25db0f936d6f`.
+The tested Simulator app SHA-256 is
+`f28d40a9655e11b982ec68c7a5a661100120497721578994ad4e4b64fa9969d2`;
+the combined Simulator library is
+`f232644e0b3d7b7a6cf7a21a3086034d77b2708cfd8d534604776b610675ef7f`.
+These identify test products, not a delivered IPA or a reproducible-binary guarantee.
+
+Actual environment: Xcode27.0 `27A266a`, iPhoneOS27.0 SDK, Apple Swift6.4,
+macOS27.0 `26A428`, iPhone16 Simulator running iOS27.0 `24A434`. Configured minimum
+remains iOS17.2. Target physical iOS27 SideStore standalone and LiveContainer guest
+execution remain separate and unperformed here. No installer/host version, signing,
+permission, real phone/Bluetooth interruption, VPN/hotspot, lock-screen or energy
+result is inferred from this Simulator test. No iPhone archive/IPA was generated.
+
+The added work is confined to tests, temporary Simulator products, CI time and
+evidence storage; it adds no runtime timer, observer, socket path, state or memory
+to the production app. The final README and its identical feature copy are updated
+after successful verification while preserving all historical text. main, release,
+the other five feature heads, branch count and the existing IPA remain unchanged.
+
+Relevant public test/build contracts (not physical-device results):
+- https://developer.apple.com/documentation/xcuiautomation/xcuielement/ishittable
+- https://developer.apple.com/documentation/xcuiautomation/xcuiscreenshotproviding
+- https://help.apple.com/xcode/mac/current/en.lproj/dev6a2c4394f.html

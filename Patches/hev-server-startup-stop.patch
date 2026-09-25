@@ -13,3 +13,82 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
  
      atomic_fetch_or (&tsync, SYNC_CONT);
  
+diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c
+--- a/src/hev-socks5-worker.c
++++ b/src/hev-socks5-worker.c
+@@ -54,6 +54,10 @@
+ task_io_yielder (HevTaskYieldType type, void *data)
+ {
+     HevSocks5Worker *self = data;
++
++    /* A pending Stop can run before this task reaches its first wait. */
++    if (!READ_ONCE (self->run))
++        return -1;
+ 
+     hev_task_yield (type);
+ 
+
+diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
+--- a/src/hev-socks5-proxy.c
++++ b/src/hev-socks5-proxy.c
+@@ -315,6 +315,13 @@
+ }
+ 
+ void
++hev_socks5_proxy_prepare (void)
++{
++    /* Idle only: a previous call's late Stop must not cancel the next call. */
++    atomic_fetch_and (&tsync, ~SYNC_STOP);
++}
++
++void
+ hev_socks5_proxy_stop (void)
+ {
+     int res;
+diff --git a/src/hev-socks5-proxy.h b/src/hev-socks5-proxy.h
+--- a/src/hev-socks5-proxy.h
++++ b/src/hev-socks5-proxy.h
+@@ -14,6 +14,7 @@
+ void hev_socks5_proxy_fini (void);
+ 
+ void hev_socks5_proxy_run (void);
++void hev_socks5_proxy_prepare (void);
+ void hev_socks5_proxy_stop (void);
+ 
+ #endif /* __HEV_SOCKS5_PROXY_H__ */
+diff --git a/src/hev-main.c b/src/hev-main.c
+--- a/src/hev-main.c
++++ b/src/hev-main.c
+@@ -126,6 +126,12 @@
+ }
+ 
+ void
++hev_socks5_server_prepare (void)
++{
++    hev_socks5_proxy_prepare ();
++}
++
++void
+ hev_socks5_server_quit (void)
+ {
+     hev_socks5_proxy_stop ();
+diff --git a/src/hev-main.h b/src/hev-main.h
+--- a/src/hev-main.h
++++ b/src/hev-main.h
+@@ -43,6 +43,16 @@
+                                      unsigned int config_len);
+ 
+ /**
++ * hev_socks5_server_prepare:
++ *
++ * Clear an idle pending Stop before scheduling a new server invocation.
++ * The previous main call must have returned. Call this on the controlling
++ * thread before dispatching the next main call or accepting its Stop request.
++ * It neither starts a server nor changes the legacy quit-before-start API.
++ */
++void hev_socks5_server_prepare (void);
++
++/**
+  * hev_socks5_server_quit:
+  *
+  * Stop the socks5 server.

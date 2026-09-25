@@ -66,13 +66,14 @@ import Foundation
         check(try AppSettings.decoded(Data(contentsOf: file)) == later, "Latest import wins on disk as well as memory")
 
         let blockedParent = root.appendingPathComponent("blocked-parent")
-        try Data([1]).write(to: blockedParent)
+        try FileManager.default.createDirectory(at: blockedParent, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: blockedParent.path)
         legacy.set(true, forKey: "background.silentAudio")
         legacy.set(true, forKey: "background.continuousLocation")
         let migrated = SettingsStore(fileURL: blockedParent.appendingPathComponent("settings.json"), legacy: legacy)
         check(migrated.errorMessage != nil && legacy.object(forKey: "background.silentAudio") != nil,
               "Failed initial migration keeps both legacy keys")
-        try FileManager.default.removeItem(at: blockedParent)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: blockedParent.path)
         migrated.set(\.server.listenPort, "12346")
         check(migrated.errorMessage == nil && migrated.value.background.silentAudio,
               "Recovered storage persists the migrated values")

@@ -8,18 +8,21 @@ final class SettingsStore: ObservableObject {
     let fileURL: URL
     private var importRevision: UInt64 = 0
     private var migrationDefaults: UserDefaults?
+    private var savePending = false
 
     init(fileURL: URL? = nil, legacy: UserDefaults = .standard) {
         self.fileURL = fileURL ?? FileManager.default.urls(for: .applicationSupportDirectory,
             in: .userDomainMask)[0].appendingPathComponent("Socks5/settings.json")
         do {
-            if FileManager.default.fileExists(atPath: self.fileURL.path) {
+            do {
                 value = try AppSettings.decoded(Self.read(self.fileURL))
-            } else {
+            } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
+                // An inaccessible existing file is not a first launch.
                 // Migrate the two settings saved by the preceding version once.
                 value.background.continuousLocation = legacy.bool(forKey: "background.continuousLocation")
                 value.background.silentAudio = legacy.bool(forKey: "background.silentAudio")
                 migrationDefaults = legacy
+                savePending = true
                 try write(value)
             }
         } catch {
@@ -36,11 +39,13 @@ final class SettingsStore: ObservableObject {
         importRevision &+= 1
         var next = value
         next[keyPath: path] = newValue
-        guard next != value else { return }
+        // A failed explicit save may be retried by the same choice, without polling.
+        guard next != value || savePending else { return }
         do {
             try write(next)
             errorMessage = nil
         } catch {
+            savePending = true
             errorMessage = "Settings could not be saved: \(error.localizedDescription)"
         }
         // A storage failure must never prevent the user from stopping a service.
@@ -96,6 +101,7 @@ final class SettingsStore: ObservableObject {
         options.insert(.completeFileProtectionUntilFirstUserAuthentication)
         #endif
         try value.encoded().write(to: fileURL, options: options)
+        savePending = false
         // Finish migration after the first successful write, including a later retry.
         migrationDefaults?.removeObject(forKey: "background.continuousLocation")
         migrationDefaults?.removeObject(forKey: "background.silentAudio")

@@ -82,12 +82,13 @@ def tcp_echo(proxy_port):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / 'SUCCESS.txt').unlink(missing_ok=True)
     with (OUT / 'app-build.log').open('w') as log:
         subprocess.run(['xcodebuild', 'build', '-project', 'Socks5.xcodeproj', '-scheme', 'Socks5',
                         '-configuration', 'Release', '-sdk', 'iphonesimulator', '-arch', 'arm64',
                         'CONFIGURATION_BUILD_DIR=' + str(ROOT / '.build/integrated-simulator'),
                         'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES',
-                        'MARKETING_VERSION=1.1.0', 'CURRENT_PROJECT_VERSION=6'],
+                        'MARKETING_VERSION=1.1.0', 'CURRENT_PROJECT_VERSION=7'],
                        cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=300)
     app = ROOT / '.build/integrated-simulator/Socks5.app'
     info = plistlib.loads((app / 'Info.plist').read_bytes())
@@ -167,13 +168,20 @@ def main():
             run('xcrun', 'simctl', 'terminate', device, bundle)
             record({'identity': label, 'case': 'saved-stop', 'passed': True})
             run('xcrun', 'simctl', 'uninstall', device, bundle)
-        (OUT / 'SUCCESS.txt').write_text('PASS: saved tabs, Start/relaunch/TCP and Stop in original/remapped Simulator installs. Not a physical SideStore/LiveContainer or background audio test.\n')
+        success_text = ('PASS: saved tabs, Start/relaunch/TCP and Stop in original/remapped Simulator installs. Not a physical SideStore/LiveContainer or background audio test.\n')
     finally:
+        cleanup = []
         for action in ('shutdown', 'delete'):
             try:
-                subprocess.run(['xcrun', 'simctl', action, device], capture_output=True, timeout=30)
+                result = subprocess.run(['xcrun', 'simctl', action, device], capture_output=True, timeout=30)
+                if result.returncode:
+                    cleanup.append({'action': action, 'exit': result.returncode, 'stderr': result.stderr.decode(errors='replace')})
             except subprocess.TimeoutExpired:
-                print('Simulator cleanup timeout:', action)
+                cleanup.append({'action': action, 'error': 'timeout'})
+        (OUT / 'cleanup.json').write_text(json.dumps(cleanup, indent=2))
+    if cleanup:
+        raise RuntimeError('Simulator cleanup failed: ' + repr(cleanup))
+    (OUT / 'SUCCESS.txt').write_text(success_text)
 
 
 if __name__ == '__main__':

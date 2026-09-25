@@ -53,3 +53,21 @@ enum ServerConfigurationError: LocalizedError {
         switch self { case .invalid(let message): return message }
     }
 }
+
+extension ServerSettings {
+    /// Hev receives UTF-8 bytes, not Swift's canonically equivalent characters.
+    /// Keep credential changes and raw drafts observable without normalizing them.
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.workers.utf8.elementsEqual(rhs.workers.utf8) &&
+        lhs.listenAddress.utf8.elementsEqual(rhs.listenAddress.utf8) &&
+        lhs.listenPort.utf8.elementsEqual(rhs.listenPort.utf8) &&
+        lhs.udpListenAddress.utf8.elementsEqual(rhs.udpListenAddress.utf8) &&
+        lhs.udpListenPort.utf8.elementsEqual(rhs.udpListenPort.utf8) &&
+        lhs.bindIPv4Address.utf8.elementsEqual(rhs.bindIPv4Address.utf8) &&
+        lhs.bindIPv6Address.utf8.elementsEqual(rhs.bindIPv6Address.utf8) &&
+        lhs.bindInterface.utf8.elementsEqual(rhs.bindInterface.utf8) &&
+        lhs.authUsername.utf8.elementsEqual(rhs.authUsername.utf8) &&
+        lhs.authPassword.utf8.elementsEqual(rhs.authPassword.utf8) &&
+        lhs.listenIPv6Only == rhs.listenIPv6Only
+    }
+}
