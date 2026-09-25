@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Test the real iOS27 async audio path in a temporary Simulator app; never an IPA.
+"""Diagnose the remaining advisory in a temporary iOS27 Simulator source copy.
 
-The isolated test-project construction follows the existing verified UI audit.
-No sibling feature is imported, no application project/source is rewritten, and no
-host/installer behavior is inferred from this Simulator execution.
+The tracked app and project are unchanged. Temporary call-boundary markers retain
+real call order and results; their runtime is diagnostic evidence, not the final
+uninstrumented product verification. No host or installer modification is made.
 """
 import hashlib
 import json
@@ -86,6 +86,35 @@ def add_test_target(app):
     shutil.copyfile(path, OUT / 'generated-test-project.pbxproj')
 
 
+def instrument_audio_boundary(app):
+    # Diagnostic-only copy: preserve the real calls and ordering, bracket each
+    # suspected synchronous boundary. No probe is written to the tracked source.
+    path = app / 'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift'
+    source = path.read_text()
+    calls = {
+        'let session = AVAudioSession.sharedInstance()': 'shared-session',
+        'try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])': 'category',
+        'try? session.setPrefersNoInterruptionsFromSystemAlerts(true)': 'alert-preference',
+        'player = try AVAudioPlayer(contentsOf: url)': 'player-init',
+    }
+    for call, label in calls.items():
+        if call not in source:
+            raise RuntimeError('Missing diagnostic boundary: ' + call)
+        source = source.replace(call, f'NSLog("BG_AUDIO_TRACE before {label}"); {call}; NSLog("BG_AUDIO_TRACE after {label}")')
+    source = source.replace('session.activate(options: [], completionHandler: completion)',
+        'NSLog("BG_AUDIO_TRACE before async-activate"); session.activate(options: [], completionHandler: completion); NSLog("BG_AUDIO_TRACE after async-activate-request")')
+    source = source.replace('session.deactivate(options: [.notifyOthersOnDeactivation], completionHandler: completion)',
+        'NSLog("BG_AUDIO_TRACE before async-deactivate"); session.deactivate(options: [.notifyOthersOnDeactivation], completionHandler: completion); NSLog("BG_AUDIO_TRACE after async-deactivate-request")')
+    source = source.replace('guard let current = player, current.play(),',
+        'guard let current = player, tracePlay(current),')
+    source = source.replace('previous?.stop()',
+        'NSLog("BG_AUDIO_TRACE before stop"); previous?.stop(); NSLog("BG_AUDIO_TRACE after stop")')
+    helper = '\n    private func tracePlay(_ player: AVAudioPlayer) -> Bool {\n        NSLog("BG_AUDIO_TRACE before player-play")\n        defer { NSLog("BG_AUDIO_TRACE after player-play") }\n        return player.play()\n    }\n'
+    source = source[:source.rfind('}')] + helper + source[source.rfind('}'):]
+    path.write_text(source)
+    (OUT / 'diagnostic-controller.swift').write_text(source)
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / 'SUCCESS.txt').unlink(missing_ok=True)
@@ -104,6 +133,7 @@ def main():
     with zipfile.ZipFile(OUT / 'source.zip') as source:
         source.extractall(app)
     add_test_target(app)
+    instrument_audio_boundary(app)
     runtimes = json.loads(output('xcrun', 'simctl', 'list', 'runtimes', '-j'))['runtimes']
     runtime = next(r for r in runtimes if r.get('isAvailable') and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-27-'))
     device = 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
@@ -111,9 +141,15 @@ def main():
     (OUT / 'runtime.json').write_text(json.dumps(dict(runtime=runtime, device=device, udid=identifier), indent=2))
     failure = None
     cleanup = []
+    trace = None
+    trace_stream = (OUT / 'audio-boundary-trace.log').open('w')
     try:
         run(['xcrun', 'simctl', 'boot', identifier], 'boot.log')
         run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'ready.log', timeout=120)
+        trace = subprocess.Popen(['xcrun', 'simctl', 'spawn', identifier, 'log', 'stream',
+                                  '--style', 'compact', '--level', 'debug', '--predicate',
+                                  'process == "Socks5" AND (eventMessage CONTAINS "BG_AUDIO_TRACE" OR eventMessage CONTAINS "UI unresponsiveness")'],
+                                 stdout=trace_stream, stderr=subprocess.STDOUT)
         run(['xcodebuild', 'test', '-project', app / 'Socks5.xcodeproj', '-scheme', 'AsyncAudioAudit',
              '-destination', 'platform=iOS Simulator,id=' + identifier, '-parallel-testing-enabled', 'NO',
              '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
@@ -141,6 +177,15 @@ def main():
     except Exception as exc:
         failure = exc
     finally:
+        if trace is not None:
+            trace.terminate()
+            try:
+                trace.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                trace.kill()
+                trace.wait(timeout=10)
+                cleanup.append('Diagnostic log stream required forced termination')
+        trace_stream.close()
         for action in ('shutdown', 'delete'):
             try:
                 run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=30)
