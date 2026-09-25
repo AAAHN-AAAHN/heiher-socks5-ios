@@ -9,8 +9,12 @@ CORE="$ROOT/.build/core"
 mkdir -p "$OUT"
 # A failed retry must not leave prior native/SDK success evidence usable.
 rm -f "$OUT/SUCCESS.txt" "$OUT/sdk-success.txt"
+# Bind tracked working files and the index to the recorded revision.
+git diff --exit-code HEAD -- > "$OUT/input-worktree.log"
+git diff --cached --exit-code HEAD -- > "$OUT/input-index.log"
 python3 Build/check.py baseline > "$OUT/baseline-audit.log"
 python3 Tests/ServerControl/audit_driver_check.py > "$OUT/audit-driver.log"
+python3 Tests/ServerControl/input_integrity_check.py > "$OUT/input-integrity.log"
 SERVER_REF=$(python3 -c 'import json; print(json.load(open("Build/upstream.json"))["sources"]["."])')
 if [ ! -d "$CORE/.git" ]; then
     git clone --no-checkout https://github.com/heiher/hev-socks5-server.git "$CORE"
@@ -69,6 +73,8 @@ for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
             > "$OUT/delayed-completion.log" 2>&1
         mkdir -p "$OUT/compiled-headers"
         cp "$CORE/src/hev-main.h" "$CORE/module.modulemap" "$OUT/compiled-headers/"
+        git rev-parse HEAD > "$OUT/compiled-headers/source-commit.txt"
+        (cd "$OUT/compiled-headers" && shasum -a 256 hev-main.h module.modulemap > SHA256SUMS.txt)
         python3 Tests/ServerControl/active_clients_check.py "$CORE" "$OUT/active-clients" \
             > "$OUT/active-clients.log" 2>&1
         if feature settings; then
@@ -98,6 +104,8 @@ if feature settings; then
     python3 Tests/Settings/run_checks.py --baseline-import > "$OUT/original-import-negative.log" 2>&1
     python3 Tests/Settings/run_checks.py --previous-store > "$OUT/previous-store-negative.log" 2>&1
 fi
+git diff --exit-code HEAD -- > "$OUT/final-worktree.log"
+git diff --cached --exit-code HEAD -- > "$OUT/final-index.log"
 if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
     (cd "$CORE" && ./build-apple.sh) > "$OUT/core-apple.log" 2>&1
     rm -rf HevSocks5Server.xcframework
