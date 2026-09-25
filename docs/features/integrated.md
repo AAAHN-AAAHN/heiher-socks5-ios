@@ -3,9 +3,11 @@
 ## Status and target
 
 This revision integrates the six pinned owners below into `release/integrated`.
-Verification of this candidate is pending until the completed run and inspected
-artifacts are recorded in the completion section. A configured CI job is not an
-executed pass. The old 1.1.0/build 6 IPA is not relabeled as this source.
+Run `36082323598` at `8982c26418988af8461b29426ec3a41cdd084ad6` passed the
+combined native, SDK, ARM64 archive/package and Simulator checks. The completed
+evidence, prior failures and retained audio-session advisory are recorded below.
+Physical SideStore/LiveContainer and background execution remain unperformed.
+The old 1.1.0/build 6 IPA is not relabeled as this new 1.1.0/build 7 package.
 
 The target is a physical iPhone on **iOS 27**, either installed independently through
 **SideStore** or executed as a **LiveContainer guest**. Those are different signing,
@@ -140,3 +142,150 @@ recorded. No Simulator screenshot is a physical-install certificate.
 Keep this README and `docs/features/integrated.md` byte-identical. Record exact
 source/tree, run/attempt, toolchain, artifacts and their hashes, passed/failed/not-run
 scope and remaining limitations after every relevant code or verification change.
+
+## Completed integrated verification (2026-09-25)
+
+Tested commit: `8982c26418988af8461b29426ec3a41cdd084ad6`.
+Tested tree: `344b5751df098eeb0cf74179558f0811ce0e78d2`.
+Actions run `36082323598`, attempt 1, completed successfully on both Linux and
+Xcode 27. Native checks, the iPhone archive, package inspection, preseeded Simulator
+cases, actual UI tests, result export and cleanup all completed. The Linux job's
+Apple-only steps were skipped, not counted as Linux execution. The final result is
+not inferred from an earlier SUCCESS marker or from successful individual features.
+
+### Combined executable coverage
+
+The unchanged feature tests were executed against the seven-patch combined engine,
+not merely reused as six separate historical green badges. Linux used independently
+identified buffered and splice objects; Darwin used buffered objects. Each of the
+three modes passed 58 mandatory UDP profile cases, eight peer/queued-continuation
+cases and 20 statistics network executions. Counter stress, partial/error/retry I/O,
+ASan/UBSan, Darwin counter TSan, exact formatting and reverse-patch checks passed.
+The eight-writer/800000-update input is synthetic counter stress, not a claim of
+that many independent device tests or petabytes transferred over a real network.
+
+Real controller/engine and JSON/store/controller/engine tests passed in each mode:
+14 controller comparison records, 12 active-client cases, 16 delayed-completion
+old/current records, 16 persistence records and four delayed-persistence records.
+Expected old-code failures remain negative controls, not current-version failures.
+The retained model suites passed: seven server scenarios, 84 revalidation assertions,
+512 option/YAML parity cases, 209 settings assertions, 1193 Background assertions
+and 10000 generated statistics samples. Apple-only checks included 34 real Combine
+deliveries and cancellation, five real Timer/RunLoop cases and 400 decoded zero WAV
+samples. Exact icon integrity and all 13 mutation methods, including 30728 single-bit
+mutations, passed. These counts contain repetitions and controlled boundaries.
+
+All 12 production Swift files passed the actual iPhoneOS 27 ARM64 typecheck at the
+configured iOS17.2 minimum, with warnings-as-errors and an empty compiler diagnostic
+log. The ARM64 iPhoneOS app was also built and archived; this is separate from type
+checking and the Simulator product. The archive/package checks verified the stats
+and prepare definitions, app/dSYM UUID pairing, icons, original WAV, permissions,
+absence of app extensions and IPA/source correspondence. No installer signing or
+physical-device permission is inferred from those checks.
+
+The preseeded Simulator harness passed ten original/remapped identity cases covering
+saved tabs, saved Start/relaunch with real TCP payload echo, and saved Stop. A separate
+actual XCTest passed one test with zero failures in 115.257 seconds. It scrolled and
+tapped Start/Stop in portrait/landscape, checked real SOCKS greetings, restored Start
+in a new process, visited Statistics, toggled and restored saved audio intent, turned
+it Off, and restored the Settings tab with saved Stop. Six complete screen attachments
+were inspected. Both Simulator cleanup records are empty, and xcodebuild returned
+success before the unchanged 900-second limit. Exported final JSON has server Stop,
+audio Off and location Off. Audio intent restoration is not proof of background
+survival, uninterrupted playback or physical phone/Bluetooth events. Import/export
+button presence is not a test of every native file-provider UI operation.
+
+### Failures, corrective scope and remaining advisory
+
+Run `36076700939` failed the first actual UI audio assertion: the test tapped a
+labeled outer SwiftUI row, not its separate actionable switch. The captured hierarchy
+and subsequent source review identified this test-selection error. Commit
+`0281aa9bc742eb089e8861da739b0112627fc2d2` selects the descendant switch and also
+requires it to be hittable, retaining value, relaunch, Off and native assertions.
+No production controller, layout or audio setting changed.
+
+Run `36079054645` did not complete the whole workflow. In its inspected attempt 2,
+the corrected test reported zero failures in 102.337 seconds, but xcodebuild remained
+in asynchronous diagnostic finalization after the test runner exited and exceeded
+the 900-second command limit. That is retained as a failed workflow, not promoted to
+a completed UI result. The precise lower-level diagnostic stall cause is unproven.
+The final commit adds `-collect-test-diagnostics never` only to this test invocation
+to avoid optional bulk system diagnostics. It does not disable test assertions,
+runtime issue reporting, screenshots, xcresult verdicts, exit checking or cleanup.
+It reduces verbose sysdiagnose/log-archive collection; that evidence trade-off is
+explicit. The previous failure evidence and supplied screenshots remain historical.
+
+The successful result still contains an AVAudioSession runtime warning that its
+synchronous activate/deactivate path can cause UI unresponsiveness on the main thread
+and suggests the asynchronous API. This is an observed performance advisory, not a
+silenced message and not proof of a crash. Actual taps completed, but absence of all
+main-thread stalls or smooth interaction in every environment is NOT established.
+The exact Background owner is retained instead of introducing a release-only
+asynchronous state machine that would change Off/retry/re-entry ordering without
+separate validation. This advisory remains a known limitation of this release.
+AppIntents and Simulator/debugger diagnostics are likewise retained in the logs.
+This is not a completely warning-free execution or a universal no-defect certificate.
+
+### Inspected source and deliverable identity
+
+Both downloaded original artifact ZIPs passed integrity and digest checks. Their
+154-file Git source archives reconstruct the tested tree, including executable modes,
+and all 154 recorded source hashes match. The build-source and independently recorded
+source ZIPs agree. All 97 membership entries match their exact owner bytes, modes
+and hashes. The six pinned feature heads are actual ancestors through integration
+commit `271c1ea75cccbd0302ee0caaf61293a0199439e5`, whose parents include the old
+release and all six owners; the later test corrections retain that ancestry.
+
+- Linux artifact `10842436334`: `4ac09c2af1899c6f97291fbccaf219c317c408b8d58439c9313d2162275e2379`.
+- macOS artifact `10843236261`: `4cb65fff159df58d9d253f6df1973c713cac66052cf3fc320616e54e090617cf`.
+- Unsigned 1.1.0/build 7 IPA: `a420c24e35b7e05a41788b7f667bb3861d4ad71cbdfd27be35413412a3598c80`.
+- ARM64 app/dSYM UUID: `DBD0D43E-98D6-331F-9FA7-C2AB5A570FEF`.
+
+The IPA is the exact output from tested commit 8982c264, not rebuilt from this later
+completion text. Independent ZIP/plist/Mach-O/dSYM inspection confirmed ARM64,
+iPhoneOS platform, SDK27.0, minimum17.2, version1.1.0/build7, no signature load command,
+matching UUID and both stats/prepare symbol definitions. Signing/import will change
+package bytes; this hash identifies the distributed unsigned input, not a user's
+subsequently signed copy. Source framework bytes remain the committed baseline;
+the compiled patched framework belongs to the generated build, not a silent source
+replacement.
+
+Actual environment: Xcode27.0 `27A266a`, iPhoneOS SDK27.0, Apple Swift6.4
+(`swiftlang-6.4.0.34.1`), macOS27.0 `26A428`, iPhone16 Simulator with iOS27.0
+`24A434`. Physical SideStore independent installation, LiveContainer guest loading,
+installer/host versions, lock-screen execution, real interruptions, VPN/hotspot,
+protected-data and energy remain unperformed. Configured minimum, intended support,
+build environment and actual executed environment are deliberately not conflated.
+
+### Documentation completion without changing the tested product
+
+The resumed review found five dated UDP/statistics review files referenced by the
+preserved feature specifications but absent from the release tree. They are restored
+byte-for-byte at their original paths from the same pinned owners. The two UDP
+reviews come from 66e7196e; the two statistics reviews and alignment review come from
+24d5fdeb. This repairs traceability, not runtime behavior. The 97-entry membership
+and all build/test inputs remain unchanged; the five supplemental document blobs
+are independently checked against those owner trees:
+
+| Restored review | Git blob |
+| --- | --- |
+| `docs/reviews/udp-compat-20260922.md` | `a769d33197ca2c07f8e56eeb66f03b5bd1378f3b` |
+| `docs/reviews/udp-compat-20260923.md` | `c49c505f32fe30fef1e2fcabc685bae23c4a5c25` |
+| `docs/reviews/traffic-statistics-20260922.md` | `07f767f6e26c54abfd908f5fa92ba56af803d99c` |
+| `docs/reviews/traffic-statistics-20260923.md` | `1cca8306c54ca40a74823eae9d367bb63c69c814` |
+| `docs/reviews/udp-statistics-alignment-20260923.md` | `a78283e2bc42c094fc9a57f17d7308e05d5cd36b` |
+
+An old `settings-lifecycle.md` path appears only inside the verbatim pre-split history;
+it describes that historical commit, not a new current feature or a reason to
+restore the removed mixed-responsibility branch. Current ownership remains server
+control plus downstream persistence. Native fixed-port/unknown-client observation
+failures remain outside the required profiles under the accepted port-zero policy.
+No full protocol/security or all-network deployment certification is claimed.
+
+This completion changes only README, its identical integrated specification and
+those five historical document files: 159 source files in the final tree versus
+154 in the tested tree. Every production, test, workflow, manifest and source pin
+remains byte-identical to the successful run. The final tree is separately recorded
+and is not misrepresented as the original 154-file CI checkout. Main, all six feature
+heads, the eight-branch count and the old build6 artifact remain untouched. No new
+runtime cost is introduced by these documentation changes.
