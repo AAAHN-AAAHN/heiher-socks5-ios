@@ -1,6 +1,32 @@
 // Scripted platform doubles for the unmodified production controller logic.
 // These tests cannot simulate actual iOS scheduling or call/audio priority.
 import Foundation
+import Dispatch
+
+
+// Only the utility-work boundary is scriptable. Main/default/labeled dispatch
+// stays real, so worker delegate and Combine scheduling tests retain real hops.
+final class DispatchQueue {
+    static var scriptUtility = true
+    static var deferUtility = false
+    static var pendingUtility: [@Sendable () -> Void] = []
+    private let queue: Dispatch.DispatchQueue
+    private let utility: Bool
+    static var main: Dispatch.DispatchQueue { Dispatch.DispatchQueue.main }
+    static func global(qos: DispatchQoS.QoSClass = .default) -> DispatchQueue {
+        DispatchQueue(queue: Dispatch.DispatchQueue.global(qos: qos), utility: qos == .utility)
+    }
+    init(label: String) { queue = Dispatch.DispatchQueue(label: label); utility = false }
+    private init(queue: Dispatch.DispatchQueue, utility: Bool) { self.queue = queue; self.utility = utility }
+    func async(execute work: @escaping @Sendable () -> Void) {
+        if utility && Self.scriptUtility {
+            if Self.deferUtility { Self.pendingUtility.append(work) }
+            else { work() }
+        } else { queue.async(execute: work) }
+    }
+    func sync(execute work: () -> Void) { queue.sync(execute: work) }
+    static func completeUtility() { pendingUtility.removeFirst()() }
+}
 
 protocol ObservableObject {}
 @propertyWrapper struct Published<Value> {
@@ -195,10 +221,17 @@ final class AVAudioSession {
     }
 }
 
-@MainActor final class AVAudioPlayer {
+final class AVAudioPlayer {
     static var instances: [AVAudioPlayer] = []
     static var rejectInit = false
     static var rejectPlay = false
+    static var rejectPreparation = false
+    static var preparationDelay: TimeInterval = 0
+    static var onPrepare: (() -> Void)?
+    static var preparations = 0
+    static var preparationsOnMain = 0
+    static var implicitPreparations = 0
+    var isPrepared = false
     static var onPlay: ((AVAudioPlayer) -> Void)?
     static var onStop: (() -> Void)?
     weak var delegate: AVAudioPlayerDelegate?
@@ -210,14 +243,26 @@ final class AVAudioSession {
         if Self.rejectInit { throw NSError(domain: "MockDecoder", code: 1) }
         Self.instances.append(self)
     }
+    func prepareToPlay() -> Bool {
+        Self.preparations += 1
+        if Thread.isMainThread { Self.preparationsOnMain += 1 }
+        if Self.preparationDelay > 0 { Thread.sleep(forTimeInterval: Self.preparationDelay) }
+        Self.onPrepare?()
+        isPrepared = !Self.rejectPreparation
+        return isPrepared
+    }
     func play() -> Bool {
+        if !isPrepared {
+            Self.implicitPreparations += 1
+            guard prepareToPlay() else { return false }
+        }
         plays += 1
         isPlaying = !Self.rejectPlay
         let result = isPlaying
         Self.onPlay?(self)
         return result
     }
-    func stop() { stops += 1; isPlaying = false; Self.onStop?() }
+    func stop() { stops += 1; isPlaying = false; isPrepared = false; Self.onStop?() }
 }
 
 @MainActor enum Bundle {

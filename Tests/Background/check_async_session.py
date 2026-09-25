@@ -15,6 +15,9 @@ IMPORTS = 'import AVFAudio\nimport CoreLocation\nimport SwiftUI\n'
 OLD = '75de52d096607eaee96abb0f06ee03378c17e547'
 current = (ROOT / CONTROLLER).read_text()
 assert current.startswith(IMPORTS)
+FIRST_ASYNC = '67f7ecd6b1f0b5d251ddf2d909568d0a3468e973'
+first_async = subprocess.check_output(['git', '-C', str(ROOT), 'show', FIRST_ASYNC])
+assert hashlib.sha1(b'blob ' + str(len(first_async)).encode() + b'\0' + first_async).hexdigest() == FIRST_ASYNC
 original = subprocess.check_output(['git', '-C', str(ROOT), 'show', OLD])
 assert hashlib.sha1(b'blob ' + str(len(original)).encode() + b'\0' + original).hexdigest() == OLD
 negative = r'''import Foundation
@@ -37,6 +40,7 @@ legacy = r'''import Foundation
 @MainActor final class ResultState { var result: Bool?; var beats = 0 }
 @main struct LegacyWorkerTests {
     @MainActor static func main() {
+        DispatchQueue.scriptUtility = false
         let session = AVAudioSession.shared
         session.synchronousDelay = 0.12
         let state = ResultState()
@@ -67,8 +71,55 @@ legacy = r'''import Foundation
     }
 }
 '''
+implicit = r'''import Foundation
+@main struct ImplicitPreparationControl {
+    @MainActor static func main() {
+        AVAudioPlayer.preparationDelay = 0.12
+        let app = BackgroundKeepAlive()
+        let start = ProcessInfo.processInfo.systemUptime
+        app.setAudio(true)
+        precondition(ProcessInfo.processInfo.systemUptime - start >= 0.1)
+        precondition(AVAudioSession.shared.synchronousCalls == 0)
+        precondition(AVAudioPlayer.implicitPreparations == 1 && AVAudioPlayer.preparationsOnMain == 1)
+        app.setAudio(false)
+        print("PASS: exact first async candidate still implicitly prepares its player on main despite native async session calls")
+    }
+}
+'''
+preparation_worker = r'''import Foundation
+@MainActor final class PreparationResult { var result: Bool?; var beats = 0 }
+@main struct PreparationWorkerTests {
+    @MainActor static func main() {
+        DispatchQueue.scriptUtility = false
+        AVAudioPlayer.preparationDelay = 0.12
+        let player = try! AVAudioPlayer(contentsOf: URL(fileURLWithPath: "/Silence.wav"))
+        let state = PreparationResult()
+        let timer = Foundation.Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { _ in
+            MainActor.assumeIsolated { state.beats += 1 }
+        }
+        defer { timer.invalidate() }
+        BackgroundKeepAlive.exercisePreparation(player) { success in
+            DispatchQueue.main.async { state.result = success }
+        }
+        let limit = Date().addingTimeInterval(2)
+        while state.result == nil && Date() < limit {
+            Foundation.RunLoop.main.run(until: Date().addingTimeInterval(0.005))
+        }
+        precondition(state.result == true && state.beats >= 3)
+        precondition(AVAudioPlayer.preparations == 1 && AVAudioPlayer.preparationsOnMain == 0)
+        precondition(player.isPrepared && !player.isPlaying)
+        precondition(player.play() && AVAudioPlayer.implicitPreparations == 0)
+        player.stop()
+        print("PASS: actual preparation adapter works off main while its run loop progresses; prepared play adds no implicit preparation")
+    }
+}
+'''
 extension = r'''
 extension BackgroundKeepAlive {
+    nonisolated static func exercisePreparation(_ player: AVAudioPlayer,
+                                                 completion: @escaping @Sendable (Bool) -> Void) {
+        prepareAudioPlayer(player, completion: completion)
+    }
     nonisolated static func exerciseLegacySession(_ active: Bool,
                                                   completion: @escaping @Sendable (Bool, Error?) -> Void) {
         changeLegacyAudioSession(active, completion: completion)
@@ -80,7 +131,10 @@ with tempfile.TemporaryDirectory() as directory:
     mocks = ROOT / 'Tests/Background/PlatformMocks.swift'
     for label, source, test in [
         ('current-delayed', current, (ROOT / 'Tests/Background/AsyncSessionTests.swift').read_text()),
+        ('current-preparation', current, (ROOT / 'Tests/Background/PreparationTests.swift').read_text()),
         ('old-blocking-control', original.decode(), negative),
+        ('first-async-implicit-preparation', first_async.decode(), implicit),
+        ('preparation-worker', current + extension, preparation_worker),
         ('legacy-worker', current + extension, legacy),
     ]:
         (folder / 'Controller.swift').write_text(source.replace(IMPORTS, 'import Foundation\n', 1))
@@ -92,4 +146,4 @@ with tempfile.TemporaryDirectory() as directory:
                             str(folder / 'Test.swift'), '-o', str(exe)], check=True, timeout=90)
             print('TEST:', label, 'optimized=', optimize, flush=True)
             subprocess.run([str(exe)], check=True, timeout=30)
-print('PASS: delayed current, exact old blocking control and unmodified legacy adapter; DEBUG and optimized')
+print('PASS: delayed session/preparation, exact old controls and real preparation/legacy adapters; DEBUG and optimized')

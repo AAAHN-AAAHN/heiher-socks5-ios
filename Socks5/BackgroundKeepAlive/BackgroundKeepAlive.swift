@@ -20,7 +20,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     private var restoringAudio = false
     private var invalidatedDuringRestore = false
     private var playerFailurePending = false
-    private enum SessionTransition { case activating, deactivating }
+    private enum SessionTransition { case activating, preparing, deactivating }
     private var sessionTransition: SessionTransition?
     private var deactivationPending = false
 
@@ -218,10 +218,9 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     private func audioActivated(_ success: Bool, error: Error?) {
         guard sessionTransition == .activating else { return }
         sessionTransition = nil
-        defer { finishAudioRestore() }
         // An Off must be drained even after Off-On: a prior release must never
         // complete after the next activation and disable the new session.
-        guard audioEnabled, !deactivationPending else { return }
+        guard audioEnabled, !deactivationPending else { finishAudioRestore(); return }
         do {
             guard success, error == nil, !invalidatedDuringRestore else {
                 throw error ?? NSError(domain: "BackgroundKeepAlive", code: 3,
@@ -233,11 +232,47 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
                                   userInfo: [NSLocalizedDescriptionKey: "Silence.wav is missing"])
                 }
                 player = try AVAudioPlayer(contentsOf: url)
-                player?.delegate = self
                 player?.numberOfLoops = -1
             }
-            guard let current = player, current.play(), current.isPlaying, audioEnabled,
-                  player === current, !invalidatedDuringRestore else {
+            guard let preparing = player else { finishAudioRestore(); return }
+            // prepareToPlay may synchronously activate audio even after our async
+            // session activation. Transfer exclusive access until it completes;
+            // no delegate, timer or Off handler touches this player on the worker.
+            player = nil
+            preparing.delegate = nil
+            sessionTransition = .preparing
+            Self.prepareAudioPlayer(preparing) { [weak self] success in
+                Self.onMain { [weak self] in
+                    guard let self else {
+                        preparing.stop()
+                        Self.changeAudioSession(false) { _, _ in }
+                        return
+                    }
+                    self.audioPrepared(preparing, success: success)
+                }
+            }
+        } catch {
+            retryAudio(error)
+            finishAudioRestore()
+        }
+    }
+
+    private func audioPrepared(_ prepared: AVAudioPlayer, success: Bool) {
+        guard sessionTransition == .preparing else { return }
+        sessionTransition = nil
+        player = prepared
+        player?.delegate = self
+        defer { finishAudioRestore() }
+        guard audioEnabled, !deactivationPending else { discardPlayer(); return }
+        do {
+            guard success, !invalidatedDuringRestore else {
+                throw NSError(domain: "BackgroundKeepAlive", code: 4,
+                              userInfo: [NSLocalizedDescriptionKey: "Audio preparation failed or was interrupted during recovery"])
+            }
+            // Preparation completed; retain MainActor play/Off ordering without
+            // making play perform its implicit synchronous preparation here.
+            guard prepared.play(), prepared.isPlaying, audioEnabled,
+                  player === prepared, !invalidatedDuringRestore else {
                 throw NSError(domain: "BackgroundKeepAlive", code: 2,
                               userInfo: [NSLocalizedDescriptionKey: "Audio playback could not start or was interrupted during recovery"])
             }
@@ -245,6 +280,13 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
             scheduleAudioCheck(after: 1)
         } catch {
             retryAudio(error)
+        }
+    }
+
+    private nonisolated static func prepareAudioPlayer(_ player: AVAudioPlayer,
+                                                       completion: @escaping @Sendable (Bool) -> Void) {
+        DispatchQueue.global(qos: .utility).async {
+            completion(player.prepareToPlay())
         }
     }
 
