@@ -193,10 +193,10 @@ import Foundation
         check(session.synchronousCalls == 0, "The iOS27 path never calls synchronous setActive")
 
         var temporary: BackgroundKeepAlive? = BackgroundKeepAlive()
-        weak var released = temporary
+        let isReleased = { [weak temporary] in temporary == nil }
         temporary!.setAudio(true)
         temporary = nil
-        check(released == nil, "Pending system completion does not retain a discarded controller")
+        check(isReleased(), "Pending system completion does not retain a discarded controller")
         session.completeNext()
         check(session.pending.count == 1 && !session.pending[0].active,
               "An orphaned successful activation is asynchronously released")

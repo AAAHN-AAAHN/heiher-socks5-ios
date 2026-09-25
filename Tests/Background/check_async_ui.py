@@ -120,6 +120,8 @@ def main():
              '-collect-test-diagnostics', 'never', 'CODE_SIGNING_ALLOWED=NO',
              'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES'], 'ui-test.log', timeout=900)
         run(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', OUT / 'UI.xcresult'], 'test-summary.json')
+        run(['xcrun', 'xcresulttool', 'export', 'attachments', '--path', OUT / 'UI.xcresult',
+             '--output-path', OUT / 'attachments'], 'attachments.log')
         run(['xcrun', 'xcresulttool', 'get', 'object', '--legacy', '--format', 'json',
              '--path', OUT / 'UI.xcresult'], 'result-object.json')
         summary = json.loads((OUT / 'test-summary.json').read_text())
