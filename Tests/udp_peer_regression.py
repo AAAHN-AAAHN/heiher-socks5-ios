@@ -47,7 +47,8 @@ def echo_server(host):
 @contextlib.contextmanager
 def proxy(binary, directory, workers):
     with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as reserve:
-        reserve.bind(('::1', 0)); port = reserve.getsockname()[1]
+        reserve.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        reserve.bind(('::', 0)); port = reserve.getsockname()[1]
     config = directory / f'peer-{workers}.yml'
     config.write_text(f"main:\n  workers: {workers}\n  port: {port}\n  listen-address: '::'\n"
                       "  listen-ipv6-only: false\n  udp-listen-address: '::'\n  udp-port: 0\n")

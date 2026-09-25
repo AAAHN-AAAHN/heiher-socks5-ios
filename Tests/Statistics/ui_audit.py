@@ -28,7 +28,7 @@ def run(args, log, cwd=ROOT, timeout=180):
 
 
 def output(*args):
-    return subprocess.check_output(list(map(str, args)), text=True, timeout=60)
+    return subprocess.check_output(list(map(str, args)), text=True, timeout=60, cwd=ROOT)
 
 
 def add_test_target(app):
@@ -91,11 +91,14 @@ def add_test_target(app):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / 'SUCCESS.txt').unlink(missing_ok=True)
+    for name in ('SUCCESS.txt', 'simulator-app-sha256.txt', 'simulator-library-sha256.txt'):
+        (OUT / name).unlink(missing_ok=True)
     if not __debug__ or sys.platform != 'darwin':
         raise SystemExit('Assertions and an actual Apple toolchain are required')
     if WORK.exists():
         raise SystemExit('Use a clean UI audit workspace')
+    run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'input-worktree.log')
+    run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'input-index.log')
     if not output('xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version').strip().startswith('27.'):
         raise SystemExit('An iOS 27 Simulator SDK is required')
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
@@ -171,6 +174,8 @@ def main():
         raise failure
     if cleanup:
         raise RuntimeError('UI audit cleanup failed: ' + repr(cleanup))
+    run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'final-worktree.log')
+    run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'final-index.log')
     (OUT / 'SUCCESS.txt').write_text('PASS: actual Simulator scrolling, Start/Stop native handshake and tab navigation in portrait/landscape. No IPA, SideStore or LiveContainer test.\n')
 
 
