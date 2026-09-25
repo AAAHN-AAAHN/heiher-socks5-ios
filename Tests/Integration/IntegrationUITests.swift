@@ -57,8 +57,10 @@ final class StatisticsUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         app.tabBars.buttons["Background"].tap()
         XCTAssertTrue(app.navigationBars["Background"].waitForExistence(timeout: 5))
-        let audio = app.switches["Loop silent WAV"]
+        // The labeled SwiftUI row contains a separate actionable switch.
+        let audio = app.switches["Loop silent WAV"].switches.element(boundBy: 0)
         XCTAssertTrue(audio.waitForExistence(timeout: 5))
+        XCTAssertTrue(audio.isHittable)
         XCTAssertEqual(audio.value as? String, "0")
         audio.tap()
         XCTAssertEqual(audio.value as? String, "1")
