@@ -93,6 +93,7 @@ def main():
     if not __debug__ or WORK.exists():
         raise SystemExit('Assertions and a clean workspace are required')
     run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'working-tree.log')
+    run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'index.log')
     if not output('xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version').startswith('27.'):
         raise SystemExit('Actual iOS27 Simulator SDK required')
     paths = output('git', 'ls-files').splitlines()
@@ -140,6 +141,8 @@ def main():
         for p, digest in snapshot.items():
             if hashlib.sha256((ROOT / p).read_bytes()).hexdigest() != digest:
                 raise RuntimeError('Tracked source modified: ' + p)
+        run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'final-working-tree.log')
+        run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'final-index.log')
     except Exception as exc:
         failure = exc
     finally:

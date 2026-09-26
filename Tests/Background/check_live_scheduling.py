@@ -8,6 +8,9 @@ from pathlib import Path
 import subprocess
 import tempfile
 
+if not __debug__:
+    raise SystemExit('Assertions must be enabled.')
+
 ROOT = Path(__file__).resolve().parents[2]
 controller = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift').read_text()
 imports = 'import AVFAudio\nimport CoreLocation\nimport SwiftUI\n'

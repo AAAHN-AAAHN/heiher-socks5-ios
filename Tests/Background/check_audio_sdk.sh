@@ -5,7 +5,9 @@ cd "$(dirname "$0")/../.."
 OUT="$PWD/artifacts/audio-checks"
 mkdir -p "$OUT"
 rm -f "$OUT/SUCCESS.txt"
+python3 -c 'import sys; sys.exit(0 if __debug__ else "Assertions must be enabled.")'
 git diff --exit-code HEAD -- > "$OUT/working-tree.log"
+git diff --cached --exit-code HEAD -- > "$OUT/index.log"
 xcodebuild -version | tee "$OUT/toolchain.txt"
 xcrun --sdk iphoneos --show-sdk-version | tee -a "$OUT/toolchain.txt" | grep -E '^27\.'
 git rev-parse HEAD > "$OUT/tested-commit.txt"
@@ -35,6 +37,7 @@ xcrun swiftc -typecheck -swift-version 5 -warnings-as-errors \
   Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift \
   Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift > "$OUT/ios-sdk-typecheck.log" 2>&1
 git diff --exit-code HEAD -- >> "$OUT/working-tree.log"
+git diff --cached --exit-code HEAD -- >> "$OUT/index.log"
 python3 - <<'PY' > "$OUT/source-sha256.json"
 import hashlib, json, pathlib, subprocess
 paths = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
