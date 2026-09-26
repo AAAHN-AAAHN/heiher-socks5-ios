@@ -1,6 +1,29 @@
 # Background services: continuous location and asynchronous silent audio
 
-## Current status and scope — 2026-09-26
+## Latest repeat audit — 2026-09-26
+
+This repeat review starts at `ae93666e97a7a8e1be7e2d8cd3211eb8085cfd94`.
+The application, all audio/location methods, UI, WAV, project/plist, source pins,
+framework and workflow remain byte-identical. The changes are confined to audit
+entry points, their regression tests and this identical README/specification pair.
+New run **36206790399** executed source
+`b8f1e4eea6163c96cc3dca375218bb715ea0ede1`, tree
+`a8bef62b406ab8229c30b4bd1c5c86cd137785e0`. SDK/controller passed in attempt 1;
+the identical-source UI retry passed in attempt 2. The first actual UI state-wait
+failure remains recorded below with an unestablished internal cause; it is not
+relabeled as a boot failure or a corrected runtime bug. Physical SideStore and
+LiveContainer installation/execution remain separate and unperformed.
+
+This completion changes only the README/specification pair after testing; the
+other 65 files match the tested 67-file source. Earlier successful runs are not
+substituted for this execution. No new iPhone archive, IPA or release integration
+is performed.
+
+The prior final-audit record below retains its source/run identity and complete
+contract. The repeat-audit section at the end describes only this additional work;
+it does not reclassify earlier failures or add application features.
+
+## Prior final-audit checkpoint — 2026-09-26
 
 This final audit is complete within the source, regression, SDK and Simulator
 boundaries below. The corrected source is
@@ -275,3 +298,147 @@ Primary contracts used in this audit (documentation, not execution evidence):
 - https://developer.apple.com/documentation/corelocation/cllocationmanager/allowsbackgroundlocationupdates
 - https://developer.apple.com/documentation/avfaudio/avaudioplayer/preparetoplay()
 - https://developer.apple.com/documentation/avfaudio/avaudioplayer/play()
+
+## Repeat-audit findings and additional verification
+
+### Index-only input drift
+
+The preceding source guard compared working files to HEAD, but not the Git index.
+An edit can remain staged while its working file is restored to HEAD. The SDK/UI
+entries then reached external tools despite an index that did not match the archived
+revision. Both now check `git diff --cached --exit-code HEAD --` in addition to the
+existing working-tree comparison. The SDK checks both before Apple work and before
+its final manifest. UI retains its complete before/after byte hashes and now also
+checks working tree and index at the final boundary. Separate logs preserve each
+check. No archive, product, timeout, XCTest assertion or warning gate is weakened.
+
+The exact prior SDK/UI blobs `355880ba630159f012a4f495bff1277461f416cd`
+and `3a6432e0da8cd9e4fae50deb4ab6ad7dd464a8c8` demonstrate that omitted
+index check in real isolated Git fixtures. The expanded test fails against the
+unmodified SDK entry before correction and passes after the added index gate.
+This does not claim a previous CI actually ran dirty, or that an adversarial actor
+cannot change and restore files between checkpoint comparisons.
+
+### Assertion-enabled execution
+
+The SDK shell now rejects Python optimization before invoking Apple tools. Three
+standalone drivers (async session, Combine subscription and live scheduling) also
+reject optimized Python execution before their source transformation or external
+commands. The prescribed full SDK run already rejected optimization later in its
+scope check; this moves rejection to the start and covers standalone drivers too.
+Swift debug/optimized builds are different: both remain enabled and keep all their
+existing postconditions. No Swift compiler optimization level is disabled here.
+
+check_audit_integrity.py retains the original sixteen entry cases and adds exact-
+prior index/optimization controls and standalone-driver checks: **37 cases total**.
+Normal paths deliberately stop at the next external-command boundary; optimized
+or dirty current input must stop earlier. This is driver validation, not a fake
+successful Swift compile or OS playback run. The original three stale-success
+shell controls are unchanged. Older records of sixteen cases describe their own
+revision, not the expanded suite.
+
+Local review also compiled the unchanged production controller with the existing
+platform doubles. A supplemental boundary matrix covers seven operations (category,
+preference, activation, preparation, play, stop, deactivation), six reentrant events
+and inline/deferred completion: 84 cases and 578 invariant checkpoints in each of
+debug and optimized execution. It checks single in-flight work/timer/player, Off
+precedence, recovery after invalidation and location independence. The matrix is
+included in the companion evidence, not added to the app or routine CI. It is not
+full state-space, actual OS-event or physical-device coverage.
+
+No further actionable controller-code defect was isolated by the source and
+scripted checks. The actual UI timing observation below retains its uncertainty.
+The previous location-reset repair and all existing regression/async/lifetime tests
+remain intact. These audit-only changes add Git reads and bounded validation work,
+not a runtime timer, queue, allocation policy, permission, host patch or retry policy.
+The following identities and results were recorded after inspecting the original artifacts.
+
+### First actual UI failure in this repeat run
+
+Run 36206790399 attempt 1 passed SDK/controller checks but its actual XCTest failed
+on the first On: the identified audio-state label was not confirmed Playing within
+the unchanged ten-second predicate wait. The test recorded one failure in 39.816
+seconds; xcodebuild failed. This was not a Simulator boot timeout. Cleanup completed
+successfully. No UI SUCCESS, advisory-check or app-hash marker was produced.
+
+The original xcresult contains repeated accessibility descriptions reporting
+Activating audio session. Its recorded movie shows that state in the 28-second
+frame and Playing in the 36-second frame. These are decoded original movie frames,
+not generated screenshots and not grounds to change the XCTest failure to a pass.
+Movie position is not a measurement of native callback latency. The state string
+covers activation and preparation, so these observations do not isolate an internal
+API call, establish an endless stall, or prove an XCTest caching defect. The initial
+state-wait failure's exact cause remains unestablished. No host change, forced audio
+restart, longer deadline or weaker predicate was introduced on that evidence.
+
+The failed original ZIP was preserved before retrying only the failed UI job on the
+identical source. Its SHA-256 is
+47e5b4988f9b2be8c6f1a175463f961760a9418675bff415bbf76d13d379d1ff (artifact
+10894776054). The companion read-only extractor decodes its compressed raw attachment
+data and optional movie frames; it is not presented as an Apple xcresulttool export.
+The later successful retry does not erase this observation or certify bounded startup
+latency on every runner or device. Pending uncancelable system work remains serialized.
+
+## Completed repeat-audit evidence
+
+All results in this section refer to source b8f1e4ee and run 36206790399, not the
+preceding ac1af90e audit. The SDK job passed in attempt 1. Only the failed UI job
+was retried; the SDK success shown with attempt 2 is carried forward, not a second
+independent SDK run. The ordinary archive/IPA verify job is intentionally skipped.
+
+The SDK artifact passes all 1193 retained controller/delegate/recovery/lifecycle/
+lifetime assertions and all 49 authorization-reset assertions. The exact previous
+controller retains its 28 expected authorization failures. Both Swift debug and
+optimized configurations pass the 38 session assertions plus 3000 transitions,
+22 preparation assertions plus 3000 transitions, exact-old blocking and implicit-
+preparation controls, and unchanged real worker helpers. All 37 audit-entry cases
+and the original three marker controls pass. Real Foundation/Combine delivers 34
+notifications and checks cancellation; the five real Timer/RunLoop conditions pass.
+Apple decoding confirms all 400 WAV samples are zero. The five production Swift
+files pass ARM64/iOS17.2 type checking against iPhoneOS27 with warnings-as-errors;
+the diagnostic log is empty. Baseline/composition/scope/whitespace and both source
+worktree/index boundaries pass. These audio/location doubles are not OS events.
+
+UI attempt 2 passed one XCTest, zero failures and zero skips in 123.036 seconds
+(test case time, not workflow duration). The identified audio Playing/Off states,
+generic-Off negative-selector control, repeated/rapid choices, tab navigation and
+saved On/Off after relaunch all passed. Both original full-screen attachments were
+opened and inspected. xcodebuild returned success, cleanup.json and runtimeWarnings
+are empty arrays, and the original main-thread audio advisory is absent from both
+console and exported xcresult object. Two AppIntents extraction warnings and
+Simulator/debugger diagnostics remain; not every diagnostic or possible hang is
+excluded. The first failed attempt is not counted as a successful UI execution.
+
+Recorded SDK environment: Xcode27.0 27A266a, iPhoneOS27.0, Apple Swift6.4
+swiftlang-6.4.0.34.1, macOS27.0 26A428. Actual UI runtime: iPhone16 Simulator,
+iOS27.0 24A434. No physical installer/host version or device result is inferred.
+The Simulator executable digest is recorded by CI in app-sha256.txt; its bytes are
+not separately included in that artifact for an independent local binary rehash.
+
+| Original artifact | Attempt | SHA-256 |
+| --- | --- | --- |
+| SDK/controller 10894190826 | 1 | be987eb8e31f28bebe94fce14a6776c6a8e5c2cd025f0102941e2e35cff609cf |
+| Actual UI state-wait failure 10894776054 | 1 | 47e5b4988f9b2be8c6f1a175463f961760a9418675bff415bbf76d13d379d1ff |
+| UI success 10894991373 | 2 | 1d064f0ee3557c7dac00ba280b2fe66b6aeb720334c6644f2f5717bbf9d08736 |
+
+All three original ZIP digests/CRCs, genuine Git source comments, all 67 paths,
+bytes, executable modes and source hashes match the tested tree. The failed run
+retains its complete raw xcresult rather than inventing an exported success summary.
+Forward/reverse patches reconstruct the before, tested and final trees. Across the
+whole repeat audit, six test/driver paths and the two documents change; 59 starting
+files remain identical and no path is added or deleted. The prior document's full
+contract and evidence are retained under the explicitly prior checkpoint above;
+the two existing history documents are byte-identical.
+
+Local regressions, all 37 entry cases, full async suites and the supplemental
+84-case matrix passed; Python/shell/JSON/plist syntax checks are recorded separately.
+The offline companion verifier checks identities and recorded results, not a new
+Apple/device execution. Direct container clone was unavailable, so exact connector
+archives and verified blobs supplied the local reconstruction rather than a claimed
+full clone. Main, all other features, release and build7 remain unchanged. Within
+the defined checks the final execution is complete; the first UI failure's cause
+and all physical/unperformed boundaries remain explicit, not declared solved.
+
+Additional primary contracts consulted, not execution evidence:
+- https://developer.apple.com/documentation/xctest/xctnspredicateexpectation
+- https://developer.apple.com/documentation/xcuiautomation/xcuielement
