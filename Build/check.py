@@ -10,6 +10,9 @@ import subprocess
 import sys
 import wave
 
+if not __debug__:
+    raise SystemExit('Assertions must be enabled')
+
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 FEATURES = set(CONFIG['features'])

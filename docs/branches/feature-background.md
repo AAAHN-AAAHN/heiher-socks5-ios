@@ -1,531 +1,444 @@
-# SOCKS5 for iOS: background
+# Background services: continuous location and asynchronous silent audio
 
-This is the focused `feature/background` branch.
-For the complete app use `release/integrated`; the shared app + engine baseline remains on `main`.
+## Latest repeat audit — 2026-09-26
 
-Build and verification: [instructions](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/feature/background/docs/build-and-validation.md).
-The following specification is also preserved verbatim at `docs/features/background.md`.
+This repeat review starts at `ae93666e97a7a8e1be7e2d8cd3211eb8085cfd94`.
+The application, all audio/location methods, UI, WAV, project/plist, source pins,
+framework and workflow remain byte-identical. The changes are confined to audit
+entry points, their regression tests and this identical README/specification pair.
+New run **36206790399** executed source
+`b8f1e4eea6163c96cc3dca375218bb715ea0ede1`, tree
+`a8bef62b406ab8229c30b4bd1c5c86cd137785e0`. SDK/controller passed in attempt 1;
+the identical-source UI retry passed in attempt 2. The first actual UI state-wait
+failure remains recorded below with an unestablished internal cause; it is not
+relabeled as a boot failure or a corrected runtime bug. Physical SideStore and
+LiveContainer installation/execution remain separate and unperformed.
 
-# Background services: continuous coarse location and silent audio recovery
+This completion changes only the README/specification pair after testing; the
+other 65 files match the tested 67-file source. Earlier successful runs are not
+substituted for this execution. No new iPhone archive, IPA or release integration
+is performed.
 
-## Purpose and scope
+The prior final-audit record below retains its source/run identity and complete
+contract. The repeat-audit section at the end describes only this additional work;
+it does not reclassify earlier failures or add application features.
 
-`feature/background` adds an opt-in Background screen and native services without
-changing Hev's relay engine. Both switches are independent of server Start/Stop.
-The aim is to keep the process eligible to execute while its SOCKS5 server is in use,
-with concise native APIs rather than iSH emulation, Python polling, or Picture in
-Picture. This is a sideload-oriented utility, not an App Store approval claim.
+## Prior final-audit checkpoint — 2026-09-26
 
-Only continuous location and silent WAV remain. Earlier held-open/five-second-read
-and close/wait/reopen experiments were removed. The location state, callback count,
-and last callback time remain visible. Coordinates are neither retained nor sent.
+This final audit is complete within the source, regression, SDK and Simulator
+boundaries below. The corrected source is
+`ac1af90e67f3bb760729ea95370536bb95fa8151`, tree
+`d7c8567532e21d4f726abdde8918d9dfd3fdba48`, on `feature/background`.
+New run **36153834876** passed: SDK/controller in attempt 1 and the same-source
+Simulator UI retry in attempt 2. The earlier run 36138588562 was not reused as
+validation of these changes. Physical installation and execution remain unperformed.
+No release integration or new IPA is part of this audit. This final documentation
+update changes only the identical README/specification pair; the other 65 files
+remain byte-for-byte and mode-for-mode identical to the tested 67-file source.
 
-## Location implementation
+The complete preceding README is preserved byte-for-byte in
+`docs/history/background-before-final-audit-20260926.md`.
+That file retains the earlier publication failures, exact artifacts and successful
+preparation-worker verification. The original synchronous specification remains in
+`docs/history/background-before-async-20260925.md`. Historical status statements
+apply to their own revisions, not this source. This README and
+`docs/features/background.md` are identical.
 
-One CLLocationManager exists while enabled. It is created on MainActor and delegates
-on that run loop. Coarse/background options are configured before assigning its
-delegate, so an initial authorization callback cannot start an unconfigured manager.
-It requests `kCLLocationAccuracyThreeKilometers`, has no distance filter, permits background updates, shows the location indicator, and disables
-automatic pausing. It calls `startUpdatingLocation()` only when needed, not on a
-polling timer. iOS determines actual callback cadence and sensor use; coarse accuracy
-is not a command to turn the physical GPS off or sample at an exact interval.
+## Target, ownership and preserved baseline
 
-Permission requests are made only while the application is active, with a flag to
-avoid duplicate requests. Both authorized-when-in-use and authorized-always states
-can use the configured session. A new When-In-Use session waits until the app is
-active; the root activation callback then starts it. A session already started in
-foreground continues in background without a restart. Always authorization retains
-its existing background-start behavior; actual OS delivery is not guaranteed.
-Permission denial stops updates but preserves user intent. Authorization changes can resume the existing manager. Off stops it,
-clears its delegate, and rejects stale callbacks by manager identity. Temporary
-errors report status rather than disabling the saved preference.
+The intended environment is a physical **iOS 27 iPhone**, installed independently
+through **SideStore** or run as a **LiveContainer guest**. These are distinct signing,
+container, permission and shared-audio-session boundaries. A Simulator or Xcode SDK
+check is not evidence of either physical installation method. The configured minimum
+remains **iOS 17.2**; it does not certify execution on every intervening OS version.
+Exact build and execution environments must be recorded with each test result.
 
-Apple documents low accuracy with automatic pausing disabled as a way to retain
-standard location updates more economically. This does not make the service free:
-no iPhone battery benchmark has established a precise percentage saving.
+The common main baseline is `d2534cd6bce7389fdf8f362bd8f681c0bd583eb1`.
+This independent feature adds no native patches and has no dependency on UDP,
+statistics, server-control, persistence or icon features. Upstream pins, the committed
+unpatched XCFramework, original ContentView/server implementation, app project,
+plist, Bundle ID `hev.Socks5` and WAV remain unchanged in this audit. Main, release,
+other feature refs and the eight-branch structure are not changed.
 
-## Audio state and events
+One root-owned MainActor controller owns location, audio state and their bounded
+recovery machinery. The standalone root persists only the two existing AppStorage
+keys `background.continuousLocation` and `background.silentAudio`. The integrated
+root can supply JSON-backed bindings to the same controller/view instead; two
+parallel persistence systems are not introduced. Background never controls Hev or
+reads/writes JSON. Audio and location switches are independent of each other and
+of Server Start/Stop. Audio remains above Location in the view.
 
-A single AVAudioPlayer loops `Silence.wav` with `numberOfLoops = -1`. The session uses
-`.playback`, `.default`, and `.mixWithOthers`. No microphone permission or recording
-is used. System-alert interruption avoidance remains a best-effort preference.
+The original four project principles remain the governing contract: understand and
+preserve established behavior before minimal, simple, efficient changes; target the
+actual SideStore/LiveContainer environments; maintain complete version/environment/
+implementation documentation; and distinguish source checks, mocks, SDK, CI,
+packages, installation and physical execution as separate evidence levels.
 
-Saved On is user intent, not a claim of successful playback. One common-mode,
-one-shot main-run-loop Timer checks `isPlaying` every second. An observed stop
-attempts recovery in that callback, without another initial one-second wait.
-A new interruption or invalidation likewise attempts recovery immediately in its
-MainActor handler, even if the old player still claims to be playing. Failed
-activation, construction or play schedules the next attempt after one second,
-without backoff, attempt limit or automatic Off. Healthy samples do not reactivate
-or recreate the player. This is not a real-time timer or suspension bypass.
+## Final-audit findings and minimal corrections
 
-### Public signal coverage
+### 1. Location authorization reset left an obsolete running flag
 
-The subscriber and handler share `BackgroundKeepAlive.audioNotifications`, avoiding
-separate lists that can drift. On iOS 27 the registry contains all 13 playback-
-relevant AVAudioSession notification names below, plus four lifecycle checkpoints.
-The legacy interruption notification is deliberately retained alongside its new
-replacements, including missing/unknown userInfo. Typed NotificationCenter messages
-are alternative representations of these events, not extra signals to duplicate.
+When an already-started manager returned to `notDetermined`, the old controller
+kept `updating = true`. A late location batch could still increment its diagnostics,
+and reauthorization was blocked by the existing already-updating guard. The exact
+old controller blob `63e9e895ed6141e2b021ba80742cbddb13d04052` fails 28 of the 49
+new authorization assertions; the corrected controller passes all 49 locally
+and in the new Apple host run.
+These callbacks are platform doubles, not a claim that a physical permission reset
+was executed. Apple's authorization callback contract includes user privacy resets
+and expiry of temporary authorization.
 
-| Signal | Handling while Audio is On |
-| --- | --- |
-| `interruptionNotification` (legacy) | Recreate and attempt recovery, for began/ended and unknown or missing metadata. |
-| `didBecomeInactiveNotification` (iOS 27) | Recreate and attempt recovery regardless of deactivation reason/context. |
-| `resumptionRecommendationNotification` (iOS 27) | Recreate and attempt recovery; missing/negative advice does not erase saved On. System priority can still deny activation. |
-| `mediaServicesWereLostNotification`, `mediaServicesWereResetNotification` | Discard stale audio objects, restore the session and attempt recovery. |
-| `routeChangeNotification` | All route reasons reach playback reconciliation. Repair changed category/mode/options. A stopped existing player is retried even on a normal category-change event. |
-| `didBecomeActiveNotification` (iOS 27) | Reconcile playback without rebuilding a healthy player. Suppress our own activation echo when a missing player already has a recovery attempt/retry. |
-| `silenceSecondaryAudioHintNotification` | Reconcile playback; this foreground-only hint is not a guaranteed background end notification. The WAV is already silent. |
-| `spatialPlaybackCapabilitiesChangedNotification`, `renderingModeChangeNotification`, `renderingCapabilitiesChangeNotification` | Reconcile playback, without reconstructing a healthy player solely for a rendering change. |
-| `outputMuteStateChangeNotification`, `userIntentToUnmuteOutputNotification` (iOS 26+) | Reconcile playback without overriding mute/volume or declaring silence a playback failure. |
+The correction adds one conditional stop/reset to the existing `notDetermined`
+branch. The flag is cleared before stopping the obsolete request. Initial permission
+requests remain active-only and deduplicated; an unused manager is not stopped.
+When-In-Use still requires foreground for a new session, Always keeps its existing
+start behavior, and repeated callbacks do not add starts/stops. User On is retained.
+No location polling, timer, new state field, coordinate storage or permission is added.
 
-App will-resign-active, did-enter-background, will-enter-foreground and protected-
-data-available notifications provide additional audio-only checkpoints. The existing
-root did-become-active callback continues reconciling both enabled services. The
-root owns subscriptions, not the Background tab. This is observation, not a request
-for new background execution, and neither changes the saved switches nor the server.
+### 2. A generic UI Off selector could match the location state
 
-Microphone-injection/input-mute notifications concern unused recording facilities;
-AVAudioEngine/AVPlayer events do not describe this AVAudioPlayer. They are not added
-as fake interruption coverage. Remote media commands are not audio-session
-interruption broadcasts: no Now Playing/remote-command ownership is introduced,
-which could interfere with the LiveContainer host or other media. Undelivered OS
-notifications, process termination and events outside this session cannot be
-observed by subscribing to more names. Polling and foreground reconciliation remain
-the fallback when no stop notification arrives.
+The former UI test searched any `Off` text. Location can display Off while audio
+is Playing, so that query alone did not identify audio state. The view now supplies
+the stable `background.audioState` accessibility identifier on its existing text.
+There is no label/layout/control change. The test waits for that element's exact
+Playing/Off label after normal toggles, rapid changes and relaunch. A negative-selector
+control also confirms that generic Off exists while the identified audio is Playing.
+The new Simulator run passed this strengthened test and its negative-selector
+control. The original screenshots show audio Playing with Location Off, followed
+by the final identified audio Off state; they are not physical-device captures.
 
-### Immediate recovery without recursive failure loops
+### 3. Working source and archived HEAD were not required to match
 
-The first unexpected completion or decoder failure after healthy playback now
-recreates and retries immediately. A failed replacement that errors again before
-one healthy timer sample belongs to the same recovery episode: preserve the pending
-one-second retry rather than spin or push its deadline further into the future.
-A healthy sample resets this pacing so the next independent failure is immediate.
-There is no global throttle on genuinely new interruption notifications.
+Both audit entry points previously allowed staged or unstaged changes to reach the
+Apple boundary. The UI app was built from `git archive HEAD` while its manifest and
+copied test could come from the working tree; SDK checks also read working files.
+Both now reject tracked differences from HEAD before Apple tools. The SDK driver
+checks again before its final manifest; the UI driver retains its full before/after
+hash check. UI Git queries use the repository root even when invoked elsewhere.
+This binds the tested tracked input to its archived revision; it is not protection
+against an adversary concurrently modifying and restoring files during a run.
 
-If setCategory, setActive, stop or play synchronously delivers another event or
-player failure, an in-progress guard prevents recursive activation/play. An
-invalidating event marks that attempt unsuccessful, and its retry remains one
-second. A delayed own-category/active echo with no player does not bypass an already
-scheduled failure retry. These are re-entry/echo protections, not ignored external
-stopped-player events. Explicit Off wins even if it occurs during activation.
+### 4. Failed UI retries retained old advisory/product markers
 
-Delegate callbacks off-main are routed to MainActor. Weak player identity rejects
-stale callbacks even after deallocation and address reuse; timer identity rejects cancelled callbacks. Off cancels the timer,
-clears recovery pacing/player/delegate state, and deactivates audio. Initial/repeated
-Off is a no-op when this controller is already disabled: applying saved Off must not
-deactivate an existing LiveContainer host session. Off during category/preference
-configuration, player disposal or activation also wins; a successful activation
-that returns after Off is deactivated again before returning. The old player is
-detached before stop can call back. Recovery may fail during a call or while iOS
-denies activation; it does not defeat that policy.
+The UI entry point now invalidates `SUCCESS.txt`, `advisory-check.txt` and
+`app-sha256.txt` before workspace/optimization/SDK validation. Old diagnostic logs
+are retained. Success is still written only after XCTest, warning checks, source
+preservation and cleanup succeed. Partial current-phase artifacts are not overall
+success. Existing original SUCCESS-marker shell controls remain unchanged.
 
-## Persistence and integration
+`check_audit_integrity.py` runs the actual old/current shell and UI entry points in
+isolated Git fixtures: clean, staged, unstaged, existing-workspace and Python -O
+boundaries. Sixteen cases retain exact-old negative controls, confirm no SDK entry
+for dirty current input, and preserve prior diagnostics. Fake failing SDK commands
+are only a driver test; they are never substituted in real Apple verification.
 
-The isolated branch uses the two existing AppStorage preference keys, which makes
-its switches complete and persistent without depending on the JSON feature.
-The integration contract uses the same controller/screen interfaces with JSON-backed
-bindings from SettingsStore. The existing release migration consumes the two old
-keys and removes them only after a successful JSON save; it does not run both
-persistence systems in parallel. This branch update has not been merged into that
-release. The controller itself contains no settings-file I/O.
+## Continuous location contract
 
-The Background screen places Audio above Location and Location state.
-`BackgroundKeepAliveView` receives the controller and two bindings. It does not own
-the server, statistics, JSON store, or whole tab hierarchy. `AppRoot` assembles the
-active features. This separation removes the former all-features root from the
-background module without redesigning its runtime recovery.
+One CLLocationManager is configured before delegate assignment: three-kilometer
+accuracy, no distance filter, background updates and visible indicator enabled,
+automatic pausing disabled. Standard updates remain continuous rather than periodic
+open/read/reopen. The OS determines timing and sensor use; approximate accuracy is
+not a command to switch GPS hardware off.
 
-## Asset and limits
+Permission requests occur only while the app is active. Already-started When-In-Use
+sessions are not restarted merely on background entry. A genuinely new When-In-Use
+session waits for foreground. Denial/restriction stops updates without clearing On;
+reauthorization can restart. Authorization reset now invalidates the obsolete local
+running flag too. Off discards the manager; stale manager delegates are ignored.
+Temporary errors preserve intent. Only callback count/time are kept, not coordinates.
 
-The preserved WAV is 844 bytes: 44-byte WAV header plus 800 zero PCM bytes, mono
-8 kHz, signed 16-bit, 400 frames (50 ms). Every sample is exactly zero. The header
-is necessarily nonzero to remain a valid WAV. Both raw-byte and AVAudioFile decoder
-checks verify silence; the SHA-256 is
+## Serialized audio, recovery and cost
+
+One AVAudioPlayer loops the unchanged WAV with playback/default/mixWithOthers and
+the best-effort system-alert preference. One common-mode one-shot Timer supplies
+one-second health checks or retries while On. Healthy checks do not recreate or
+reactivate playback. New independent interruptions/stops attempt immediate recovery;
+repeated player failures in the same episode retain the existing retry deadline,
+without backoff, attempt caps, busy loops or automatic Off.
+
+The optional transition enum serializes activating, preparing and deactivating,
+including queued MainActor completions. iOS 27 uses native session completion APIs.
+Earlier supported systems run synchronous setActive on a shared utility worker.
+No semaphore, synchronous MainActor wait or timeout pretends to cancel an OS request.
+Player preparation also runs on a utility worker: controller ownership and delegate
+are detached until completion, preventing concurrent player use. Only accepted,
+noninvalidated completion with current On intent can play. Category/preference setup,
+player construction and final play remain on MainActor; no universal latency claim
+is made. The present audit does not change this audio implementation.
+
+Off stops local playback/monitoring immediately and waits for outstanding work before
+release. Off-On drains the older release before a new activation. Activation or
+preparation failure keeps On and schedules the existing retry. Release failure while
+Off is displayed without an Off retry loop; explicit repeated Off can retry. Initial
+or completed repeated Off does not deactivate an unused host session. Weak completion
+ownership and best-effort orphan cleanup are retained. One root owner is supported;
+independent LiveContainer host session activity is not serialized by this controller.
+
+The fixed registry still covers 13 session notifications on iOS 27 and four lifecycle
+checkpoints, with 26/27 availability guards and the legacy interruption signal.
+Root-level Combine subscriptions survive tab changes; the separate app-active event
+restores both services. Weak player identity, stale timer identity, re-entry guards
+and invalidation checks protect Off and recovery ordering. No new observer, remote
+control, Now Playing, microphone, BGTask, NetworkExtension or host patch is added.
+
+The WAV remains 844 bytes: mono 8 kHz signed 16-bit, 400 zero samples (50 ms), SHA-256
 `26131825c935435301fb05d3549d815bc93b1e717d6228d890ee9578dd00025e`.
+Its required nonzero header is distinguished from silent decoded PCM. Runtime cost
+added by this audit is only the conditional cleanup on authorization reset and static
+accessibility metadata; tests add no production objects. Energy/throughput/latency
+improvement has not been measured.
 
-Timers are scheduling requests, not real-time guarantees. If iOS suspends or kills
-the process, callbacks and retries cannot execute. Interruption delivery itself may
-be delayed until the app is scheduled. Saved On is reapplied on the next launch;
-the app does not relaunch itself. A call may or may not allow reactivation. The code
-continues retrying when it can execute, but cannot override iOS audio priorities.
+## Verification commands and boundaries
 
-## Supported versions, installation environments and current scope
+Use a full Git checkout, with Swift, Python and Git, because exact old-code controls
+and ancestry checks require real Git objects. Generated source ZIPs are not full
+repository history.
 
-- **Target use:** iOS 27.0 physical iPhone, SideStore standalone installation or
-  LiveContainer guest execution. These are different runtime environments.
-- **Minimum deployment target:** unchanged at iOS 17.2; this is not certification
-  that every OS release has been tested. New 26/27 notifications are runtime-gated.
-- **Build requirement for these symbols:** Xcode 27 / iPhoneOS 27 SDK. The branch's
-  macOS CI runner now selects that toolchain. The app identity, entitlements,
-  permissions, audio options, coarse-location parameters and WAV are unchanged.
-- **Scope:** all Background-owned additions relative to main, including the public
-  signals, audio/location lifecycle, root bindings, project/plist, asset, tests and
-  README. The current audit also repairs initial Off/shared-session interference,
-  Off during recovery and new When-In-Use foreground startup. Audio remains above
-  Location. No BGTask, host patch, ID rewrite, extra timer, persistent diagnostic
-  log or relay change is introduced.
-- **No IPA requested:** a commit marked `[audio-checks-only]` runs only the isolated
-  validation job. The production archive job is skipped, not called and discarded.
-  The validation script type-checks sources but creates no app archive or IPA.
-- **Actual checks:** the current local run uses Swift 6.2.1 Linux platform doubles,
-  1030 existing controller assertions, four worker-delegate checks, 103 recovery
-  assertions, 41 branch-wide lifecycle assertions and 15 callback-lifetime assertions
-  (including scripted repeated
-  decoder/completion callbacks and 2000 deterministic mixed state transitions).
-  Counts include loop repetitions and are not independent physical-device tests.
-  Historical and current SDK/CI results are recorded separately below.
-- **Not performed:** physical iOS 27 SideStore/LiveContainer installation or
-  interruption delivery, phone/Siri/Bluetooth/lock-screen tests, energy benchmarks,
-  and release/integrated merging. No claim that every OS signal is always delivered
-  or every attempted activation succeeds is made.
+```sh
+python3 Tests/Background/run_checks.py
+python3 Tests/Background/check_async_session.py
+python3 Tests/Background/check_audit_integrity.py
+# macOS, actual iOS 27 SDK; checks only, no iPhone archive or IPA:
+bash Tests/Background/check_audio_sdk.sh
+python3 Tests/Background/check_async_ui.py
+```
 
-The added signal observers are a fixed-size list (13 session + four lifecycle
-checkpoints on iOS 27), not new polling. Extra state is three Booleans for in-flight
-invalidation and repeated-player-error pacing. Memory does not grow per event.
-Frequent external notifications can cause more than one immediate attempt per
-second; one second is the scheduled retry interval, not a global event-rate limit.
-No battery or CPU saving is asserted without measurement.
+`run_checks.py` retains all 1193 earlier assertions and adds 49 authorization-reset
+assertions plus an exact-old failing control. Async tests retain 38 session assertions
+and 3000 mixed transitions, 22 preparation assertions and 3000 mixed transitions,
+exact-old blocking/implicit-preparation controls and real worker helpers, in debug
+and optimized modes. The Apple entry point also retains source/framework/scope
+checks, three original shell controls, 34 actual Combine deliveries/cancellation,
+five real Timer/RunLoop cases, Apple WAV decoding and five production Swift files'
+ARM64/iOS17.2 typecheck with warnings-as-errors. Audio/location objects in host
+suites are doubles; assertion counts are not independent physical-device trials.
 
-The previous `f2b0ad7` update only reordered Audio and changed health checks to one
-second. Its old common composition checker still required the obsolete two-second
-literal and notification names physically in the view. That validator now checks
-the shared registry and one-second policy; it does not reintroduce obsolete code to
-satisfy string checks. Feature-specific validation is allowed to evolve, while
-engine pins, the committed framework and production build script remain locked.
+The unchanged checks-only workflow skips ordinary iPhone archive/IPA production.
+Its separate UI job builds a temporary Simulator project, drives actual On/Off,
+playback state, stored intent/relaunch and tab navigation, exports xcresult and
+screenshots, and rejects the original main-thread audio advisory in both console
+and runtime results. Test deadlines, warning reporting and all existing postconditions
+remain enabled. Optional bulk system diagnostics stay disabled as previously
+recorded; that is not suppression of the targeted warning or XCTest results.
 
-**README maintenance rule:** record minimum/target/tested OS separately, including
-OS build, SDK/Xcode, installer/host version when actually known, tested source
-commit/CI run, passed/failed/not-run scopes, costs and limitations. SDK type checking,
-scripted tests and Simulator evidence never substitute for physical SideStore or
-LiveContainer tests. Keep this README and its feature specification byte-identical;
-preserve historical results with their own source/version rather than relabeling
-old evidence as a new run.
+Local results include preserved 1193 regressions, complete async suites, 49 new
+permission checks (also optimized), the exact-old 28-failure control and 16 audit-entry
+cases. A supplemental optimized host test enumerated all 32768 length-five sequences
+of eight selected events and checked 231780 invariant boundaries. It used the exact
+tested controller and existing deferred platform doubles without OS rejection.
+This finite model is not full state-space or physical-event coverage, and it was
+not added to CI. Its source and reproducible runner are in the companion evidence.
 
-## Historical no-IPA verification: c334ed0 (2026-09-23)
+## Inspected final execution evidence
 
-Tested commit: `c334ed060ac8d27081c74196dae544df5bff3a80`.
-Tested tree: `8995bd73aea2ce4df10ae9bd8641262262a56696`.
-GitHub Actions run: `35824844915`; test-only `audio-checks` job succeeded.
-The normal `verify` archive/IPA job was intentionally skipped by the commit marker.
-This completion text is a later documentation-only change, not another test run.
+Run `36153834876` executed the exact source/tree identified above. SDK/controller
+attempt 1 passed all retained 1193 assertions, 49 new authorization assertions,
+the exact-old 28-failure negative control, all session/preparation suites in debug
+and optimized modes, the 16 audit-entry cases, the three original shell controls,
+34 Combine deliveries/cancellation, five real Timer/RunLoop conditions and Apple
+WAV decoding of 400 zero samples. Baseline/composition/scope checks passed.
+The five production Swift files passed the actual ARM64/iOS17.2 typecheck with
+warnings-as-errors and an empty diagnostic log. Tracked-source diff logs are empty.
 
-The actual toolchain was Xcode 27.0 build 27A266a, iPhoneOS SDK 27.0. All five
-production Swift files passed `swiftc -typecheck -warnings-as-errors` for ARM64 with
-the unchanged iOS 17.2 deployment target. This validates API names, availability,
-types and SwiftUI wiring, but does not link an application or run it on an iPhone.
-The tests ran on the macOS runner; no Simulator or physical iOS runtime was used.
+UI attempt 1 failed before XCTest because Simulator bootstatus exceeded 120 seconds.
+Shutdown and delete cleanup each exceeded 30 seconds. The failed original ZIP was
+preserved; it contains no XCTest verdict, overall success, advisory or product marker.
+The precise CoreSimulator stall cause is not established. Only that failed UI job
+was rerun normally on identical source, with all deadlines and assertions unchanged.
+The SDK success displayed in attempt 2 is carried forward from attempt 1, not a
+second independent SDK execution.
 
-The 1030 controller assertions, four off-main delegate checks and 103 recovery
-assertions passed. Recovery tests exercise each registered notification, unknown
-metadata, all known/unknown route reasons, immediate first decoder failure, repeated
-failure pacing, stale callbacks, synchronous re-entry, Off during activation, and
-single-timer ownership. The 1000 decoder/100 completion loops are scripted repeats,
-not that many independent interruption scenarios or OS-generated events.
+UI attempt 2 passed one XCTest with zero failures or skips; the test case took
+110.656 seconds, not the entire workflow. It checked the identified audio Playing/Off
+state, the ambiguous old-selector counterexample, repeated/rapid intent changes,
+tab navigation and stored On/Off after process relaunch. Both original full-screen
+attachments were inspected. xcodebuild exited successfully, cleanup.json is [],
+runtimeWarnings is [], and the original main-thread audio advisory is absent from
+both the console and xcresult JSON. AppIntents/debugger diagnostics remain in the
+logs; absence of the targeted advisory is not a universally warning-free or hang-free
+execution. No synthetic audio/location callback is presented as a real OS interruption.
 
-The actual production Combine publisher expression was also tested with real
-Foundation/Combine and scripted audio/device boundaries. All 17 names delivered
-once from main and once from a worker reached the handler on main: 34 deliveries.
-Subscription cancellation detached it. This checks forwarding, not OS delivery
-conditions or the lifetime of a hosted SwiftUI screen. Apple's AVAudioFile decoded
-the original WAV into 400 zero samples. Baseline pin/framework preservation,
-composition/style checks and whitespace checks passed.
+Actual SDK environment: Xcode 27.0 `27A266a`, iPhoneOS 27.0, Apple Swift 6.4
+(`swiftlang-6.4.0.34.1`), macOS 27.0 `26A428`. Actual UI: iPhone 16 Simulator,
+iOS 27.0 `24A434`. The ordinary archive/IPA workflow job was skipped.
 
-Artifact `10734727873` was downloaded and inspected. Its SHA-256 is
-`131d85c248b0fca074df347130eda5b7cfbe0a20cfe3a90703fb391fc20f05b5`.
-All 53 recorded source-file hashes match the reviewed source tree. The artifact
-contains logs and a source hash manifest, no IPA or app archive. Compared with
-`f2b0ad7`, 40 of 50 existing tracked files remain byte-identical; ten files changed
-and three test-only files were added. The location methods are byte-identical.
-Only controller and view are changed production Swift files; the Xcode project,
-Info.plist, AppRoot, server, WAV, source pins and build pipeline script are unchanged.
-`Build/check.py` itself is no longer byte-locked to the baseline because its
-feature checks were updated; the runtime/source/framework locks remain enforced.
+| Original artifact | Attempt | SHA-256 |
+| --- | --- | --- |
+| SDK/controller 10873136052 | 1 | 30345383f7e84bcb31b9a36f9e4e50e582b339c9e51e29f111f66f6efd7e23a3 |
+| UI boot failure 10872389189 | 1 | fc7f54125ff6a61f82dd95d89ea124d86c7b57d6b0668be4743a54823a6cb397 |
+| UI success 10873467349 | 2 | 0f9557b0f216bd63cdb1f58f42cf5f831c50868aca768dfb4c3e8f2a5a5900a1 |
 
-No physical-device phone/Siri/Bluetooth interruption, iOS delivery timing, SideStore
-signature/install, LiveContainer guest loading or actual audio priority arbitration
-was tested. No installer or host version is claimed tested. Successful scripted
-recovery is not proof that iOS will permit every activation or deliver every event.
+All three downloaded ZIPs passed digest/CRC checks. Each genuine Git source archive
+has the correct commit comment, and all 67 paths, modes, bytes, source hashes and
+the reconstructed Git tree match the tested source. Forward/reverse application of
+the audit patch reconstructs the corrected 67-file and original 64-file trees.
+Nine existing paths change and three are added; 55 existing files are unchanged.
+The only production delta is five controller lines and one accessibility identifier;
+all audio methods, the fixed registry, WAV, root, project, plist, native framework and
+source pins are preserved. Main, release and the other five feature heads remain
+unchanged. The companion offline verifier checks these source/artifact identities;
+it is not a new Apple or physical-device execution.
 
-## Complete Background-only audit (2026-09-23)
+## Explicitly unperformed and unchanged boundaries
 
-The input feature commit is `4b6f637eefb8a07547d63a17d5407cb4b9cd9f19`.
-The excluded main baseline is `d2534cd6bce7389fdf8f362bd8f681c0bd583eb1`.
-This audit reviews the Background delta, not the inherited SOCKS5 engine or unrelated
-UDP/statistics/settings/icon features. It does not merge into `release/integrated`.
-The seven existing branches remain the only branches; no audit branch is added.
+Physical SideStore signing/install, LiveContainer guest loading and host arbitration,
+real telephone/Siri/Bluetooth events, privacy prompts and resets, Files/container
+behavior, lock screen, suspension/termination, VPN/hotspot changes, earlier-device
+execution, long-duration survival and power measurements remain unperformed for this
+revision. Saved On is intent; no callback/timer can run when the OS does not schedule
+the process. No automatic relaunch or override of system audio priority is promised.
 
-### Reproduced defects and narrowly scoped corrections
+The existing release `b1ce46553424099937d8001b5badb4eeceab1cce` and build 7 remain
+unchanged and do not contain the later Background owner. This feature audit must not
+be presented as a refreshed integrated IPA. Accepted UDP/server/settings limitations
+are not rewritten as part of a Background-only review.
 
-| Finding | Correction and reason |
-| --- | --- |
-| Initial saved Audio Off called setActive(false), even when the controller had never used audio; repeated Off did so again. | Disabled-to-disabled updates now do nothing. Explicit On-to-Off still stops and deactivates. This avoids an unnecessary shared-session side effect in LiveContainer without changing the host or adding ownership hooks. |
-| Off raised during category/preference setup, orphan disposal or a successful activation could be followed by another activation. Off during retry disposal could be overwritten with Waiting state and a timer. | Recheck intent at those boundaries, detach the old player before stop, and compensate an activation that completes after Off. No new persistent state or retry timer is required. |
-| Delegate assignment preceded location configuration. An immediate authorization callback could start with defaults. | Apply the existing accuracy/background/pause options before attaching the delegate. No settings values are changed. |
-| A new When-In-Use session could be started while backgrounded. | Defer that start to the existing foreground restore event. Do not stop an already running session or impose this restriction on Always authorization. |
-
-These were reproduced with the actual old controller and strengthened scripted
-boundaries: nine failing lifecycle assertions. This is code-path evidence, not a
-claim that all nine failures were observed on the user's iPhone. The strengthened
-session double tracks final active state, not just call counts; earlier tests had
-missed active-after-Off even when the controller's switch and timer looked stopped.
-The initial-delegate case intentionally exercises synchronous delivery as a boundary
-condition, not a claim about every Core Location implementation's scheduling.
-
-`LifecycleTests.swift` now covers the corrections, permission transitions, temporary
-errors, stale delegates, repeated On/Off, configuration/activation/init/play failures,
-independent audio/location switches and 2000 deterministic mixed transitions.
-Existing 13 session/four lifecycle notifications, immediate new-event recovery,
-one-second health/retry cadence, failure pacing and original WAV remain intact.
-No diagnostic UI, disk logging, extra timer, thread, socket or global host patch is
-added. Extra runtime work is a few intent checks at transition boundaries and, only
-if activation succeeds after Off, one compensating deactivation. Energy is unmeasured.
-
-`check_scope.py` verifies every unmodified main file byte-for-byte, the sole app
-entry-point substitution, native source pins and unchanged native checker helpers,
-project identity/deployment settings, two AppStorage bindings, one root subscriber,
-plist modes/permissions/single-scene configuration, Audio-first order and README
-mirror. This is source configuration verification, not proof of granted device
-permissions. Commit-wide whitespace is checked against main, not just a clean
-working tree. Test subprocesses have finite deadlines.
-
-Only the Background controller changes in production. AppRoot, view, Info.plist,
-Xcode project, WAV, server and all inherited runtime files are retained. Tests and
-README/specification are updated; the existing checks-only CI path is reused.
-No archive, IPA, physical iOS runtime or installer/host test is implied by type checks.
-
-### Completed audit evidence
-
-Tested commit: `247e91aacbe588cb1f39fdb5087d9608e91ade05`.
-Tested tree: `421794e2d397f55e081990502c458f9dbdf57bb4`.
-Run `35829002622`: `audio-checks` succeeded on the first run; the normal archive/IPA
-job was deliberately skipped. Xcode 27.0 (27A266a), iPhoneOS SDK 27.0 type-checked
-all five production Swift files for ARM64 at the unchanged iOS 17.2 minimum, with
-warnings treated as errors and an empty type-check diagnostic log.
-
-The runner passed 1030 controller, 103 recovery and 41 lifecycle assertions plus
-four worker-delegate checks. Real Foundation/Combine delivered all 17 registered
-names from main and worker threads (34 deliveries) and detached on cancellation.
-Apple AVAudioFile decoded the original 400 zero samples. Source boundary, project,
-permissions declarations, settings bindings, source locks and whitespace checks
-passed. Exactly 33 inherited main files were byte-identical; the six intentional
-main-file integration/configuration deltas were checked separately. The existing
-80-assertion final audio-contract test also passed locally against this controller;
-it was a local regression, not an additional CI or iPhone run.
-
-Downloaded artifact `10736291871` SHA-256:
-`4978c84d8f5a17d16728a8c68d91a52af296582722cc7326b8ae6e0b481dcbfd`.
-All 55 source hashes match the reviewed tested tree. The artifact contains checks
-and logs only, not an app archive or IPA. This completion text is a later
-README/specification-only commit; production and test code are the tested bytes.
-Relative to input `4b6f637e`, six existing files changed and two test files were
-added; the other 47 original files remain byte-identical. No additional known
-code-path defect was found within the reviewed scope. Physical interruption delivery,
-SideStore signing/install, LiveContainer loading/host arbitration, background timing
-and energy use remain untested; source verification is not device certification.
-
-## Final revalidation: queued callback identity (2026-09-23)
-
-Input: `fde5746be7d29113c8581d90385b252391f002c1`. The scope remains the Background
-implementation relative to main, not the relay, other features or integrated release.
-
-A further lifetime defect was reproduced: a worker delegate stored only the old
-player's `ObjectIdentifier` while waiting for MainActor. After that object was
-released, the allocator could reuse its address for a new player. The queued old
-callback then passed the address comparison and unnecessarily restarted the healthy
-replacement. Swift guarantees ObjectIdentifier comparisons only during the object's
-lifetime. This is a code-path reproduction, not an observed user-device failure.
-The previous mocks retained every player in an instances array, masking this case.
-
-Only the completion and decoder delegate bodies change in production. Each captures
-the callback player weakly and, on MainActor, checks the surviving actual object
-against the current player with `===`. A deallocated player yields nil; a different
-living player fails identity comparison. Current-player callbacks retain the same
-immediate recovery, Off checks and repeated-failure pacing. No unsafe pointer, new
-identity counter, unchecked Sendable wrapper, actor bypass, timer or persistent state
-is added. Weak capture has normal ARC bookkeeping until callback disposal; discarded
-players are not kept alive. No energy or CPU improvement is claimed measured.
-
-`CallbackLifetimeTests.swift` adds 15 assertions with real worker/actor scheduling
-and scripted audio objects. It explicitly releases the old test player, checks
-current/living-stale/released-stale/Off paths and preserves the existing timer.
-Allocator reuse is measured rather than required on every platform. Locally, reuse
-occurred and the old controller failed the completion regression; a separate old
-controller decoder probe also restarted the replacement. Both corrected paths
-passed. Optimized local builds also passed the lifetime and 80-assertion audio
-contract tests. These tests do not inject telephone or Bluetooth events on an iPhone.
-
-Tested commit: `758a550aab7b8c6fb18d5a2b4c00f5cb936cde7e`.
-Tested tree: `b5671a81f5eff4299bed3dfa411d4e034616f0e2`.
-Run `35832101248`: `audio-checks` succeeded; archive/IPA `verify` was intentionally
-skipped. Xcode 27.0 (27A266a), iPhoneOS SDK 27.0 type-checked all five production
-Swift files at the unchanged ARM64 iOS 17.2 deployment target with warnings-as-errors.
-The type-check and commit-whitespace logs are empty. The unchanged main-boundary,
-source-pin, project/plist/root/settings checks passed, including 33 byte-preserved
-main files. No app link, archive or IPA was performed.
-
-The runner passed 1030 controller, four worker-delegate, 103 recovery, 41 lifecycle
-and 15 new lifetime assertions: 1193 total, including scripted repetition. The 2000
-mixed transitions and existing decoder/completion repetition remain part of those
-scenarios, not independent device trials. Actual Foundation/Combine again delivered
-34 registered events and detached on cancellation; AVAudioFile decoded 400 zero
-samples. In the runner lifetime test, decoder address reuse occurred after one
-allocation; completion address reuse was not observed within 20,000 allocations.
-Both postconditions passed. This explicitly distinguishes observed reuse from the
-non-reuse case rather than counting both as reproduced collisions.
-
-Earlier run `35831753584` failed while compiling the new test's never-mutated local
-weak variable under Xcode 27 warnings-as-errors. An immutable weak-capture probe
-replaced that variable without dropping the deallocation assertion or suppressing
-warnings. Production code did not change between that failed run and the successful
-run. Its failure artifact is retained as failure evidence, not an SDK success.
-
-Successful artifact `10737043024` SHA-256:
-`5c136da52c4f217178462ad280acf97d70548b5358b0b7115bc5f2065415b665`.
-All 56 recorded source hashes match the reviewed tested tree. This record is added
-in a later README/specification-only commit; those two documents remain byte-identical.
-The 13 session notifications, four lifecycle checkpoints, one-second polling/retry,
-location policy, WAV, UI, AppRoot, plist, project, build pipeline and main engine
-remain unchanged by the lifetime fix. Only this existing feature branch is updated;
-no new branch, host change, BGTask experiment or integrated merge is introduced.
-
-No other reproducible defect was found in the exercised revalidation paths. Actual
-iOS 27 SideStore signing/install, LiveContainer guest execution and host arbitration,
-OS-originated interruptions, lock-screen timing and power use remain untested. No
-installer/host version or physical-device pass is claimed. Source and SDK checks
-cannot establish that the system always delivers an event or permits playback.
-
-## Validation
-
-`Tests/Background` compiles the controller body against platform doubles to exercise
-permissions, identity guards, healthy checks, missing-resource errors, notification
-metadata, one-second repeated failures, Off, and off-main delegates. The repeated
-1000-failure check is one scenario with 1000 assertions, not 1000 independent device
-tests. The Apple audio decoder uses the real asset on macOS. iOS compilation checks
-the actual framework APIs. Phone calls, Bluetooth routes, lock-screen scheduling,
-and energy consumption still require device tests.
-
-References (public API contracts, not device-test results):
-- https://developer.apple.com/documentation/avfaudio/avaudiosession/didbecomeinactivenotification
-- https://developer.apple.com/documentation/avfaudio/avaudiosession/resumptionrecommendationnotification
-- https://developer.apple.com/documentation/avfaudio/avaudiosession/didbecomeactivenotification
-- https://developer.apple.com/library/archive/qa/qa1882/_index.html
-- https://developer.apple.com/documentation/foundation/timer
-- https://developer.apple.com/documentation/corelocation/cllocationmanager/pauseslocationupdatesautomatically
-- https://developer.apple.com/documentation/corelocation/cllocationmanager/allowsbackgroundlocationupdates
+Primary contracts used in this audit (documentation, not execution evidence):
 - https://developer.apple.com/documentation/corelocation/cllocationmanagerdelegate/locationmanagerdidchangeauthorization(_:)
-- https://developer.apple.com/documentation/avfaudio/avaudiosession/interruptionnotification
-- https://developer.apple.com/documentation/avfaudio/avaudioplayer/numberofloops
-- https://developer.apple.com/documentation/swift/objectidentifier
+- https://developer.apple.com/documentation/corelocation/cllocationmanager/allowsbackgroundlocationupdates
+- https://developer.apple.com/documentation/avfaudio/avaudioplayer/preparetoplay()
+- https://developer.apple.com/documentation/avfaudio/avaudioplayer/play()
 
+## Repeat-audit findings and additional verification
 
-## Six-feature closure recheck (2026-09-24)
+### Index-only input drift
 
-Input product/test snapshot: `9227a03461e5f1a72a2ffbed75cdd7724c2175fc`.
-Fresh verification commit `22e284d4e86309be06b258a9f60f44bef8fc6351` has the
-same tree `1d389daa6d94475dab7efe3ee89f69d05ebed0e1`. Run `35928260734`
-passed on its first attempt; only the existing audio-checks job ran and the
-archive/IPA job was skipped. The downloaded artifact `10780062749` SHA-256 is
-`6709aacb2795fb7b4fc69b38169cc88c410213fd383eb62166dd2ae6aa9b2461`.
-All 56 source hashes match the unchanged input. No runtime or test edit was needed.
+The preceding source guard compared working files to HEAD, but not the Git index.
+An edit can remain staged while its working file is restored to HEAD. The SDK/UI
+entries then reached external tools despite an index that did not match the archived
+revision. Both now check `git diff --cached --exit-code HEAD --` in addition to the
+existing working-tree comparison. The SDK checks both before Apple work and before
+its final manifest. UI retains its complete before/after byte hashes and now also
+checks working tree and index at the final boundary. Separate logs preserve each
+check. No archive, product, timeout, XCTest assertion or warning gate is weakened.
 
-The full 1193 assertions passed again: controller 1030, worker delegate 4,
-recovery 103, lifecycle 41 and callback lifetime 15. Real Foundation/Combine
-delivered all 34 main/worker notifications and detached on cancellation; Apple's
-decoder confirmed the existing 400 silent samples. Xcode 27.0 `27A266a` with
-iPhoneOS SDK 27.0 typechecked five production Swift files, with an empty diagnostic
-log. Exact main boundary, plist/root bindings, Audio-first order and resource
-identity checks passed. Repetitions are not independent physical-device trials.
+The exact prior SDK/UI blobs `355880ba630159f012a4f495bff1277461f416cd`
+and `3a6432e0da8cd9e4fae50deb4ab6ad7dd464a8c8` demonstrate that omitted
+index check in real isolated Git fixtures. The expanded test fails against the
+unmodified SDK entry before correction and passes after the added index gate.
+This does not claim a previous CI actually ran dirty, or that an adversarial actor
+cannot change and restore files between checkpoint comparisons.
 
-The controller remains responsible only for the independent location/audio
-services. The standalone root's two existing AppStorage keys supply user intent;
-the integrated root can instead supply persistence-owned bindings. Neither
-SettingsStore nor server-control is a dependency of this standalone feature.
-The 13 session notifications, four lifecycle checkpoints, immediate detected-stop
-recovery, one-second single-timer policy and bounded re-entry protections are
-unchanged. No host patch, extra scheduler, new observer or polling path is added.
+### Assertion-enabled execution
 
-The repository-wide closure retains eight branches and leaves main/release
-unchanged; earlier seven-branch statements above describe their historical runs.
-Actual iOS 27 SideStore installation, LiveContainer host arbitration, telephone/
-Bluetooth notifications, process suspension and energy use remain untested.
-This result verifies the implemented paths and current SDK contracts, not
-guaranteed delivery/activation while iOS refuses or suspends execution.
+The SDK shell now rejects Python optimization before invoking Apple tools. Three
+standalone drivers (async session, Combine subscription and live scheduling) also
+reject optimized Python execution before their source transformation or external
+commands. The prescribed full SDK run already rejected optimization later in its
+scope check; this moves rejection to the start and covers standalone drivers too.
+Swift debug/optimized builds are different: both remain enabled and keep all their
+existing postconditions. No Swift compiler optimization level is disabled here.
 
-## Retained independent real-scheduling verification (2026-09-24)
+check_audit_integrity.py retains the original sixteen entry cases and adds exact-
+prior index/optimization controls and standalone-driver checks: **37 cases total**.
+Normal paths deliberately stop at the next external-command boundary; optimized
+or dirty current input must stop earlier. This is driver validation, not a fake
+successful Swift compile or OS playback run. The original three stale-success
+shell controls are unchanged. Older records of sixteen cases describe their own
+revision, not the expanded suite.
 
-The subsequently observed scheduling harness and its test-only compiler corrections
-are retained, not reverted. Their purpose is distinct from scripted timer firing:
-use actual Foundation Timer/RunLoop and Combine scheduling around the unchanged
-production controller body and actual publisher expression. Audio and location
-remain explicit doubles. No production observer, timer, thread, setting or recovery
-state was added, and this test does not claim background execution permission.
+Local review also compiled the unchanged production controller with the existing
+platform doubles. A supplemental boundary matrix covers seven operations (category,
+preference, activation, preparation, play, stop, deactivation), six reentrant events
+and inline/deferred completion: 84 cases and 578 invariant checkpoints in each of
+debug and optimized execution. It checks single in-flight work/timer/player, Off
+precedence, recovery after invalidation and location independence. The matrix is
+included in the companion evidence, not added to the app or routine CI. It is not
+full state-space, actual OS-event or physical-device coverage.
 
-Tested commit: `da9a8b615be0132097103118f65020ba76bf9a7e`.
-Tested tree: `04140706a9350a38b033984f8901a0f0aed06859`.
-Run `35941608803` succeeded; the normal app archive/IPA job was skipped. The five
-new scheduling postconditions passed: failed activation retries with a real timer;
-new queued resumption before the pending retry; no reactivation from healthy samples
-or 100 restores; Off wins before worker-notification delivery; independent location,
-canceled observers and controller release stay inactive. Recorded initial attempts
-were approximately 0.0012, 1.0379 and 2.0458 seconds. These are host observations,
-not a one-second real-time guarantee on a suspended iPhone.
+No further actionable controller-code defect was isolated by the source and
+scripted checks. The actual UI timing observation below retains its uncertainty.
+The previous location-reset repair and all existing regression/async/lifetime tests
+remain intact. These audit-only changes add Git reads and bounded validation work,
+not a runtime timer, queue, allocation policy, permission, host patch or retry policy.
+The following identities and results were recorded after inspecting the original artifacts.
 
-The existing 1193 assertions, 34 real Combine deliveries/cancellation, 400 zero
-WAV samples, source boundaries and actual Xcode 27.0 `27A266a` / iPhoneOS SDK 27.0
-five-file ARM64 typecheck also passed. The first harness compilation had diagnosed
-a test weak local and an actor-isolated notification referenced from a worker;
-those test declarations were corrected without suppressing warnings, removing
-assertions or editing production logic. The earlier failure is not an executed
-successful scheduling test.
+### First actual UI failure in this repeat run
 
-Downloaded artifact `10784863270` SHA-256:
-`33500b40a820499c590134d33146d20ffead120aea9158408864a52f98ab3922`.
-The recorded 57 source hashes identify the exact tested files. This completion
-updates only README and its identical specification; the successful test/production
-bytes are retained. Session attribution cannot be established from commit authorship,
-so the retention decision follows source scope and executable evidence instead.
+Run 36206790399 attempt 1 passed SDK/controller checks but its actual XCTest failed
+on the first On: the identified audio-state label was not confirmed Playing within
+the unchanged ten-second predicate wait. The test recorded one failure in 39.816
+seconds; xcodebuild failed. This was not a Simulator boot timeout. Cleanup completed
+successfully. No UI SUCCESS, advisory-check or app-hash marker was produced.
 
-The original immediate detected-stop recovery, one-second health/retry schedule,
-weak callback identity, Off priority and coarse-location startup policy remain.
-No extra runtime cost is introduced by retaining test-only code; energy is still
-unmeasured. Physical iOS27 SideStore/LiveContainer installation, real phone/Siri/
-Bluetooth interruptions, lock-screen scheduling, host arbitration and OS refusal
-remain outside these checks. No main/release change, new branch, app archive or
-IPA is part of this closure, and the repository still has eight branches.
+The original xcresult contains repeated accessibility descriptions reporting
+Activating audio session. Its recorded movie shows that state in the 28-second
+frame and Playing in the 36-second frame. These are decoded original movie frames,
+not generated screenshots and not grounds to change the XCTest failure to a pass.
+Movie position is not a measurement of native callback latency. The state string
+covers activation and preparation, so these observations do not isolate an internal
+API call, establish an endless stall, or prove an XCTest caching defect. The initial
+state-wait failure's exact cause remains unestablished. No host change, forced audio
+restart, longer deadline or weaker predicate was introduced on that evidence.
 
-## Final audit-driver and evidence closure (2026-09-25)
+The failed original ZIP was preserved before retrying only the failed UI job on the
+identical source. Its SHA-256 is
+47e5b4988f9b2be8c6f1a175463f961760a9418675bff415bbf76d13d379d1ff (artifact
+10894776054). The companion read-only extractor decodes its compressed raw attachment
+data and optional movie frames; it is not presented as an Apple xcresulttool export.
+The later successful retry does not erase this observation or certify bounded startup
+latency on every runner or device. Pending uncancelable system work remains serialized.
 
-A failed checks-only retry could retain a prior SUCCESS.txt. The actual old shell
-was executed with a deterministic first-toolchain failure and reproduced that
-stale marker. The entry now removes only its old success marker before validation.
-Three isolated old/current-retry/current-first-failure cases check the nonzero exit,
-marker state and preservation of prior diagnostic logs. No controller or resource
-change is needed. The artifact now also contains source.zip, a Git source archive
-rather than an application archive, so its full source manifest is reconstructable.
+## Completed repeat-audit evidence
 
-Tested commit: `3307a5fc1008c6f9aa7042a4abe854d705d9e154`.
-Tested tree: `9cb37faa36840b1676c33e60c6ae072d356d0af5`.
-Run `36055863671` passed audio-checks on its first attempt; the ordinary archive/IPA
-job was intentionally skipped. All 1193 retained controller/recovery/lifecycle/
-callback assertions, 34 real Combine deliveries and cancellation, five real
-Timer/RunLoop scheduling postconditions and the three new driver cases passed.
-The Apple decoder again confirmed 400 zero samples. Both released-player address-
-reuse observations occurred in this run; these are scripted object-lifetime cases,
-not phone interruptions. Five production Swift files passed Xcode 27.0 `27A266a`
-and iPhoneOS SDK27.0 ARM64/iOS17.2 type checking with an empty diagnostic log.
+All results in this section refer to source b8f1e4ee and run 36206790399, not the
+preceding ac1af90e audit. The SDK job passed in attempt 1. Only the failed UI job
+was retried; the SDK success shown with attempt 2 is carried forward, not a second
+independent SDK run. The ordinary archive/IPA verify job is intentionally skipped.
 
-Artifact `10832780858` SHA-256:
-`ffbe79d98295eb19396df631b7a04ad90031be97370f76321ec3192689e93e4b`.
-The downloaded ZIP passed integrity checks; all 58 source-manifest hashes matched,
-and its source archive reconstructed the exact tested Git tree, including modes.
-The runtime files and original WAV are byte-identical to the preceding owner.
-Only test-driver/evidence handling changed before this successful run; this final
-README and its identical feature copy add documentation after that run.
+The SDK artifact passes all 1193 retained controller/delegate/recovery/lifecycle/
+lifetime assertions and all 49 authorization-reset assertions. The exact previous
+controller retains its 28 expected authorization failures. Both Swift debug and
+optimized configurations pass the 38 session assertions plus 3000 transitions,
+22 preparation assertions plus 3000 transitions, exact-old blocking and implicit-
+preparation controls, and unchanged real worker helpers. All 37 audit-entry cases
+and the original three marker controls pass. Real Foundation/Combine delivers 34
+notifications and checks cancellation; the five real Timer/RunLoop conditions pass.
+Apple decoding confirms all 400 WAV samples are zero. The five production Swift
+files pass ARM64/iOS17.2 type checking against iPhoneOS27 with warnings-as-errors;
+the diagnostic log is empty. Baseline/composition/scope/whitespace and both source
+worktree/index boundaries pass. These audio/location doubles are not OS events.
 
-The target physical iOS27 SideStore and LiveContainer paths remain distinct from
-native host/SDK tests. Installer/host versions, actual phone/Siri/Bluetooth events,
-permissions, lock-screen survival and energy remain untested. The unchanged iOS17.2
-minimum is not an all-version execution claim. No new polling, observer, production
-state, host patch, main/release update, branch, app archive or IPA was introduced.
+UI attempt 2 passed one XCTest, zero failures and zero skips in 123.036 seconds
+(test case time, not workflow duration). The identified audio Playing/Off states,
+generic-Off negative-selector control, repeated/rapid choices, tab navigation and
+saved On/Off after relaunch all passed. Both original full-screen attachments were
+opened and inspected. xcodebuild returned success, cleanup.json and runtimeWarnings
+are empty arrays, and the original main-thread audio advisory is absent from both
+console and exported xcresult object. Two AppIntents extraction warnings and
+Simulator/debugger diagnostics remain; not every diagnostic or possible hang is
+excluded. The first failed attempt is not counted as a successful UI execution.
+
+Recorded SDK environment: Xcode27.0 27A266a, iPhoneOS27.0, Apple Swift6.4
+swiftlang-6.4.0.34.1, macOS27.0 26A428. Actual UI runtime: iPhone16 Simulator,
+iOS27.0 24A434. No physical installer/host version or device result is inferred.
+The Simulator executable digest is recorded by CI in app-sha256.txt; its bytes are
+not separately included in that artifact for an independent local binary rehash.
+
+| Original artifact | Attempt | SHA-256 |
+| --- | --- | --- |
+| SDK/controller 10894190826 | 1 | be987eb8e31f28bebe94fce14a6776c6a8e5c2cd025f0102941e2e35cff609cf |
+| Actual UI state-wait failure 10894776054 | 1 | 47e5b4988f9b2be8c6f1a175463f961760a9418675bff415bbf76d13d379d1ff |
+| UI success 10894991373 | 2 | 1d064f0ee3557c7dac00ba280b2fe66b6aeb720334c6644f2f5717bbf9d08736 |
+
+All three original ZIP digests/CRCs, genuine Git source comments, all 67 paths,
+bytes, executable modes and source hashes match the tested tree. The failed run
+retains its complete raw xcresult rather than inventing an exported success summary.
+Forward/reverse patches reconstruct the before, tested and final trees. Across the
+whole repeat audit, six test/driver paths and the two documents change; 59 starting
+files remain identical and no path is added or deleted. The prior document's full
+contract and evidence are retained under the explicitly prior checkpoint above;
+the two existing history documents are byte-identical.
+
+Local regressions, all 37 entry cases, full async suites and the supplemental
+84-case matrix passed; Python/shell/JSON/plist syntax checks are recorded separately.
+The offline companion verifier checks identities and recorded results, not a new
+Apple/device execution. Direct container clone was unavailable, so exact connector
+archives and verified blobs supplied the local reconstruction rather than a claimed
+full clone. Main, all other features, release and build7 remain unchanged. Within
+the defined checks the final execution is complete; the first UI failure's cause
+and all physical/unperformed boundaries remain explicit, not declared solved.
+
+Additional primary contracts consulted, not execution evidence:
+- https://developer.apple.com/documentation/xctest/xctnspredicateexpectation
+- https://developer.apple.com/documentation/xcuiautomation/xcuielement

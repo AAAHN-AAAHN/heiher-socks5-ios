@@ -19,4 +19,5 @@ manifest = {p: hashlib.sha256(git('show', 'HEAD:' + p)).hexdigest() for p in pat
 (out / 'source-identity.json').write_text(json.dumps({'commit': commit, 'tree': tree,
     'scope': 'Git source snapshot; generated native framework/archive is recorded separately'}, indent=2) + '\n')
 subprocess.run(['git', '-C', str(ROOT), 'archive', '--format=zip', 'HEAD', '-o', str(out / 'verified-source.zip')], check=True)
-print('Recorded', len(paths), 'source files for', commit)
+subprocess.run(['git', '-C', str(ROOT), 'bundle', 'create', str(out / 'history.bundle'), 'HEAD'], check=True)
+print('Recorded', len(paths), 'source files and reachable Git history for', commit)

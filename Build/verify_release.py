@@ -8,16 +8,20 @@ import re
 import struct
 import subprocess
 import zipfile
+import sys
+from release_source import check_product, check_source, check_ipa_files
 
 if not __debug__:
     raise SystemExit('Assertions must be enabled')
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'artifacts/integrated'
+(OUT / 'package-review.json').unlink(missing_ok=True)
+check_product()
 ARCHIVE = ROOT / '.build/integrated.xcarchive'
 APP = ARCHIVE / 'Products/Applications/Socks5.app'
 info = plistlib.loads((APP / 'Info.plist').read_bytes())
 assert info['CFBundleIdentifier'] == 'hev.Socks5'
-assert info['CFBundleShortVersionString'] == '1.1.0' and info['CFBundleVersion'] == '7'
+assert info['CFBundleShortVersionString'] == '1.1.0' and info['CFBundleVersion'] == '8'
 assert info['MinimumOSVersion'] == '17.2'
 assert info['DTSDKName'].startswith('iphoneos27.')
 assert set(info['UIBackgroundModes']) == {'audio', 'location'}
@@ -51,7 +55,8 @@ for _ in range(ncmds):
     if cmd in (0x21, 0x2c):
         assert struct.unpack_from('<I', binary, cursor + 16)[0] == 0
     cursor += size
-assert build is not None
+assert build is not None and build['minimum'] == (17 << 16 | 2 << 8)
+assert not signature, 'Expected the unsigned delivery input'
 assert not any('BackgroundTasks.framework' in x or 'NetworkExtension.framework' in x for x in libraries)
 dwarf = ARCHIVE / 'dSYMs/Socks5.app.dSYM/Contents/Resources/DWARF/Socks5'
 uuids = subprocess.check_output(['xcrun', 'dwarfdump', '--uuid', str(APP / 'Socks5'), str(dwarf)], text=True)
@@ -68,6 +73,22 @@ with zipfile.ZipFile(ipa) as archive:
     assert archive.read('Payload/Socks5.app/Socks5') == binary
     assert plistlib.loads(archive.read('Payload/Socks5.app/Info.plist')) == info
     assert not any(n.endswith(('.swift', '.py', '.c', '.patch')) for n in archive.namelist())
+check_ipa_files(ipa, APP)
+# Reuse the exact owner's compiled-resource and ImageIO contracts on the archive.
+sys.path.insert(0, str(ROOT / 'Tests/AppIcon'))
+import check_compiled as icon
+images = icon.compiled(APP, info)
+assetinfo = subprocess.check_output(['xcrun', 'assetutil', '--info', str(APP / 'Assets.car')], text=True)
+(OUT / 'archive-assets.json').write_text(assetinfo)
+icon.catalog_renditions(json.loads(assetinfo))
+decoder = ROOT / '.build/integrated-decode-images'
+subprocess.run(['xcrun', 'swiftc', '-parse-as-library', '-swift-version', '5', '-warnings-as-errors',
+                str(ROOT / 'Tests/AppIcon/DecodeImages.swift'), '-o', str(decoder)], check=True, timeout=90)
+decoded = subprocess.check_output([str(decoder), str(ROOT / 'Socks5/Assets.xcassets/AppIcon.appiconset/AppIcon.png'),
+                                   *map(str, images)], text=True, timeout=60)
+(OUT / 'archive-imageio.json').write_text(decoded)
+assert json.loads(decoded)[0]['fileSHA256'] == icon.IMAGE_HASH
+check_source()
 result = {'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
           'version': info['CFBundleShortVersionString'], 'build': info['CFBundleVersion'],
           'bundle_id': info['CFBundleIdentifier'], 'minimum_os': info['MinimumOSVersion'],

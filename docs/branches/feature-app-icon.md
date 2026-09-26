@@ -1,332 +1,242 @@
-# SOCKS5 for iOS: app-icon
+# Application icon — preserved artwork and verified resource integration
 
-This is the focused `feature/app-icon` branch.
-For the complete app use `release/integrated`; the shared app + engine baseline remains on `main`.
+## Current review — 2026-09-26
 
-Build and verification: [instructions](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/feature/app-icon/docs/build-and-validation.md).
-The following specification is also preserved verbatim at `docs/features/app-icon.md`.
+This is the independent `feature/app-icon` branch. The audit starts at
+`1beaefa4e068a3b4e9473bab478b27526b88defd`, on unchanged main
+`d2534cd6bce7389fdf8f362bd8f681c0bd583eb1`. No defect requiring an artwork,
+catalog, project or application-runtime change was found. The corrections below
+close audit-input and compiled-resource validation gaps. New run 36204666461
+completed on the exact source below; older successful runs were not substituted.
+Physical installation/execution and untested appearance modes remain unperformed.
 
-# Application icon
+The complete former README is preserved byte-for-byte in
+`docs/history/app-icon-before-final-audit-20260926.md`, including previous failures,
+source/run/artifact identities and qualified results. Historical status applies to
+those revisions. This README and `docs/features/app-icon.md` are identical and form
+the current specification. The integrated release is maintained separately.
 
-## Purpose
+## Target environment and responsibility
 
-`feature/app-icon` adds the existing SOCKS5 application icon to the combined main baseline
-without adding networking, settings, background services, or runtime code. It is a
-presentation feature only. The integrated release reuses the same asset bytes.
+The intended environment is a physical **iOS 27 iPhone**, either independently
+installed through **SideStore** or executed as a **LiveContainer guest**. These have
+different signing, container, registration and host-icon/cache boundaries. An SDK
+compile or Simulator installation is not evidence of either physical path. The
+configured minimum remains **iOS 17.2**; not every intervening OS has been executed.
+Do not infer installer or host versions from the Apple build environment.
 
-The icon represents a server and bidirectional network relay. It is not a system VPN
-badge, a claim of encryption, a WireGuard server feature, or an affiliation with
-Apple/Hev beyond the source project being used. Earlier generated promotional
-mockups in the conversation are not screenshots and are not bundled into the app.
+This feature supplies only the original application icon and standard resource
+metadata. It adds no server patch, statistics, persistent settings, background
+service, alternate-icon API, runtime drawing, image download or permission. It has
+no dependency on the five sibling features. Original Swift sources and committed
+native framework are unchanged from main. Existing single-scene/local-network plist
+wiring predates this review and is preserved. Bundle ID remains `hev.Socks5`.
 
-## Files and integration
+The icon depicts the existing server/network artwork. It is not a system VPN badge,
+a claim of encryption or an additional protocol feature. Promotional mockups are
+not OS screenshots and are not bundled. A guest icon does not replace LiveContainer's
+own application icon; this feature adds no host modification, cache deletion or
+web-clip management. Actual guest-list and host rendering remain untested here.
 
-`Socks5/Assets.xcassets/AppIcon.appiconset/AppIcon.png` is the previously delivered
-1024 by 1024 opaque image. `Contents.json` binds it to the universal iOS app icon.
-The upstream Xcode target already selects AppIcon, so no custom image loader,
-runtime drawing, network image download, or extra dependency is necessary.
-The normal asset compiler produces the device icon resources and Info.plist icon
-metadata during an archive. Source catalogs and archived resources are different
-representations; comparing their file hashes would not be meaningful.
+The four governing principles are preservation before minimal, simple and efficient
+changes; use of the real SideStore/LiveContainer context; complete version, purpose,
+scope, cost and limitation documentation; and distinct evidence for source, mocks,
+SDK, CI, products, installation and physical execution. No asset migration or host
+workaround is justified merely by an unverified rendering hypothesis.
 
-## Resource impact and style
+## Immutable asset and normal integration
 
-There is no additional timer, actor, task, allocation policy, or networking path.
-The icon-specific resource is the image and standard asset metadata. The branch
-also already contains the shared single-scene/local-network usage plist wiring;
-this audit preserves it rather than treating it as new icon behavior.
-The system renders and masks app icons; a second icon view is not injected into
-the existing server interface. The image is not used as a splash advertisement.
-Icon source and metadata are preserved across feature and integrated builds.
-
-## Validation
-
-The build verifies the PNG signature, width/height and opaque RGB/palette format,
-and checks that AppIcon is selected by the Xcode target. The archived app is checked
-for Assets.car, CFBundleIcons/CFBundlePrimaryIcon and the AppIcon name. Other branches
-that intentionally retain upstream's empty icon catalog do not incorrectly claim to
-have the custom icon. The final integration membership manifest also records the
-image's SHA-256 so accidental replacement is detectable.
-
-There is no icon-specific executable behavior to unit-test. The general checks
-above are retained byte-for-byte, but are not sufficient to prove complete PNG
-integrity or a correct catalog filename. The final audit below adds separate,
-feature-owned resource tests and actual Xcode asset compilation. The earlier
-archive description is not reused as a dated iOS 27 test result. Device installation
-still requires the existing sideload signing workflow. This branch does not change
-the Bundle ID, request account access, or grant background execution.
-
-
-## Supported versions and installation environments
-
-| Item | Contract and evidence boundary |
-| --- | --- |
-| Minimum deployment target | iOS 17.2, unchanged. Not every supported OS release was executed. |
-| Intended environment | Physical iOS 27.0 iPhone using SideStore independent installation or LiveContainer guest execution. These are distinct environments. |
-| Icon format | One opaque 1024 x 1024 indexed PNG in the standard universal iOS AppIcon catalog. No custom Dark/Tinted or multilayer Icon Composer asset. |
-| Display appearances | Only the original artwork is authored here. System fallback, masking and appearance transformation are OS behavior; this branch does not promise a separately authored clear/tinted appearance. |
-| SideStore | Uses the normal icon metadata generated by Xcode. No icon entitlement, fixed signing-team suffix or host-specific Bundle ID is required by these assets. Actual installer/signature/device display remains a separate test. |
-| LiveContainer | Guest-list icon rendering, caches and any home-screen web clip belong to LiveContainer. Importing a guest does not replace the host app icon. No host patch or icon-cache deletion is performed by this app. |
-| This audit's build policy | Compile assets with iPhoneOS 27, then build/register/launch the unchanged Simulator product. Do not call the production archive/IPA pipeline; no new IPA delivery is requested. |
-
-At this checkpoint the original PNG is 3841 bytes, 2-bit indexed colour, with four
-RGB palette entries, no alpha channel and no tRNS chunk. It contains one image and
-no animation, EXIF, ICC profile or text chunks. Every pixel is opaque. These are
-properties of this preserved file, not restrictions on every possible iOS icon.
-Approved file SHA-256:
+The source is `Socks5/Assets.xcassets/AppIcon.appiconset/AppIcon.png`:
+1024 x 1024, 3841 bytes, 2-bit indexed PNG, four RGB palette entries. Its ordered
+IHDR/PLTE/IDAT/IEND chunks contain no alpha, tRNS, animation, EXIF, ICC or text chunks.
+All 1048576 pixels are opaque. The approved SHA-256 is
 `4a2f2a9384e8b6db351a9284232db56e719377e60f17123e4a6992cee1799cc2`.
-Palette compression/limited colours are existing artwork decisions; the audit does
-not recolour, resample, redraw, add borders or generate a replacement image.
+The full decoded RGB hash is
+`c20aaf49d0fa8b12b551bb98937f818b334631290b77e17ee80bf985dd8bc08d`.
+These identify this preserved artwork, not a general rule for every valid PNG.
 
-Apple continues to document asset-catalog icons as a supported path. Switching to
-Icon Composer would change the icon representation and may change rendering on
-older releases, so it is not introduced merely because the target is iOS 27.
-The default catalog has a single entry; no unused dummy Dark/Tinted entries are
-added to manufacture a claim of appearance coverage.
+Contents.json binds that filename to the one universal iOS 1024x1024 slot. Debug
+and Release already select AppIcon with device families 1,2. Xcode generates the
+asset catalog, primary-icon dictionaries and fallback PNGs; resized/compiler-
+processed files are not expected to have the original source PNG hash. The normal
+source catalog path is retained instead of adding Icon Composer or unused variants.
+No recoloring, resampling, border, transparency or replacement image is introduced.
 
-## Final resource audit (2026-09-24)
+Only the original Any artwork is authored. Light/dark system-UI home captures do
+not prove manual Dark/Tinted/clear icon selections or separately authored variants.
+Masking and OS appearance transformations are not extra code in this application.
 
-Input icon commit: `f88e8c8946b095c4d5551d413dee3b4a60943714`.
-Excluded main implementation: `d2534cd6bce7389fdf8f362bd8f681c0bd583eb1`.
-This is an icon-only scope. App Swift, project, plist, catalog JSON, original PNG,
-source pins, committed framework and shared Build scripts are preserved exactly.
-Only this feature branch's tests/workflow and README/specification are updated.
-Neither the other seven heads nor release/integrated is changed; no audit branch
-is created.
+## Findings and minimal audit corrections
 
-### Demonstrated verification gaps
+### Recorded HEAD versus actual working input
 
-The retained Build/check.py only inspected the PNG prefix, size and colour-type
-bytes. Its actual composition() accepted a 29-byte truncated PNG and a catalog
-filename referencing a missing image. These are mutation tests of the validator,
-not claims that the approved icon was corrupt or missing. A separate exact-resource
-validator now checks chunk boundaries and CRCs, complete bounded decompression,
-scanline reconstruction, palette pixels, manifest binding and immutable asset hash.
-The negative tests also cover altered dimensions, compression, transparency,
-trailing data, valid-but-altered art and unused files. They leave the shared main
-checker unchanged and never replace the app resource.
+The shell previously archived HEAD while its validators/compiler read working
+files. It now rejects both working-tree-versus-HEAD and index-versus-HEAD differences
+before creating source evidence and before final success. This includes a staged
+change whose working file has been restored. The compiled-check entry enforces the
+same boundaries even when invoked directly. Commands are rooted at the repository,
+not the caller's working directory. Python optimization is rejected so inherited
+assert-based shared checks cannot silently disappear.
 
-### Verification layers and costs
+These are checkpoint comparisons, not atomic filesystem snapshots. They do not
+certify unrelated untracked input, external toolchains or concurrent malicious
+modification/restoration between checks. Use a clean, complete, isolated checkout.
+The existing build/IPA scripts remain unchanged; this entry never calls them.
 
-`Tests/AppIcon/run_checks.sh` is the no-IPA entry point on Xcode 27. It runs the
-shared baseline/composition checks plus the dedicated source and mutation tests,
-resolves real Debug/Release build settings, compiles the actual asset catalog for
-iPhone and iPad, and records generated CFBundleIcons/CFBundleIcons~ipad and PNG
-fallbacks. Apple's ImageIO independently decodes source/generated PNGs and verifies
-all pixels are opaque; assetutil inspects compiled catalog metadata. It does not
-claim source PNG bytes equal resized/compiler-processed images.
+### Fallback filename false positives
 
-The unchanged Simulator app is built and installed with the original and a remapped
-Bundle ID. Its registered/bundled icon mappings and app launch are checked. The
-second ID belongs only to a copied test bundle, not the source project or user's
-installed app. Home-screen captures use light/dark system UI appearance; that is
-not the same as manually exercising every tinted/clear icon mode. A screenshot
-that does not visibly contain the icon cannot prove its appearance. No fabricated
-home-screen mockup is used as OS evidence.
+The old compiled() accepted any `name*.png`, including a wrong suffix or a directory.
+For example, a valid PNG renamed AppIcon60x60WRONG.png falsely satisfied a reference
+to AppIcon60x60. The check now requires an actual file whose whole name matches the
+extensionless base plus standard optional scale/device suffixes and .png. Empty
+basenames are rejected. Tests retain accepted plain/@2x/@3x and phone/pad variants.
+This is validation of this compiler-output contract, not a new image-loading API.
+No generated or installed resource is renamed to make the check pass.
 
-The verification code is not in the app target. It adds no runtime timer, thread,
-network request, permission or image-processing code. The product's file/byte
-footprint is preserved; test time and retained CI artifacts are the only added
-costs. Battery, memory and performance are not benchmarked. The inherited relay
-engine is not re-audited by an icon resource test.
+### Compiled catalog false positives
 
-Actual commit/run/toolchain/results are recorded below from inspected CI
-outputs. Compiler success, Simulator registration and visual inspection must stay
-separate from iOS 27 device, SideStore and LiveContainer proof. No installer/host
-version, App Store validation, device icon-cache refresh or permission is presumed.
+The earlier CAR check accepted any Name containing AppIcon. It did not require
+actual icon images or both target idioms. The current check requires exact AppIcon
+Icon Image records for phone and pad, at 1024x1024 with Opaque true. Exact-old AST
+controls demonstrate false accepts for a substring-only name, wrong asset type,
+missing pad, incorrect dimensions and transparency. The actual assetutil output
+must pass this stronger gate; fixture JSON is not used as compiler evidence.
 
-### README maintenance
+### Failed retries and stale installation verdicts
 
-Keep README.md and docs/features/app-icon.md byte-identical. Record minimum/target
-and actually executed OS/build separately, exact toolchain, tested source/run,
-pass/fail/not-run scope, resource cost and remaining limitations. Preserve earlier
-evidence under its own commit. An icon compiler or Simulator success must not be
-reported as successful physical sideload installation or LiveContainer rendering.
+Both entries invalidate SUCCESS.txt and simulator-results.json before rejection
+paths. The former direct compiled entry could retain both; the former shell could
+retain the prior installation verdict. Previous diagnostic logs/screens remain,
+but are not new execution evidence. Each completed cleanup writes cleanup.json;
+errors still preserve the original failure and cause failure after otherwise
+successful work. Simulator deadlines and error propagation are unchanged.
 
-Primary sources used for design/platform context, not as test results:
+The new test_audit_boundaries.py executes exact-old/current bodies from Git blobs:
+20 clean/unstaged/staged/index-only/optimized entry cases; eight fallback-name cases;
+eight CAR metadata cases; and two real command-cwd controls. All 38 cases in four
+methods passed locally. The SDK/archive boundary in entry fixtures deliberately
+fails; it never substitutes for actual Xcode execution. The existing 13 resource
+methods, all 30728 one-bit mutations, and three stale-shell controls remain intact.
+
+## Validation procedure and evidence boundaries
+
+Use a full Git checkout; historical controls and scope checks read exact Git objects.
+On the Xcode 27 host run:
+
+```sh
+bash Tests/AppIcon/run_checks.sh
+```
+
+The branch's `[icon-checks-only]` push workflow performs resource validation without
+calling the ordinary archive/IPA job. It retains baseline/composition/source-scope
+checks; bounded complete PNG parsing, CRC/decompression/filter/palette decoding;
+immutable hash and exact manifest tests; actual Debug/Release settings; iPhoneOS
+actool for phone and pad; assetutil records; independent Apple ImageIO decoding;
+and a real Simulator build using the committed native framework. Swift helper and
+app warnings remain errors, with separate platform/build diagnostics retained.
+
+The Simulator product is registered and launched under its original identity and
+one copied test-bundle identity, `hev.Socks5.ICONREVIEW`. Only that test copy's
+Info.plist changes, followed by ad-hoc signing. Both icon dictionaries, installed
+resources and launches are checked, then four original/remapped light/dark-system-
+UI home screens are captured. Visual review must confirm the icon is actually in
+frame; capturing an empty screen is not appearance evidence. Cleanup must complete.
+This is not SideStore signing, LiveContainer execution, App Store validation or a
+physical-device launch. The native engine is not re-audited by the icon suite.
+
+For completed execution, record source SHA/tree, run/attempt, exact toolchain and
+runtime, decoded pixels, compiler metadata, process/job status, screenshots and
+cleanup. Verify original artifact ZIP digest/CRC and source bytes/modes/manifest.
+Failed and partially completed phases remain failures or limited evidence. The
+companion offline verifier checks those identities, not a fresh SDK/device run.
+A later documentation-only commit must match all tested non-document files.
+
+## Costs and explicitly unperformed scope
+
+All product inputs, PNG/catalog, runtime Swift, project/plist, source pins,
+framework and shared build scripts are preserved. There is no new app timer, task,
+thread, allocation policy, network path, resource decoder or permission. Audit Git,
+hash, fixture, compiler and evidence work is test-only. Power, throughput and
+physical rendering latency are not measured; no improvement amount is asserted.
+
+Physical SideStore installation/signing/permissions, LiveContainer guest list/cache/
+web-clip and loader behavior, actual iPhone icon-cache refresh, iPad runtime,
+user-selected Dark/Tinted/clear modes, other OS/devices and App Store acceptance
+remain unperformed for this source. No host patch or fixed signing identity is
+assumed. Main, other feature branches, release/integrated and build 7 stay unchanged.
+This review does not refresh the integrated application or create an IPA.
+
+Primary platform contracts, not test results:
 - https://developer.apple.com/documentation/xcode/configuring-your-app-icon
-- https://developer.apple.com/documentation/xcode/creating-your-app-icon-using-icon-composer
-- https://developer.apple.com/documentation/xcode/build-settings-reference
-- https://github.com/LiveContainer/LiveContainer/blob/4dbe0f9a626de801184a42c0be8d2cb105058e3d/LiveContainerSwiftUI/Models/LCAppInfo.m
+- https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleicons
+- https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 
-## Completed iOS 27 icon verification
+## Completed final audit — 2026-09-26
 
-Tested commit: `3250e7e77780aaa0d26c1107bcb7e52543e8b9a6`.
-Tested tree: `1236db49421edadaaaedf14b544db0dafb7ce209`.
-Run `35921655619`: `icon-checks` succeeded; the ordinary `verify` archive job was
-intentionally skipped. No iPhone app archive or IPA was produced. The Simulator
-product was built and executed, not merely typechecked. This completion record is
-a later documentation-only change; product/test bytes remain the tested bytes.
+Run **36204666461**, attempt 1, executed source
+`638c0cb2026b77c04874757c11bd9c8f0c9c311f`, tree
+`e0c330d1c347629d3acb15aabd561071d18b533b`, with 50 tracked files.
+The complete icon-checks job and artifact upload succeeded on the first attempt;
+the normal archive/IPA job was intentionally skipped. No failed workflow attempt,
+rerun, relaxed deadline or suppressed resource assertion was needed in this run.
+The earlier 36055937895 artifact was used to reconstruct the audit input, not as
+new execution evidence. Its complete historical results and failures remain archived.
 
-| Verified layer | Actual result |
-| --- | --- |
-| Source integrity | Complete standard-library PNG decoding, all chunk CRCs, manifest reference and original artwork hash passed. Independent Pillow RGB and Apple ImageIO RGBA decoding agree with the corresponding local pixels. |
-| Resource regression | All 12 unittest methods passed, including the two actual old-validator false-accept controls. Subcases are not independent device tests. |
-| Target settings | Real Debug and Release settings selected AppIcon, both device families, unchanged iOS 17.2 minimum and hev.Socks5 identity. |
-| iPhoneOS asset compiler | Xcode 27 actool compiled the original full catalog for iPhone/iPad with no asset warnings or errors. Both CFBundleIcons dictionaries and generated PNG fallbacks were present. |
-| Compiled catalog | assetutil reported phone and pad AppIcon renditions at 1024 square, opaque, with the default Any appearance. No custom dark/tinted variants are claimed. |
-| Apple image decoding | Source 1024-square, generated 120-square phone and 152-square iPad PNGs fully decoded with all pixels opaque. Simulator-generated PNGs also decoded. |
-| Actual Simulator app | The unchanged product built successfully and registered/launched for hev.Socks5 and copied-test-bundle hev.Socks5.ICONREVIEW. Icon metadata remained intact after both installs. |
-| Visual observation | All four original/remapped, light/dark-system-UI home-screen captures visibly contain the Socks5 icon. Images are actual Simulator captures, not generated mockups. |
+All 13 retained resource methods, including all 30728 single-bit corruptions,
+original malformed-PNG/catalog controls and immutable artwork checks passed.
+All 38 new boundary cases in four methods and the three previous shell controls
+passed on the Apple host as well as locally. These cases deliberately reject
+invalid inputs; they are not 38 product defects or physical-device trials.
+Baseline/composition/source-scope and all four input/final worktree/index logs pass.
+The source and original history bytes are unchanged where required.
 
-Actual toolchain: Xcode 27.0 `27A266a`, iPhoneOS SDK 27.0, Apple Swift 6.4
-(`swiftlang-6.4.0.34.1`), macOS 27.0 `26A428`. The runtime was iOS 27.0
-`24A434`, iPhone 16 Simulator. This is not the user's earlier physical `24A437`
-OS build. The successful build log retains two non-asset warnings: multiple matching
-Simulator destinations (the selected SDK/architecture and actual runtime are recorded)
-and skipped AppIntents metadata extraction because no AppIntents dependency exists.
-They are not hidden or described as a completely warning-free app build. No Swift
-compiler error was present; Swift warnings were treated as errors.
+Actual Debug/Release settings select AppIcon, families 1,2, hev.Socks5 and minimum
+17.2. iPhoneOS actool compiled the full real catalog for phone and pad without
+asset warnings/errors. The stronger assetutil check found exact AppIcon Icon Image
+records for both idioms, each opaque and 1024x1024. Fallback references resolve to
+AppIcon60x60@2x.png (120x120) and AppIcon76x76@2x~ipad.png (152x152).
+ImageIO decoded the source and both device fallbacks and the two Simulator fallbacks
+completely as single images with every pixel opaque. The source RGB/RGBA hashes
+also match independent local decoding. Device and Simulator fallback file hashes
+can differ while their decoded RGBA hashes match, as observed here.
 
-### Prior failures retained
+The actual Simulator Release app built, registered and launched under hev.Socks5
+and the separate copied-test identity hev.Socks5.ICONREVIEW. All four original
+full-screen light/dark-system-UI captures were opened and visibly contain the
+preserved Socks5 icon and label. These are real Simulator captures, not generated
+mockups, manual Dark/Tinted/clear icon coverage or SideStore/LiveContainer results.
+All recorded subprocess exits are zero; shutdown/delete completed and cleanup.json
+is []. This suite uses simctl registration/launch and inspection, not an XCTest
+UI-interaction suite or a native server functional re-audit.
 
-Run `35920386959` passed source/mutation checks and device asset compilation, then
-failed compiling the test-only single-file ImageIO helper: @main required
-`-parse-as-library`. Only that compiler flag was added; no image or assertion changed.
-Run `35920720449` then passed ImageIO and the actual Simulator product build, but
-Simulator installation exceeded 120 seconds and cleanup shutdown also timed out.
-That run does not prove installation or appearance. The exact internal simulator
-stall cause was not established. The checker now records timeouts and preserves the
-initial failure when cleanup also fails. No install deadline was extended, skip or
-automatic fallback added, or assertion weakened. The complete final run succeeded
-on a fresh runner/device with identical product bytes, including cleanup.
+Actual environment: Xcode 27.0 `27A266a`, iPhoneOS SDK 27.0, Apple Swift 6.4
+`swiftlang-6.4.0.34.1`, macOS 27.0 `26A428`; iPhone 16 Simulator iOS 27.0
+`24A434`. The Simulator build retains two non-asset warnings: multiple matching
+destinations and skipped AppIntents metadata extraction. Destination diagnostics
+also remain in build-setting command logs. No claim of universally warning-free
+or hang-free execution is made.
 
-Downloaded artifact hashes:
-- First failed run, `10776612962`: `2e17303c395da9131efacc55611785d83ba1f629e333f71221af50f499084c91`.
-- Installation-timeout run, `10777481226`: `b463ed867513dce394b99f57102154bcc811544bf99f17083a6a0f96409b4e35`.
-- Complete final run, `10776959486`: `e5fbb61dff90e9e111dd048b9b899dea4557560fa5737ebd391aedb670da2a05`.
+Original new artifact **10893786621**, SHA-256
+`28275b03f5effe820d123848a00730eb205c5000c44283ad7fe1ff8116ad4bd3`,
+passed digest/CRC, genuine source-comment, all 50 path/byte/mode and source-manifest
+checks. The source archive reconstructs the exact tested Git tree. Final result
+documentation changes only this README and its identical specification; the other
+48 files remain identical to the executed source. Five existing paths change and
+two are added relative to the 48-file audit input; 43 existing files are preserved.
+All product resources, app/runtime, project/plist, workflow, shared build scripts,
+framework and pins remain byte-for-byte and mode-for-mode unchanged.
 
-All 47 source-file hashes in the final artifact match the reviewed tested tree.
-Relative to the input, only workflow/README/specification change among existing
-files; five feature-owned test files are added and the other 39 files are byte-
-identical. Product changes are zero, including both icon files, app code, project,
-plist, native framework and shared build scripts. The test-only files are not in
-the app target. Existing integrated IPA artwork remains the same; release/integrated
-and the other seven branches are not changed or rebuilt. The repository retains the
-requested eight branches. No dependency on the deleted BGTask experiment is added.
+Local container clone was unavailable because github.com DNS failed; verified
+connector archives and exact blobs supplied the reconstruction, not a full clone.
+A supplemental local Pillow attempt could not decode the device-compiled PNGs,
+which contain CgBI chunks; the error and chunk CRC checks are retained separately.
+It is not counted as a successful Pillow decode or an Apple/product failure.
+Actual Apple ImageIO decoding above succeeded on those exact bytes. No image was
+rewritten or test weakened to hide that local-decoder limitation.
 
-Remaining untested scope: physical SideStore signing/install, LiveContainer guest
-list/cache/web-clip rendering, actual iPhone icon-cache refresh, custom user-selected
-Dark/Tinted/clear modes, iPad runtime/UI and other iOS versions. The four screenshots
-exercise light/dark system UI, not every icon appearance selection. App Store upload
-and marketing approval are also not claimed. The code has no icon-related host
-permission request and the audit does not justify a host patch or Bundle ID change.
-No failing condition remains in the executed final resource checks; that conclusion
-is bounded by these actual compiler, decoder and Simulator observations.
-
-
-## Six-feature closure recheck (2026-09-24)
-
-Input `8c8b071b238b7c0c0a5fd1946c18263c5bd0f1bd` and fresh verification
-commit `c47acc5296d33ba4cefa1bbe233f8d1a9977e3ee` have the identical tree
-`758c9c60e590a06b9fcae05a098a3c9e0e41c9e5`. No product, artwork, catalog,
-project, test or workflow change was required for this rerun. The sole later
-changes are this README and its identical specification.
-
-Run `35928328152` passed its complete icon-checks job on attempt 3; ordinary
-archive/IPA verify remained intentionally skipped. Attempts 1 and 2 passed source,
-mutation, asset compilation, ImageIO and Simulator product building but timed out
-installing the original app after 120 seconds. Cleanup also stalled. These remain
-failed attempts; the exact internal simulator-service stall cause was not proven.
-Two explicit reruns used identical source and limits on fresh runners/devices.
-No assertion, installation step, timeout or failure handling was relaxed. Attempt 3
-completed both identities, all four screenshots and cleanup successfully.
-
-The 12 mutation/resource tests, actual Debug/Release settings, iPhone/iPad actool,
-CAR metadata and independent Apple image decoding passed. The real Simulator app
-registered and launched under hev.Socks5 and the copied test ID
-hev.Socks5.ICONREVIEW. All four new light/dark-system-UI screenshots were inspected
-and visibly contain the preserved Socks5 icon; none is a generated mockup.
-This does not exercise every custom tinted/clear icon setting or the iPad runtime.
-
-The successful runner recorded Xcode27.0 `27A266a`, iPhoneOS SDK27.0, Apple Swift6.4
-and macOS27.0 `26A5406e`; the actual iPhone16 Simulator was iOS27.0 `24A434`.
-The unchanged iOS17.2 deployment target is separate from those executed versions.
-The two non-asset build warnings (matching destinations and unused AppIntents
-metadata extraction) remain visible; asset compilation had no warning/error.
-SideStore or LiveContainer was not installed or executed.
-
-Inspected artifacts and SHA-256:
-- Attempt 1 `10780520415`: `7d121ca632518aede02af41074640f95f455ff598bc1a62c512bc2f70ed04974`.
-- Attempt 2 `10780557241`: `75f22d18508900c1ae0013f2e6ca47c4f46e10691b72775cfe6a914ac7c6bc9d`.
-- Successful attempt 3 `10781231723`: `08bce9bf855af335cf3d4dc39d72bf30c0bbf5ce8a8931a1f77b2d1d200caeca`.
-
-All 47 final source hashes match the reviewed unchanged snapshot. This feature
-remains presentation-only on main, with no dependency on the other five features,
-no runtime workload, no host changes and no new IPA/archive. Eight branches remain;
-main/release are excluded. Physical iOS27 SideStore signing/display, LiveContainer
-guest/cache/web-clip behavior and untested appearance modes remain outside this
-evidence. The transient failed attempts are not erased by the final success.
-
-
-## Retained exhaustive resource check: final closure (2026-09-25)
-
-The independently observed commit `43993ab7aef5480a74876a3233011c446046001f`
-is retained. It adds only an exhaustive mutation property to the existing test suite:
-each of the 3841 source bytes has each bit flipped in isolation (30728 mutations),
-every corrupted result is rejected, and the original bytes are restored. It neither
-replaces the approved artwork nor adds code/resources to the application target.
-There are now thirteen unittest methods; mutation repetitions are not device tests.
-The earlier twelve-method records above remain accurate for their earlier versions.
-
-Tested commit: `43993ab7aef5480a74876a3233011c446046001f`.
-Tested tree: `8b07ce8c87041ff5a7b7bc83917338d459f92f57`.
-Run `35941057588` succeeded: thirteen source/mutation methods, actual iPhoneOS27
-asset compilation for phone/pad, Apple ImageIO decoding, and the unchanged iPhone16
-iOS27 Simulator product registration/launch for original and remapped test IDs.
-The normal iPhone archive/IPA job was skipped. The icon metadata and four captured
-light/dark-system-UI home screens remain evidence for those two Simulator installs,
-not authored tinted/clear variants or physical SideStore/LiveContainer rendering.
-
-The recorded toolchain was Xcode27.0 `27A266a`, iPhoneOS27.0, Apple Swift6.4 and
-macOS27.0 `26A5406e`; the Simulator runtime was iOS27.0 `24A434`. Minimum iOS17.2,
-Bundle ID, project/plist, source image and catalog are unchanged. This runner's OS
-build is distinct from the previous run's 26A428 and from the user's physical OS.
-
-Downloaded artifact `10785356428` SHA-256:
-`dae18ef7a1980dbf88a8a2b86eef113c4d7576b0fb59ddebf4c8b083da8c4d1d`.
-The 47-file source archive reconstructs the tested tree and all 47 recorded source
-hashes match. The thirteen-method suite was also rerun locally during this closure;
-that Linux resource check is not another Apple/Simulator execution. Retention is
-based on the code's scope and observed results, not attribution to a particular
-ChatGPT session. Existing runtime work/resource usage is unchanged.
-
-Only README and its identical feature specification are updated by this completion.
-No production change, new branch, main/release update, app archive or IPA is made.
-Exactly eight branches remain. Physical SideStore signing/install, LiveContainer
-host cache/guest-list/web-clip rendering, actual iPhone icon-cache refresh, iPad
-runtime and manual Dark/Tinted/clear modes remain untested. Earlier failed runs
-and these limits remain explicit; a successful asset/Simulator test is not a
-universal installation or appearance guarantee.
-
-## Final stale-success repair and resource verification (2026-09-25)
-
-The actual old resource-audit shell retained SUCCESS.txt when its first command
-failed. The entry now removes only that marker before beginning. Three bounded
-old/current-retry/current-first-failure controls prove the nonzero exit, corrected
-marker state and retained diagnostic log. This changes audit evidence handling,
-not the artwork, catalog, application code, native engine or Simulator deadlines.
-
-Tested commit: `8a25bc4d5b43e5dcc1044c004442f962ef9f46a7`.
-Tested tree: `c994280dd93273f34ee753e45af34bb13bb0daaf`.
-Run `36055937895` passed icon-checks on its first attempt; ordinary archive/IPA
-verification was intentionally skipped. All thirteen resource methods, including
-30728 one-bit mutations and old-validator controls, passed with the three new
-shell cases. Actual phone/iPad asset compilation, ImageIO decoding and Simulator
-registration/launch for both original/remapped IDs passed. All four new light/dark
-system-home screenshots were inspected and visibly contain the preserved icon.
-This is not manual coverage of every clear/tinted appearance or physical install.
-
-Downloaded artifact `10833195483` SHA-256:
-`71c82aeedc78927e42c4357acc310eded204cc4e3656015f2f21fae673b8ae61`.
-The ZIP passed integrity; all 48 source-manifest hashes matched and the source
-archive reconstructed the exact tested tree. Xcode27.0 `27A266a`, iPhoneOS27.0,
-Apple Swift6.4 and macOS27.0 `26A428` were recorded. The runtime was the iPhone16
-iOS27.0 `24A434` Simulator, not the owner's physical device. Existing non-asset
-Simulator-destination/AppIntents warnings remain visible, not described as absent.
-
-Only this README and its identical feature copy change after the successful run.
-The original PNG, catalog, project/plist, source pins and runtime bytes are intact.
-The iOS17.2 minimum, intended physical SideStore/LiveContainer paths and untested
-host/cache/web-clip, iPad runtime and installer behavior remain separate boundaries.
-No new branch, main/release change, production work, iPhone archive or IPA occurred.
+The companion evidence preserves before/tested/final source snapshots, complete
+patch and original artifacts. Its offline verifier checks hashes/trees, documented
+outcomes and exact forward/reverse patch reconstruction, not fresh Apple or physical
+execution. The branch is complete within these executed source/resource/compiler/
+Simulator boundaries. Main, other features, integrated release and build 7 remain
+unchanged; physical installation and all unperformed boundaries above remain open.

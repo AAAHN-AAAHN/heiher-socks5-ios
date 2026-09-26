@@ -62,14 +62,40 @@ final class StatisticsUITests: XCTestCase {
         XCTAssertTrue(audio.waitForExistence(timeout: 5))
         XCTAssertTrue(audio.isHittable)
         XCTAssertEqual(audio.value as? String, "0")
+        let audioState = app.staticTexts["background.audioState"]
+        func expectAudioState(_ value: String, timeout: TimeInterval = 5) {
+            XCTAssertTrue(audioState.waitForExistence(timeout: timeout))
+            let expectation = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "label == %@", value), object: audioState)
+            XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: timeout), .completed)
+        }
+        expectAudioState("Off")
         audio.tap()
         XCTAssertEqual(audio.value as? String, "1")
+        expectAudioState("Playing silent WAV continuously", timeout: 10)
+        // Starting/stopping the combined engine must not turn the independent audio off.
+        app.tabBars.buttons["Server"].tap()
+        for _ in 0..<6 {
+            if app.buttons["Start"].isHittable && app.buttons["Stop"].isHittable { break }
+            app.scrollViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(app.buttons["Start"].isHittable)
+        app.buttons["Start"].tap()
+        XCTAssertTrue(waitUntil { Self.handshake() })
+        XCTAssertTrue(app.buttons["Stop"].isHittable)
+        app.buttons["Stop"].tap()
+        XCTAssertTrue(waitUntil { !Self.handshake() })
+        app.tabBars.buttons["Background"].tap()
+        XCTAssertEqual(audio.value as? String, "1")
+        expectAudioState("Playing silent WAV continuously", timeout: 10)
         app.terminate()
         app.launch()
         XCTAssertTrue(app.navigationBars["Background"].waitForExistence(timeout: 10))
         XCTAssertEqual(audio.value as? String, "1", "Saved audio intent must survive relaunch")
+        expectAudioState("Playing silent WAV continuously", timeout: 10)
         audio.tap()
         XCTAssertEqual(audio.value as? String, "0")
+        expectAudioState("Off")
         XCTAssertEqual(app.switches["Continuous location"].value as? String, "0")
         let background = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         background.name = "integrated-background"; background.lifetime = .keepAlways; add(background)

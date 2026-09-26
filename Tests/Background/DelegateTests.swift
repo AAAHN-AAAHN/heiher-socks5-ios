@@ -1,40 +1,47 @@
 import Foundation
 
 @main struct DelegateTests {
-    @MainActor static func main() async {
+    @MainActor static func main() {
         let app = BackgroundKeepAlive()
         app.setAudio(true)
         let finished = AVAudioPlayer.instances.last!
-        await Task.detached { app.audioPlayerDidFinishPlaying(finished, successfully: false) }.value
-        await waitUntil { AVAudioPlayer.instances.last !== finished }
+        send { app.audioPlayerDidFinishPlaying(finished, successfully: false) }
+        waitUntil { AVAudioPlayer.instances.last !== finished }
         precondition(AVAudioPlayer.instances.last!.isPlaying)
         print("PASS: audio completion on a worker safely recovers on MainActor")
         let decoder = AVAudioPlayer.instances.last!
-        await Task.detached { app.audioPlayerDecodeErrorDidOccur(decoder, error: nil) }.value
-        await waitUntil { app.audioState.hasPrefix("Waiting to resume") }
+        send { app.audioPlayerDecodeErrorDidOccur(decoder, error: nil) }
+        waitUntil { app.audioState.hasPrefix("Waiting to resume") }
         precondition(app.audioEnabled && Timer.live.count == 1)
         print("PASS: decoder failure on a worker safely schedules one-second recovery")
         Timer.live[0].fire()
         precondition(AVAudioPlayer.instances.last!.isPlaying)
         app.setAudio(false)
         let activations = AVAudioSession.shared.activations
-        await Task.detached { app.audioPlayerDidFinishPlaying(decoder, successfully: true) }.value
-        for _ in 0..<20 { await Task.yield() }
+        send { app.audioPlayerDidFinishPlaying(decoder, successfully: true) }
+        Foundation.RunLoop.main.run(until: Date().addingTimeInterval(0.02))
         precondition(AVAudioSession.shared.activations == activations && Timer.live.isEmpty)
         print("PASS: an off-main stale delegate cannot restart disabled audio")
         app.setAudio(true)
         let firstDecoder = AVAudioPlayer.instances.last!
-        await Task.detached { app.audioPlayerDecodeErrorDidOccur(firstDecoder, error: nil) }.value
-        await waitUntil { AVAudioPlayer.instances.last !== firstDecoder }
+        send { app.audioPlayerDecodeErrorDidOccur(firstDecoder, error: nil) }
+        waitUntil { AVAudioPlayer.instances.last !== firstDecoder }
         precondition(AVAudioPlayer.instances.last!.isPlaying && Timer.live.count == 1)
         print("PASS: first off-main decoder failure recovers immediately on MainActor")
         app.setAudio(false)
     }
 
-    @MainActor static func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<10_000 {
+    private static func send(_ callback: @escaping @Sendable () -> Void) {
+        let posted = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async { callback(); posted.signal() }
+        precondition(posted.wait(timeout: .now() + 2) == .success)
+    }
+
+    @MainActor static func waitUntil(_ condition: () -> Bool) {
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline {
             if condition() { return }
-            await Task.yield()
+            Foundation.RunLoop.main.run(until: Date().addingTimeInterval(0.001))
         }
         preconditionFailure("Delegate did not reach MainActor")
     }

@@ -79,7 +79,7 @@ class PortReservationTests(unittest.TestCase):
     def reserve(self, source, forced_port=0):
         # Execute the actual first reservation statement, not a rewritten allocator.
         definition = next(n for n in ast.parse(source).body
-                          if isinstance(n, ast.FunctionDef) and n.name == 'proxy_server')
+                          if isinstance(n, ast.FunctionDef) and n.name == getattr(self, 'function_name', 'proxy_server'))
         self.assertIsInstance(definition.body[0], ast.With)
         module = ast.parse('def reserve_port():\n    return port\n')
         module.body[0].body.insert(0, definition.body[0])
@@ -126,6 +126,64 @@ class PortReservationTests(unittest.TestCase):
         self.assertGreater(port, 0)
         self.assertEqual(observed, {'address': ('::', 0), 'v6only': 0})
         print('PASS: current reservation uses the actual dual-stack wildcard listener scope')
+
+
+class InputIdentityTests(unittest.TestCase):
+    def test_actual_old_and_current_input_boundaries(self):
+        blob = 'a55059641f821e62adb19f4a30ec31fa2f337a9d'
+        source = subprocess.check_output(['git', '-C', str(audit.ROOT), 'show', blob])
+        self.assertEqual(hashlib.sha1(b'blob ' + str(len(source)).encode() + b'\0' + source).hexdigest(), blob)
+        old = SimpleNamespace(__file__=audit.__file__, __name__='old_udp_audit')
+        exec(compile(source, audit.__file__, 'exec'), old.__dict__)
+        for label, module in [('old', old), ('current', audit)]:
+            for state in ('clean', 'unstaged', 'staged', 'index-only'):
+                with self.subTest(version=label, state=state), tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    def git(*args):
+                        return subprocess.check_output(['git', '-C', str(root), *args], stderr=subprocess.STDOUT)
+                    git('init', '-q')
+                    tracked = root / 'tracked.txt'
+                    tracked.write_text('original\n')
+                    git('add', '.')
+                    git('-c', 'user.name=Audit fixture', '-c', 'user.email=fixture@example.invalid',
+                        'commit', '-qm', 'isolated input fixture')
+                    if state != 'clean':
+                        tracked.write_text('changed\n')
+                        if state in ('staged', 'index-only'):
+                            git('add', '.')
+                        if state == 'index-only':
+                            tracked.write_text('original\n')
+                    out = root / 'artifacts'
+                    out.mkdir()
+                    (out / 'SUCCESS.txt').write_text('old success\n')
+                    (out / 'previous.log').write_text('retain\n')
+                    entered = []
+                    def run(args, name, cwd=None, timeout=180):
+                        if args[0] == 'git' and '--exit-code' in args:
+                            git(*args[1:])
+                        else:
+                            entered.append(name)
+                            raise RuntimeError('stop at first downstream source command')
+                    with patch.multiple(module, ROOT=root, OUT=out, CORE=root / 'missing-core', run=run):
+                        with self.assertRaises((RuntimeError, subprocess.CalledProcessError)):
+                            module.main()
+                    self.assertEqual(bool(entered), label == 'old' or state == 'clean')
+                    self.assertFalse((out / 'SUCCESS.txt').exists())
+                    self.assertEqual((out / 'previous.log').read_text(), 'retain\n')
+        print('PASS: 8 actual old/current input boundaries; real Git rejects working/index drift before downstream checks')
+
+
+class PeerPortReservationTests(PortReservationTests):
+    function_name = 'proxy'
+
+    @classmethod
+    def setUpClass(cls):
+        path = Path(__file__).with_name('udp_peer_regression.py')
+        cls.current = path.read_bytes()
+        blob = '81453ee580930a91ec926c99c852d31e888e7661'
+        cls.original = subprocess.check_output(['git', '-C', str(path.parent), 'show', blob])
+        if hashlib.sha1(b'blob ' + str(len(cls.original)).encode() + b'\0' + cls.original).hexdigest() != blob:
+            raise RuntimeError('Wrong original peer-test source')
 
 
 if __name__ == '__main__':

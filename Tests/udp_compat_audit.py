@@ -56,6 +56,9 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     if CORE.exists():
         raise SystemExit('Use a fresh checkout or remove .build/udp-final-audit first.')
+    # The working files, index and archived HEAD must describe the same input.
+    run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'input-worktree.log')
+    run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'input-index.log')
     run(['git', 'rev-parse', 'HEAD'], 'tested-commit.txt')
     run(['git', 'diff', '--name-status', CONFIG['base_commit'], 'HEAD'], 'branch-files.txt')
     run(['git', 'diff', CONFIG['base_commit'], 'HEAD'], 'branch-diff.patch')
@@ -159,6 +162,8 @@ def main():
     run([executable], 'unit-optimized.log')
     executable.unlink()
     run([sys.executable, 'Build/check.py', 'reverse', CORE], 'reverse.log')
+    run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'final-worktree.log')
+    run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'final-index.log')
     (OUT / 'SUCCESS.txt').write_text('Scoped UDP repair audit passed. Read summary.json for observation-only failures. No IPA was built.\n')
 
 

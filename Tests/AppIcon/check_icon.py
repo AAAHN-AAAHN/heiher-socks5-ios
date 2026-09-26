@@ -118,7 +118,10 @@ def main():
         if path not in allowed:
             require((ROOT / path).read_bytes() == git('show', INPUT + ':' + path), path)
             preserved.append(path)
-    require(all(p.startswith('Tests/AppIcon/') for p in set(paths) - set(originals)),
+    history = 'docs/history/app-icon-before-final-audit-20260926.md'
+    require((ROOT / history).read_bytes() == git('show',
+            '1beaefa4e068a3b4e9473bab478b27526b88defd:README.md'), 'Original audit history')
+    require(all(p.startswith('Tests/AppIcon/') or p == history for p in set(paths) - set(originals)),
             'Unexpected feature addition')
     baseline_config = json.loads(git('show', BASE + ':Build/features.json'))
     config = json.loads((ROOT / 'Build/features.json').read_bytes())

@@ -14,6 +14,7 @@ struct BackgroundKeepAliveView: View {
                 Section {
                     Toggle("Loop silent WAV", isOn: $audioEnabled)
                     Text(keepAlive.audioState).font(.footnote)
+                        .accessibilityIdentifier("background.audioState")
                 } header: {
                     Text("Audio")
                 } footer: {

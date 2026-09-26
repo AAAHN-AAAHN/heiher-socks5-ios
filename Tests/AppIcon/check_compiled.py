@@ -8,6 +8,7 @@ LiveContainer execution and does not certify SpringBoard tinted/clear appearance
 import json
 from pathlib import Path
 import plistlib
+import re
 import shutil
 import subprocess
 import sys
@@ -24,7 +25,7 @@ def run(*args, timeout=120):
     with (OUT / 'commands.log').open('a') as log:
         log.write(json.dumps(command) + '\n')
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         with (OUT / 'commands.log').open('a') as log:
             log.write(f'TIMEOUT after {timeout}s; command did not complete.\n')
@@ -43,17 +44,37 @@ def compiled(folder, info):
         require(primary['CFBundleIconName'] == 'AppIcon', key)
         require(primary.get('CFBundleIconFiles'), 'Missing legacy filename fallback')
         for name in primary['CFBundleIconFiles']:
-            require(Path(name).name == name, 'Icon reference must be a basename')
-            candidates = list(folder.glob(name + '*.png'))
+            require(isinstance(name, str) and name and Path(name).name == name,
+                    'Icon reference must be a nonempty basename')
+            pattern = re.escape(name) + r'(?:@[123]x)?(?:~(?:iphone|ipad))?\.png'
+            candidates = [path for path in folder.glob('*.png')
+                          if path.is_file() and re.fullmatch(pattern, path.name)]
             require(bool(candidates), 'No generated file for ' + name)
         require(not info[key].get('CFBundleAlternateIcons'), 'Unexpected alternate icons')
-    images = sorted(folder.glob('AppIcon*.png'))
+    images = sorted(path for path in folder.glob('AppIcon*.png') if path.is_file())
     require(bool(images), 'No generated icon PNG')
     return images
 
 
+def catalog_renditions(items):
+    icons = [item for item in items
+             if item.get('Name') == 'AppIcon' and item.get('AssetType') == 'Icon Image']
+    require({item.get('Idiom') for item in icons} >= {'phone', 'pad'},
+            'CAR missing phone/pad AppIcon images')
+    require(all(item.get('PixelWidth') == 1024 and item.get('PixelHeight') == 1024
+                and item.get('Opaque') is True for item in icons),
+            'CAR AppIcon dimensions/opacity differ from the source contract')
+
+
 def main():
-    OUT.mkdir(parents=True, exist_ok=True); WORK.mkdir(parents=True, exist_ok=True)
+    OUT.mkdir(parents=True, exist_ok=True)
+    # Direct retries must not retain a previous successful install verdict.
+    for marker in ('SUCCESS.txt', 'simulator-results.json'):
+        (OUT / marker).unlink(missing_ok=True)
+    require(__debug__, 'Run the audit without Python optimization')
+    run('git', 'diff', '--exit-code', 'HEAD', '--')
+    run('git', 'diff', '--cached', '--exit-code', 'HEAD', '--')
+    WORK.mkdir(parents=True, exist_ok=True)
     require(run('xcrun', '--sdk', 'iphoneos', '--show-sdk-version').startswith('27.'), 'Wrong SDK')
     toolchain = run('xcodebuild', '-version') + '\n' + run('xcrun', '--sdk', 'iphoneos', '--show-sdk-version')
     (OUT / 'toolchain.txt').write_text(toolchain + '\n' + run('sw_vers') + '\n' + run('xcrun', 'swiftc', '--version') + '\n')
@@ -83,7 +104,7 @@ def main():
     device_images = compiled(device_assets, info)
     assetinfo = run('xcrun', 'assetutil', '--info', device_assets / 'Assets.car')
     (OUT / 'assets-info.json').write_text(assetinfo + '\n')
-    require(any('AppIcon' in str(item.get('Name', '')) for item in json.loads(assetinfo)), 'CAR missing AppIcon renditions')
+    catalog_renditions(json.loads(assetinfo))
     decoder = WORK / 'decode-images'
     run('xcrun', 'swiftc', '-parse-as-library', '-swift-version', '5', '-warnings-as-errors',
         ROOT / 'Tests/AppIcon/DecodeImages.swift', '-o', decoder)
@@ -96,7 +117,7 @@ def main():
                         '-configuration', 'Release', '-sdk', 'iphonesimulator', '-arch', 'arm64',
                         'CONFIGURATION_BUILD_DIR=' + str(WORK / 'simulator'), 'CODE_SIGNING_ALLOWED=NO',
                         'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES'], stdout=log, stderr=subprocess.STDOUT,
-                       check=True, timeout=300)
+                       check=True, timeout=300, cwd=ROOT)
     app = WORK / 'simulator/Socks5.app'
     app_info = plistlib.loads((app / 'Info.plist').read_bytes())
     require(app_info['DTSDKName'].startswith('iphonesimulator27.'), 'Wrong Simulator SDK')
@@ -152,10 +173,13 @@ def main():
                 run('xcrun', 'simctl', action, device, timeout=30)
             except (RuntimeError, subprocess.TimeoutExpired) as error:
                 cleanup_errors.append(str(error))
+        (OUT / 'cleanup.json').write_text(json.dumps(cleanup_errors, indent=2) + '\n')
         if cleanup_errors:
             (OUT / 'cleanup-errors.txt').write_text('\n'.join(cleanup_errors) + '\n')
             if not failed:
                 raise RuntimeError('Simulator cleanup failed; see cleanup-errors.txt')
+    run('git', 'diff', '--exit-code', 'HEAD', '--')
+    run('git', 'diff', '--cached', '--exit-code', 'HEAD', '--')
     print('PASS: device asset compilation, independent ImageIO decode, actual Simulator product and two identities.')
     print('SCOPE: screenshots change system UI appearance, not manual tinted/clear icon modes. No physical install, host or IPA test.')
 

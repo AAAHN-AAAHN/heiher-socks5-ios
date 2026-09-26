@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
-UDP = '66e7196ef5faccc43d9b154cab21a94e4466a77e'
+UDP = '7f603a7e063422df460fb171d3b95b36cc6230af'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 UDP_FILES = {
     '.github/workflows/udp-compat-audit.yml': '.github/workflows/verify-build.yml',
@@ -24,7 +24,8 @@ UDP_FILES = {
                      'Tests/udp_compat_audit.py', 'Tests/udp_sockaddr_regression.py',
                      'Tests/udp_sockaddr_unit.c', 'Tests/udp_audit_driver_regression.py',
                      'docs/reviews/udp-compat-20260923.md', 'docs/features/udp-compatibility.md',
-                     'docs/reviews/udp-compat-20260922.md', 'Socks5/Info.plist')}
+                     'docs/reviews/udp-compat-20260922.md', 'Socks5/Info.plist',
+                     'docs/history/udp-before-final-audit-20260926.md')}
 }
 
 
@@ -174,8 +175,12 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     if CORE.exists():
         raise SystemExit('Use a clean checkout or remove .build/statistics-final-audit.')
+    # The working files, index and archived HEAD must describe the same input.
+    run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'input-worktree.log')
+    run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'input-index.log')
     inspect_sources()
     run([sys.executable, 'Tests/Statistics/audit_driver_probe.py'], 'audit-driver.log')
+    run([sys.executable, 'Tests/Statistics/input_probe.py'], 'input-probe.log')
     run([sys.executable, 'Tests/Statistics/host_probe.py'], 'host-reader.log')
     run(['git', 'clone', '--no-checkout', 'https://github.com/heiher/hev-socks5-server.git', CORE], 'clone.log')
     run(['git', 'checkout', '--detach', CONFIG['sources']['.']], 'checkout.log', CORE)
@@ -215,6 +220,8 @@ def main():
     run([sys.executable, 'Build/check.py', 'reverse', CORE], 'reverse.log')
     for name in ('host', 'counter', 'tcp', 'udp', 'counter-tsan', 'model'):
         (OUT / name).unlink(missing_ok=True)
+    run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'final-worktree.log')
+    run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'final-index.log')
     (OUT / 'SUCCESS.txt').write_text('PASS: statistics-scoped native audit and applicable type checks.\n'
                                     'UDP contents preserved. No IPA or XCFramework build.\n')
 

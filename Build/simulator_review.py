@@ -11,13 +11,14 @@ import socket
 import subprocess
 import threading
 import time
+from release_source import PRODUCT, check_product, check_source
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'artifacts/integrated/simulator'
 
 
 def run(*args, timeout=120):
-    result = subprocess.run([str(x) for x in args], capture_output=True, text=True, timeout=timeout)
+    result = subprocess.run([str(x) for x in args], capture_output=True, text=True, timeout=timeout, cwd=ROOT)
     if result.returncode:
         raise RuntimeError(f'{args}: exit {result.returncode}\n{result.stdout}\n{result.stderr}')
     return result.stdout.strip()
@@ -82,13 +83,15 @@ def tcp_echo(proxy_port):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / 'SUCCESS.txt').unlink(missing_ok=True)
+    for marker in ('SUCCESS.txt', 'results.json'):
+        (OUT / marker).unlink(missing_ok=True)
+    check_product()
     with (OUT / 'app-build.log').open('w') as log:
-        subprocess.run(['xcodebuild', 'build', '-project', 'Socks5.xcodeproj', '-scheme', 'Socks5',
+        subprocess.run(['xcodebuild', 'build', '-project', str(PRODUCT / 'Socks5.xcodeproj'), '-scheme', 'Socks5',
                         '-configuration', 'Release', '-sdk', 'iphonesimulator', '-arch', 'arm64',
                         'CONFIGURATION_BUILD_DIR=' + str(ROOT / '.build/integrated-simulator'),
                         'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES',
-                        'MARKETING_VERSION=1.1.0', 'CURRENT_PROJECT_VERSION=7'],
+                        'MARKETING_VERSION=1.1.0', 'CURRENT_PROJECT_VERSION=8'],
                        cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=300)
     app = ROOT / '.build/integrated-simulator/Socks5.app'
     info = plistlib.loads((app / 'Info.plist').read_bytes())
@@ -181,6 +184,7 @@ def main():
         (OUT / 'cleanup.json').write_text(json.dumps(cleanup, indent=2))
     if cleanup:
         raise RuntimeError('Simulator cleanup failed: ' + repr(cleanup))
+    check_product()
     (OUT / 'SUCCESS.txt').write_text(success_text)
 
 
