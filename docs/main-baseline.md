@@ -98,3 +98,32 @@ call/Siri/Bluetooth, VPN/hotspot, lock/suspension, long-duration and energy test
 not performed by these scripts. An unsigned IPA must go through the user's signing/
 import workflow; its hash is not the hash of a later signed copy. No original build7
 or build8 package is relabeled as a fresh product.
+
+## Completed baseline verification — 2026-09-26
+
+Run **36218740219**, attempt 1, executed exact source
+`3e7047cfa52f446e5c5d2f6c15e49e8bbfd7cd8b`, tree
+`c9cdbbac0c00ebe1e0ef26f047c443b959ce3689`. Linux and Xcode27 jobs both
+passed on their first execution. All46 old/current audit cases, actual native TCP
+echo, baseline/composition and exact native source reversal passed on both hosts.
+Input and final worktree/index logs are empty. Actual Apple framework generation,
+ARM64 app archive and package/ZIP checks completed without changing the tracked
+checkout. This is baseline packaging, not the integrated six-feature deliverable.
+
+Original artifacts10898635468 (Linux) and10898475964 (macOS) were inspected:
+SHA-256 respectively
+`86d1932980659a1ef74d691faab0d9e49e8fd5d3e8cce406aa5a6e78a58d7f51` and
+`7a2821c131bb129bbda3c8859e311632a292aa0ae608d6706ad55406732687a0`.
+Both ZIP CRCs, genuine source comments and all42 file contents/modes match the
+executed tree. Source/history and native/Apple results are distinct evidence.
+The baseline unsigned IPA is72545bytes, SHA-256
+`33dd1ff63510b11b225b67d93f157e032f0b503087ff6d6b1d2cfbed89c1cd83`.
+Its inventory contains the original app executable, plist and PkgInfo only; no
+feature resources or tests were added. No device/Simulator execution is implied.
+Platform-specific empty-symbol libtool warnings and AppIntents metadata warnings
+remain in original logs. No assertion, timeout or warning rule was relaxed.
+
+This result completion changes only the identical README/main-specification pair;
+the other40 files are the executed bytes/modes. The subsequent features must inherit
+this completed main commit before final integration; their old successes are not
+counted as verification of this new common audit implementation.
