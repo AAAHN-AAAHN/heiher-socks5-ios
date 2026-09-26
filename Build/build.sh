@@ -9,10 +9,12 @@ CORE="$ROOT/.build/core"
 mkdir -p "$OUT"
 # A failed retry must not leave prior native/SDK success evidence usable.
 rm -f "$OUT/SUCCESS.txt" "$OUT/sdk-success.txt"
+python3 -c 'import sys; sys.exit(0 if __debug__ else "Assertions must be enabled.")'
 # Bind tracked working files and the index to the recorded revision.
 git diff --exit-code HEAD -- > "$OUT/input-worktree.log"
 git diff --cached --exit-code HEAD -- > "$OUT/input-index.log"
 python3 Build/check.py baseline > "$OUT/baseline-audit.log"
+python3 Tests/baseline_audit.py > "$OUT/baseline-driver.log" 2>&1
 python3 Tests/ServerControl/audit_driver_check.py > "$OUT/audit-driver.log"
 python3 Tests/ServerControl/input_integrity_check.py > "$OUT/input-integrity.log"
 SERVER_REF=$(python3 -c 'import json; print(json.load(open("Build/upstream.json"))["sources"]["."])')
@@ -102,9 +104,14 @@ git diff --exit-code HEAD -- > "$OUT/final-worktree.log"
 git diff --cached --exit-code HEAD -- > "$OUT/final-index.log"
 if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
     (cd "$CORE" && ./build-apple.sh) > "$OUT/core-apple.log" 2>&1
-    rm -rf HevSocks5Server.xcframework
-    cp -R "$CORE/HevSocks5Server.xcframework" .
-    xcodebuild archive -project Socks5.xcodeproj -scheme Socks5 -configuration Release \
+    # Keep the source checkout immutable; package only a disposable HEAD copy.
+    PRODUCT="$ROOT/.build/$NAME-product-source"
+    test ! -e "$PRODUCT"
+    mkdir -p "$PRODUCT"
+    git archive HEAD | tar -x -C "$PRODUCT"
+    rm -rf "$PRODUCT/HevSocks5Server.xcframework"
+    cp -R "$CORE/HevSocks5Server.xcframework" "$PRODUCT/"
+    xcodebuild archive -project "$PRODUCT/Socks5.xcodeproj" -scheme Socks5 -configuration Release \
         -sdk iphoneos -destination 'generic/platform=iOS' \
         -archivePath "$ROOT/.build/$NAME.xcarchive" \
         CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
@@ -114,8 +121,10 @@ if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
     APP="$ROOT/.build/$NAME.xcarchive/Products/Applications/Socks5.app"
     xcrun lipo "$APP/Socks5" -verify_arch arm64
     python3 Build/check.py package "$APP" > "$OUT/package.log"
+    rm -rf "$ROOT/.build/package-$NAME"
     mkdir -p "$ROOT/.build/package-$NAME/Payload"
     ditto "$APP" "$ROOT/.build/package-$NAME/Payload/Socks5.app"
+    rm -f "$OUT/Socks5-$NAME-unsigned.ipa"
     (cd "$ROOT/.build/package-$NAME" && zip -qr "$OUT/Socks5-$NAME-unsigned.ipa" Payload)
     unzip -t "$OUT/Socks5-$NAME-unsigned.ipa" >> "$OUT/package.log"
     ditto -c -k --keepParent "$ROOT/.build/$NAME.xcarchive/dSYMs" "$OUT/Socks5-dSYMs.zip"
@@ -123,4 +132,6 @@ if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
     (cd "$OUT" && shasum -a 256 *.ipa > SHA256SUMS.txt)
 fi
 python3 Build/check.py reverse "$CORE" >> "$OUT/source-audit.log"
+git diff --exit-code HEAD -- > "$OUT/final-worktree.log"
+git diff --cached --exit-code HEAD -- > "$OUT/final-index.log"
 printf 'PASS: %s build and applicable checks completed\n' "$NAME" | tee "$OUT/SUCCESS.txt"
