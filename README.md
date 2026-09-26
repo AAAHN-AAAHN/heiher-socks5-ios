@@ -1,222 +1,140 @@
-# Server execution control
+# Server execution control — current main
 
-## Current audit — 2026-09-26
+## Completed project alignment — 2026-09-26
 
-This branch owns server options and serialized Start/Stop/reconfiguration, not JSON
-storage or the integrated application. The final review starts at
-`b4d20f8402cdcd5ee687d17f46bf71d38a9febb5`. No additional runtime defect was reproduced
-in the reviewed model/controller/native boundaries. The changes below repair audit
-input identity and the native-header/SDK handoff without modifying production code.
-New run `36201868398` at `1a236645b55712eb5aed80454102b30fb5b8a5bb` passed
-both Linux and Xcode27 jobs on attempt 1. The inspected source tree is
-`f6b6456343c4451ea4f58824fa4eafaeea332f95`. Earlier green runs were not used
-instead of this new verification. The final documentation update changes only this
-README and its identical specification; the other 66 files match the tested input.
+This independent branch inherits main75335d201cb1e541bb153e9899badbc11ccf1973 as
+an actual ancestor. Both Build/features.json and the separate membership document
+name that same baseline. Run36225969482 attempt1 executed
+3ba1eb40efd25a0a833b7b3b3ed6c393ddcd8e2e, tree
+2e2c96728d88731406cc8e0c0fc2e51d53ad3f4c; Linux and Xcode27 both passed.
+The final documentation changes only this mirrored README/specification and adds
+an exact copy of the preceding README at
+`docs/history/server-control-before-project-alignment-20260926.md`. All other69
+files remain the tested bytes/modes; no runtime is changed after verification.
+Earlier source/run identities, failures and full contracts are retained in that
+history and the existing earlier audit history, not relabeled as this result.
 
-The complete preceding README is preserved byte-for-byte in
-`docs/history/server-control-before-final-audit-20260926.md`, including original
-failures, corrections, source/run/artifact identities and evidence qualifications.
-Historical claims apply to their own revisions. This README is identical to
-`docs/features/server-control.md` and is the current contract.
+## Target, ownership and established behavior
 
-## Versions, actual environment and ownership
+The intended target is a physical iOS27 iPhone, installed independently through
+SideStore or run as a LiveContainer guest. Signing, container/identity, permissions,
+process-global engine/signal state and host arbitration differ. Native host tests
+and SDK typechecking are not installation, guest-loader or physical background
+proof. Configured minimum iOS17.2 is not certification of every intervening OS.
+The exact four governing principles remain in docs/top-level-principles.md.
 
-The target is a physical iOS 27 iPhone installed independently with SideStore or
-executed as a LiveContainer guest. Signing, app/container identity, permissions,
-process-global engine/signal state and host arbitration differ between these paths.
-Neither a native host test nor an iOS SDK typecheck establishes either installation
-method. No particular installer/host version, physical permission or background
-execution has been tested in this audit. The configured minimum remains iOS 17.2.
-Actual toolchain and execution versions must be recorded with each completed run.
+The dependency is one way: main -> server-control -> settings-persistence.
+ServerSettings, ServerController and ContentView never read AppSettings, SettingsStore,
+UserDefaults or JSON. This branch has no UDP/statistics/Background/icon dependency.
+One root-owned MainActor controller owns the blocking invocation independently of
+view visibility. The standalone root begins stopped and keeps options in memory;
+a downstream root may supply durable settings without creating a second engine.
 
-The unchanged base is main `d2534cd6bce7389fdf8f362bd8f681c0bd583eb1`.
-`main -> server-control -> settings-persistence` is the one-way dependency. The
-server layer never reads AppSettings, SettingsStore, UserDefaults or JSON. It has
-no dependency on UDP compatibility, statistics, Background or app-icon features.
-A downstream update must inherit the completed owner and exact mapped files rather
-than edit or duplicate its controller. Other branches and the existing integrated
-release/IPA are not automatically changed by a server audit.
+The existing eleven options and defaults remain: workers4, TCP address::/port1080,
+empty UDP address/port1080, IPv4 bind0.0.0.0, IPv6 bind::, empty interface and both
+credentials, IPv6-only false. Validation permits workers1-64, TCP1-65535, UDP0-65535;
+seven text fields must be single-line, control-free and at most255 UTF-8 bytes.
+Authentication is both empty or both present; YAML single-quote escaping is retained.
+Invalid drafts may exist while stopped but never start an invalid configuration.
+The ten string fields use byte-sensitive UTF-8 equality and the Boolean normal
+equality. Canonically equivalent strings with different credential bytes remain
+different. No normalization, duplicate storage, hash cache or JSON comparison is added.
 
-The four project principles govern this work: preserve established behavior before
-minimal, simple and efficient changes; target the actual SideStore/LiveContainer
-environments; document purpose, scope, costs, versions and limits; and keep source,
-mock, native, SDK, CI, package, installation and physical-runtime evidence distinct.
+Current/desired/attempted values serialize calls. Configuration changes or Stop
+request quit once. A new invocation begins only after the prior call returns and
+its actor completion is processed. Latest Stop cancels queued replacement. Repeated
+apply does not automatically retry invalid/exited work; explicit Start, changed
+options or completed Stop/Start may retry. Running is invocation state, not proof
+of listen readiness. Unexpected native exit remains visible; worker completion
+retains the controller. Independent concurrent engines in one process are unsupported.
 
-## Server option contract
+The unchanged single native patch sets SYNC_ABRT on early pre-start Stop, checks
+worker run before and after I/O yield, and exposes the idle prepare boundary that
+clears only obsolete SYNC_STOP from a prior invocation. Prepare occurs after
+validation and before dispatch; a later Stop remains authoritative. Legacy C callers
+retain behavior. No polling, added native API, timer, runtime queue, new permission,
+logging, host change or automatic retry policy is introduced in this alignment.
 
-ServerSettings is a Codable value containing the existing eleven options. Defaults
-remain workers 4, listen address ::, TCP port 1080, empty UDP address, UDP port 1080,
-IPv4 bind 0.0.0.0, IPv6 bind ::, empty interface and credentials, IPv6-only false.
-The UDP sibling's port-zero operating recommendation does not silently change them.
+App/server/submodule pins and the committed16-file unpatched framework remain main's
+exact bytes. Products must rebuild the existing patch for the prepare symbol before
+linking. Project/plist, app/controller/defaults and resources are unchanged from
+52251e12. Native signal/loader and LiveContainer host interactions are not certified
+by tests in an independent host process. Cost remains the existing comparisons,
+state and worker dispatch; no CPU, latency or energy improvement is measured.
 
-Executable validation permits workers 1-64, TCP port 1-65535 and UDP port 0-65535.
-The seven text fields passed to native fixed-size buffers must be single-line,
-control-free and at most 255 UTF-8 bytes. Authentication is both empty or both set.
-Single quotes are escaped when producing the original YAML. Invalid drafts can be
-held while stopped; validation errors do not start the engine. Codable itself is
-not persistence or native readiness certification.
+## Audit changes, exact scope and cost
 
-The ten string fields use UTF-8-view equality and the Boolean uses normal equality.
-This preserves raw credentials/drafts that Swift canonical String equality would
-otherwise merge. There is no Unicode normalization, second stored representation,
-hash cache or JSON encoding on every comparison. The validator, YAML and errors
-remain unchanged. Comparison work is linear in the compared bytes.
+Main's validator now checks all tracked native inputs, including Makefiles/scripts
+and the index, before patch application and after exact reversal. It no longer
+checks only C/H files or only worktree differences. Python optimization is rejected
+before assertion-based checks. The identical common46-case regression suite uses
+real isolated Git fixtures and exact-old/current implementations.
 
-## Controller and native cancellation contract
+The server build preserves its26 native/header entry cases and six old-success
+controls, and adds the common suite. The existing native SUCCESS and same-HEAD
+SHA-256 identities for hev-main.h/module.modulemap remain mandatory before SDK work.
+Missing, stale or modified headers are rejected. Root worktree/index checks occur
+at entry and final boundaries. The optional generic product path now installs the
+rebuilt framework only into a disposable exact-HEAD copy and clears only its owned
+previous package directory/archive. It does not overwrite the tracked baseline.
 
-One root-owned MainActor ServerController owns the blocking native call independently
-of view visibility. ServerSettings supplies options, ContentView edits bindings and
-AppRoot connects intent. The standalone root starts stopped and keeps options only
-in memory. The same editor/controller can be supplied by downstream persistence.
+The first alignment b8ab6c1e passed run36225295956, but its separate membership
+metadata still referred to old main. Both metadata references were then corrected
+without changing runtime/tests and the complete source was retested in36225969482.
+That first pass is not substituted for the corrected metadata's final execution.
+Historical fixture source SHAs are deliberately retained; they are negative-control
+identities, not stale production dependencies.
 
-Current/desired/attempted values serialize execution. Changes or Stop request quit
-once; a replacement starts only after the previous main call returns and its actor
-completion is handled. Latest Stop cancels a pending replacement. Unrelated repeated
-apply calls do not retry an exited/invalid configuration; explicit Start, changed
-options or completed Stop/Start may retry. Running denotes scheduled invocation,
-not proof of socket bind/listen success. Unexpected native exit remains visible.
-The worker callback retains its controller until completion. Concurrent independent
-controllers/engines in one process are not a supported composition.
+The checks-only workflow uses BUILD_IPA=0. Thus this new run did not execute the
+optional standalone packaging path. Main's analogous unpatched packaging passed in
+its own run; this branch's changed script path was reviewed, not falsely described
+as a new server IPA. Audit cost is bounded Git/hash/fixture work and evidence storage,
+not new production objects or wakeups. These are checkpoint comparisons, not an
+adversarial atomic snapshot of untracked input, toolchains or changes restored
+between comparisons. Use clean, separate, complete checkouts.
 
-The one existing native patch preserves three related boundaries:
-- Set SYNC_ABRT on the proxy's early pre-start Stop return so other workers exit.
-- Check the worker run flag before I/O yield as well as after it; an already-delivered
-  Stop wakeup must not be followed by a fresh unbounded wait.
-- Call project API hev_socks5_server_prepare after validation, while idle and before
-  dispatching the next call. It clears only obsolete SYNC_STOP from a prior call;
-  a later Stop retains cancellation semantics. Legacy C callers remain unchanged.
+## Inspected current results
 
-The committed baseline XCFramework and source/submodule pins stay unchanged. The
-baseline alone has no prepare symbol: actual builds must rebuild the existing patch
-before linking. There is no readiness polling, new native API in this audit, added
-queue/timer, service, logging, permission, host patch or automatic retry policy.
-These tests do not serialize unrelated LiveContainer host code or prove universal
-signal/loader compatibility. CPU, energy and latency improvements are not measured.
+Both hosts passed7 server scenarios,84 current revalidation assertions,512 original
+configuration/validation/YAML parity cases and22 expected old equality failures.
+Actual Swift controller plus patched Hev produced14 records, including byte-distinct
+and255-byte credentials and40 active Stop/restarts. Twelve active-client cases,
+eight current delayed schedules with exact-old controls,40 original pre-start and
+100 legacy/prepared cancellations, worker wait controls, TCP echo/parser, formatter,
+source composition/ownership and exact native reversal all passed.
 
-## Findings and minimal audit corrections
+All46 common cases,26 native/header entry cases and six marker controls passed on
+both hosts. Input/final worktree/index logs are empty. Five production Swift files
+passed ARM64/iOS17.2 warnings-as-errors typechecking with an empty diagnostic log.
+The actual native headers match their same-revision recorded digests. The saved
+Apple toolchain records Xcode27.0 27A266a and iPhoneOS27.0; compiler/macOS build values
+absent from that file are not inferred from another run. Linux did not run Apple
+checks. Counts include repeats and expected old failures, not device trials.
 
-### Working files and index could differ from the recorded revision
+| Original final artifact | SHA-256 |
+| --- | --- |
+| Linux10900532603 | 43f83f159d057a483a06bb099da7fa2e069cb09ac3e9fd37009e898434eae6fb |
+| macOS10901051463 | 6c9d17c078384b8afabf6b46e2e917fc450e01330b4aba61ce55abafebbf5688 |
 
-The build and SDK entry points read working files, while record_evidence archives
-HEAD. They now reject both working-tree-versus-HEAD and index-versus-HEAD differences
-before native/Apple work. Native input is checked again before the optional packaging
-phase; SDK input is checked again before success. This also catches a staged change
-whose working file has been restored. In checks-only runs no tracked file changes.
-The existing optional packaging phase still generates its patched framework/product;
-that intentional build output is not claimed to be committed baseline bytes.
+Both original ZIP digests/CRCs, genuine source comments, all71 paths/bytes/modes,
+complete source manifests and tree match the final tested commit. No failed attempt
+or rerun was needed for either source run. The two earlier alignment artifacts are
+retained separately. A later documentation-only HEAD is not a second test run.
 
-### SDK checks could reuse unrelated or modified compiled headers
-
-The old SDK entry accepted any nonempty compiled-headers files, including a previous
-revision or output remaining after a failed native run. The build now records its
-HEAD and SHA-256 of hev-main.h/module.modulemap beside the exact copied headers.
-The SDK entry requires native SUCCESS, the same HEAD, and both matching hashes before
-Apple tools. Missing identity, stale revision or modified header/module is rejected.
-Native and SDK success markers still represent different phases. A standalone SDK
-run after changing even documentation requires a fresh native pass at that revision.
-
-input_integrity_check.py executes the exact old/current shell bodies in real isolated
-Git fixtures: clean, unstaged, staged and index-only states; stale/missing header
-identity, changed header/module, and missing native success. All 26 cases passed
-locally. The fixtures stop at a deliberately failing downstream boundary and do not
-pretend to build Hev or use an Apple SDK. The original six stale-success controls
-remain unchanged. Previous diagnostics are retained and rejected attempts invalidate
-only their applicable success markers.
-
-These are checkpoint comparisons and local provenance checks, not a cryptographic
-trust boundary against an adversary rewriting both files and attestations. Untracked
-inputs, external toolchains and concurrent edits restored between checks are not
-certified. Run audits in separate, clean complete Git checkouts.
-
-## Validation commands and retained checks
+## Reproduction and explicit limits
 
 ```sh
 BUILD_IPA=0 bash Build/build.sh
-# On the actual Xcode 27 host, after native success at the same commit:
+# On Xcode27, after native success at the same HEAD:
 bash Build/check_swift_sdk.sh
 python3 Build/record_evidence.py
 ```
 
-The unchanged workflow runs Linux and Xcode 27 with BUILD_IPA=0. It retains seven
-server scenarios, 84 revalidation assertions, 512 exact-old validation/YAML parity
-cases and the expected 22 old-equality failures. The actual controller links to the
-patched native library for authentication/byte replacement, 14 result records and
-40 active Stop/restarts per host. Twelve active-client cases cover incomplete SOCKS,
-partial authentication, active echo, backpressure and reset clients. Six expected
-old-controller failures and two old final-Stop controls accompany eight corrected
-delayed-completion schedules. Forty original pre-start and 100 legacy/prepared
-cancellation cycles, exact worker controls, TCP echo/parser fixtures, formatting,
-patch reversal, owner and baseline checks remain. Counts contain repetitions.
-
-Five actual production Swift files are typechecked against iPhoneOS 27 with the
-ARM64/iOS17.2 target and warnings-as-errors, using the native output's verified
-headers. This is not an iPhone link/archive/IPA or UI test. Existing source archive,
-full hash manifest and source identity are retained. Inspect actual exits, all jobs,
-run/attempt, ZIP digests/CRCs, commit/tree/modes and per-test logs, not only a badge.
-A later README-only completion must match all executed non-document inputs.
-
-Local actual-body tests passed seven server scenarios and all 84 assertions. The
-settings child also passed its existing 209 current-store assertions locally. These
-local runs substitute the existing UI/engine/provider boundaries and do not replace
-fresh native/SDK CI. New execution results are recorded only after inspection.
-
-## Unperformed and unchanged scope
-
-Physical SideStore provisioning/install, LiveContainer guest loading, host signals
-and permissions, UI/keyboard/accessibility, real IPv4/IPv6/VPN/hotspot, app suspension
-or termination, lock screen, long-duration operation and energy remain unperformed
-for this revision. Neither branch adds background keep-alive. Saved downstream Start
-is intent, not a promise of relaunch or execution while suspended. Main, unrelated
-features, release/integrated, branch count and existing build 7 IPA remain unchanged.
-
-Primary contracts, not device execution evidence:
-- https://docs.swift.org/swift-book/documentation/the-swift-programming-language/stringsandcharacters/#String-and-Character-Equality
-- https://www.rfc-editor.org/rfc/rfc1929
-
-
-## Completed final-audit evidence — 2026-09-26
-
-Run 36201868398 executed the exact 68-file source above; both jobs completed
-successfully on their first attempt. Existing seven scenarios,84 current assertions,
-512 validation/YAML parity cases and22 expected old-model failures passed as designed.
-Actual patched Hev/Swift tests produced14 native-controller records and40 active
-Stop/restarts per host,12 active-client schedules,8 current delayed schedules plus
-6 expected old failures and2 old final-Stop controls. The40 original pre-start and
-100 legacy/prepared cancellation cycles, worker-body controls, TCP/parser fixtures,
-formatting, baseline/composition/ownership and exact reverse patch checks passed.
-
-All26 new input/header boundary cases and the6 existing marker controls passed
-on each host. Source worktree/index logs are empty at both boundaries. The macOS
-SDK check accepted the same tested commit and verified both copied header hashes;
-all5 production Swift files typechecked at ARM64/iOS17.2 with warnings-as-errors and
-an empty diagnostic log. Linux does not run the Apple-only step. Native SUCCESS and
-SDK success are separately inspected, not counted as installer or UI evidence.
-
-The saved toolchain file records Xcode27.0 `27A266a` and iPhoneOS SDK27.0. It does
-not record the Swift compiler version or macOS host build, so those values are not
-inferred from another feature's runner. No Simulator app, UI test, physical install,
-iPhone archive or IPA was produced in this run. No timeout/assertion/worker profile
-was weakened. No failing workflow attempt occurred in this server run.
-
-| Original artifact | SHA-256 |
-| --- | --- |
-| Linux10892282349 | f9cdfe5bbaa8f49b13c41c979f25339f8c432e0a692cba822457a9555cd339d0 |
-| macOS10892317402 | 708bef5c0afe7fecd7eb444b8652dea5eef0ec8f30e63da83fff0adc6c9e4950 |
-
-Both original ZIP digests/CRCs, source archive commit comments, all68 paths/bytes/
-modes, full68-entry manifests and source tree were checked. Compiled-header commit
-and hashes match the SDK input. The previous README is preserved exactly. Four
-existing paths changed and two were added; the other62 starting files are unchanged.
-All production, native patch, project, defaults, source pins and baseline framework
-are byte-identical to the audit start. Forward/reverse patch checks in the companion
-evidence restore both68-file current and66-file original trees. A tree snapshot is
-not full Git ancestry; remote parent relationships are checked separately.
-
-Local container clone failed because github.com DNS was unavailable; original
-connector source archives and verified blobs supplied the local reconstruction.
-Local7/84 tests and input fixtures are supplementary, not claimed local Hev rebuilds.
-An early combined fixture invocation exceeded its external tool limit and was rerun
-to completion without changing internal tests; partial logs are not counted as pass.
-The companion offline verifier checks identities, not a new native/Apple execution.
-The finalized owner is ready for the requested downstream persistence merge; main,
-release/integrated, other features, branch count and build7 IPA remain unchanged.
+Use full Git history for exact controls and ancestor checks; a snapshot alone cannot
+provide it. Downstream settings must inherit this completed owner and exact mapped
+source/test/document inputs, and release must revalidate the combined composition.
+Physical SideStore signing/install, LiveContainer loading/shared-process behavior,
+actual permission UI, VPN/hotspot, calls/Bluetooth, lock/suspend/termination, prolonged
+execution, crash/power-loss and energy are unperformed. Saved Start is intent, not
+auto-relaunch or an override of OS scheduling. No ordinary archive/IPA or Simulator
+execution was performed by this dedicated no-IPA verification.
