@@ -1,3 +1,24 @@
+# Project-wide final verification — udp-compat
+
+## Current main integration — 2026-09-26
+
+This revision incorporates completed main `75335d201cb1e541bb153e9899badbc11ccf1973` as an actual
+ancestor. The original application/feature runtime, native patches, resource bytes,
+options, schema and platform declarations remain unchanged from `7f603a7e063422df460fb171d3b95b36cc6230af`.
+Shared source checking now covers all tracked native build inputs and their index,
+rejects Python optimization and verifies exact reverse restoration. The generic
+build no longer overwrites the committed framework. The shared 46-case exact-old/
+current fixture is executed in addition to every existing feature assertion.
+
+The complete prior specification and dated outcomes follow unchanged. Their old
+main/ref/run identities describe that earlier checkpoint, not this new source.
+Fresh checks for this composition and the final dependency graph are required;
+individual earlier successes are not substituted. Physical SideStore/LiveContainer
+execution, documented operational limits and unresolved historical observations
+remain separate. No host workaround or runtime retry policy is added.
+
+---
+
 # UDP compatibility for the native iOS SOCKS5 relay
 
 ## Final re-audit scope — 2026-09-26

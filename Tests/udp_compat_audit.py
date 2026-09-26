@@ -70,6 +70,7 @@ def main():
     run(['git', 'diff', '--check', CONFIG['base_commit'], 'HEAD', '--', '.',
          ':(exclude)Patches/*.patch'], 'whitespace.log')
     run([sys.executable, 'Build/check.py', 'baseline'], 'baseline.log')
+    run([sys.executable, 'Tests/baseline_audit.py'], 'baseline-driver.log')
     run([sys.executable, 'Build/check.py', 'composition'], 'composition.log')
     run([sys.executable, 'Tests/udp_audit_driver_regression.py'], 'audit-driver.log')
     if sys.platform == 'darwin':
