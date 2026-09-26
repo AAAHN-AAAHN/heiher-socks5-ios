@@ -1,7 +1,7 @@
 name: Verify and build declared SOCKS5 features
 on:
   push:
-    branches: [main, feature/udp-compat, feature/traffic-statistics, feature/background, feature/settings, feature/app-icon, release/integrated]
+    branches: [main, feature/udp-compat, feature/traffic-statistics, feature/background, feature/server-control, feature/settings-persistence, feature/app-icon, release/integrated]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15]
+        os: [ubuntu-24.04, xcode-27]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
     steps:
@@ -32,7 +32,9 @@ jobs:
             sudo apt-get install -y clang-format-18
           else
             brew install llvm@18
-            echo "$(brew --prefix llvm@18)/bin" >> "$GITHUB_PATH"
+            mkdir -p "$HOME/.local/bin"
+            ln -sf "$(brew --prefix llvm@18)/bin/clang-format" "$HOME/.local/bin/clang-format-18"
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           fi
       - name: Validate source, test native code, and archive iOS on macOS
         shell: bash
