@@ -13,7 +13,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-INPUT = 'b1ce46553424099937d8001b5badb4eeceab1cce'
+INPUT = '2bc8e5a8bfbe6a7d2de74644bec9955513f8f8df'
 
 
 def git(*args):
@@ -36,6 +36,9 @@ def main():
     assert config['name'] == 'integrated'
     assert config['features'] == ['udp', 'statistics', 'background', 'server', 'settings', 'icon']
     assert len(refs) == 6
+    assert members['base_commit'] == config['base_commit'], 'Membership baseline differs'
+    git('merge-base', '--is-ancestor', INPUT, 'HEAD')
+    git('merge-base', '--is-ancestor', config['base_commit'], 'HEAD')
     subprocess.run([sys.executable, 'Build/check_ownership.py'], check=True)
     for path in members['sources']:
         owner = members['sources'][path]
@@ -65,9 +68,14 @@ def main():
     for ref in refs.values():
         owner = json.loads(git('show', ref + ':Build/features.json'))
         assert owner['sources'] == config['sources'] and owner['upstream_app'] == config['upstream_app']
+        assert owner['base_commit'] == config['base_commit'], 'Owner baseline differs'
+        git('merge-base', '--is-ancestor', config['base_commit'], ref)
     assert refs['feature/udp-compat'].encode() in git('show', refs['feature/traffic-statistics'] + ':Tests/Statistics/audit.py')
     parent = json.loads(git('show', refs['feature/settings-persistence'] + ':docs/feature-membership.json'))
     assert parent['branches']['feature/server-control'] == refs['feature/server-control']
+    assert parent['base_commit'] == config['base_commit']
+    git('merge-base', '--is-ancestor', refs['feature/server-control'], refs['feature/settings-persistence'])
+    git('merge-base', '--is-ancestor', refs['feature/udp-compat'], refs['feature/traffic-statistics'])
     # Check the actual integrated resources, independent of icon-only source gates.
     icon = load('integration_icon', 'Tests/AppIcon/check_icon.py')
     print(json.dumps(icon.catalog(ROOT / icon.CATALOG), indent=2))

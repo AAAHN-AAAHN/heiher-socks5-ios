@@ -91,7 +91,7 @@ def main():
                         '-configuration', 'Release', '-sdk', 'iphonesimulator', '-arch', 'arm64',
                         'CONFIGURATION_BUILD_DIR=' + str(ROOT / '.build/integrated-simulator'),
                         'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES',
-                        'MARKETING_VERSION=1.1.0', 'CURRENT_PROJECT_VERSION=8'],
+                        'MARKETING_VERSION=1.1.0', 'CURRENT_PROJECT_VERSION=9'],
                        cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=300)
     app = ROOT / '.build/integrated-simulator/Socks5.app'
     info = plistlib.loads((app / 'Info.plist').read_bytes())

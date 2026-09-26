@@ -21,7 +21,7 @@ ARCHIVE = ROOT / '.build/integrated.xcarchive'
 APP = ARCHIVE / 'Products/Applications/Socks5.app'
 info = plistlib.loads((APP / 'Info.plist').read_bytes())
 assert info['CFBundleIdentifier'] == 'hev.Socks5'
-assert info['CFBundleShortVersionString'] == '1.1.0' and info['CFBundleVersion'] == '8'
+assert info['CFBundleShortVersionString'] == '1.1.0' and info['CFBundleVersion'] == '9'
 assert info['MinimumOSVersion'] == '17.2'
 assert info['DTSDKName'].startswith('iphoneos27.')
 assert set(info['UIBackgroundModes']) == {'audio', 'location'}

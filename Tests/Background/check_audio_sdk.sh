@@ -15,6 +15,7 @@ git archive --format=zip HEAD -o "$OUT/source.zip"
 BASE=$(python3 -c 'import json; print(json.load(open("Build/features.json"))["base_commit"])')
 git diff --check "$BASE" HEAD > "$OUT/whitespace.log"
 python3 Build/check.py baseline > "$OUT/baseline.log"
+python3 Tests/baseline_audit.py > "$OUT/baseline-driver.log" 2>&1
 python3 Build/check.py composition > "$OUT/composition.log"
 python3 Tests/Background/check_scope.py > "$OUT/background-scope.json"
 python3 Tests/Background/audit_driver_check.py > "$OUT/audit-driver.log"

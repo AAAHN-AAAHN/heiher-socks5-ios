@@ -53,7 +53,9 @@ def apply(core):
     for relative, sha in CONFIG['sources'].items():
         repo = core / relative
         assert git(repo, 'rev-parse', 'HEAD').decode().strip() == sha, relative
-        assert not git(repo, 'diff', 'HEAD', '--', '*.c', '*.h'), 'Dirty core checkout'
+        # Build scripts and the index are source inputs too, not only C/H files.
+        git(repo, 'diff', '--exit-code', 'HEAD', '--')
+        git(repo, 'diff', '--cached', '--exit-code', 'HEAD', '--')
     for relative, patch in patches():
         git(core / relative, 'apply', '--check', '--whitespace=error-all', str(patch))
         git(core / relative, 'apply', '--whitespace=error-all', str(patch))
@@ -74,8 +76,11 @@ def reverse(core):
     for relative, patch in reversed(list(patches())):
         git(core / relative, 'apply', '-R', '--check', str(patch))
         git(core / relative, 'apply', '-R', str(patch))
-    git(core, 'diff', '--exit-code')
-    git(core, 'submodule', 'foreach', '--recursive', 'git diff --exit-code')
+    for relative in CONFIG['sources']:
+        git(core / relative, 'diff', '--exit-code', 'HEAD', '--')
+        git(core / relative, 'diff', '--cached', '--exit-code', 'HEAD', '--')
+    git(core, 'submodule', 'foreach', '--recursive',
+        'git diff --exit-code HEAD -- && git diff --cached --exit-code HEAD --')
     print('PASS: reverse patches restore exact upstream source')
 
 

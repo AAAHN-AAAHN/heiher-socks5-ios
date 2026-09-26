@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
-UDP = '7f603a7e063422df460fb171d3b95b36cc6230af'
+UDP = '9909aa5f5f41ec87bb3edd976923b2d668e00f08'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 UDP_FILES = {
     '.github/workflows/udp-compat-audit.yml': '.github/workflows/verify-build.yml',
@@ -25,7 +25,8 @@ UDP_FILES = {
                      'Tests/udp_sockaddr_unit.c', 'Tests/udp_audit_driver_regression.py',
                      'docs/reviews/udp-compat-20260923.md', 'docs/features/udp-compatibility.md',
                      'docs/reviews/udp-compat-20260922.md', 'Socks5/Info.plist',
-                     'docs/history/udp-before-final-audit-20260926.md')}
+                     'docs/history/udp-before-final-audit-20260926.md',
+                     'docs/history/udp-before-project-alignment-20260926.md')}
 }
 
 
@@ -56,17 +57,19 @@ def inspect_sources():
         data = (ROOT / target).read_bytes()
         assert data == git('show', UDP + ':' + source), target
         preserved[target] = hashlib.sha256(data).hexdigest()
-    # Update only the inherited UDP boundary, not statistics production or build logic.
+    # Update only the inherited UDP boundary, not statistics production. Shared build logic stays locked to current main.
     # Exact prefix ownership above and the original suffix below reject missing,
     # reordered, extra or silently edited patches without freezing an obsolete parent.
     original = json.loads(git('show', START + ':Build/features.json'))
     statistics_patches = [p for p in original['patches'] if p['file'].startswith('hev-stats-')]
-    assert CONFIG == dict(original, patches=udp_config['patches'] + statistics_patches)
+    assert CONFIG == dict(original, base_commit=udp_config['base_commit'],
+                          patches=udp_config['patches'] + statistics_patches)
     git('diff', '--exit-code', START, 'HEAD', '--', 'Socks5', 'Socks5.xcodeproj',
         'Patches/hev-stats-core.patch', 'Patches/hev-stats-server.patch',
-        'Patches/hev-stats-task-io.patch', 'Build', ':(exclude)Build/features.json')
+        'Patches/hev-stats-task-io.patch')
     git('merge-base', '--is-ancestor', UDP, 'HEAD')
     run([sys.executable, 'Build/check.py', 'baseline'], 'baseline.log')
+    run([sys.executable, 'Tests/baseline_audit.py'], 'baseline-driver.log')
     run([sys.executable, 'Build/check.py', 'composition'], 'composition.log')
     run(['git', 'diff', '--check', CONFIG['base_commit'], 'HEAD', '--', '.',
          ':(exclude)Patches/*.patch'], 'whitespace.log')

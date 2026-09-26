@@ -13,6 +13,7 @@ python3 -c 'import sys; sys.exit(0 if __debug__ else "Assertions must be enabled
 git diff --exit-code HEAD -- > "$OUT/input-worktree.log"
 git diff --cached --exit-code HEAD -- > "$OUT/input-index.log"
 python3 Build/check.py baseline > "$OUT/baseline-audit.log"
+python3 Tests/baseline_audit.py > "$OUT/baseline-driver.log" 2>&1
 python3 Build/integration_checks.py > "$OUT/integration-source-checks.log" 2>&1
 python3 Build/owner_checks.py > "$OUT/owner-checks.log" 2>&1
 python3 Tests/Integration/input_boundaries.py > "$OUT/input-boundaries.log" 2>&1
@@ -79,7 +80,7 @@ if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
         -archivePath "$ROOT/.build/$NAME.xcarchive" \
         CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
         SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
-        MARKETING_VERSION=1.1.0 CURRENT_PROJECT_VERSION=8 \
+        MARKETING_VERSION=1.1.0 CURRENT_PROJECT_VERSION=9 \
         > "$OUT/app-build.log" 2>&1
     APP="$ROOT/.build/$NAME.xcarchive/Products/Applications/Socks5.app"
     xcrun lipo "$APP/Socks5" -verify_arch arm64

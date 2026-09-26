@@ -67,7 +67,7 @@ def main():
              '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
              '-collect-test-diagnostics', 'never',
              'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES',
-             'MARKETING_VERSION=1.1.0', 'CURRENT_PROJECT_VERSION=8'], 'ui-test.log', timeout=900)
+             'MARKETING_VERSION=1.1.0', 'CURRENT_PROJECT_VERSION=9'], 'ui-test.log', timeout=900)
         run(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', OUT / 'UI.xcresult'], 'test-summary.json')
         run(['xcrun', 'xcresulttool', 'get', 'object', '--legacy', '--format', 'json', '--path', OUT / 'UI.xcresult'], 'xcresult.json')
         console = (OUT / 'ui-test.log').read_text()
