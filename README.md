@@ -6,8 +6,9 @@ This is the independent `feature/app-icon` branch. The audit starts at
 `1beaefa4e068a3b4e9473bab478b27526b88defd`, on unchanged main
 `d2534cd6bce7389fdf8f362bd8f681c0bd583eb1`. No defect requiring an artwork,
 catalog, project or application-runtime change was found. The corrections below
-close audit-input and compiled-resource validation gaps. New actual Apple execution
-is pending for this candidate; older successful runs are not its verification.
+close audit-input and compiled-resource validation gaps. New run 36204666461
+completed on the exact source below; older successful runs were not substituted.
+Physical installation/execution and untested appearance modes remain unperformed.
 
 The complete former README is preserved byte-for-byte in
 `docs/history/app-icon-before-final-audit-20260926.md`, including previous failures,
@@ -169,3 +170,73 @@ Primary platform contracts, not test results:
 - https://developer.apple.com/documentation/xcode/configuring-your-app-icon
 - https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleicons
 - https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
+
+## Completed final audit — 2026-09-26
+
+Run **36204666461**, attempt 1, executed source
+`638c0cb2026b77c04874757c11bd9c8f0c9c311f`, tree
+`e0c330d1c347629d3acb15aabd561071d18b533b`, with 50 tracked files.
+The complete icon-checks job and artifact upload succeeded on the first attempt;
+the normal archive/IPA job was intentionally skipped. No failed workflow attempt,
+rerun, relaxed deadline or suppressed resource assertion was needed in this run.
+The earlier 36055937895 artifact was used to reconstruct the audit input, not as
+new execution evidence. Its complete historical results and failures remain archived.
+
+All 13 retained resource methods, including all 30728 single-bit corruptions,
+original malformed-PNG/catalog controls and immutable artwork checks passed.
+All 38 new boundary cases in four methods and the three previous shell controls
+passed on the Apple host as well as locally. These cases deliberately reject
+invalid inputs; they are not 38 product defects or physical-device trials.
+Baseline/composition/source-scope and all four input/final worktree/index logs pass.
+The source and original history bytes are unchanged where required.
+
+Actual Debug/Release settings select AppIcon, families 1,2, hev.Socks5 and minimum
+17.2. iPhoneOS actool compiled the full real catalog for phone and pad without
+asset warnings/errors. The stronger assetutil check found exact AppIcon Icon Image
+records for both idioms, each opaque and 1024x1024. Fallback references resolve to
+AppIcon60x60@2x.png (120x120) and AppIcon76x76@2x~ipad.png (152x152).
+ImageIO decoded the source and both device fallbacks and the two Simulator fallbacks
+completely as single images with every pixel opaque. The source RGB/RGBA hashes
+also match independent local decoding. Device and Simulator fallback file hashes
+can differ while their decoded RGBA hashes match, as observed here.
+
+The actual Simulator Release app built, registered and launched under hev.Socks5
+and the separate copied-test identity hev.Socks5.ICONREVIEW. All four original
+full-screen light/dark-system-UI captures were opened and visibly contain the
+preserved Socks5 icon and label. These are real Simulator captures, not generated
+mockups, manual Dark/Tinted/clear icon coverage or SideStore/LiveContainer results.
+All recorded subprocess exits are zero; shutdown/delete completed and cleanup.json
+is []. This suite uses simctl registration/launch and inspection, not an XCTest
+UI-interaction suite or a native server functional re-audit.
+
+Actual environment: Xcode 27.0 `27A266a`, iPhoneOS SDK 27.0, Apple Swift 6.4
+`swiftlang-6.4.0.34.1`, macOS 27.0 `26A428`; iPhone 16 Simulator iOS 27.0
+`24A434`. The Simulator build retains two non-asset warnings: multiple matching
+destinations and skipped AppIntents metadata extraction. Destination diagnostics
+also remain in build-setting command logs. No claim of universally warning-free
+or hang-free execution is made.
+
+Original new artifact **10893786621**, SHA-256
+`28275b03f5effe820d123848a00730eb205c5000c44283ad7fe1ff8116ad4bd3`,
+passed digest/CRC, genuine source-comment, all 50 path/byte/mode and source-manifest
+checks. The source archive reconstructs the exact tested Git tree. Final result
+documentation changes only this README and its identical specification; the other
+48 files remain identical to the executed source. Five existing paths change and
+two are added relative to the 48-file audit input; 43 existing files are preserved.
+All product resources, app/runtime, project/plist, workflow, shared build scripts,
+framework and pins remain byte-for-byte and mode-for-mode unchanged.
+
+Local container clone was unavailable because github.com DNS failed; verified
+connector archives and exact blobs supplied the reconstruction, not a full clone.
+A supplemental local Pillow attempt could not decode the device-compiled PNGs,
+which contain CgBI chunks; the error and chunk CRC checks are retained separately.
+It is not counted as a successful Pillow decode or an Apple/product failure.
+Actual Apple ImageIO decoding above succeeded on those exact bytes. No image was
+rewritten or test weakened to hide that local-decoder limitation.
+
+The companion evidence preserves before/tested/final source snapshots, complete
+patch and original artifacts. Its offline verifier checks hashes/trees, documented
+outcomes and exact forward/reverse patch reconstruction, not fresh Apple or physical
+execution. The branch is complete within these executed source/resource/compiler/
+Simulator boundaries. Main, other features, integrated release and build 7 remain
+unchanged; physical installation and all unperformed boundaries above remain open.
