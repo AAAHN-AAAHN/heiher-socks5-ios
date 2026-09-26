@@ -3,10 +3,10 @@
 ## Current integration review — 2026-09-26
 
 This revision integrates the six completed owners below into `release/integrated`,
-starting from `b1ce46553424099937d8001b5badb4eeceab1cce`. The combined native, SDK,
-archive/package and Simulator checks for THIS source are pending until the dated
-execution record is appended below. Individual feature successes are not evidence
-of a successful new combined build. The new package identifier is **1.1.0 (build 8)**;
+starting from `b1ce46553424099937d8001b5badb4eeceab1cce`. The actual combined native,
+SDK, archive/package and Simulator checks completed in run36214354604 as detailed
+below. Individual feature successes were not substituted for the combined build.
+The new package identifier is **1.1.0 (build 8)**;
 the previous build 7 IPA and its historical results are not relabeled or overwritten.
 
 The intended environment is a physical **iOS 27 iPhone**, either **SideStore standalone**
@@ -215,3 +215,156 @@ screen, long-duration survival, power-loss durability and energy are unperformed
 for this revision. Simulator is not a substitute. Exact source/run/toolchain,
 failures, pass/not-run boundaries and artifact digests are recorded only after
 inspection in the completion section below.
+
+## Completed integrated release verification — 2026-09-26
+
+The executed source is **b559b19bab86a9d4125a2db90813812f7a4360fc**, tree
+**bfbda5342efa71164d186fe56da334f274ef53a4**, with 181 tracked files. This is a
+real merge of the preceding release and all six owner commits above. Run
+**36214354604** completed successfully after retrying only the failed Linux job.
+The macOS native/SDK/archive/package/Simulator/UI job succeeded in attempt 1.
+Linux succeeded in attempt 2 on identical source. The macOS result shown with
+attempt 2 is carried forward, not a second independent Apple execution. No source,
+assertion, timeout, worker profile or warning criterion changed between attempts.
+The final documentation commit changes only this README/specification pair; all
+179 remaining files match the actually tested source, including executable modes.
+
+### First Linux failure and unchanged-source retry
+
+Attempt 1 stopped in the required buffered mixed-workers4 UDP profile: the
+three-association/independent-close case returned ConnectionRefusedError, errno111.
+The other ten cases in that profile passed. This was NOT the accepted fixed-port
+observation-only failure, not a Simulator boot failure, and not a corrected
+production defect. Its original artifact and failed status remain preserved.
+Native SUCCESS and downstream Apple/package/UI results were not produced by this
+Linux attempt. The later retry passed the entire buffered and splice suite.
+
+Supplementary local replay used the actual stats-linked Hev host executable from
+that failed artifact with its command stdin held open. Five full unbound/workers4
+profile replays and 200 targeted independent-close repetitions passed. The original
+protocol/context helpers were retained with extra traceback/endpoint recording.
+This host embeds the same tested library but is not the original CLI executable or
+a new native rebuild. Neither the replays nor the retry establish the first
+failure's internal cause or a zero failure probability. No speculative engine,
+host, dispatcher or retry-policy change was made to conceal that uncertainty.
+
+### Native and model results
+
+The successful Linux buffered/splice and macOS buffered combinations each passed
+all58 required UDP profile-case executions,8 current peer/queue cases,20 statistics
+network executions,8 writers/800000 counter updates, actual TCP/UDP boundary probes,
+ASan/UBSan and optimized sockaddr checks. Actual object symbols identified the
+I/O mode. macOS additionally passed the real counter's TSan check. The fixed-unknown
+UDP observations remain separate: Linux buffered workers1 was9/9; its workers4,
+both Linux splice workers and both macOS workers were8/9 on independent closure.
+These outcomes retain, rather than solve, the documented fixed-port restriction.
+
+Each mode also passed the inherited real server/controller suite:14 result records
+including40 active Stop/restarts,12 active-client cases,16 old/current delayed
+completion records,40 pre-start and100 legacy/prepared cancellations, worker controls
+and configuration/parser checks. JSON/store/controller/Hev integration produced16
+passing records and4 expected old/current delayed records per mode. This includes
+byte-distinct and255-byte credentials, real process relaunch, failed saves still
+stopping the engine, explicit pending-save retry and persisted Stop. Old negative
+controls remain expected failures, not failed conditions in the current code.
+
+Both hosts passed7 server scenarios,84 current assertions,512 parity cases and the
+22 expected original-model failures;209 settings assertions and original import/
+store/access controls;1193 retained Background assertions plus49 authorization-reset
+assertions and28 expected old-controller failures. Session38/3000 and preparation
+22/3000 suites passed in both Swift debug and optimized builds with the original
+blocking/implicit-preparation controls and real worker helpers. The10000-sample
+statistics model,6 pipe cases and3 original statistics-driver cases passed.
+Apple Foundation/Combine delivered34 notifications and verified cancellation;
+all5 real Timer/RunLoop conditions and400 zero WAV samples passed. Audio/location
+objects in these host suites are doubles; counts include repeated controlled events,
+not independent physical-device trials or whole-program sanitizer coverage.
+
+All six exact detached-owner source/driver groups passed and were cleaned up.
+They retain the current UDP/statistics/server/persistence/Background/icon controls,
+including the icon's13 methods/30728 one-bit mutations and38 boundary cases,
+Background's37 entry cases and the existing marker controls. The separate release
+37 input/header/generated-source cases and12 exact-old/current payload cases passed
+on both hosts. Main/owner ancestry, all120 file hashes/modes, composition, formatter,
+patch application and exact reverse checks passed. Input/final worktree/index logs
+are empty. The same-revision native headers matched both saved digests before SDK use.
+
+### Actual Apple product and UI
+
+Xcode27.0 **27A266a**, iPhoneOS SDK27.0, Swift6.4 **swiftlang-6.4.0.34.1** and
+macOS27.0 **26A428** are recorded by this run. All12 production Swift files passed
+ARM64/iOS17.2 typechecking with warnings-as-errors and a zero-byte diagnostic log.
+The actual seven-patch engine/framework and iPhone app archive compiled and linked.
+The delivered executable is ARM64, iOS platform2, minimum17.2 and SDK27.0, with no
+code-signature load command. Defined stats/prepare symbols and app/dSYM UUID pairing
+passed. Full IPA payload inventory and bytes matched the verified archive.
+
+Archived CAR inspection found exact opaque1024-square phone/pad AppIcon images.
+Apple ImageIO decoded the approved source and120/152-square compiler fallbacks
+completely; fallback bytes in the delivered IPA match the recorded decoder hashes.
+The source artwork and WAV are unchanged. These are archive-resource checks, not a
+new physical home-screen, manual tinted/clear or LiveContainer icon-cache test.
+
+The real iPhone16 Simulator ran iOS27.0 **24A434**. All10 preseeded original/remapped
+cases passed: saved tabs, Start/relaunch with actual TCP echo and saved Stop. Both
+actual XCTests then passed,0 failures and0 skips: the unchanged owner audio test
+108.069seconds and integrated server/settings/audio test108.447seconds, total
+216.516seconds of test-case execution. The reported result-bundle span is distinct
+from those times and from full workflow duration. Eight UI attachments and five
+seeded screen captures were inspected; they are original Simulator evidence, not
+rendered mockups. Scrolling/portrait/landscape native greetings, stored intent,
+specific Playing/Off state and server Start/Stop while audio remained On passed.
+
+Final JSON has serverRunning=false and both Background switches=false; test settings
+are not bundled into the IPA. Both Simulator cleanup reports and runtimeWarnings
+are empty arrays. The targeted main-thread audio advisory is absent from completed
+console and xcresult. Native libtool empty-symbol warnings for platform-specific
+objects, AppIntents extraction warnings and debugger/destination diagnostics remain
+in raw logs. This is not a universally warning-free or bounded-latency guarantee.
+The earlier Background owner's first-On timing failure remains historical and
+unresolved as documented by that owner, not erased by this integrated success.
+
+### Delivery identity and independent artifact inspection
+
+**Unsigned IPA: Socks5-1.1.0-build8-unsigned.ipa**
+
+- Source: b559b19bab86a9d4125a2db90813812f7a4360fc; version1.1.0/build8; hev.Socks5.
+- Bytes:261577; SHA-256: **3babd7a9eef22c30d490cbf441f54d9ffc7e0bad397f4bdebbdb93674c700ead**.
+- App/dSYM UUID: **03F5D92F-C31B-3702-B635-AEC509102466**.
+
+The three downloaded original artifacts passed SHA-256/CRC, genuine source-comment,
+all181 file bytes/modes, complete manifests and reconstructed Git-tree checks.
+The actual delivered IPA's Mach-O commands and dSYM bytes were independently parsed;
+the original CI IPA is copied unchanged. The generated framework attestation is
+inspected as CI evidence; its rebuilt libraries are not separately shipped in these
+artifacts for an independent local rehash. The committed baseline libraries are
+fully present and verified in source. A Simulator binary/hash is not the iPhone IPA.
+
+| Original artifact | Attempt and result | SHA-256 |
+| --- | --- | --- |
+| Linux10896468726 | 1, required UDP failure | d3ae0feae3d790543396594ee8f56ad07854b7f2604786385c12e1ca3e284993 |
+| macOS10896714499 | 1, full Apple success | ac044ed7922cfb6884732d618bf5c20f074c4293f04c43ad2ac221599930a20e |
+| Linux10897311199 | 2, full native success | 7139cbca740370c6672f3880431d0d686ac7b2dd929c5e4c7eb084e95d1dd624 |
+
+The companion offline verifier checks source trees, exact owner files and genuine
+reachable merge ancestry, original artifacts, recorded package/UI results and patch
+forward/reverse reconstruction. It does not run a fresh Apple or device test. The
+source delta has66 changed paths:44 existing paths and22 additions, no deletions;
+115 preceding files remain identical. The only product-source changes remain the
+two exact Background files. No main/feature branch or prior build7 IPA was changed.
+
+Local preparation initially lacked full historical objects because direct GitHub
+DNS cloning was unavailable. The first CI artifact then supplied a genuine145-commit
+reachable bundle. Baseline/composition, server, settings, Background and full async
+local reruns passed with actual history. Earlier missing-object errors and externally
+limited batches are retained separately; an interrupted owner batch is not counted
+as complete. CI's full owner groups passed. Only the owned temporary worktree from
+that interrupted local batch was removed. No test deadline/assertion was weakened.
+
+For source rebuilds use the documented build entry in a clean checkout. It no longer
+modifies the tracked root framework. Directly building the root project with its
+unpatched committed framework is not the supported integrated build path; the
+script archives `.build/integrated-product-source/Socks5.xcodeproj` with the freshly
+rebuilt patched framework. Final documentation-only HEAD and tested binary source
+remain explicitly distinct. Physical installation/execution and the unestablished
+first Linux failure cause remain outside the successful final verdicts above.
