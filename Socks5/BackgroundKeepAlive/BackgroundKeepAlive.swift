@@ -183,6 +183,11 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
             // An explicit user request may retry; generic notifications may not.
             servicesUnavailable = false
             waitingToRetry = false
+            // A fresh user request must survive an already invalidated operation.
+            // Drain that operation first, then retry without an extra timer delay.
+            if invalidatedDuringRestore, restoringAudio || sessionTransition != nil {
+                resumeAfterRestore = true
+            }
             resumeAudio()
         } else {
             waitingToRetry = false

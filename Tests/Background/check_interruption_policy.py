@@ -20,11 +20,13 @@ CASES = ('healthy-advice', 'activation-advice', 'preparation-advice',
          'generic-storm', 'inactive-storm', 'negative-advice-storm',
          'positive-advice-storm', 'end-preserves-healthy',
          'end-after-invalidated-activation', 'end-after-invalidated-preparation',
+         'explicit-after-invalidated-activation', 'explicit-after-invalidated-preparation',
+         'explicit-during-valid-activation', 'explicit-during-valid-preparation',
          'lost-no-probes', 'lost-missing-reset', 'lost-probe-interruption', 'lost-activation-reset', 'lost-preparation-reset',
          'lost-foreground', 'lost-explicit-on', 'lost-positive-advice',
          'configuration-drift', 'silent-stop', 'first-decoder-stop',
          'reset-storm', 'own-echo', 'lost-off-reentry', 'no-completion',
-         'owner-release', 'initial-off', 'reentry-matrix', 'mixed-transitions')
+         'owner-release', 'initial-off', 'reentry-matrix', 'automatic-liveness', 'mixed-transitions')
 OLD_FAILURES = ('healthy-advice', 'activation-advice', 'preparation-advice',
                 'generic-storm', 'inactive-storm', 'negative-advice-storm',
                 'positive-advice-storm', 'end-preserves-healthy',
@@ -32,10 +34,15 @@ OLD_FAILURES = ('healthy-advice', 'activation-advice', 'preparation-advice',
 current = (ROOT / PATH).read_text()
 old = subprocess.check_output(['git', '-C', str(ROOT), 'show', OLD + ':' + PATH]).decode()
 assert hashlib.sha256(old.encode()).hexdigest() == '05ef30ec0af599e7cfccaec8fad2b7655d2f038173a605bdbc6631f7b84fc261'
+previous = subprocess.check_output([
+    'git', '-C', str(ROOT), 'show',
+    '73e36a5b265357cecd799ae6907f4a6b68566635:' + PATH]).decode()
+assert hashlib.sha256(previous.encode()).hexdigest() == 'ad7098debe6abf96677d595644f0c6ee41ec635c41619adeb6b08c03157647f7'
+PREVIOUS_FAILURES = ('explicit-after-invalidated-activation', 'explicit-after-invalidated-preparation')
 mode = sys.argv[1] if len(sys.argv) > 1 else 'all'
 with tempfile.TemporaryDirectory() as folder:
     folder = Path(folder)
-    for label, source in [('current', current), ('old-negative', old)]:
+    for label, source in [('current', current), ('old-negative', old), ('previous-repair-negative', previous)]:
         assert source.startswith(IMPORTS)
         (folder / 'Controller.swift').write_text(source.replace(IMPORTS, 'import Foundation\n', 1))
         for optimize in (False, True):
@@ -47,7 +54,8 @@ with tempfile.TemporaryDirectory() as folder:
                             str(ROOT / 'Tests/Background/PlatformMocks.swift'), str(folder / 'Controller.swift'),
                             str(ROOT / 'Tests/Background/InterruptionPolicyTests.swift'), '-o', str(exe)],
                            check=True, timeout=90)
-            for case in CASES if label == 'current' else OLD_FAILURES:
+            cases = CASES if label == 'current' else OLD_FAILURES if label == 'old-negative' else PREVIOUS_FAILURES
+            for case in cases:
                 result = subprocess.run([str(exe), case], capture_output=True, text=True, timeout=30)
                 print('TEST:', label, 'optimized=', optimize, case, flush=True)
                 print(result.stdout, end='', flush=True)
@@ -55,5 +63,5 @@ with tempfile.TemporaryDirectory() as folder:
                     assert result.returncode == 0, (case, result.stderr)
                 else:
                     assert result.returncode == 1 and 'FAIL:' in result.stdout and 'SUMMARY:' in result.stdout, (case, result.stderr)
-                    print('EXPECTED OLD POLICY FAILURE (not current):', case, flush=True)
+                    print('EXPECTED PRIOR FAILURE (not current):', label, case, flush=True)
 print('PASS: current recovery invariants and exact-build9 negative controls; not Apple/physical interruptions')

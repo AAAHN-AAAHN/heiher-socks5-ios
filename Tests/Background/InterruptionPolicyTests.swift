@@ -97,6 +97,26 @@ import Foundation
             invariant()
             drain()
             check(healthy() && session.activations == 2, "end during stale work requests one fresh recovery at completion")
+        case "explicit-after-invalidated-activation", "explicit-after-invalidated-preparation":
+            session.deferTransitions = name.hasSuffix("activation")
+            DispatchQueue.deferUtility = name.hasSuffix("preparation")
+            app.setAudio(true)
+            event(AVAudioSession.interruptionNotification)
+            app.setAudio(true)
+            invariant()
+            drain()
+            check(healthy() && session.activations == 2,
+                  "latest explicit On follows invalidated completion without an extra retry delay")
+            check(Timer.live.count == 1 && Timer.live[0].interval == 1,
+                  "explicit recovery returns to one normal health timer")
+        case "explicit-during-valid-activation", "explicit-during-valid-preparation":
+            session.deferTransitions = name.hasSuffix("activation")
+            DispatchQueue.deferUtility = name.hasSuffix("preparation")
+            app.setAudio(true)
+            for _ in 0..<100 { app.setAudio(true) }
+            invariant(); drain()
+            check(healthy() && session.activations == 1,
+                  "repeated explicit On preserves a valid pending result without duplicate work")
         case "lost-no-probes":
             app.setAudio(true); let before = session.activations
             session.rejectActivation = true
@@ -262,6 +282,52 @@ import Foundation
                     }
                 }
             }
+        case "automatic-liveness":
+            session.deferTransitions = true
+            DispatchQueue.deferUtility = true
+            app.setAudio(true)
+            var seed: UInt64 = 0x9B_28_F001
+            for _ in 0..<300 {
+                for _ in 0..<40 {
+                    seed = seed &* 6364136223846793005 &+ 1
+                    switch (seed >> 32) % 14 {
+                    case 0: app.setAudio(true)
+                    case 1: app.setAudio(false)
+                    case 2: if !session.pending.isEmpty { session.completeNext(success: seed & 7 != 0) }
+                    case 3: if !DispatchQueue.pendingUtility.isEmpty {
+                        AVAudioPlayer.rejectPreparation = seed & 7 == 0
+                        DispatchQueue.completeUtility(); AVAudioPlayer.rejectPreparation = false
+                    }
+                    case 4: Timer.live.first?.fire()
+                    case 5: advice()
+                    case 6: advice(false)
+                    case 7: event(AVAudioSession.mediaServicesWereLostNotification)
+                    case 8: event(AVAudioSession.mediaServicesWereResetNotification)
+                    case 9: event(AVAudioSession.interruptionNotification,
+                                  [AVAudioSessionInterruptionTypeKey: UInt(seed & 1)])
+                    case 10: event(AVAudioSession.didBecomeInactiveNotification)
+                    case 11: event(AVAudioSession.renderingModeChangeNotification)
+                    case 12: if let current = AVAudioPlayer.instances.last {
+                        app.audioPlayerDecodeErrorDidOccur(current, error: nil)
+                    }
+                    default: if let current = AVAudioPlayer.instances.last { current.isPlaying = false }
+                    }
+                    invariant()
+                }
+                // Once the platform accepts work, saved On must recover using only
+                // completions and its existing timer, without a new user request.
+                session.rejectActivation = false
+                session.rejectDeactivation = false
+                AVAudioPlayer.rejectPreparation = false
+                for _ in 0..<8 {
+                    drain()
+                    if !app.audioEnabled || healthy() { break }
+                    Timer.live.first?.fire()
+                }
+                drain(); invariant()
+                check(!app.audioEnabled || healthy(),
+                      "saved On recovers automatically after arbitrary finite event history")
+            }
         case "mixed-transitions":
             session.deferTransitions = true
             DispatchQueue.deferUtility = true
@@ -285,8 +351,8 @@ import Foundation
                 case 10: event(AVAudioSession.didBecomeInactiveNotification)
                 case 11: event(AVAudioSession.renderingModeChangeNotification)
                 case 12: app.restore()
-                case 13: if let first = AVAudioPlayer.instances.last { app.audioPlayerDecodeErrorDidOccur(first, error: nil) }
-                default: if let first = AVAudioPlayer.instances.last { first.isPlaying = false }
+                case 13: if let player = AVAudioPlayer.instances.last { app.audioPlayerDecodeErrorDidOccur(player, error: nil) }
+                default: if let player = AVAudioPlayer.instances.last { player.isPlaying = false }
                 }
                 invariant()
                 if step % 100 == 0 {

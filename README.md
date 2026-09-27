@@ -75,7 +75,10 @@ not a measured Apple recovery latency. One Timer is reused, not two polling syst
 A first valid interruption is not intentionally delayed for a whole second. The
 pacing applies to repeated failures before a healthy observation. Genuine user On
 can retry deliberately. Duplicate automatic hints cannot repeatedly consume that
-privilege. A successful healthy timer sample ends the failed episode.
+privilege. A successful healthy timer sample ends the failed episode. Explicit On received
+after an in-flight operation was invalidated records a follow-up request: it waits
+for that real completion, then retries immediately instead of adding another timer
+delay. Repeated On during valid work still coalesces without duplication.
 
 ## Concurrency, resource use and limits
 
@@ -132,7 +135,11 @@ New scenarios cover healthy/in-flight positive and negative advice, repeated gen
 and inactive events, missing metadata/end/reset, unavailable-service probes, drift,
 first/repeated silent and decoder stops, reset storms, reentrant Off, cleanup, and
 98 boundary/action/delivery combinations. A 12000-step deterministic sequence checks
-single-operation/player/timer and eventual explicit recovery. Repetitions are not
+single-operation/player/timer and eventual explicit recovery. A separate 12000-event
+sequence ends 300 finite histories using only completions and existing timers:
+saved On must recover without another explicit user request once the platform accepts
+work. The policy driver has 34 current scenarios, ten exact-build9 negative controls,
+and two exact-first-repair negative controls per Swift compiler mode. Repetitions are not
 independent device trials. Exact-build9 negative controls must fail the repaired
 properties; old failures are never counted as new-source failures.
 
@@ -144,9 +151,19 @@ remain. Input/index/marker guards and common46-case native-input fixture remain.
 
 ### Execution status for this implementation
 
-Local current-controller suites and policy scenarios are being finalized. Actual
-SDK/Simulator/CI results will be recorded only against their tested commit and
-original artifacts. A successful earlier build9 or rejected cycled source is not
+The first repair73e36a5b passed SDK/model checks in36348760076. Attempt1 of its
+Simulator job failed during simulator readiness/cleanup before app execution;
+attempt2 failed the unchanged initial Playing deadline. The early diagnostic commit
+message incorrectly grouped both as Playing failures; their original artifacts take
+precedence. Test-copy tracing in f33cf831/run36351187140 passed UI, with native
+activation and off-main preparation completions observed. That instrumented success
+neither proves the prior delay's internal cause nor replaces final uninstrumented
+validation. The trace helper is removed; no tracing is linked in this candidate.
+
+Local current suites, 34 recovery scenarios and both compiler modes pass. The exact
+first repair fails the two new explicit-On-after-invalidation cases; this candidate
+passes them without overlap or loss of Off priority. Actual final SDK/Simulator/CI
+results must still be recorded against their tested commit and original artifacts. A successful earlier build9 or rejected cycled source is not
 reused as this revision's result. No new IPA or release merge is part of this scoped
 branch-only repair. Physical SideStore/LiveContainer installation, real calls/Siri/
 Bluetooth, actual service resets, long-duration locked iPad behavior, power and
