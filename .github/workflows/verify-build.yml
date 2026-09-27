@@ -80,7 +80,7 @@ jobs:
           fetch-depth: 0
       - name: Actual iOS 27 async audio UI and runtime advisory checks (no IPA)
         shell: bash
-        run: python3 Tests/Background/check_async_ui.py
+        run: python3 Tests/Background/trace_recovery.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
