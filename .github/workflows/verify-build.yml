@@ -1,56 +1,118 @@
-name: Retire rejected cycled-audio branch
+name: Verify and build declared SOCKS5 features
 on:
   push:
-    branches: [feature/background]
+    branches: [main, feature/udp-compat, feature/traffic-statistics, feature/background, feature/settings, feature/app-icon, release/integrated]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
 permissions:
   contents: read
 jobs:
-  retire:
-    if: ${{ github.repository == 'AAAHN-AAAHN/heiher-socks5-ios' && github.ref == 'refs/heads/feature/background' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      contents: write
+  verify:
+    if: ${{ !contains(github.event.head_commit.message, '[audio-checks-only]') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, xcode-27]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
     steps:
-      - name: Delete only the explicitly rejected branch at its observed revision
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          python3 - <<'PY'
-          import json, os, urllib.request, urllib.error
-          from pathlib import Path
-          root = 'https://api.github.com/repos/AAAHN-AAAHN/heiher-socks5-ios/git/'
-          name = 'heads/feature/background-cycled-audio'
-          expected = '68fa715fabb60b4e558771c3289af063a96a4a24'
-          def call(path, method='GET'):
-              request = urllib.request.Request(root + path, method=method, headers={
-                  'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
-                  'Accept': 'application/vnd.github+json',
-                  'X-GitHub-Api-Version': '2022-11-28'})
-              try:
-                  with urllib.request.urlopen(request, timeout=30) as response:
-                      data = response.read()
-                      return response.status, json.loads(data) if data else None
-              except urllib.error.HTTPError as error:
-                  if error.code == 404: return 404, None
-                  raise
-          status, before = call('ref/' + name)
-          if status == 200:
-              if before['object']['sha'] != expected:
-                  raise SystemExit('Ref changed; refusing deletion of unreviewed work')
-              status, _ = call('refs/' + name, 'DELETE')
-              if status != 204: raise SystemExit('Deletion did not return 204')
-          status, _ = call('ref/' + name)
-          if status != 404: raise SystemExit('Ref still exists')
-          result = {'ref': name, 'expected_before': expected, 'before': before,
-                    'after_http_status': status, 'operation_commit': os.environ['GITHUB_SHA'],
-                    'run_id': os.environ['GITHUB_RUN_ID'],
-                    'scope': 'Branch ref removal only; no history rewrite or artifact deletion'}
-          Path('retirement.json').write_text(json.dumps(result, indent=2) + '\n')
-          print(json.dumps(result, indent=2))
-          PY
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          name: Cycled-branch-retirement
-          path: retirement.json
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install upstream formatter
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y clang-format-18
+          else
+            brew install llvm@18
+            echo "$(brew --prefix llvm@18)/bin" >> "$GITHUB_PATH"
+          fi
+      - name: Validate source, test native code, and archive iOS on macOS
+        shell: bash
+        run: bash Build/build.sh
+      - name: Name artifact
+        if: always()
+        shell: bash
+        run: echo "NAME=$(python3 -c 'import json; print(json.load(open("Build/features.json"))["name"])')" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Socks5-${{ env.NAME }}-${{ runner.os }}
+          path: artifacts/
+          retention-days: 30
+  audio-checks:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[audio-checks-only]') }}
+    runs-on: xcode-27
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Audio tests and iOS 27 type checks only (no archive or IPA)
+        shell: bash
+        run: bash Tests/Background/check_audio_sdk.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Background-audio-checks-no-IPA
+          path: artifacts/audio-checks/
+          retention-days: 30
+  audio-async-ui:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[audio-checks-only]') }}
+    needs: audio-checks
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Actual iOS 27 async audio UI and runtime advisory checks (no IPA)
+        shell: bash
+        run: python3 Tests/Background/check_async_ui.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Background-async-audio-Simulator
+          path: artifacts/audio-async-ui/
+          retention-days: 30
+  audio-recovery-linux:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[audio-checks-only]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Exact-source recovery and negative controls (no Apple execution)
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/recovery-linux
+          git diff --exit-code HEAD --
+          git diff --cached --exit-code HEAD --
+          git rev-parse HEAD > artifacts/recovery-linux/tested-commit.txt
+          git archive --format=zip HEAD -o artifacts/recovery-linux/source.zip
+          swiftc --version > artifacts/recovery-linux/toolchain.txt
+          python3 Tests/Background/check_interruption_policy.py > artifacts/recovery-linux/policy.log 2>&1
+          git diff --exit-code HEAD --
+          git diff --cached --exit-code HEAD --
+          echo 'PASS: exact-source policy tests; no Apple execution' > artifacts/recovery-linux/SUCCESS.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Background-recovery-Linux
+          path: artifacts/recovery-linux/
           retention-days: 30

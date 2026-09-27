@@ -77,9 +77,9 @@ import Foundation
         app.setAudio(true)
         app.audioEvent(Notification(name: AVAudioSession.mediaServicesWereResetNotification))
         session.completeNext()
-        check(!AVAudioPlayer.instances.last!.isPlaying && Timer.live.count == 1 && Timer.live[0].interval == 1,
-              "Reset during activation rejects stale success and preserves one-second recovery pacing")
-        Timer.live[0].fire()
+        check(!AVAudioPlayer.instances.last!.isPlaying && Timer.live.isEmpty
+              && session.pending.count == 1 && session.pending[0].active,
+              "Reset rejects stale activation, then starts one fresh request without an extra second")
         session.completeNext()
         check(AVAudioPlayer.instances.last!.isPlaying, "Fresh request after invalidation restores playback")
         off()

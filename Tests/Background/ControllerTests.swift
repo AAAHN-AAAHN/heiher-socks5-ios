@@ -55,10 +55,13 @@ import Foundation
             [AVAudioSessionInterruptionTypeKey: UInt(0)],
             [AVAudioSessionInterruptionTypeKey: UInt(999)], nil
         ] {
+            Timer.live[0].fire() // A healthy sample begins an independent incident.
             let previous = AVAudioPlayer.instances.last!
             app.audioEvent(Notification(name: AVAudioSession.interruptionNotification, userInfo: info))
-            check(AVAudioPlayer.instances.last !== previous && AVAudioPlayer.instances.last!.isPlaying,
-                  "Interruption is handled even with absent/unknown metadata and stale isPlaying")
+            let ended = info?[AVAudioSessionInterruptionTypeKey] as? UInt == 0
+            check((ended ? AVAudioPlayer.instances.last === previous : AVAudioPlayer.instances.last !== previous)
+                  && AVAudioPlayer.instances.last!.isPlaying,
+                  "End preserves healthy audio; began/unknown metadata invalidates even stale isPlaying")
         }
         audio.rejectActivation = true
         app.audioEvent(Notification(name: AVAudioSession.interruptionNotification))
@@ -74,19 +77,24 @@ import Foundation
         audio.rejectActivation = false
         Timer.live[0].fire()
         check(AVAudioPlayer.instances.last!.isPlaying && Timer.live[0].interval == 1, "Recovery retains one-second monitoring")
+        Timer.live[0].fire() // Mark completed recovery healthy before the next incident.
         player = AVAudioPlayer.instances.last!
         player.isPlaying = false
         Timer.live[0].fire()
         check(player.isPlaying, "Unnotified stop recovered by active monitoring")
-        for event in [AVAudioSession.mediaServicesWereLostNotification, AVAudioSession.mediaServicesWereResetNotification] {
-            let old = AVAudioPlayer.instances.last!
-            app.audioEvent(Notification(name: event))
-            check(old !== AVAudioPlayer.instances.last && AVAudioPlayer.instances.last!.isPlaying, "Media service event recreates player")
-        }
+        let oldServicePlayer = AVAudioPlayer.instances.last!
+        app.audioEvent(Notification(name: AVAudioSession.mediaServicesWereLostNotification))
+        check(!oldServicePlayer.isPlaying && Timer.live.count == 1 && Timer.live[0].interval == 5 && app.audioEnabled,
+              "Known loss stops resources and schedules one slow availability probe")
+        app.audioEvent(Notification(name: AVAudioSession.mediaServicesWereResetNotification))
+        check(oldServicePlayer !== AVAudioPlayer.instances.last && AVAudioPlayer.instances.last!.isPlaying,
+              "Media service reset recreates player immediately")
+        Timer.live[0].fire()
         audio.category = .ambient
         app.audioEvent(Notification(name: AVAudioSession.routeChangeNotification,
                                     userInfo: [AVAudioSessionRouteChangeReasonKey: UInt(3)]))
         check(audio.category == .playback && AVAudioPlayer.instances.last!.isPlaying, "External category change repaired")
+        Timer.live[0].fire()
         player = AVAudioPlayer.instances.last!
         let beforeDecoder = audio.activations
         app.audioPlayerDecodeErrorDidOccur(player, error: nil)

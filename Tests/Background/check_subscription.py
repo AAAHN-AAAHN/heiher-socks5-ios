@@ -54,6 +54,10 @@ PUBLISHER
                     NotificationCenter.default.post(name: name, object: nil)
                 }
                 drain { received == previous + 1 }
+                if name == AVAudioSession.mediaServicesWereLostNotification {
+                    precondition(!AVAudioPlayer.instances.last!.isPlaying && app.audioEnabled)
+                    app.restore() // A separate availability checkpoint, not the loss notification.
+                }
                 precondition(AVAudioPlayer.instances.last!.isPlaying)
                 app.setAudio(false)
             }

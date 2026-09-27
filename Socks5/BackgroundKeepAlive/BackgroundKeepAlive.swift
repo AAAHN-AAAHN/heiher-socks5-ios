@@ -20,6 +20,13 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     private var restoringAudio = false
     private var invalidatedDuringRestore = false
     private var playerFailurePending = false
+    private var waitingToRetry = false
+    private var resumeOpportunityUsed = false
+    private var resumeAfterRestore = false
+    private var servicesUnavailable = false
+    private var probingServices = false
+    private static let serviceProbeInterval: TimeInterval = 5
+    private var ownsAudioSession = false
     private enum SessionTransition { case activating, preparing, deactivating }
     private var sessionTransition: SessionTransition?
     private var deactivationPending = false
@@ -59,12 +66,20 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         return names
     }()
 
-    deinit { audioCheck?.invalidate() }
+    deinit {
+        audioCheck?.invalidate()
+        player?.delegate = nil
+        player?.stop()
+        // Pending activation/preparation has its own weak orphan completion.
+        if ownsAudioSession, sessionTransition == nil, !servicesUnavailable {
+            Self.changeAudioSession(false) { _, _ in }
+        }
+    }
 
     /// Called at launch and on return to the foreground. Safe to call repeatedly.
     func restore() {
         if locationEnabled { openLocation() }
-        if audioEnabled { resumeAudio() }
+        if audioEnabled { requestAudioResume(servicesAvailable: true) }
     }
 
     func setLocation(_ enabled: Bool) {
@@ -165,8 +180,16 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         guard enabled || audioEnabled || deactivationPending else { return }
         audioEnabled = enabled
         if enabled {
+            // An explicit user request may retry; generic notifications may not.
+            servicesUnavailable = false
+            waitingToRetry = false
             resumeAudio()
         } else {
+            waitingToRetry = false
+            resumeOpportunityUsed = false
+            resumeAfterRestore = false
+            servicesUnavailable = false
+            probingServices = false
             audioCheck?.invalidate()
             audioCheck = nil
             playerFailurePending = false
@@ -183,7 +206,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     }
 
     private func resumeAudio(recreate: Bool = false) {
-        guard audioEnabled else { return }
+        guard audioEnabled, !servicesUnavailable || probingServices else { return }
         // One transition at a time, including the callback's hop to MainActor.
         // Invalidations during activation must not publish stale playback success.
         guard !restoringAudio, sessionTransition == nil else {
@@ -191,14 +214,27 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
             return
         }
         guard !deactivationPending else { deactivateAudio(); return }
+        if waitingToRetry {
+            if audioCheck == nil { scheduleAudioCheck(after: 1) }
+            return
+        }
+        // A second silent stop before a healthy sample is the same failure episode.
+        if !recreate, player != nil, !audioIsHealthy(), playerFailurePending {
+            retryAudio(nil)
+            return
+        }
         restoringAudio = true
         invalidatedDuringRestore = false
         if recreate { discardPlayer() }
         guard audioEnabled, !deactivationPending else { finishAudioRestore(); return }
-        if player?.isPlaying == true {
+        if audioIsHealthy() {
             if audioCheck == nil { scheduleAudioCheck(after: 1) }
             finishAudioRestore()
             return
+        }
+        if player != nil {
+            playerFailurePending = true
+            if !audioConfigurationMatches() { discardPlayer() }
         }
         audioCheck?.invalidate()
         audioCheck = nil
@@ -212,6 +248,11 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
                 try? session.setPrefersNoInterruptionsFromSystemAlerts(true)
             }
             guard audioEnabled, !deactivationPending else { finishAudioRestore(); return }
+            if invalidatedDuringRestore {
+                retryAudio(nil)
+                finishAudioRestore()
+                return
+            }
             audioState = "Activating audio session"
             beginSessionTransition(active: true)
         } catch {
@@ -231,6 +272,10 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
                 throw error ?? NSError(domain: "BackgroundKeepAlive", code: 3,
                                        userInfo: [NSLocalizedDescriptionKey: "Audio session activation failed or was interrupted during recovery"])
             }
+            // A successful fresh activation establishes service availability;
+            // no reset notification is required for a bounded availability probe.
+            servicesUnavailable = false
+            probingServices = false
             if player == nil {
                 guard let url = Bundle.main.url(forResource: "Silence", withExtension: "wav") else {
                     throw NSError(domain: "BackgroundKeepAlive", code: 1,
@@ -297,7 +342,15 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
 
     private func finishAudioRestore() {
         restoringAudio = false
-        if deactivationPending { deactivateAudio() }
+        if deactivationPending {
+            deactivateAudio()
+        } else if resumeAfterRestore {
+            resumeAfterRestore = false
+            if audioEnabled, !servicesUnavailable, !audioIsHealthy() {
+                waitingToRetry = false
+                resumeAudio()
+            }
+        }
     }
 
     private func deactivateAudio() {
@@ -309,6 +362,8 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     private func audioDeactivated(_ success: Bool, error: Error?) {
         guard sessionTransition == .deactivating else { return }
         sessionTransition = nil
+        if success, error == nil { ownsAudioSession = false }
+        resumeAfterRestore = false
         // Playback is already stopped. Do not spin or start a timer while Off.
         deactivationPending = !audioEnabled && (!success || error != nil)
         if audioEnabled {
@@ -322,11 +377,12 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
 
     private func beginSessionTransition(active: Bool) {
         sessionTransition = active ? .activating : .deactivating
+        if active { ownsAudioSession = true }
         Self.changeAudioSession(active) { [weak self] success, error in
             Self.onMain { [weak self] in
                 guard let self else {
                     // A released controller must not leave its late activation on.
-                    if active, success { Self.changeAudioSession(false) { _, _ in } }
+                    if active { Self.changeAudioSession(false) { _, _ in } }
                     return
                 }
                 if active { self.audioActivated(success, error: error) }
@@ -370,24 +426,64 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         }
         discardPlayer()
         guard audioEnabled else { return }
-        audioState = "Waiting to resume: \(error?.localizedDescription ?? "Audio playback stopped")"
-        // Repeated failures must not postpone an already scheduled retry.
-        if audioCheck == nil { scheduleAudioCheck(after: 1) }
+        playerFailurePending = true
+        waitingToRetry = true
+        probingServices = false
+        audioState = servicesUnavailable ? "Waiting for audio services" :
+            "Waiting to resume: \(error?.localizedDescription ?? "Audio playback stopped")"
+        // One deadline for the entire failed episode, including notification storms.
+        if audioCheck == nil {
+            scheduleAudioCheck(after: servicesUnavailable ? Self.serviceProbeInterval : 1)
+        }
     }
 
-    private func playerStopped(_ error: Error?) {
+    private func playerStopped(_ error: Error?, resumeOpportunity: Bool = false) {
         guard audioEnabled else { return }
-        if restoringAudio {
+        let expedite = resumeOpportunity && !resumeOpportunityUsed
+        if expedite {
+            resumeOpportunityUsed = true
+            waitingToRetry = false
+        }
+        if restoringAudio || sessionTransition != nil {
             invalidatedDuringRestore = true
             playerFailurePending = true
-        } else if playerFailurePending {
-            // Another failure before a healthy sample belongs to the same recovery
-            // episode. Preserve the one-second retry instead of a decoder spin.
+            if expedite { resumeAfterRestore = true }
+        } else if playerFailurePending && !expedite {
             retryAudio(error)
         } else {
             playerFailurePending = true
             resumeAudio(recreate: true)
         }
+    }
+
+    /// Availability advice is not resource invalidation. Coalesce duplicate advice
+    /// and preserve valid in-flight work; only a stale completion needs a fresh start.
+    private func requestAudioResume(servicesAvailable: Bool = false) {
+        guard audioEnabled else { return }
+        if servicesAvailable { servicesUnavailable = false }
+        guard !servicesUnavailable, !audioIsHealthy() else { return }
+        if restoringAudio || sessionTransition != nil {
+            if !resumeOpportunityUsed, invalidatedDuringRestore {
+                resumeOpportunityUsed = true
+                resumeAfterRestore = true
+            }
+            return
+        }
+        if !resumeOpportunityUsed {
+            resumeOpportunityUsed = true
+            waitingToRetry = false
+        }
+        resumeAudio()
+    }
+
+    private func audioConfigurationMatches() -> Bool {
+        let session = AVAudioSession.sharedInstance()
+        return session.category == .playback && session.mode == .default
+            && session.categoryOptions == [.mixWithOthers]
+    }
+
+    private func audioIsHealthy() -> Bool {
+        player?.isPlaying == true && audioConfigurationMatches()
     }
 
     private func discardPlayer() {
@@ -405,7 +501,12 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
             MainActor.assumeIsolated {
                 guard let self, self.audioCheck === timer else { return }
                 self.audioCheck = nil
-                if self.player?.isPlaying == true { self.playerFailurePending = false }
+                self.waitingToRetry = false
+                self.probingServices = self.servicesUnavailable
+                if self.audioIsHealthy() {
+                    self.playerFailurePending = false
+                    self.resumeOpportunityUsed = false
+                }
                 self.resumeAudio()
             }
         }
@@ -415,35 +516,81 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
 
     func audioEvent(_ notification: Notification) {
         guard audioEnabled, Self.audioNotifications.contains(notification.name) else { return }
-        if Self.invalidatingAudioNotifications.contains(notification.name) {
-            // No metadata/shouldResume gate: saved On means best-effort recovery,
-            // even with missing context or stale isPlaying. iOS can still refuse.
-            resumeAudio(recreate: true)
+        let name = notification.name
+        if name == AVAudioSession.mediaServicesWereLostNotification {
+            let newlyUnavailable = !servicesUnavailable
+            if newlyUnavailable { resumeOpportunityUsed = false }
+            servicesUnavailable = true
+            probingServices = false
+            invalidatedDuringRestore = true
+            playerFailurePending = true
+            waitingToRetry = true
+            if newlyUnavailable {
+                audioCheck?.invalidate()
+                audioCheck = nil
+            }
+            // A preparation worker exclusively owns its detached player until return.
+            let wasRestoring = restoringAudio
+            restoringAudio = true
+            discardPlayer()
+            restoringAudio = wasRestoring
+            if audioEnabled {
+                audioState = "Waiting for audio services"
+                // Do not permanently depend on a reset/end notification being
+                // delivered. A lost service is probed slowly, never on every hint.
+                if audioCheck == nil { scheduleAudioCheck(after: Self.serviceProbeInterval) }
+            }
+            if deactivationPending { deactivateAudio() }
             return
         }
-        if notification.name == AVAudioSession.routeChangeNotification,
+        if name == AVAudioSession.mediaServicesWereResetNotification {
+            servicesUnavailable = false
+            playerStopped(nil, resumeOpportunity: true)
+            return
+        }
+        if name == AVAudioSession.interruptionNotification {
+            // Preserve explicit On even without shouldResume metadata. A begun or
+            // unknown interruption invalidates; an end is an availability checkpoint.
+            if notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt == 0 {
+                requestAudioResume()
+            } else if !servicesUnavailable || probingServices {
+                playerStopped(nil)
+            }
+            return
+        }
+        if #available(iOS 27.0, *) {
+            if name == AVAudioSession.didBecomeInactiveNotification {
+                if !servicesUnavailable || probingServices { playerStopped(nil) }
+                return
+            }
+            if name == AVAudioSession.resumptionRecommendationNotification {
+                let context = notification.userInfo?[AVAudioSession.resumptionContextKey]
+                    as? AVAudioSession.ResumptionContext
+                // A negative hint never erases On or stops healthy playback. It
+                // simply does not bypass the existing bounded automatic retry.
+                if context?.recommendation == .shouldNotResume {
+                    resumeAudio()
+                } else {
+                    requestAudioResume(servicesAvailable: true)
+                }
+                return
+            }
+        }
+        if name == AVAudioSession.routeChangeNotification,
            notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
                 == AVAudioSession.RouteChangeReason.categoryChange.rawValue {
-            let session = AVAudioSession.sharedInstance()
-            if session.category != .playback || session.mode != .default || session.categoryOptions != [.mixWithOthers] {
-                resumeAudio(recreate: true)
+            if !audioConfigurationMatches() {
+                if !servicesUnavailable || probingServices { playerStopped(nil) }
                 return
             }
-            // Ignore our own normal configuration echo while waiting to create a
-            // player. A real stopped player must still be checked immediately.
-            if player == nil {
-                if audioCheck == nil, !restoringAudio, sessionTransition == nil { scheduleAudioCheck(after: 1) }
-                return
-            }
+            // Own configuration echo cannot start a second restore or bypass retry.
+            if player == nil { return }
         }
-        if #available(iOS 27.0, *), notification.name == AVAudioSession.didBecomeActiveNotification,
+        if #available(iOS 27.0, *), name == AVAudioSession.didBecomeActiveNotification,
            player == nil, restoringAudio || audioCheck != nil {
-            // Successful activation can notify before player creation/play fails.
-            // Do not let its delayed echo turn one-second retries into a busy loop.
             return
         }
-        // Routes, rendering/mute hints and lifecycle transitions are checkpoints,
-        // not reasons to rebuild healthy playback or override the user's mute.
+        // Route/mute/rendering/lifecycle hints inspect; they never cancel backoff.
         resumeAudio()
     }
 

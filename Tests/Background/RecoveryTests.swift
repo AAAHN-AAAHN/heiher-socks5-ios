@@ -11,11 +11,10 @@ import Foundation
         let session = AVAudioSession.shared
         let app = BackgroundKeepAlive()
         let invalidations = [AVAudioSession.interruptionNotification,
-                             AVAudioSession.mediaServicesWereLostNotification,
                              AVAudioSession.mediaServicesWereResetNotification,
-                             AVAudioSession.didBecomeInactiveNotification,
-                             AVAudioSession.resumptionRecommendationNotification]
-        let checkpoints = [AVAudioSession.routeChangeNotification,
+                             AVAudioSession.didBecomeInactiveNotification]
+        let checkpoints = [AVAudioSession.resumptionRecommendationNotification,
+                           AVAudioSession.routeChangeNotification,
                            AVAudioSession.silenceSecondaryAudioHintNotification,
                            AVAudioSession.spatialPlaybackCapabilitiesChangedNotification,
                            AVAudioSession.renderingModeChangeNotification,
@@ -27,7 +26,7 @@ import Foundation
                            UIApplication.didEnterBackgroundNotification,
                            UIApplication.willEnterForegroundNotification,
                            UIApplication.protectedDataDidBecomeAvailableNotification]
-        check(Set(BackgroundKeepAlive.audioNotifications) == Set(invalidations + checkpoints),
+        check(Set(BackgroundKeepAlive.audioNotifications) == Set(invalidations + checkpoints + [AVAudioSession.mediaServicesWereLostNotification]),
               "All 13 playback-session names and four lifecycle checkpoints are registered")
         check(BackgroundKeepAlive.audioNotifications.count == 17, "No duplicate notification registration")
         for event in invalidations + checkpoints { app.audioEvent(Notification(name: event)) }
@@ -35,6 +34,7 @@ import Foundation
         app.setAudio(true)
         for event in invalidations {
             for payload: [AnyHashable: Any]? in [nil, [:], ["context": "unknown"], ["shouldResume": false]] {
+                Timer.live[0].fire() // Independent incident, after a healthy sample.
                 let old = AVAudioPlayer.instances.last!
                 let before = session.activations
                 app.audioEvent(Notification(name: event, userInfo: payload))
@@ -45,6 +45,7 @@ import Foundation
             }
         }
         for event in checkpoints {
+            Timer.live[0].fire()
             let healthy = AVAudioPlayer.instances.last!
             let before = session.activations
             app.audioEvent(Notification(name: event))
@@ -56,6 +57,7 @@ import Foundation
                   "Stopped checkpoint retries immediately: \(event.rawValue)")
         }
         for reason in [0, 1, 2, 3, 4, 6, 7, 8, 999] {
+            Timer.live[0].fire()
             let player = AVAudioPlayer.instances.last!
             player.isPlaying = false
             let before = session.activations
@@ -67,8 +69,11 @@ import Foundation
         let unexpected = session.activations
         app.audioEvent(Notification(name: Notification.Name("UnrelatedInputOnlySignal")))
         check(session.activations == unexpected, "Unrelated notifications do not trigger recovery")
-        session.rejectActivation = true
         for event in invalidations {
+            app.setAudio(false)
+            session.rejectActivation = false
+            app.setAudio(true)
+            session.rejectActivation = true
             let before = session.activations
             app.audioEvent(Notification(name: event))
             check(session.activations == before + 1 && app.audioEnabled && Timer.live.count == 1,
@@ -143,10 +148,11 @@ import Foundation
         AVAudioPlayer.onPlay = nil
         AVAudioPlayer.onStop = { app.audioEvent(Notification(name: AVAudioSession.didBecomeInactiveNotification)) }
         Timer.live[0].fire()
+        Timer.live[0].fire()
         let beforeStopEcho = session.activations
         app.audioEvent(Notification(name: AVAudioSession.interruptionNotification))
-        check(session.activations == beforeStopEcho + 1 && Timer.live.count == 1,
-              "Synchronous stop/deactivation echoes cannot recursively recreate players")
+        check(session.activations <= beforeStopEcho + 1 && Timer.live.count == 1,
+              "Synchronous stop echoes cannot launch recursive or known-invalid activation")
         AVAudioPlayer.onStop = nil
         Timer.live[0].fire()
         Timer.live[0].fire()

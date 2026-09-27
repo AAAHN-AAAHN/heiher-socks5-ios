@@ -29,7 +29,7 @@ import Combine
 @main struct LiveScheduling {
     @MainActor static func main() {
         var app: BackgroundKeepAlive? = BackgroundKeepAlive()
-        weak var weakApp = app
+        let ownerReleased = { [weak app] in app == nil }
         let session = AVAudioSession.shared
         var attempts: [TimeInterval] = []
         let origin = ProcessInfo.processInfo.systemUptime
@@ -52,6 +52,13 @@ PUBLISHER
         session.rejectActivation = true
         app!.setAudio(true)
         precondition(attempts.count == 1)
+        // Saturate ordinary hints before the first real deadline. They must not
+        // start new attempts or postpone that deadline.
+        for _ in 0..<40 {
+            NotificationCenter.default.post(name: AVAudioSession.renderingModeChangeNotification, object: nil)
+        }
+        until({ received == 40 }, timeout: 0.8)
+        precondition(attempts.count == 1)
         until({ attempts.count >= 3 })
         precondition(attempts.count == 3)
         precondition(attempts[1] - attempts[0] >= 0.85 && attempts[2] - attempts[1] >= 0.85,
@@ -60,7 +67,7 @@ PUBLISHER
         session.rejectActivation = false
         let beforeSignal = attempts.count
         NotificationCenter.default.post(name: AVAudioSession.resumptionRecommendationNotification, object: nil)
-        until({ received == 1 && attempts.count > beforeSignal }, timeout: 0.8)
+        until({ received == 41 && attempts.count > beforeSignal }, timeout: 0.8)
         precondition(AVAudioPlayer.instances.last!.isPlaying)
         print("PASS: a new queued resumption signal recovers before the next one-second retry")
 
@@ -80,7 +87,7 @@ PUBLISHER
         precondition(queued.wait(timeout: .now() + 2) == .success)
         // The worker finished posting, while its RunLoop delivery is still pending.
         app!.setAudio(false)
-        until({ received == 2 })
+        until({ received == 42 })
         runFor(1.1)
         precondition(session.activations == healthy && app!.audioState == "Off")
         print("PASS: Off before queued worker notification delivery remains Off; the old real timer cannot restart audio")
@@ -94,9 +101,8 @@ PUBLISHER
         app = nil
         NotificationCenter.default.post(name: AVAudioSession.interruptionNotification, object: nil)
         runFor(1.1)
-        precondition(received == deliveries && weakApp == nil && session.activations == healthy)
+        precondition(received == deliveries && ownerReleased() && session.activations == healthy)
         print("PASS: location independence, observer cancellation and controller release with real timers")
-        weakApp = nil
         session.onActivation = nil
         print("SCOPE: native Foundation/Combine execution with audio/device doubles; measured timing is not an iOS real-time guarantee")
     }
