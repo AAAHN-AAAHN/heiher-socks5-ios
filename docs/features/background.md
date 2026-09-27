@@ -149,25 +149,89 @@ iPhoneOS27 SDK check retains warnings-as-errors and records the actual declarati
 The existing uninstrumented Simulator UI test, original deadlines and advisory scan
 remain. Input/index/marker guards and common46-case native-input fixture remain.
 
-### Execution status for this implementation
+### Final verified state — 2026-09-28
 
-The first repair73e36a5b passed SDK/model checks in36348760076. Attempt1 of its
-Simulator job failed during simulator readiness/cleanup before app execution;
-attempt2 failed the unchanged initial Playing deadline. The early diagnostic commit
-message incorrectly grouped both as Playing failures; their original artifacts take
-precedence. Test-copy tracing in f33cf831/run36351187140 passed UI, with native
-activation and off-main preparation completions observed. That instrumented success
-neither proves the prior delay's internal cause nor replaces final uninstrumented
-validation. The trace helper is removed; no tracing is linked in this candidate.
+Implementation and the scoped Background validation are complete at tested commit
+`6f1ab4fcdd1073b18711112224ef990ab9281cc0`, tree
+`7a412e5347b90b6725343c822c5fc17888e05a39`. Workflow `36357672450`
+finished successfully on attempt 2. The final documentation commit changes only
+README.md and this feature specification: the other 70 tracked paths, including
+production, tests, workflow and assets, remain identical to the tested 72-file tree.
+The controller blob is `44bf6de00a9d769adbae2d1a0a7e0c4a832d4379`;
+its SHA-256 is `15a6f853ff7ca0e00fb15976203308c024e5d631d59c499b161cd605f14eba4c`.
 
-Local current suites, 34 recovery scenarios and both compiler modes pass. The exact
-first repair fails the two new explicit-On-after-invalidation cases; this candidate
-passes them without overlap or loss of Off priority. Actual final SDK/Simulator/CI
-results must still be recorded against their tested commit and original artifacts. A successful earlier build9 or rejected cycled source is not
-reused as this revision's result. No new IPA or release merge is part of this scoped
-branch-only repair. Physical SideStore/LiveContainer installation, real calls/Siri/
-Bluetooth, actual service resets, long-duration locked iPad behavior, power and
-network throughput remain unperformed until explicitly recorded.
+| Evidence layer | Actual result and scope |
+| --- | --- |
+| Exact-source Linux recovery policy | 34 current scenarios in debug and optimized modes pass; 98 reentry combinations, a 12000-transition mixed sequence and a separate 12000-event/300-history automatic-recovery sequence are included, not independent device trials. |
+| Negative controls | Ten exact-build9 and two exact-first-repair scenarios per compiler mode fail the repaired properties as expected. These retained failures are not current-source failures. |
+| Existing controller and transition tests | 1030 controller checks, 85 recovery assertions, 41 lifecycle assertions, 15 callback-lifetime assertions, 49 authorization assertions and worker-delegate checks pass. Async session 38/3000 transitions and preparation 22/3000 transitions pass in both modes. Historical authorization control retains 28 expected failures. |
+| Foundation/Combine and worker helpers | 34 main/worker notification deliveries, cancellation, five real scheduling conditions and exact old blocking/implicit-preparation controls pass. Observed failed-activation times are 0.00116, 1.01696 and 2.04028 seconds; these are host-fixture observations, not device latency guarantees. |
+| Shared validation guards | 46 common input/marker cases, 37 audit-entry cases, original marker controls, main ancestry, source pins, composition and clean worktree/index checks pass. |
+| Apple SDK | Five production Swift files typecheck for ARM64/iOS17.2 with iPhoneOS27 and warnings-as-errors; diagnostic log is empty. Apple AVAudioFile decodes all 400 zero samples of the unchanged 50ms WAV. |
+| Uninstrumented app execution | iPhone 16 Simulator, iOS27.0 build24A434: one original XCTest case passes, zero failures/skips, 116.249 seconds case time. Repeated On/Off, saved intent/relaunch, rapid changes and tab changes pass. Playing and Off screenshots were inspected. |
+| Advisory and cleanup gates | Targeted main-thread audio advisory is absent in completed console and xcresult. runtimeWarnings and cleanup are empty. This is not a claim that every framework warning or every possible hang is absent. |
+| Generic native archive/IPA job | Skipped by the explicit audio-checks-only scope, not represented as passed. No new IPA or release merge is produced by this branch-only repair. |
+| Physical target environments | SideStore independent installation and LiveContainer guest execution, actual calls/Siri/Bluetooth/media-server reset, long locked-iPad operation, power, latency and throughput remain unperformed. |
+
+The final run's SDK and Linux artifacts were produced on attempt 1; only the failed
+Simulator job was rerun on attempt 2. They are not claimed to be three newly executed
+attempt-2 jobs. Original ZIP digests and CRCs were verified. The SDK/Linux/UI source
+archives have identical file bytes/modes and the expected commit comment. Independent
+Git-tree reconstruction from all 72 paths reproduces the tested tree above. Local
+Linux/Swift6.2.1 additionally reran the eight current fixture executables and all
+34 policy scenarios plus 12 historical negative controls in both compiler modes.
+Those offline fixture runs do not replace Apple SDK or actual Simulator execution.
+
+Recorded Apple host: Xcode27.0 27A266a, iPhoneOS27.0, Swift6.4
+swiftlang-6.4.0.34.1, macOS27.0 26A428. The CI Linux host uses Swift6.4.
+The Simulator executable SHA-256 recorded by CI is
+`f28d40a9655e11b982ec68c7a5a661100120497721578994ad4e4b64fa9969d2`.
+Its executable is not separately distributed in the artifact for an independent
+local rehash; the source and original artifact archives were independently rehashed.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Final SDK 10943683861 | 7a06f92ee982b5f2519c60ce8613c0b1f4fdc294258314ed70068dfa2e56ab5b |
+| Final Linux 10944726138 | a648f4f06ad61356778d02be7f5f6758a90d4ee18fa99fe394534493cae5a556 |
+| Final UI attempt2 10944594234 | cb74fea6ad67f71e509cc367ec886efbe602eb8d5ea5013328aa06ded5e0a438 |
+| Retained UI attempt1 failure 10944573245 | e3000b21c09f92dc8eb7b4536e2d023d17cfc4030b1f370519ef456ba865560e |
+| Diagnostic-only UI 10944137752 | 3542b9c8b782aa2ddeae57ba3aaf2a99c6ee9299d5ed0996ad3765f62c62ed2c |
+| Cycled-ref removal 10940424430 | 91d3b6c13a207472a14bfc70844306594ad115b4e011ee7f1cd2ea8b60a4af48 |
+
+### Retained failures and unresolved external timing
+
+The first repair73e36a5b passed SDK/model checks in36348760076. Its Simulator
+attempt1 failed readiness/cleanup before app execution; attempt2 failed the original
+initial Playing deadline. A diagnostic commit message initially grouped both as
+Playing failures; the original artifacts and this correction take precedence.
+Tracing in f33cf831/run36351187140 passed only with test-copy instrumentation.
+The later d3dde5c9 uninstrumented run36352163355 passed; d7876d04 then changed only
+the explanatory Audio footer and received fresh tests rather than inheriting that
+verdict without qualification. Earlier readiness and Playing-wait failures remain
+failure evidence; successful retries do not erase them or establish their every cause.
+
+Diagnostic caa0e3b0/run36356990709 isolated a slow boundary on saved-On relaunch:
+prepareToPlay() on the utility worker ran from device uptime3689.6040882083335 to
+3700.3924599166667, approximately10.78837 seconds, and returned true. Activation had
+already succeeded. No overlapping operation or notification/retry loop occurs in
+that recorded segment. This locates an observed delay inside the Apple call; it does
+not identify its internal cause, prove that all prior failures shared it, or establish
+a fixed worst-case startup time. Instrumented success is not final product evidence.
+
+Final6f1ab4fc contains no trace helper or production telemetry and has exactly the
+same tree as d7876d04. Run36357672450 attempt1 again stopped at Simulator readiness/
+cleanup before application execution. Attempt2 reused the identical source and
+passed all original UI deadlines, advisory and cleanup gates. No predicate, timeout,
+warning scan, host, entitlement or runtime workaround was changed to manufacture a
+pass. The completion above is code/policy and scoped-validation completion, not a
+promise that audio always resumes within one second or that every possible OS-level
+interruption has been physically reproduced. A never-returning external operation
+and suspension still cannot be bypassed safely by overlapping another operation.
+
+The rejected cyclic ref is absent; the repository again has the original eight
+branches. Only feature/background advanced. Main, the other five feature branches,
+release/integrated at8577bb1f and the previously supplied build9 IPA remain unchanged.
+The repaired Background source is therefore not silently present in that old IPA.
 
 Primary contracts:
 - https://developer.apple.com/documentation/avfaudio/avaudiosession/resumptionrecommendation
