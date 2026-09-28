@@ -1,8 +1,7 @@
 diff --git a/src/hev-main.c b/src/hev-main.c
-index 0695ce6f122b17a3865521c86f3e174ddc25874f..00fc18c9b171fdda88144d2839f6ab2f97ccdca3 100644
 --- a/src/hev-main.c
 +++ b/src/hev-main.c
-@@ -131,6 +131,12 @@ hev_socks5_server_quit (void)
+@@ -131,6 +131,44 @@ hev_socks5_server_quit (void)
      hev_socks5_proxy_stop ();
  }
  
@@ -12,23 +11,55 @@ index 0695ce6f122b17a3865521c86f3e174ddc25874f..00fc18c9b171fdda88144d2839f6ab2f
 +    hev_socks5_transfer_get (received, sent);
 +}
 +
++typedef struct
++{
++    HevSocks5ClientStats *rows;
++    size_t capacity;
++} ClientStatsCopy;
++
++static void
++client_stats_copy (uint64_t id, const char *address, uint64_t received,
++                   uint64_t sent, void *data)
++{
++    ClientStatsCopy *copy = data;
++    HevSocks5ClientStats *row;
++
++    /* IDs are stable contiguous process-lifetime indices. If clients register
++     * between size query and copy, preserve older rows and return the new size. */
++    if (id >= copy->capacity)
++        return;
++    row = &copy->rows[id];
++    row->id = id;
++    row->received = received;
++    row->sent = sent;
++    snprintf (row->address, sizeof (row->address), "%s", address);
++}
++
++size_t
++hev_socks5_server_client_stats (HevSocks5ClientStats *rows, size_t capacity)
++{
++    ClientStatsCopy copy = { rows, capacity };
++
++    return hev_socks5_transfer_clients (rows ? client_stats_copy : NULL, &copy);
++}
++
  WEAK int
  main (int argc, char *argv[])
  {
 diff --git a/src/hev-main.h b/src/hev-main.h
-index 37a3c8ce0db9f734f07bfc57b3b59df8559562e6..d541390acc963ba248f8bc232ad50381f1a5905d 100644
 --- a/src/hev-main.h
 +++ b/src/hev-main.h
-@@ -10,6 +10,8 @@
+@@ -10,6 +10,9 @@
  #ifndef __HEV_MAIN_H__
  #define __HEV_MAIN_H__
  
++#include <stddef.h>
 +#include <stdint.h>
 +
  #ifdef __cplusplus
  extern "C" {
  #endif
-@@ -51,6 +53,17 @@ int hev_socks5_server_main_from_str (const unsigned char *config_str,
+@@ -51,6 +53,41 @@ int hev_socks5_server_main_from_str (const unsigned char *config_str,
   */
  void hev_socks5_server_quit (void);
  
@@ -42,6 +73,30 @@ index 37a3c8ce0db9f734f07bfc57b3b59df8559562e6..d541390acc963ba248f8bc232ad50381
 + * Excludes SOCKS5 and transport headers; not peer acknowledgements or VPN bytes.
 + */
 +void hev_socks5_server_stats (uint64_t *received, uint64_t *sent);
++
++/** A process-lifetime client IP bucket; id 0 is unattributed payload. */
++typedef struct
++{
++    uint64_t id;
++    uint64_t received;
++    uint64_t sent;
++    char address[64];
++} HevSocks5ClientStats;
++
++/**
++ * hev_socks5_server_client_stats:
++ * @rows: caller-owned storage, or NULL to query required capacity
++ * @capacity: number of rows available, ignored when rows is NULL
++ *
++ * Return the required row count, including id 0. Copy min(capacity, count)
++ * rows ordered by stable id. A larger return than capacity means newer rows
++ * did not fit; query again on the next sample. No internal pointer is returned.
++ * Totals survive server Stop/Start and use the same external-side payload
++ * boundary as hev_socks5_server_stats. IPs identify observed control peers,
++ * not devices behind NAT. Rows/counter pairs are sampled independently.
++ */
++size_t hev_socks5_server_client_stats (HevSocks5ClientStats *rows,
++                                      size_t capacity);
 +
  #ifdef __cplusplus
  }

@@ -1,137 +1,151 @@
-# Traffic statistics — completed current-main alignment
+# Traffic statistics — aggregate and client-IP payload accounting
 
-## Current verification — 2026-09-26
+## Target and unchanged baseline
 
-This branch inherits completed UDP `9909aa5f5f41ec87bb3edd976923b2d668e00f08`
-and main `75335d201cb1e541bb153e9899badbc11ccf1973` as actual Git ancestors.
-Run **36226383235**, attempt 1, executed statistics source
-`b4b840d8e8594f9cbc1a08bb69f1c8c5c01210a6`, tree
-`940d9193c0e031a93f5e9f31c331efc60d63ed1f`. All four jobs passed: Linux/macOS
-UDP prerequisites and Linux/macOS statistics, including the actual Simulator UI.
-The prerequisites checked out the completed UDP owner, not the statistics trigger.
+The primary target is physical iOS27/iPadOS27 installed independently with SideStore
+or executed as a LiveContainer guest. Signing, containers, permissions and shared
+host process state differ; neither Xcode direct installation nor Simulator execution
+substitutes for those targets. Configured minimum remains iOS17.2. SDK compilation,
+Simulator, native tests, device archive/IPA and physical execution are distinct
+verification levels. Original principles remain in docs/top-level-principles.md.
 
-The resumed review independently checked the original artifact digests, ZIP CRCs,
-source comments, all82 statistics paths/bytes/modes and Git tree, and both57-file
-UDP prerequisite archives. This result update changes only this identical README/
-docs/features/traffic-statistics.md pair and adds the exact preceding specification
-at docs/history/statistics-before-project-alignment-20260926.md. All80 other files
-remain the tested bytes/modes. Earlier complete histories and failed attempts remain
-unchanged; they are not new execution evidence.
+This feature extends `feature/traffic-statistics` at
+`bb07d1795f010d624b1924cc06203af9aeb3c6a2`. Composition remains main75335d20 ->
+UDP9909aa5f -> statistics. The completed Background9d87d7cf, other feature branches,
+main, release8577bb1f and the previously supplied build9 IPA are not changed.
+This standalone branch does not include Background, settings persistence, the
+separate ServerController or the custom icon. No new IPA or release merge is part
+of this feature implementation. The unchanged committed XCFramework is upstream
+baseline input; products must rebuild and link the patched native library.
 
-## Target and one-way composition
+## Measurement contract
 
-The primary target is physical iOS27 on an iPhone: SideStore standalone and
-LiveContainer guest are different signing, container, permission and shared-process
-boundaries. Configured minimum iOS17.2 is not a claim of execution on every version.
-Native host, SDK, Simulator, archive/IPA and physical installation are distinct
-proof levels. The four original instructions are in docs/top-level-principles.md.
+Existing aggregate In/Out remains authoritative and unchanged in meaning. In counts
+successful payload reads from destination-side sockets; Out counts successful
+payload writes to those sockets. Destination-side is a socket role, not a test for
+public versus private destination addresses. TCP buffered/splice and UDP batch
+boundaries are preserved, including partial successful I/O before error and external
+receive bytes even when later forwarding to the client fails. System DNS resolver
+traffic, SOCKS framing, IP/TCP/UDP headers, retransmissions, peer acknowledgements and
+VPN/radio/billing usage remain outside the boundary. No packet inspection is added.
 
-Composition is main -> UDP -> statistics. The17 mapped UDP paths, exact prerequisite
-ref and patch prefix agree with the completed owner. This branch does not include
-Background, JSON storage, the separate ServerController or custom icon. Standalone
-AppRoot starts on Server and offers Statistics/Server tabs. Source/app/submodule pins
-and the16-file committed unpatched XCFramework are main's exact bytes. Product
-rebuilds apply the three UDP and three statistics patches once. No production Swift,
-project/plist, patch, default, resource or framework byte changes in this alignment.
+At the same existing accounting events, each amount also increments the bucket of
+the SOCKS control connection's observed peer IP. Ports are ignored: TCP connections,
+UDP associations and Hev UDP-over-TCP from one IP share a row. IPv4 and its mapped
+IPv6 representation normalize to one IPv4 key; real IPv6 keeps its scope identifier.
+An explicitly supplied UDP endpoint does not replace the requester's control-peer
+identity. UDP peer discovery/filtering and forwarding policy are unchanged; fixed
+UDP-port multi-association restrictions remain, and UDP Listen Port0 is still the
+recommendation. No client protocol change, MAC/name discovery or device fingerprint
+is introduced. NAT-hidden clients sharing one observed IP cannot be separated; a
+changed IP is a different bucket. Same-IP reassignment merges usage by design.
 
-## Preserved native accounting contract
+Totals and IP buckets live for the process, not a connection. Stop/Start, closing
+connections or hiding the screen does not erase usage. A new app process starts at
+zero. No disk history, reset/export API, destination history or extra network request
+is added. Failure to obtain/normalize the peer or allocate its bucket must not stop
+relay: the aggregate and an explicit Unattributed bucket still receive the bytes.
+Unattributed is hidden only while both its totals are zero.
 
-Counters measure successful external-side socket payload I/O. Out is data written
-toward external destinations; In is data read from those destinations. TCP accounting
-is at side B of the actual splice/buffered path, not at both forwarding ends. Partial
-successful I/O is retained before a later error/cancellation, without double counting.
-UDP writes count only the successful send prefix; received data is retained even
-when the subsequent client forwarding fails. Address/header handling and peer/queue
-filtering retain the exact UDP implementation. No protocol policy is rewritten here.
+## Native implementation and concurrency
 
-Two atomic UInt64 counters live for the process and are not reset by ordinary server
-Stop/Start or screen changes. Queries do not modify totals. A paired read is not an
-atomic snapshot of both counters; wraparound and reporting after batch completion
-remain finite-counter/timing limitations. This is not radio/billing usage, packet
-headers, retransmissions, remote acknowledgement or guaranteed application receipt.
-The system resolver's internal DNS traffic is outside this external socket boundary.
-No Fake-IP assumption, packet monitor, per-client history or reset/export API is added.
+The task-io statistics patch and its exact byte-count arithmetic are unchanged.
+TCP uses the existing synchronous callback context. UDP carries the same context
+through its two existing forwarding functions. A context is obtained once per relay
+from the control socket, never per packet. No base object layout or native worker
+scheduling policy changes. Original three UDP patches, native source pins, shared
+build files, framework input, project/plist and permissions stay unchanged.
 
-The existing per-success atomic operations have a cost. There is no per-packet
-logging, persistent telemetry, heap history, dedicated sampler thread or new network
-activity. No zero-overhead, battery or throughput improvement is asserted.
+The core collector keeps a 256-bucket address hash registry and immutable process-
+lifetime entries allocated by libc, not the task allocator. This deliberate lifetime
+survives native worker/server teardown and avoids per-packet reference counting or
+use-after-free during snapshots. Memory grows linearly with distinct observed IPs,
+not packets or reconnects; entries are not silently evicted or reassigned. Allocation
+failure sends that relay's usage to Unattributed. This is not an unlimited-memory
+promise and hostile high-cardinality inputs remain a resource consideration.
 
-## Swift sampling and UI
+A short mutex protects only lookup/registration and capturing a list head/count.
+Byte updates use existing relaxed aggregate atomics plus relaxed per-IP atomics;
+they do not take that mutex, allocate, stringify, query addresses, yield, call Swift
+or log. Immutable links let readers enumerate a captured list without holding the
+registry lock. Entries are never removed while relay code holds their pointer.
 
-Subtract UInt64 counters before conversion to Double. A first sample, nonincreasing
-time or decreased counter publishes zero rate and establishes the next baseline.
-Sampling uses monotonic systemUptime. The UI adds converted direction totals rather
-than overflowing UInt64 addition. Decimal KB/MB/GB and Kbps/Mbps/Gbps retain the
-existing two-decimal format and finite Double precision limits.
+The additive public API `hev_socks5_server_client_stats(rows, capacity)` copies
+caller-owned rows (id, numeric address, In, Out). It returns required capacity;
+NULL queries the size. ID0 is Unattributed, IDs1..N are stable registry indices.
+Only min(capacity, count) rows are written. If registration races the size query,
+older rows still fit and newer rows appear at the next sample; no dangling native
+pointer crosses into Swift. Existing aggregate API remains available unchanged.
 
-Sampling runs immediately and once per second only when Statistics is visible and
-the scene active. The task is cancelled on exit/inactivity and checked after sleep.
-It does not control server lifetime, reset native counters, write settings or keep
-the app alive. Native counters may continue outside visible sampling. The screen
-and original Server controls/root remain unchanged.
+Counter pairs and different rows are independently sampled, not transactional.
+During concurrent traffic, aggregate and row sums can temporarily differ. At rest,
+the sum including Unattributed must equal the aggregate (subject to UInt64 wrap).
+Do not add global per-packet locking merely to force a visual live snapshot equality.
 
-## Audit alignment and retained protections
+## Swift model and screen
 
-The exact current-main common build/check code now validates all tracked native
-inputs and their index before patch application and after reversal, not only C/H
-files or worktree differences. It rejects Python optimization and packages through
-a disposable exact-HEAD product copy instead of mutating the committed framework.
-The identical46-case exact-old/current input fixture runs in this dedicated audit.
+The existing total sections remain. A new Clients by IP section lists stable rows
+with expandable In/Out speeds and accumulated In/Out/combined usage. The existing
+TrafficStatistics delta/format model is reused per native ID; no second formula or
+native sampling thread is added. Counters are subtracted as UInt64 before Double
+conversion. First samples, nonincreasing times or decreased counters establish a
+zero-rate baseline. Decimal KB/MB/GB and Kbps/Mbps/Gbps retain their existing meaning.
 
-Statistics scope permits only the new main ref and the exact updated UDP prefix
-plus the unchanged statistics patch suffix. Runtime freezes,17 owner-file byte
-checks and source pins remain. The former old shared-Build freeze is replaced by
-comparison to the new main, not by acceptance of arbitrary build modifications.
-Existing source/index, cwd, obsolete success/product marker and dual-stack wildcard
-port-reservation repairs retain all26 boundary cases. Existing three audit-driver
-and six pipe-reader tests remain. These fixtures stop at controlled tool boundaries;
-they do not manufacture native/Apple passes. Swift optimized tests are not Python -O.
+One visible/active-tab task samples the aggregate and rows immediately and about
+once per second using monotonic systemUptime. Leaving the tab or inactive scene
+cancels the task; returning starts fresh speed baselines, not fresh native totals.
+This is unrelated to Background's 0.5-second recovery timer, which is untouched.
+Native counters continue while the server runs even when the view does not sample.
+The list is stable by registration ID rather than jumping around with current speed.
 
-Input checks are explicit checkpoints, not an adversarial atomic snapshot of
-untracked files, external tools or modifications restored between checks. Port
-reservation matches the real server's dual-stack wildcard scope, but closing a
-reservation before server bind does not eliminate every external port race. Use
-clean isolated complete checkouts; historical controls require actual Git objects.
+Costs: one IP lookup/registry lookup per relay, extra per-direction atomic additions,
+process-lifetime memory per distinct IP, and visible-tab snapshot/format work. There
+is no zero-overhead claim or measured iPad energy/throughput improvement. Local UDP
+fixture timing is an observation, not a physical-device or before/after benchmark.
 
-## Actual results for this composition
+## Validation and reproduction
 
-Linux buffered/splice and macOS buffered each passed20 network executions (10
-scenarios repeated twice), eight peer/queue cases,8 writers/800000 counter updates,
-real TCP/UDP boundary probes and ASan/UBSan checks. Object symbols identify the actual
-I/O mode. macOS also passed TSan on the real counter. The10000-sample Swift model,
-six pipe cases,three existing driver cases,26 input cases and46 common cases passed.
-C/header9 and production Swift5 typechecks passed at ARM64/iOS17.2 with warnings-as-
-errors; diagnostic logs and entry/final source/index logs are empty. Formatter18,
-source composition, patches and exact reverse checks passed. Counts include repeats
-and controlled probes, not independent physical trials or whole-program sanitizers.
+Use a full clean Git checkout with historical objects:
 
-The actual iPhone16 Simulator/iOS27.0 24A434 test passed: one XCTest,0 failures,
-0 skips,55.484 seconds of case execution. Portrait/landscape scrolling, native SOCKS
-greetings for Start/Stop and tab navigation were checked. Cleanup is []. This does
-not cover every live displayed statistic, field, keyboard, Dynamic Type or iPad.
-The recorded host is Xcode27.0 27A266a/iPhoneOS27.0, Swift6.4, macOS27.0 26A428.
-AppIntents/debugger diagnostics remain in raw logs; not every diagnostic is absent.
+```
+python3 Tests/Statistics/audit.py
+# On the recorded Xcode27 host:
+python3 Tests/Statistics/ui_audit.py
+```
 
-| Original artifact | SHA-256 |
-| --- | --- |
-| UDP Linux10901052120 | 876f96220f5ea130074b4633dca4919388a1606be2f762691ed602f4a3ae1561 |
-| UDP macOS10900977134 | 9d6892df8ddcaa3eaad03718fcfc518122984de0e620f288f41c632e32577161 |
-| Statistics Linux10900438365 | a50813be1e7771270424e9f245bac37a87da226bbb5df9fd41b3a9e8e40e90d3 |
-| Statistics macOS10900503710 | 21f8a58407e15620f8eafa799dc22f4d4aef65de46fa54fe283bd7af3c06e3e2 |
+The workflow preserves exact completed UDP prerequisites. Shared main/native-input,
+index, source-pin, reverse-patch, marker and port-reservation guards remain. Only
+four explicit statistics runtime paths may change from bb07d179: two Swift files
+and the stats core/server patches; the task-io and UDP patches stay frozen.
 
-## Commands and retained limits
+The native audit retains original aggregate/partial-I/O tests and adds real dual-stack
+TCP/UDP and UDP-over-TCP attribution, same-IP multiple connections, asymmetric TCP,
+fd churn, Stop/Start, and 2000 small UDP exchanges. A direct actual-collector fixture
+injects only peer lookup/allocation failures and tests mapped addresses, IPv6 scope,
+unknown fallback, snapshot capacity/canaries, reentrant enumeration, concurrent
+registration/writers/readers, stable IDs and quiescent equality. ASan/UBSan apply to
+the included collector; macOS TSan additionally checks its actual concurrent paths.
+Test-only injection is not a physical network event. Swift model tests cover per-IP
+baselines/rates, unknown visibility, idle counters, overflow/time edges and tab reset.
 
-Run python3 Tests/Statistics/audit.py and, on Xcode27, python3 Tests/Statistics/ui_audit.py.
-The workflow first runs the exact completed UDP prerequisite. It creates no iPhone
-archive, new XCFramework or IPA. Its Simulator product is separate from a device app.
+The uninstrumented Simulator test retains original Server controls, real greetings,
+orientation/scrolling/navigation gates and adds a real locally relayed UDP payload
+plus expanding its client-IP row. No production source is replaced by test doubles
+in that app. The committed source remains distinct from the disposable product copy.
 
-UDP Listen Port0 remains the recommendation for multiple unknown-client associations;
-fixed-port independent-closure restrictions and prior failed observations remain in
-the UDP specification. Defaults and saved values are not silently rewritten. Prior
-release required-UDP and Background timing failures retain their own unresolved
-causes; this separate success does not retroactively resolve them.
+### Execution status
 
-Physical SideStore installation, LiveContainer guest/host operation, actual IPv4/IPv6,
-VPN/hotspot/Moonlight, lock/suspension, prolonged execution and energy/throughput tests
-remain unperformed for this source. The final release must inherit these exact owner
-inputs and run its combined product checks rather than borrowing standalone badges.
+Implementation candidate; current complete native/SDK/Simulator results must be
+recorded after the actual run. Local isolated collector code has passed concurrent
+and failure-boundary tests, including ASan/UBSan, and the new pure Swift model passes
+debug/optimized. Those supplemental local checks are not a complete linked native
+build, Apple SDK or Simulator result. All failures remain failure evidence until
+resolved and a new exact-source run completes; no earlier pass is borrowed.
+
+The preceding aggregate-only specification and its successful36226383235 results
+are preserved exactly in docs/history/statistics-before-client-ip-20260928.md.
+Physical SideStore, LiveContainer, real device IPv4/IPv6/VPN/hotspot/Moonlight, long
+locked-iPad operation, power and before/after throughput/latency remain unperformed
+for this new feature unless separately recorded. An old build9 IPA does not contain
+these changes. Final release integration must inherit this feature and run its own
+combined validation.

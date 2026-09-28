@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
+CLIENT_BASE = 'bb07d1795f010d624b1924cc06203af9aeb3c6a2'
 UDP = '9909aa5f5f41ec87bb3edd976923b2d668e00f08'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 UDP_FILES = {
@@ -57,15 +58,21 @@ def inspect_sources():
         data = (ROOT / target).read_bytes()
         assert data == git('show', UDP + ':' + source), target
         preserved[target] = hashlib.sha256(data).hexdigest()
-    # Update only the inherited UDP boundary, not statistics production. Shared build logic stays locked to current main.
+    # UDP and shared build logic stay frozen; only the explicit statistics-owned
+    # runtime paths below may differ from the completed aggregate-only baseline.
     # Exact prefix ownership above and the original suffix below reject missing,
     # reordered, extra or silently edited patches without freezing an obsolete parent.
     original = json.loads(git('show', START + ':Build/features.json'))
     statistics_patches = [p for p in original['patches'] if p['file'].startswith('hev-stats-')]
     assert CONFIG == dict(original, base_commit=udp_config['base_commit'],
                           patches=udp_config['patches'] + statistics_patches)
-    git('diff', '--exit-code', START, 'HEAD', '--', 'Socks5', 'Socks5.xcodeproj',
-        'Patches/hev-stats-core.patch', 'Patches/hev-stats-server.patch',
+    runtime_changes = set(git('diff', '--name-only', CLIENT_BASE, 'HEAD', '--',
+                              'Socks5', 'Socks5.xcodeproj', 'Patches').decode().splitlines())
+    allowed = {'Socks5/Statistics/TrafficStatistics.swift',
+               'Socks5/Statistics/TrafficStatisticsView.swift',
+               'Patches/hev-stats-core.patch', 'Patches/hev-stats-server.patch'}
+    assert runtime_changes <= allowed, runtime_changes - allowed
+    git('diff', '--exit-code', CLIENT_BASE, 'HEAD', '--',
         'Patches/hev-stats-task-io.patch')
     git('merge-base', '--is-ancestor', UDP, 'HEAD')
     run([sys.executable, 'Build/check.py', 'baseline'], 'baseline.log')
@@ -85,7 +92,8 @@ def inspect_sources():
         'base': CONFIG['base_commit'], 'start': START, 'udp': UDP,
         'files_vs_main': inventory, 'excluded_udp_files': preserved,
         'statistics_owned_paths': [p for p in inventory if p not in UDP_FILES],
-        'statistics_production_unchanged': True, 'udp_dependency_updated': True}, indent=2) + '\n')
+        'statistics_production_unchanged': False,
+        'client_ip_base': CLIENT_BASE, 'allowed_runtime_changes': sorted(runtime_changes), 'udp_dependency_updated': True}, indent=2) + '\n')
     run(['git', 'diff', CONFIG['base_commit'], 'HEAD'], 'main-to-feature.diff')
     run(['git', 'diff', UDP, 'HEAD'], 'udp-to-statistics.diff')
     run(['git', 'rev-parse', 'HEAD'], 'tested-commit.txt')
@@ -123,9 +131,20 @@ def native_checks(mode):
     run([*common, '-I' + str(CORE / 'src'), 'Tests/Statistics/counter_probe.c',
          *libs, '-o', OUT / 'counter'], mode + '-counter-build.log')
     run([OUT / 'counter'], mode + '-counter.log')
+    run([sys.executable, 'Tests/Statistics/client_network.py', host],
+        mode + '-client-network.log', timeout=120)
+    client_includes = ['-I' + str(CORE / 'src'),
+                       '-I' + str(CORE / 'src/core/src'),
+                       '-I' + str(task / 'include')]
+    run([*common, *client_includes, 'Tests/Statistics/client_probe.c', *libs,
+         '-o', OUT / 'client-probe'], mode + '-client-build.log')
+    run([OUT / 'client-probe'], mode + '-client.log')
     sanitize = ['-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
                 '-fno-omit-frame-pointer']
     env = dict(os.environ, ASAN_OPTIONS='detect_leaks=0', UBSAN_OPTIONS='halt_on_error=1')
+    run([*common, *sanitize, *client_includes, 'Tests/Statistics/client_probe.c',
+         *libs, '-o', OUT / 'client-asan'], mode + '-client-asan-build.log')
+    run([OUT / 'client-asan'], mode + '-client-asan.log', env=env)
     for kind in ('tcp', 'udp'):
         includes = (['-I' + str(task / 'src'), '-I' + str(task / 'include')]
                     if kind == 'tcp' else ['-I' + str(CORE / 'src/core/src'), '-I' + str(task / 'include')])
@@ -142,6 +161,11 @@ def native_checks(mode):
              CORE / 'src/core/src/hev-socks5-misc.c', *libs, '-o', OUT / 'counter-tsan'],
             'counter-tsan-build.log')
         run([OUT / 'counter-tsan'], 'counter-tsan.log',
+            env=dict(os.environ, TSAN_OPTIONS='halt_on_error=1'))
+        run([*common, '-O1', '-g', '-fsanitize=thread', *client_includes,
+             'Tests/Statistics/client_probe.c', *libs, '-o', OUT / 'client-tsan'],
+            'client-tsan-build.log')
+        run([OUT / 'client-tsan'], 'client-tsan.log',
             env=dict(os.environ, TSAN_OPTIONS='halt_on_error=1'))
 
 
@@ -189,6 +213,10 @@ def main():
     run(['git', 'checkout', '--detach', CONFIG['sources']['.']], 'checkout.log', CORE)
     run(['git', 'submodule', 'update', '--init', '--recursive'], 'submodules.log', CORE)
     run([sys.executable, 'Build/check.py', 'apply', CORE], 'apply.log')
+    # Preserve the actual patched native sources for offline inspection; no build
+    # product, credentials or .git metadata is included in this source-only archive.
+    run(['tar', '-czf', OUT / 'native-patched-source.tar.gz', '--exclude=.git',
+         '-C', CORE, '.'], 'native-source-archive.log')
     # Only statistics-owned hunks are reviewed; UDP prerequisite contents are frozen.
     changed = []
     for item in CONFIG['patches']:
@@ -199,8 +227,14 @@ def main():
     if not formatter or 'version 18.' not in subprocess.check_output([formatter, '--version'], text=True):
         raise RuntimeError('clang-format 18 is required.')
     hashes = {}
+    formatting_errors = []
     for path in changed:
-        assert subprocess.check_output([formatter, str(path)]) == path.read_bytes(), path
+        formatted = subprocess.check_output([formatter, str(path)])
+        if formatted != path.read_bytes():
+            target = OUT / 'formatting' / path.relative_to(CORE)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(formatted)
+            formatting_errors.append(str(path))
         hashes[str(path.relative_to(CORE))] = hashlib.sha256(path.read_bytes()).hexdigest()
     assert len(hashes) == 9
     (OUT / 'statistics-source-hashes.json').write_text(json.dumps(hashes, indent=2) + '\n')
@@ -209,19 +243,28 @@ def main():
         target = OUT / ('formatted-' + path.name)
         formatted = subprocess.check_output([formatter, '--style=file:' + str(CORE / '.clang-format'), str(path)])
         target.write_bytes(formatted)
-        assert formatted == path.read_bytes(), path
+        if formatted != path.read_bytes():
+            formatting_errors.append(str(path))
+    assert not formatting_errors, formatting_errors
     for mode in (('buffered', 'splice') if sys.platform == 'linux' else ('buffered',)):
         native_checks(mode)
     run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
          'Socks5/Statistics/TrafficStatistics.swift', 'Tests/traffic_statistics_model.swift',
          '-o', OUT / 'model'], 'model-build.log')
     run([OUT / 'model'], 'model.log')
+    for optimization in ([], ['-O']):
+        label = 'client-model-optimized' if optimization else 'client-model-debug'
+        run(['swiftc', '-swift-version', '5', '-warnings-as-errors', *optimization,
+             'Socks5/Statistics/TrafficStatistics.swift', 'Tests/Statistics/client_model.swift',
+             '-o', OUT / 'client-model'], label + '-build.log')
+        run([OUT / 'client-model'], label + '.log')
     if sys.platform == 'darwin':
         ios_checks(changed)
     for name, expected in hashes.items():
         assert hashlib.sha256((CORE / name).read_bytes()).hexdigest() == expected
     run([sys.executable, 'Build/check.py', 'reverse', CORE], 'reverse.log')
-    for name in ('host', 'counter', 'tcp', 'udp', 'counter-tsan', 'model'):
+    for name in ('host', 'counter', 'tcp', 'udp', 'counter-tsan', 'model',
+                 'client-probe', 'client-asan', 'client-tsan', 'client-model'):
         (OUT / name).unlink(missing_ok=True)
     run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'final-worktree.log')
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'final-index.log')

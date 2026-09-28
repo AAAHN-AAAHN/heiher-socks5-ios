@@ -147,7 +147,7 @@ main (void)
             expected += lengths[i];
         bound = 1;
         hev_socks5_transfer_get (&before_in, &before_out);
-        hev_socks5_udp_fwd_f (&self, 11, buffer, 3, &bound);
+        hev_socks5_udp_fwd_f (&self, 11, buffer, 3, &bound, NULL);
         hev_socks5_transfer_get (&received, &sent);
         assert (received == before_in && sent == before_out + expected);
     }
@@ -158,12 +158,12 @@ main (void)
     hev_socks5_transfer_get (&before_in, &before_out);
     for (i = 0; i < 2; i++) {
         io_error = i ? EIO : EAGAIN;
-        hev_socks5_udp_fwd_f (&self, 11, buffer, 3, &bound);
+        hev_socks5_udp_fwd_f (&self, 11, buffer, 3, &bound, NULL);
     }
     receive_result = 3;
     bind_error = 1;
     bound = 0;
-    hev_socks5_udp_fwd_f (&self, 11, buffer, 3, &bound);
+    hev_socks5_udp_fwd_f (&self, 11, buffer, 3, &bound, NULL);
     hev_socks5_transfer_get (&received, &sent);
     assert (received == before_in && sent == before_out);
     puts (
@@ -179,7 +179,7 @@ main (void)
     for (n = -1; n <= 3; n++) {
         send_result = n;
         hev_socks5_transfer_get (&before_in, &before_out);
-        hev_socks5_udp_fwd_b (&self, 11, vec, 3);
+        hev_socks5_udp_fwd_b (&self, 11, vec, 3, NULL);
         hev_socks5_transfer_get (&received, &sent);
         assert (received == before_in + 21 && sent == before_out);
     }
@@ -189,11 +189,11 @@ main (void)
     hev_socks5_transfer_get (&before_in, &before_out);
     for (i = 0; i < 2; i++) {
         io_error = i ? EIO : EAGAIN;
-        hev_socks5_udp_fwd_b (&self, 11, vec, 3);
+        hev_socks5_udp_fwd_b (&self, 11, vec, 3, NULL);
     }
     receive_result = send_result = 1;
     lengths[0] = 0;
-    hev_socks5_udp_fwd_b (&self, 11, vec, 3);
+    hev_socks5_udp_fwd_b (&self, 11, vec, 3, NULL);
     hev_socks5_transfer_get (&received, &sent);
     assert (received == before_in && sent == before_out);
     puts (

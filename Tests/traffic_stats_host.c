@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "hev-main.h"
@@ -34,6 +35,23 @@ main (int argc, char **argv)
             pthread_join (worker, NULL);
             if (pthread_create (&worker, NULL, run_server, argv[1]))
                 return 2;
+        }
+        if (!strcmp (command, "clients\n")) {
+            size_t capacity = hev_socks5_server_client_stats (NULL, 0) + 32;
+            HevSocks5ClientStats *rows = calloc (capacity, sizeof (*rows));
+            if (!rows)
+                return 3;
+            size_t count = hev_socks5_server_client_stats (rows, capacity);
+            if (count > capacity)
+                count = capacity;
+            printf ("CLIENTS %zu\n", count);
+            for (size_t i = 0; i < count; i++)
+                printf ("CLIENT %" PRIu64 " %s %" PRIu64 " %" PRIu64 "\n",
+                        rows[i].id, rows[i].address, rows[i].received,
+                        rows[i].sent);
+            free (rows);
+            fflush (stdout);
+            continue;
         }
         hev_socks5_server_stats (&received, &sent);
         printf ("STATS %" PRIu64 " %" PRIu64 "\n", received, sent);

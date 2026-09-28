@@ -36,3 +36,28 @@ struct TrafficStatistics {
         return String(format: "%.2f %@", amount / divisor, units[index])
     }
 }
+
+/// The native registry owns attribution and lifetime; this is only a visible-tab
+/// sampler. Stable IDs combine all connections for the same normalized peer IP.
+struct ClientTrafficStatistics {
+    struct Entry: Identifiable {
+        let id: UInt64
+        let address: String
+        var traffic = TrafficStatistics()
+    }
+
+    private(set) var entries: [UInt64: Entry] = [:]
+
+    var rows: [Entry] {
+        entries.values.filter {
+            $0.id != 0 || $0.traffic.received != 0 || $0.traffic.sent != 0
+        }.sorted { $0.id < $1.id }
+    }
+
+    mutating func sample(id: UInt64, address: String, received: UInt64,
+                         sent: UInt64, at time: TimeInterval) {
+        var entry = entries[id] ?? Entry(id: id, address: address)
+        entry.traffic.sample(received: received, sent: sent, at: time)
+        entries[id] = entry
+    }
+}

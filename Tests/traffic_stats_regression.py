@@ -53,6 +53,19 @@ class Host:
         assert len(row) == 3 and row[0] == 'STATS', row
         return tuple(map(int, row[1:]))
 
+    def clients(self):
+        self.proc.stdin.write(b'clients\n')
+        self.proc.stdin.flush()
+        header = self.readline().split()
+        assert len(header) == 2 and header[0] == 'CLIENTS', header
+        rows = {}
+        for _ in range(int(header[1])):
+            row = self.readline().split()
+            assert len(row) == 5 and row[0] == 'CLIENT', row
+            assert row[2] not in rows, row
+            rows[row[2]] = tuple(map(int, row[3:]))
+        return rows
+
     def readline(self, timeout=5):
         deadline = time.monotonic() + timeout
         while b'\n' not in self.output:
