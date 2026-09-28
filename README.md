@@ -86,7 +86,7 @@ Do not add global per-packet locking merely to force a visual live snapshot equa
 
 The Total table appears first, followed by IP tables in native registration order.
 Each entry has an identifying section title, bold In/Out/Sum column headings and
-bold Speed/Transferred row labels. Two always-visible data rows use regular black
+bold Spd./Vol. row labels (defined below). Two always-visible data rows use regular black
 values on a white surface, with light-gray header/label separator lines. Sum combines
 unrounded directions before numerical rounding to three decimal places; Total is
 used only as the aggregate title, never as an internal column label. No expansion
@@ -532,3 +532,102 @@ live snapshot reads and possible truncation at the50% scale floor remain documen
 limits. No new IPA/release merge, physical SideStore/LiveContainer, long locked-iPad
 or comparative power/throughput test is claimed. Other seven refs and build9 IPA,
 including Background9d87d7cf and its0.5second recovery, remain unchanged.
+
+## Spd./Vol. labels and compact spacing — 2026-09-28
+
+This revision starts at46133289. Total stays first, followed by the same registered
+IP order, and the table retains bold In/Out/Sum column labels. The row labels are
+now exactly `Spd.` and `Vol.`, including periods. Their meanings are stated in the
+visible explanation below the tables, not inferred from an alleged universal
+abbreviation standard:
+
+- Spd. (speed) is the average successful destination-side TCP/UDP payload transfer
+  rate during the last actual sampling interval (normally about1second), expressed
+  in bits per second through Kbps/Mbps/Gbps/Tbps/Pbps. It is observed proxy traffic,
+  not the network link's rated bandwidth, application goodput at the client, or
+  a separately measured maximum connection speed.
+- Vol. (volume) is cumulative successful destination-side TCP/UDP payload bytes
+  since this app process started, displayed as KB/MB/GB/TB/PB. It is not the amount
+  only in the last interval. Native server Stop/Start preserves it; a new app
+  process starts new totals. The aggregate and each peer bucket use this same basis.
+
+In means destination sockets into this proxy; Out means successful writes from this
+proxy to destination sockets. Sum uses the two unrounded directional quantities.
+SOCKS/transport headers, retransmission overhead and system-resolver traffic remain
+outside the accounting boundary. These values are not VPN/radio/carrier-billed usage.
+IP rows identify observed SOCKS control peers, not distinct physical devices behind
+NAT. Independent snapshots can briefly disagree with a live aggregate as before.
+
+The label column uses a40point base width scaled relative to the caption text style.
+This keeps the short labels narrow and lets the value columns use the remaining
+width without a custom geometry engine. Per-edge vertical cell padding changes from
+12 to8points; existing4point numeric horizontal and8point label trailing padding are
+retained. Labels stay bold and values regular black on white; light-gray separators,
+three decimals, raw-first Sum and minimumScaleFactor0.5 are unchanged. This is a
+single shared table renderer, not individual IP layouts or a new timer/cache.
+Extreme Dynamic Type or arbitrary text lengths are still not universally certified.
+
+Production changes are confined to TrafficStatisticsView.swift. Native patches,
+model/formatter, one-publication snapshot body, visible one-second sampling task,
+source pins, project/plist, permissions and other app files are byte-identical to
+46133289. Background9d87d7cf and all other refs, including release8577bb1f/build9 IPA,
+remain unchanged. No IPA, release integration or new physical installation is made.
+
+### Verified source and original Simulator captures
+
+Tested commit `81b7abfbc89dab014512c8fa18d2034f4dc33e55`, tree
+`fa671a3339195cbedc52145e53fe7aacb07c5012`, completed run `36435371952`
+on attempt 1 with all four jobs successful. Exact UDP prerequisites were checked
+on Linux/macOS before the Statistics jobs. The final closing commit changes only
+this README and its identical feature specification; the other89 of91 paths retain
+the tested bytes/Git modes. This documentation commit is not a new execution.
+
+| Evidence | Actual result and scope |
+| --- | --- |
+| Native and model regression | Original buffered/splice accounting, normalized-IP attribution, partial-I/O, concurrent registry, snapshot, process-lifetime and scoped sanitizer checks pass. Existing three-decimal/SI models, 512-client sample-body and expanded registry guards remain intact. |
+| Apple SDK | Patched native C/headers and five production Swift files pass ARM64/iOS17.2 checks against iPhoneOS27 with warnings-as-errors; both compiler diagnostic logs are empty. |
+| Actual uninstrumented Simulator | iPhone16, iOS27.0 build24A434: one XCTest, zero failures/skips,150.064seconds case duration. Both orientations retain real IPv4/IPv6 UDP, Start/Stop, table/order/numeric checks, exact punctuated labels, aligned label/value centers and nonoverlap. The corrected width comparison passes. runtimeWarnings=[]; cleanup=[]. |
+| Independent provenance | Original ZIP hashes/CRCs, three Statistics source archives with91 exact files/modes and two matching57-file UDP owner archives were checked. Independent Git-tree reconstruction matches the tested tree. |
+| Supplemental local checks | Swift view/test parsing, Python AST, exact sampling/task/model/native preservation and four compiled debug/optimized model executables pass. One combined local command exceeded its external tool limit; its last executable was rerun separately. This is not a claimed successful completion of that timed-out command. |
+| Physical/products | No IPA, release integration, physical SideStore/LiveContainer run, iPad/large-font coverage or device power/throughput benchmark. |
+
+Recorded Apple host: Xcode27.0 27A266a, iPhoneOS27.0, Swift6.4
+swiftlang-6.4.0.34.1, macOS27.0 26A428. Empty SDK diagnostics and runtimeWarnings do
+not imply that every package manager, framework or debugger warning is absent.
+
+Portrait, landscape leading-Total overview and landscape scrolled-IP screenshots
+are original exported XCTest PNGs. Portrait shows Total and both registered peers;
+landscape requires scrolling for all entries and uses the existing floating tab bar.
+A single screenshot does not certify every row is simultaneously unobscured. No
+screenshot pixels were edited or populated with invented traffic values.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Statistics Linux10975707351 | bbeac2b210cedc41fb6d94e03b08ed7c37a36a48234f54667c9be1b769851767 |
+| Statistics macOS10975867386 | cd721a2dd64a52d06d71e80458a0b1313630b7db12236c7cfe2c92843b035e85 |
+| UDP Linux10975562281 | 7bd7934edd4969c6190dedf61fe79e5b9608b8d04bfe4e5eaeca37e179115862 |
+| UDP macOS10974689383 | 90a7c707e2f7df86695504090562aebb8fff1e4178be029c5b3a4db2770e7459 |
+
+The initial0648dc65 UI test made an incorrect new width comparison: XCTest reports
+11.6667points for the In glyph, not the Grid column allocation, while the label frame
+is40points. Run36432364605 failed that assertion in32.057seconds, then recorded a
+separate600second diagnostic collection timeout; cleanup was empty. Original artifact
+10975037083/SHA256104abb7d3d45df22773010b3ea1cb368ded826250cab137fc78eeef7e5bd54b2
+is retained. Its test failure is not an observed production overlap or native count
+error, and the later diagnostic timeout's internal cause is not established here.
+
+81b7abfb corrects only the added test to compare with adjacent column-center spacing,
+requiring the next header rather than deleting the width check. It retains exact
+punctuation, label/row alignment, nonoverlap, original numeric and navigation gates,
+real dual-stack payloads, portrait/landscape requirements and every timeout. Production
+view bytes remain identical to0648dc65. Earlier failed runs stay failure evidence.
+The screenshots are original XCTest captures of the actual linked Simulator app,
+not generated mockups. Test traffic is small real IPv4/IPv6 loopback UDP payload;
+the test stops the server before screenshots so displayed speeds are0.000Kbps while
+volume remains. This does not certify large live speeds, physical iPad, SideStore,
+LiveContainer, all font sizes, or performance/power under long background operation.
+
+The other inherited0648dc65 run36432235733 also failed; its completed job log records
+a900second xcodebuild timeout. Its internal cause is not assumed to be identical to
+the observed width-assertion failure in36432364605. Both earlier executions remain
+failure evidence; the corrected-source success does not retroactively change them.
