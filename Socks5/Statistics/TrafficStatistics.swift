@@ -8,6 +8,9 @@ struct TrafficStatistics {
     private(set) var sendRate = 0.0
     private var sampledAt: TimeInterval?
 
+    /// Sum before display rounding so small directional rates are not lost.
+    var sumRate: Double { receiveRate + sendRate }
+
     mutating func sample(received: UInt64, sent: UInt64, at time: TimeInterval) {
         if let previous = sampledAt, time > previous,
            received >= self.received, sent >= self.sent {
@@ -33,7 +36,10 @@ struct TrafficStatistics {
     private static func scaled(_ amount: Double, units: [String]) -> String {
         let index = amount >= 1_000_000_000 ? 2 : (amount >= 1_000_000 ? 1 : 0)
         let divisor = [1_000.0, 1_000_000.0, 1_000_000_000.0][index]
-        return String(format: "%.2f %@", amount / divisor, units[index])
+        // Round the numeric value in the selected SI unit, then display exactly
+        // three decimals. Keep raw counters/rates intact for subsequent samples.
+        let rounded = (amount / (divisor / 1_000)).rounded(.toNearestOrAwayFromZero) / 1_000
+        return String(format: "%.3f %@", locale: Locale(identifier: "en_US_POSIX"), rounded, units[index])
     }
 }
 

@@ -13,12 +13,14 @@ import Foundation
         model.sample(id: 2, address: "::1", received: 50, sent: 20, at: 3)
         precondition(model.rows[0].traffic.receiveRate == 100 && model.rows[0].traffic.sendRate == 50)
         precondition(model.rows[1].traffic.receiveRate == 0)
+        precondition(model.rows[0].traffic.sumRate == 150)
         model.sample(id: 0, address: "Unattributed", received: 10, sent: 5, at: 3)
         precondition(model.rows.map(\.id) == [0, 1, 2])
         model.sample(id: 1, address: "127.0.0.1", received: 300, sent: 160, at: 4)
         precondition(model.rows[1].traffic.receiveRate == 0 && model.rows[1].traffic.received == 300)
         model.sample(id: 1, address: "127.0.0.1", received: 1, sent: 2, at: 5)
         precondition(model.rows[1].traffic.receiveRate == 0)
+        precondition(model.rows[1].traffic.sumRate == 0)
         model.sample(id: 1, address: "127.0.0.1", received: 9, sent: 12, at: 5)
         precondition(model.rows[1].traffic.sendRate == 0)
         model.sample(id: 3, address: "fe80::1%3", received: UInt64.max, sent: UInt64.max, at: 5)
@@ -29,6 +31,57 @@ import Foundation
         model = ClientTrafficStatistics()
         model.sample(id: 1, address: "127.0.0.1", received: 10000, sent: 9000, at: 50)
         precondition(model.rows[0].traffic.receiveRate == 0 && model.rows[0].traffic.received == 10000)
+        checkTableRounding()
         print("PASS: per-IP independent deltas, first sample, idle/reconnect totals, stable rows, unknown, counter/time edges")
+    }
+
+    private static func checkTableRounding() {
+        let amounts: [(Double, String)] = [
+            (0, "0.000 KB"), (1, "0.001 KB"), (64, "0.064 KB"),
+            (999, "0.999 KB"), (1_000, "1.000 KB"),
+            (1_234_499, "1.234 MB"), (1_234_500, "1.235 MB"),
+            (1_234_501, "1.235 MB"), (1_234_500_000, "1.235 GB"),
+            (999_999, "999.999 KB"), (999_999.5, "1000.000 KB"),
+            (1_000_000, "1.000 MB"), (999_999_999, "1000.000 MB")
+        ]
+        for (input, expected) in amounts {
+            precondition(TrafficStatistics.capacity(input) == expected, "Rounding \(input)")
+        }
+        for (input, expected) in [
+            (0.05, "0.000 Kbps"), (0.0625, "0.001 Kbps"),
+            (407_936.25, "3.263 Mbps"), (407_937.5, "3.264 Mbps"),
+            (407_938.75, "3.264 Mbps"), (125_000_000.0, "1.000 Gbps")
+        ] {
+            precondition(TrafficStatistics.speed(input) == expected)
+        }
+        var traffic = TrafficStatistics()
+        traffic.sample(received: 0, sent: 0, at: 0)
+        traffic.sample(received: 1, sent: 1, at: 20)
+        precondition(traffic.sumRate == 0.1)
+        precondition(TrafficStatistics.speed(traffic.receiveRate) == "0.000 Kbps")
+        precondition(TrafficStatistics.speed(traffic.sumRate) == "0.001 Kbps")
+        for _ in 0..<100 { _ = TrafficStatistics.speed(traffic.sumRate) }
+        precondition(traffic.receiveRate == 0.05 && traffic.received == 1)
+        traffic.sample(received: 4, sent: 6, at: 22)
+        precondition(traffic.sumRate == 4 && traffic.receiveRate == 1.5)
+        precondition(TrafficStatistics.speed(traffic.sumRate) == "0.032 Kbps")
+        // Independent decimal arithmetic checks every fourth-decimal boundary
+        // across a dense interval without sharing the production rounding formula.
+        for input in 1_230_000...1_240_000 {
+            var decimal = Decimal(input) / Decimal(1_000_000)
+            var rounded = Decimal()
+            NSDecimalRound(&rounded, &decimal, 3, .plain)
+            let expected = String(format: "%.3f MB", NSDecimalNumber(decimal: rounded).doubleValue)
+            precondition(TrafficStatistics.capacity(Double(input)) == expected)
+        }
+        let large = Double(UInt64.max) + Double(UInt64.max)
+        precondition(large.isFinite && TrafficStatistics.capacity(large).hasSuffix(" GB"))
+        var clients = ClientTrafficStatistics()
+        clients.sample(id: 2, address: "::1", received: 0, sent: 0, at: 0)
+        clients.sample(id: 1, address: "127.0.0.1", received: 0, sent: 0, at: 0)
+        clients.sample(id: 1, address: "127.0.0.1", received: 1, sent: 1, at: 20)
+        precondition(clients.rows.map(\.id) == [1, 2])
+        precondition(TrafficStatistics.speed(clients.rows[0].traffic.sumRate) == "0.001 Kbps")
+        print("PASS: 10001 independent decimal controls, half-up boundaries, three digits, raw-first Sum, unmodified counter/rate baselines, per-IP order")
     }
 }

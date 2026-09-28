@@ -10,6 +10,11 @@ final class StatisticsUITests: XCTestCase {
         app.launch()
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         XCTAssertTrue(app.tabBars.buttons["Server"].waitForExistence(timeout: 10))
+        // The aggregate table exists even before the first client registers.
+        app.tabBars.buttons["Statistics"].tap()
+        XCTAssertTrue(app.staticTexts["total-title"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["total-usage-sum"].label, "0.000 KB")
+        XCTAssertFalse(app.staticTexts["client-1"].exists)
         for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
             XCUIDevice.shared.orientation = orientation
             app.tabBars.buttons["Server"].tap()
@@ -48,22 +53,36 @@ final class StatisticsUITests: XCTestCase {
             XCTAssertTrue(top.exists && top.isHittable)
             var previousHeaderY = top.frame.minY
             for id in ["total", "client-1", "client-2"] {
-                let speed = app.descendants(matching: .any).matching(identifier: id + "-speed").firstMatch
-                let usage = app.descendants(matching: .any).matching(identifier: id + "-usage").firstMatch
+                let first = app.staticTexts[id + "-column-in"]
+                let last = app.staticTexts[id + "-usage-sum"]
                 for _ in 0..<6 {
-                    if speed.exists && speed.isHittable && usage.exists && usage.isHittable { break }
+                    if first.exists && first.isHittable && last.exists && last.isHittable { break }
                     let from = form.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.65))
                     let to = form.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.40))
                     from.press(forDuration: 0.05, thenDragTo: to,
                                withVelocity: .slow, thenHoldForDuration: 0.1)
                 }
-                XCTAssertTrue(speed.exists && speed.isHittable, "Speed must be visible without expanding a row")
-                XCTAssertTrue(usage.exists && usage.isHittable, "Usage must be visible without expanding a row")
-                XCTAssertLessThan(speed.frame.minY, usage.frame.minY)
-                let speedText = speed.label + " " + (speed.value as? String ?? "")
-                let usageText = usage.label + " " + (usage.value as? String ?? "")
-                XCTAssertTrue(speedText.contains("In") && speedText.contains("Out") && speedText.contains("bps"))
-                XCTAssertTrue(usageText.contains("In") && usageText.contains("Out") && usageText.contains("Total"))
+                XCTAssertTrue(first.exists && first.isHittable, "Column labels must be reachable")
+                XCTAssertTrue(last.exists && last.isHittable, "Both data rows must be visible without expansion")
+                let bytes = (orientation == .portrait ? 64 : 128) * (id == "total" ? 2 : 1)
+                var previousColumnX: CGFloat = -.infinity
+                for (column, title) in [("in", "In"), ("out", "Out"), ("sum", "Sum")] {
+                    let heading = app.staticTexts[id + "-column-" + column]
+                    let speed = app.staticTexts[id + "-speed-" + column]
+                    let usage = app.staticTexts[id + "-usage-" + column]
+                    XCTAssertEqual(heading.label, title)
+                    XCTAssertTrue(speed.exists && speed.isHittable)
+                    XCTAssertTrue(usage.exists && usage.isHittable)
+                    XCTAssertGreaterThan(heading.frame.midX, previousColumnX)
+                    previousColumnX = heading.frame.midX
+                    XCTAssertEqual(heading.frame.midX, speed.frame.midX, accuracy: 1)
+                    XCTAssertEqual(speed.frame.midX, usage.frame.midX, accuracy: 1)
+                    XCTAssertLessThan(heading.frame.minY, speed.frame.minY)
+                    XCTAssertLessThan(speed.frame.minY, usage.frame.minY)
+                    XCTAssertEqual(speed.label, "0.000 Kbps")
+                    let expected = Double(bytes * (column == "sum" ? 2 : 1)) / 1_000
+                    XCTAssertEqual(usage.label, String(format: "%.3f KB", expected))
+                }
                 if id != "total" {
                     let header = app.staticTexts[id]
                     XCTAssertTrue(header.exists)
@@ -75,7 +94,7 @@ final class StatisticsUITests: XCTestCase {
                 }
             }
             let statistics = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-            statistics.name = "statistics-two-lines-\(orientation.rawValue)"
+            statistics.name = "statistics-table-\(orientation.rawValue)"
             statistics.lifetime = .keepAlways
             add(statistics)
             app.tabBars.buttons["Server"].tap()

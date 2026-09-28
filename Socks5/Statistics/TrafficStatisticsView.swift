@@ -17,6 +17,7 @@ struct TrafficStatisticsView: View {
                     summary(statistics, id: "total")
                 } header: {
                     Text("Total")
+                        .textCase(nil)
                         .accessibilityIdentifier("total-title")
                 }
                 ForEach(clientRows) { client in
@@ -41,7 +42,7 @@ struct TrafficStatisticsView: View {
                     }
                 }
                 Section {
-                    Text("Speed: In / Out. Transferred: In / Out / Total. Clients follow IP registration order; Unattributed appears first when needed.")
+                    Text("Columns: In / Out / Sum. Rows: Speed / Transferred. Sum combines the unrounded In and Out values. Each displayed value is rounded to three decimal places. Clients follow IP registration order; Unattributed appears first when needed.")
                     Text("Since app launch; stopping the server does not reset totals. In: external network to this app. Out: this app to the external network. TCP and UDP payload only.")
                     Text("Observed SOCKS control-peer IP, not a device identity. Ports are ignored. Unattributed preserves bytes when IP lookup or registration fails. Totals and client rows are independent live reads and may briefly differ.")
                     Text("Speed uses the last sampling interval (about 1 second). KB/MB/GB use 1,000-based bytes; Kbps/Mbps/Gbps use bits per second. Sampling pauses when this tab is hidden or the app is inactive; native totals keep accumulating while the server runs.")
@@ -66,35 +67,62 @@ struct TrafficStatisticsView: View {
         }
     }
 
-    /// One shared two-line layout for the aggregate and every registered client.
+    /// One shared table for the aggregate and every registered client.
     private func summary(_ statistics: TrafficStatistics, id: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                metric("In", TrafficStatistics.speed(statistics.receiveRate))
-                metric("Out", TrafficStatistics.speed(statistics.sendRate))
+        Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
+            GridRow {
+                rowLabel(" ").accessibilityHidden(true)
+                tableCell("In", id: "\(id)-column-in", bold: true)
+                tableCell("Out", id: "\(id)-column-out", bold: true)
+                tableCell("Sum", id: "\(id)-column-sum", bold: true)
             }
-            .font(.subheadline)
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("\(id)-speed")
-            HStack(spacing: 8) {
-                metric("In", TrafficStatistics.capacity(Double(statistics.received)))
-                metric("Out", TrafficStatistics.capacity(Double(statistics.sent)))
-                metric("Total", TrafficStatistics.capacity(
-                    Double(statistics.received) + Double(statistics.sent)))
+            Color(white: 0.82)
+                .frame(height: 1)
+                .gridCellUnsizedAxes(.horizontal)
+                .accessibilityHidden(true)
+            GridRow {
+                rowLabel("Speed")
+                tableCell(TrafficStatistics.speed(statistics.receiveRate), id: "\(id)-speed-in")
+                tableCell(TrafficStatistics.speed(statistics.sendRate), id: "\(id)-speed-out")
+                tableCell(TrafficStatistics.speed(statistics.sumRate), id: "\(id)-speed-sum")
             }
-            .font(.footnote)
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("\(id)-usage")
+            GridRow {
+                rowLabel("Transferred")
+                tableCell(TrafficStatistics.capacity(Double(statistics.received)), id: "\(id)-usage-in")
+                tableCell(TrafficStatistics.capacity(Double(statistics.sent)), id: "\(id)-usage-out")
+                tableCell(TrafficStatistics.capacity(
+                    Double(statistics.received) + Double(statistics.sent)), id: "\(id)-usage-sum")
+            }
         }
-        .monospacedDigit()
-        .padding(.vertical, 4)
+        .font(.caption)
+        .foregroundStyle(.black)
+        .background(.white)
+        .listRowBackground(Color.white)
+        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
     }
 
-    private func metric(_ label: String, _ value: String) -> some View {
-        Text("\(label) \(value)")
+    private func rowLabel(_ text: String) -> some View {
+        Text(text)
+            .fontWeight(.bold)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.vertical, 12)
+            .padding(.trailing, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .trailing) {
+                Color(white: 0.82).frame(width: 1)
+            }
+    }
+
+    private func tableCell(_ text: String, id: String, bold: Bool = false) -> some View {
+        Text(text)
+            .fontWeight(bold ? .bold : .regular)
+            .monospacedDigit()
             .lineLimit(1)
             .minimumScaleFactor(0.7)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 4)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .accessibilityIdentifier(id)
     }
 
     private func sample() {

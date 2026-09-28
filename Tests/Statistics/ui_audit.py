@@ -101,11 +101,12 @@ def main():
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'input-index.log')
     if not output('xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version').strip().startswith('27.'):
         raise SystemExit('An iOS 27 Simulator SDK is required')
-    # This request is presentation-only; keep native/model/project inputs frozen.
-    ui_base = '3a740eba570cdd1cd37c4b4c2f219963084beca8'
+    # Table presentation plus explicit three-decimal formatting; native inputs stay frozen.
+    ui_base = '803a1ef26209c23af7338c1effa4fe7d90ead857'
     changed = set(output('git', 'diff', '--name-only', ui_base, 'HEAD', '--',
                          'Socks5', 'Socks5.xcodeproj', 'Patches').splitlines())
-    assert changed <= {'Socks5/Statistics/TrafficStatisticsView.swift'}, changed
+    assert changed <= {'Socks5/Statistics/TrafficStatisticsView.swift',
+                       'Socks5/Statistics/TrafficStatistics.swift'}, changed
     view = (ROOT / 'Socks5/Statistics/TrafficStatisticsView.swift').read_text()
     old_view = output('git', 'show', ui_base + ':Socks5/Statistics/TrafficStatisticsView.swift')
     assert 'DisclosureGroup' not in view
@@ -114,7 +115,16 @@ def main():
     assert view.split('    private func sample()', 1)[1] == old_view.split('    private func sample()', 1)[1]
     # Only a shared renderer was inserted between the existing task and sample.
     assert view.split('        .task(id:', 1)[1].split('    /// One shared', 1)[0] == \
-        old_view.split('        .task(id:', 1)[1].split('    private func sample()', 1)[0]
+        old_view.split('        .task(id:', 1)[1].split('    /// One shared', 1)[0]
+    model = (ROOT / 'Socks5/Statistics/TrafficStatistics.swift').read_text()
+    old_model = output('git', 'show', ui_base + ':Socks5/Statistics/TrafficStatistics.swift')
+    # Three-decimal formatting and a computed Sum must not alter raw accumulation.
+    assert model.split('    mutating func sample(', 1)[1].split('    static func capacity(', 1)[0] == \
+        old_model.split('    mutating func sample(', 1)[1].split('    static func capacity(', 1)[0]
+    assert model.split('struct ClientTrafficStatistics', 1)[1] == old_model.split('struct ClientTrafficStatistics', 1)[1]
+    assert 'tableCell("Sum"' in view and 'tableCell("Total"' not in view
+    assert 'Grid(alignment:' in view and '.foregroundStyle(.black)' in view
+    assert '.fontWeight(bold ? .bold : .regular)' in view and 'Color(white: 0.82)' in view
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
     if config['features'] != ['udp', 'statistics']:
         raise RuntimeError('Statistics-only composition required')

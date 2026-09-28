@@ -84,9 +84,13 @@ Do not add global per-packet locking merely to force a visual live snapshot equa
 
 ## Swift model and screen
 
-The total appears first, followed by IP entries in native registration order. Each
-entry has an identifying section header and exactly two always-visible data lines:
-In/Out speed, then accumulated In/Out/Total usage. No expansion tap is required. The existing
+The Total table appears first, followed by IP tables in native registration order.
+Each entry has an identifying section title, bold In/Out/Sum column headings and
+bold Speed/Transferred row labels. Two always-visible data rows use regular black
+values on a white surface, with light-gray header/label separator lines. Sum combines
+unrounded directions before numerical rounding to three decimal places; Total is
+used only as the aggregate title, never as an internal column label. No expansion
+tap is required. The existing
 TrafficStatistics delta/format model is reused per native ID; no second formula or
 native sampling thread is added. Counters are subtracted as UInt64 before Double
 conversion. First samples, nonincreasing times or decreased counters establish a
@@ -304,3 +308,49 @@ iPad layouts, extreme Dynamic Type, very long IPv6 strings, many-client scrollin
 actual LAN devices and comparative performance remain unperformed for this UI.
 Earlier failed implementation UI runs remain the historical records above; this
 presentation revision passed its first exact-source workflow without retries.
+
+
+## Table presentation and three-decimal precision — 2026-09-28
+
+Supersedes the compact two-line layout above, from803a1ef2; its previous execution
+records remain historical, not proof of this table revision. The aggregate is always
+a section titled Total, even before a client is registered. Registered IP sections
+follow unchanged stable-ID order. A shared Grid renders blank/In/Out/Sum above
+Speed and Transferred. Labels are bold, numbers regular black; the table uses a white
+surface even in dark appearance so requested black values retain contrast. A light
+0.82-gray one-point rule separates headings from data, and the label column from
+values, matching the requested reference without drawing a heavy full-cell grid.
+Existing Form scrolling is retained; no custom renderer, extra refresh task or
+per-IP sampling loop is introduced. Narrow value cells retain bounded font scaling.
+
+Speed Sum is receiveRate+sendRate before formatting, not addition of rounded strings.
+Transferred Sum converts both UInt64 counters before adding, retaining overflow-safe
+display behavior. One shared formatter numerically rounds the selected SI-unit value
+to the nearest0.001 (half away from zero), then prints exactly three decimals using
+a fixed decimal point. The selected unit thresholds are unchanged: a rounded value
+may read1000.000KB immediately before the original MB threshold. Raw UInt64 counters,
+Double rates, sampling times and deltas are NOT rounded or fed back from display;
+that would silently lose low-volume traffic over repeated samples. Sum can differ
+from adding the displayed directions by0.001 because it is independently rounded
+from the unrounded values. No claim of three-decimal physical measurement accuracy
+or exact decimal representation of arbitrary Double inputs is made.
+
+Runtime changes are restricted to TrafficStatisticsView.swift and the computed
+sumRate/formatter in TrafficStatistics.swift. Native patches, source pins, network
+I/O/UDP policy, registry, aggregate and IP lifetime, sampling/task bodies, project,
+permissions and every other branch stay unchanged. Statistics still samples at one
+second while visible/active; Background9d87d7cf remains unchanged at0.5seconds.
+
+The existing aggregate formatter expectations are updated to three decimals; the
+per-IP model suite now checks Sum before rounding and10001 independent Decimal
+rounding controls in both debug/optimized builds. UI tests retain real UDP data,
+IPv4/IPv6 registration order, Stop/Start, both orientations and existing timeouts.
+They additionally require an initial zero-valued Total before IP creation, aligned
+In/Out/Sum columns, both rows without expansion and exact three-decimal amounts.
+
+Candidate status: local Swift syntax and numeric model tests pass. A fresh full
+statistics workflow, actual Apple SDK/Simulator results and original screenshots
+must be recorded for this exact revision before completion. Physical iPad, SideStore
+and LiveContainer execution, extreme Dynamic Type/very long addresses and large
+value-cell layouts remain separate tests; no new IPA or release integration is
+part of this table-only request.
