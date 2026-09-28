@@ -120,7 +120,10 @@ def composition():
                       'renderingCapabilitiesChangeNotification', 'outputMuteStateChangeNotification',
                       'userIntentToUnmuteOutputNotification'):
             assert event in source, event
-        assert 'scheduleAudioCheck(after: 2)' not in source and 'scheduleAudioCheck(after: 1)' in source
+        assert 'private static let audioCheckInterval: TimeInterval = 0.5' in source
+        assert source.count('Timer(timeInterval:') == 1
+        assert 'Timer(timeInterval: Self.audioCheckInterval, repeats: false)' in source
+        assert 'scheduleAudioCheck(after:' not in source and 'serviceProbeInterval' not in source
         assert 'retryDelay' not in source and 'UserDefaults' not in source
     if 'settings' in FEATURES:
         content = (ROOT / 'Socks5/ContentView.swift').read_text()
