@@ -37,7 +37,7 @@ struct TrafficStatisticsTests {
         value.sample(received: large + 1, sent: large + 3, at: 1.5)
         precondition(value.receiveRate == 2 && value.sendRate == 6)
         let total = Double(UInt64.max) + Double(UInt64.max)
-        precondition(total.isFinite && TrafficStatistics.capacity(total).hasSuffix(" GB"))
+        precondition(total.isFinite && TrafficStatistics.capacity(total).hasSuffix(" PB"))
         var received = UInt64(1) << 60
         var sent = received
         var time = 100.0

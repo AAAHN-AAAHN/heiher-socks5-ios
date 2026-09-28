@@ -125,6 +125,11 @@ def main():
     assert 'tableCell("Sum"' in view and 'tableCell("Total"' not in view
     assert 'Grid(alignment:' in view and '.foregroundStyle(.black)' in view
     assert '.fontWeight(bold ? .bold : .regular)' in view and 'Color(white: 0.82)' in view
+    # Unit/scale extension must not add another renderer or sampling path.
+    assert view.count('.minimumScaleFactor(0.5)') == 1
+    assert '.minimumScaleFactor(0.7)' not in view
+    assert '["KB", "MB", "GB", "TB", "PB"]' in model
+    assert '["Kbps", "Mbps", "Gbps", "Tbps", "Pbps"]' in model
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
     if config['features'] != ['udp', 'statistics']:
         raise RuntimeError('Statistics-only composition required')

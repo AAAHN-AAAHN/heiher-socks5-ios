@@ -26,16 +26,20 @@ struct TrafficStatistics {
     }
 
     static func capacity(_ bytes: Double) -> String {
-        scaled(bytes, units: ["KB", "MB", "GB"])
+        scaled(bytes, units: ["KB", "MB", "GB", "TB", "PB"])
     }
 
     static func speed(_ bytesPerSecond: Double) -> String {
-        scaled(bytesPerSecond * 8, units: ["Kbps", "Mbps", "Gbps"])
+        scaled(bytesPerSecond * 8, units: ["Kbps", "Mbps", "Gbps", "Tbps", "Pbps"])
     }
 
     private static func scaled(_ amount: Double, units: [String]) -> String {
-        let index = amount >= 1_000_000_000 ? 2 : (amount >= 1_000_000 ? 1 : 0)
-        let divisor = [1_000.0, 1_000_000.0, 1_000_000_000.0][index]
+        var index = 0
+        var divisor = 1_000.0
+        while index + 1 < units.count && amount >= divisor * 1_000 {
+            index += 1
+            divisor *= 1_000
+        }
         // Round the numeric value in the selected SI unit, then display exactly
         // three decimals. Keep raw counters/rates intact for subsequent samples.
         let rounded = (amount / (divisor / 1_000)).rounded(.toNearestOrAwayFromZero) / 1_000

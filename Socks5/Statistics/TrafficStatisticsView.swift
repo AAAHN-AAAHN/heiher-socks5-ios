@@ -45,7 +45,7 @@ struct TrafficStatisticsView: View {
                     Text("Columns: In / Out / Sum. Rows: Speed / Transferred. Sum combines the unrounded In and Out values. Each displayed value is rounded to three decimal places. Clients follow IP registration order; Unattributed appears first when needed.")
                     Text("Since app launch; stopping the server does not reset totals. In: external network to this app. Out: this app to the external network. TCP and UDP payload only.")
                     Text("Observed SOCKS control-peer IP, not a device identity. Ports are ignored. Unattributed preserves bytes when IP lookup or registration fails. Totals and client rows are independent live reads and may briefly differ.")
-                    Text("Speed uses the last sampling interval (about 1 second). KB/MB/GB use 1,000-based bytes; Kbps/Mbps/Gbps use bits per second. Sampling pauses when this tab is hidden or the app is inactive; native totals keep accumulating while the server runs.")
+                    Text("Speed uses the last sampling interval (about 1 second). KB/MB/GB/TB/PB use 1,000-based bytes; Kbps/Mbps/Gbps/Tbps/Pbps use bits per second. Sampling pauses when this tab is hidden or the app is inactive; native totals keep accumulating while the server runs.")
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -118,7 +118,7 @@ struct TrafficStatisticsView: View {
             .fontWeight(bold ? .bold : .regular)
             .monospacedDigit()
             .lineLimit(1)
-            .minimumScaleFactor(0.7)
+            .minimumScaleFactor(0.5)
             .padding(.vertical, 12)
             .padding(.horizontal, 4)
             .frame(maxWidth: .infinity, alignment: .center)

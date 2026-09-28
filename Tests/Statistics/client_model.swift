@@ -32,6 +32,7 @@ import Foundation
         model.sample(id: 1, address: "127.0.0.1", received: 10000, sent: 9000, at: 50)
         precondition(model.rows[0].traffic.receiveRate == 0 && model.rows[0].traffic.received == 10000)
         checkTableRounding()
+        checkExtendedUnits()
         print("PASS: per-IP independent deltas, first sample, idle/reconnect totals, stable rows, unknown, counter/time edges")
     }
 
@@ -75,7 +76,7 @@ import Foundation
             precondition(TrafficStatistics.capacity(Double(input)) == expected)
         }
         let large = Double(UInt64.max) + Double(UInt64.max)
-        precondition(large.isFinite && TrafficStatistics.capacity(large).hasSuffix(" GB"))
+        precondition(large.isFinite && TrafficStatistics.capacity(large).hasSuffix(" PB"))
         var clients = ClientTrafficStatistics()
         clients.sample(id: 2, address: "::1", received: 0, sent: 0, at: 0)
         clients.sample(id: 1, address: "127.0.0.1", received: 0, sent: 0, at: 0)
@@ -83,5 +84,64 @@ import Foundation
         precondition(clients.rows.map(\.id) == [1, 2])
         precondition(TrafficStatistics.speed(clients.rows[0].traffic.sumRate) == "0.001 Kbps")
         print("PASS: 10001 independent decimal controls, half-up boundaries, three digits, raw-first Sum, unmodified counter/rate baselines, per-IP order")
+    }
+
+    private static func checkExtendedUnits() {
+        // Both public paths share the same SI thresholds and numeric rounding.
+        let cases: [(Double, String)] = [
+            (0, "0.000 KB"), (999, "0.999 KB"),
+            (1_000, "1.000 KB"), (1_000_000, "1.000 MB"),
+            (1_000_000_000, "1.000 GB"),
+            (999_999_999_999, "1000.000 GB"),
+            (1_000_000_000_000, "1.000 TB"),
+            (1_000_000_000_001, "1.000 TB"),
+            (999_999_999_999_999, "1000.000 TB"),
+            (1_000_000_000_000_000, "1.000 PB"),
+            (1_000_000_000_000_001, "1.000 PB"),
+            (1_234_499_000_000, "1.234 TB"),
+            (1_234_500_000_000, "1.235 TB"),
+            (1_234_501_000_000, "1.235 TB"),
+            (1_234_499_000_000_000, "1.234 PB"),
+            (1_234_500_000_000_000, "1.235 PB"),
+            (1_234_501_000_000_000, "1.235 PB"),
+            (362_234_567_000_000, "362.235 TB"),
+            (1_000_000_000_000_000_000, "1000.000 PB"),
+            (Double(UInt64.max), "18446.744 PB"),
+            (Double(UInt64.max) + Double(UInt64.max), "36893.488 PB")
+        ]
+        for (amount, capacity) in cases {
+            precondition(TrafficStatistics.capacity(amount) == capacity, "Capacity: \(amount)")
+            let rate = capacity.replacingOccurrences(of: "KB", with: "Kbps")
+                .replacingOccurrences(of: "MB", with: "Mbps")
+                .replacingOccurrences(of: "GB", with: "Gbps")
+                .replacingOccurrences(of: "TB", with: "Tbps")
+                .replacingOccurrences(of: "PB", with: "Pbps")
+            precondition(TrafficStatistics.speed(amount / 8) == rate, "Rate: \(amount)")
+        }
+        // Independent Decimal reference, repeated at both new magnitudes. The
+        // values are exactly representable integers before conversion to Double.
+        for (factor, unit) in [(1_000_000, "TB"), (1_000_000_000, "PB")] {
+            for input in 1_230_000...1_240_000 {
+                var decimal = Decimal(input) / Decimal(1_000_000)
+                var rounded = Decimal()
+                NSDecimalRound(&rounded, &decimal, 3, .plain)
+                let digits = String(format: "%.3f", locale: Locale(identifier: "en_US_POSIX"),
+                                    NSDecimalNumber(decimal: rounded).doubleValue)
+                let amount = Double(Int64(input) * Int64(factor))
+                precondition(TrafficStatistics.capacity(amount) == digits + " " + unit)
+                precondition(TrafficStatistics.speed(amount / 8) == digits + " " + unit.prefix(1) + "bps")
+            }
+        }
+        var total = TrafficStatistics()
+        total.sample(received: 0, sent: 0, at: 0)
+        total.sample(received: 75_000_000_000, sent: 75_000_000_000, at: 1)
+        precondition(TrafficStatistics.speed(total.receiveRate) == "600.000 Gbps")
+        precondition(TrafficStatistics.speed(total.sumRate) == "1.200 Tbps")
+        let oldRate = total.receiveRate
+        _ = TrafficStatistics.capacity(Double(total.received))
+        precondition(total.receiveRate == oldRate && total.received == 75_000_000_000)
+        total.sample(received: 75_000_000_001, sent: 75_000_000_003, at: 1.5)
+        precondition(total.receiveRate == 2 && total.sendRate == 6)
+        print("PASS: KB-PB/Kbps-Pbps thresholds, ties, 20002 independent Decimal controls, PB cap, UInt64 maxima and raw-first cross-unit Sum")
     }
 }
