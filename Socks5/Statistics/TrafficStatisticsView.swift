@@ -5,6 +5,7 @@ import HevSocks5Server
 struct TrafficStatisticsView: View {
     let isVisible: Bool
     @Environment(\.scenePhase) private var scenePhase
+    @ScaledMetric(relativeTo: .caption) private var labelColumnWidth: CGFloat = 40
     @State private var statistics = TrafficStatistics()
     @State private var clients = ClientTrafficStatistics()
     @State private var clientsIncomplete = false
@@ -42,10 +43,13 @@ struct TrafficStatisticsView: View {
                     }
                 }
                 Section {
-                    Text("Columns: In / Out / Sum. Rows: Speed / Transferred. Sum combines the unrounded In and Out values. Each displayed value is rounded to three decimal places. Clients follow IP registration order; Unattributed appears first when needed.")
-                    Text("Since app launch; stopping the server does not reset totals. In: external network to this app. Out: this app to the external network. TCP and UDP payload only.")
-                    Text("Observed SOCKS control-peer IP, not a device identity. Ports are ignored. Unattributed preserves bytes when IP lookup or registration fails. Totals and client rows are independent live reads and may briefly differ.")
-                    Text("Speed uses the last sampling interval (about 1 second). KB/MB/GB/TB/PB use 1,000-based bytes; Kbps/Mbps/Gbps/Tbps/Pbps use bits per second. Sampling pauses when this tab is hidden or the app is inactive; native totals keep accumulating while the server runs.")
+                    Text("Spd. (speed): average TCP/UDP payload transfer rate at this proxy's destination-side sockets over the last sample (about 1 second), in bits per second. This is observed traffic, not the network link's maximum speed.")
+                        .accessibilityIdentifier("measurement-speed")
+                    Text("Vol. (volume): cumulative TCP/UDP payload bytes read from or successfully written to destination-side sockets since this app process started. Server Stop/Start does not reset it; a new app process does.")
+                        .accessibilityIdentifier("measurement-volume")
+                    Text("In: payload read from destination sockets into this app. Out: payload successfully written by this app to destination sockets. Sum: In + Out before display rounding. SOCKS and transport headers, retransmissions and system-resolver traffic are excluded; these are not VPN, radio or billed data totals.")
+                    Text("Total combines all clients. Each IP table contains traffic attributed to that observed SOCKS control-peer IP, not a device identity. IPs follow registration order; Unattributed appears first when needed. Independent live reads can briefly differ from the aggregate.")
+                    Text("Values use three decimal places. KB/MB/GB/TB/PB are 1,000-based bytes; Kbps/Mbps/Gbps/Tbps/Pbps are bits per second. Visible sampling pauses while this tab is hidden or the app is inactive; native totals continue as traffic is processed.")
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -81,13 +85,15 @@ struct TrafficStatisticsView: View {
                 .gridCellUnsizedAxes(.horizontal)
                 .accessibilityHidden(true)
             GridRow {
-                rowLabel("Speed")
+                rowLabel("Spd.")
+                    .accessibilityIdentifier("\(id)-label-speed")
                 tableCell(TrafficStatistics.speed(statistics.receiveRate), id: "\(id)-speed-in")
                 tableCell(TrafficStatistics.speed(statistics.sendRate), id: "\(id)-speed-out")
                 tableCell(TrafficStatistics.speed(statistics.sumRate), id: "\(id)-speed-sum")
             }
             GridRow {
-                rowLabel("Transferred")
+                rowLabel("Vol.")
+                    .accessibilityIdentifier("\(id)-label-volume")
                 tableCell(TrafficStatistics.capacity(Double(statistics.received)), id: "\(id)-usage-in")
                 tableCell(TrafficStatistics.capacity(Double(statistics.sent)), id: "\(id)-usage-out")
                 tableCell(TrafficStatistics.capacity(
@@ -105,9 +111,9 @@ struct TrafficStatisticsView: View {
         Text(text)
             .fontWeight(.bold)
             .fixedSize(horizontal: true, vertical: false)
-            .padding(.vertical, 12)
+            .padding(.vertical, 8)
             .padding(.trailing, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(width: labelColumnWidth, alignment: .leading)
             .overlay(alignment: .trailing) {
                 Color(white: 0.82).frame(width: 1)
             }
@@ -119,7 +125,7 @@ struct TrafficStatisticsView: View {
             .monospacedDigit()
             .lineLimit(1)
             .minimumScaleFactor(0.5)
-            .padding(.vertical, 12)
+            .padding(.vertical, 8)
             .padding(.horizontal, 4)
             .frame(maxWidth: .infinity, alignment: .center)
             .accessibilityIdentifier(id)

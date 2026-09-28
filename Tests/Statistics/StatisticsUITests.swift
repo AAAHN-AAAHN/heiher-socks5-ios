@@ -64,6 +64,16 @@ final class StatisticsUITests: XCTestCase {
                 }
                 XCTAssertTrue(first.exists && first.isHittable, "Column labels must be reachable")
                 XCTAssertTrue(last.exists && last.isHittable, "Both data rows must be visible without expansion")
+                let speedLabel = app.staticTexts[id + "-label-speed"]
+                let volumeLabel = app.staticTexts[id + "-label-volume"]
+                XCTAssertTrue(speedLabel.exists && speedLabel.isHittable)
+                XCTAssertTrue(volumeLabel.exists && volumeLabel.isHittable)
+                XCTAssertEqual(speedLabel.label, "Spd.")
+                XCTAssertEqual(volumeLabel.label, "Vol.")
+                XCTAssertEqual(speedLabel.frame.minX, volumeLabel.frame.minX, accuracy: 1)
+                XCTAssertEqual(speedLabel.frame.maxX, volumeLabel.frame.maxX, accuracy: 1)
+                XCTAssertLessThan(speedLabel.frame.width, first.frame.width,
+                                  "Abbreviations must leave more room for the value columns")
                 let bytes = (orientation == .portrait ? 64 : 128) * (id == "total" ? 2 : 1)
                 var previousColumnX: CGFloat = -.infinity
                 for (column, title) in [("in", "In"), ("out", "Out"), ("sum", "Sum")] {
@@ -79,6 +89,10 @@ final class StatisticsUITests: XCTestCase {
                     XCTAssertEqual(speed.frame.midX, usage.frame.midX, accuracy: 1)
                     XCTAssertLessThan(heading.frame.minY, speed.frame.minY)
                     XCTAssertLessThan(speed.frame.minY, usage.frame.minY)
+                    XCTAssertEqual(speedLabel.frame.midY, speed.frame.midY, accuracy: 1)
+                    XCTAssertEqual(volumeLabel.frame.midY, usage.frame.midY, accuracy: 1)
+                    XCTAssertLessThanOrEqual(speedLabel.frame.maxX, speed.frame.minX + 1)
+                    XCTAssertLessThanOrEqual(volumeLabel.frame.maxX, usage.frame.minX + 1)
                     XCTAssertEqual(speed.label, "0.000 Kbps")
                     let expected = Double(bytes * (column == "sum" ? 2 : 1)) / 1_000
                     XCTAssertEqual(usage.label, String(format: "%.3f KB", expected))
@@ -94,9 +108,21 @@ final class StatisticsUITests: XCTestCase {
                 }
             }
             let statistics = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-            statistics.name = "statistics-table-\(orientation.rawValue)"
+            statistics.name = "statistics-spd-vol-\(orientation.rawValue)"
             statistics.lifetime = .keepAlways
             add(statistics)
+            if orientation == .landscapeLeft {
+                // Also capture the leading Total table, not only the scrolled IPs.
+                for _ in 0..<6 {
+                    if top.exists && top.isHittable { break }
+                    form.swipeDown()
+                }
+                XCTAssertTrue(top.exists && top.isHittable)
+                let overview = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+                overview.name = "statistics-spd-vol-landscape-overview"
+                overview.lifetime = .keepAlways
+                add(overview)
+            }
             app.tabBars.buttons["Server"].tap()
             XCTAssertTrue(start.waitForExistence(timeout: 5))
         }
