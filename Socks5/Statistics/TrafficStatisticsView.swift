@@ -13,67 +13,41 @@ struct TrafficStatisticsView: View {
         let clientRows = clients.rows
         NavigationStack {
             Form {
-                Section("Transfer speed") {
-                    Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 12) {
-                        GridRow {
-                            Text("Direction")
-                            Text("Speed")
+                Section {
+                    summary(statistics, id: "total")
+                } header: {
+                    Text("Total")
+                        .accessibilityIdentifier("total-title")
+                }
+                ForEach(clientRows) { client in
+                    Section {
+                        summary(client.traffic, id: "client-\(client.id)")
+                    } header: {
+                        Text(client.address)
+                            .textCase(nil)
+                            .accessibilityIdentifier("client-\(client.id)")
+                    }
+                }
+                if clientRows.isEmpty || clientsIncomplete {
+                    Section {
+                        if clientRows.isEmpty {
+                            Text("No client payload recorded yet.")
+                                .foregroundStyle(.secondary)
                         }
-                        .font(.headline)
-                        Divider()
-                        GridRow {
-                            Text("In")
-                            Text(TrafficStatistics.speed(statistics.receiveRate))
-                        }
-                        GridRow {
-                            Text("Out")
-                            Text(TrafficStatistics.speed(statistics.sendRate))
+                        if clientsIncomplete {
+                            Text("New clients will be included in the next sample.")
+                                .font(.footnote)
                         }
                     }
-                    .monospacedDigit()
                 }
                 Section {
-                    LabeledContent("Total In", value: TrafficStatistics.capacity(Double(statistics.received)))
-                    LabeledContent("Total Out", value: TrafficStatistics.capacity(Double(statistics.sent)))
-                    LabeledContent("Total", value: TrafficStatistics.capacity(
-                        Double(statistics.received) + Double(statistics.sent)))
-                        .fontWeight(.semibold)
-                } header: {
-                    Text("Transferred")
-                } footer: {
+                    Text("Speed: In / Out. Transferred: In / Out / Total. Clients follow IP registration order; Unattributed appears first when needed.")
                     Text("Since app launch; stopping the server does not reset totals. In: external network to this app. Out: this app to the external network. TCP and UDP payload only.")
-                }
-                .monospacedDigit()
-                Section {
-                    if clientRows.isEmpty {
-                        Text("No client payload recorded yet.")
-                            .foregroundStyle(.secondary)
-                    }
-                    ForEach(clientRows) { client in
-                        DisclosureGroup(client.address) {
-                            LabeledContent("In speed", value: TrafficStatistics.speed(client.traffic.receiveRate))
-                            LabeledContent("Out speed", value: TrafficStatistics.speed(client.traffic.sendRate))
-                            LabeledContent("Total In", value: TrafficStatistics.capacity(Double(client.traffic.received)))
-                            LabeledContent("Total Out", value: TrafficStatistics.capacity(Double(client.traffic.sent)))
-                            LabeledContent("Total", value: TrafficStatistics.capacity(
-                                Double(client.traffic.received) + Double(client.traffic.sent)))
-                        }
-                        .accessibilityIdentifier("client-\(client.id)")
-                    }
-                    if clientsIncomplete {
-                        Text("New clients will be included in the next sample.")
-                            .font(.footnote)
-                    }
-                } header: {
-                    Text("Clients by IP")
-                } footer: {
-                    Text("Observed SOCKS control-peer IP, not a device identity. TCP and UDP are combined per IP; ports are ignored. Unattributed preserves bytes when IP lookup or registration fails. Totals and client rows are independent live reads and may briefly differ.")
-                }
-                .monospacedDigit()
-                Section {
+                    Text("Observed SOCKS control-peer IP, not a device identity. Ports are ignored. Unattributed preserves bytes when IP lookup or registration fails. Totals and client rows are independent live reads and may briefly differ.")
                     Text("Speed uses the last sampling interval (about 1 second). KB/MB/GB use 1,000-based bytes; Kbps/Mbps/Gbps use bits per second. Sampling pauses when this tab is hidden or the app is inactive; native totals keep accumulating while the server runs.")
-                        .font(.footnote)
                 }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             }
             .navigationTitle("Statistics")
         }
@@ -90,6 +64,37 @@ struct TrafficStatisticsView: View {
                 sample()
             }
         }
+    }
+
+    /// One shared two-line layout for the aggregate and every registered client.
+    private func summary(_ statistics: TrafficStatistics, id: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                metric("In", TrafficStatistics.speed(statistics.receiveRate))
+                metric("Out", TrafficStatistics.speed(statistics.sendRate))
+            }
+            .font(.subheadline)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("\(id)-speed")
+            HStack(spacing: 8) {
+                metric("In", TrafficStatistics.capacity(Double(statistics.received)))
+                metric("Out", TrafficStatistics.capacity(Double(statistics.sent)))
+                metric("Total", TrafficStatistics.capacity(
+                    Double(statistics.received) + Double(statistics.sent)))
+            }
+            .font(.footnote)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("\(id)-usage")
+        }
+        .monospacedDigit()
+        .padding(.vertical, 4)
+    }
+
+    private func metric(_ label: String, _ value: String) -> some View {
+        Text("\(label) \(value)")
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func sample() {

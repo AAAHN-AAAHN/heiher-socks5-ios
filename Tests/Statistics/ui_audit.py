@@ -101,6 +101,20 @@ def main():
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'input-index.log')
     if not output('xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version').strip().startswith('27.'):
         raise SystemExit('An iOS 27 Simulator SDK is required')
+    # This request is presentation-only; keep native/model/project inputs frozen.
+    ui_base = '3a740eba570cdd1cd37c4b4c2f219963084beca8'
+    changed = set(output('git', 'diff', '--name-only', ui_base, 'HEAD', '--',
+                         'Socks5', 'Socks5.xcodeproj', 'Patches').splitlines())
+    assert changed <= {'Socks5/Statistics/TrafficStatisticsView.swift'}, changed
+    view = (ROOT / 'Socks5/Statistics/TrafficStatisticsView.swift').read_text()
+    old_view = output('git', 'show', ui_base + ':Socks5/Statistics/TrafficStatisticsView.swift')
+    assert 'DisclosureGroup' not in view
+    assert view.count('summary(statistics, id: "total")') == 1
+    assert view.count('summary(client.traffic, id: "client-\\(client.id)")') == 1
+    assert view.split('    private func sample()', 1)[1] == old_view.split('    private func sample()', 1)[1]
+    # Only a shared renderer was inserted between the existing task and sample.
+    assert view.split('        .task(id:', 1)[1].split('    /// One shared', 1)[0] == \
+        old_view.split('        .task(id:', 1)[1].split('    private func sample()', 1)[0]
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
     if config['features'] != ['udp', 'statistics']:
         raise RuntimeError('Statistics-only composition required')
@@ -150,6 +164,10 @@ def main():
              '-destination', 'platform=iOS Simulator,id=' + identifier, '-parallel-testing-enabled', 'NO',
              '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
              'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES'], 'ui-test.log', timeout=900)
+        run(['xcrun', 'xcresulttool', 'export', 'attachments', '--path', OUT / 'UI.xcresult',
+             '--output-path', OUT / 'screenshots'], 'screenshots-export.log')
+        run(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', OUT / 'UI.xcresult',
+             '--compact'], 'test-summary.json')
         product = WORK / 'DerivedData/Build/Products/Debug-iphonesimulator/Socks5.app/Socks5'
         (OUT / 'simulator-app-sha256.txt').write_text(hashlib.sha256(product.read_bytes()).hexdigest() + '\n')
         for path, digest in snapshot.items():
