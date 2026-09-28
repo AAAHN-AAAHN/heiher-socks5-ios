@@ -33,7 +33,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
 
     // Both the subscriber and handler use this registry: no unhandled new names.
     // Keep the legacy notification for compatibility alongside the iOS 27 signals.
-    private static let invalidatingAudioNotifications: [Notification.Name] = {
+    private static let sessionLifecycleNotifications: [Notification.Name] = {
         var names = [AVAudioSession.interruptionNotification,
                      AVAudioSession.mediaServicesWereLostNotification,
                      AVAudioSession.mediaServicesWereResetNotification]
@@ -45,7 +45,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     }()
 
     static let audioNotifications: [Notification.Name] = {
-        var names = invalidatingAudioNotifications + [
+        var names = sessionLifecycleNotifications + [
             AVAudioSession.routeChangeNotification,
             AVAudioSession.silenceSecondaryAudioHintNotification,
             AVAudioSession.spatialPlaybackCapabilitiesChangedNotification,
@@ -523,17 +523,14 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         guard audioEnabled, Self.audioNotifications.contains(notification.name) else { return }
         let name = notification.name
         if name == AVAudioSession.mediaServicesWereLostNotification {
-            let newlyUnavailable = !servicesUnavailable
-            if newlyUnavailable { resumeOpportunityUsed = false }
             servicesUnavailable = true
             probingServices = false
             invalidatedDuringRestore = true
             playerFailurePending = true
             waitingToRetry = true
-            if newlyUnavailable {
-                audioCheck?.invalidate()
-                audioCheck = nil
-            }
+            // Loss/advice can alternate within one failed episode. Preserve both
+            // its deadline and its one automatic resume opportunity; resetting
+            // either here lets notification storms postpone or bypass retry.
             // A preparation worker exclusively owns its detached player until return.
             let wasRestoring = restoringAudio
             restoringAudio = true

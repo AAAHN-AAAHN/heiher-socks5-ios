@@ -73,3 +73,6 @@ with tempfile.TemporaryDirectory() as folder:
                     assert result.returncode == 1 and 'FAIL:' in result.stdout and 'SUMMARY:' in result.stdout, (case, result.stderr)
                     print('EXPECTED PRIOR FAILURE (not current):', label, case, flush=True)
 print('PASS: current recovery invariants and exact-build9 negative controls; not Apple/physical interruptions')
+
+# Mixed-signal regressions run against the same exact controller and platform doubles.
+subprocess.run([sys.executable, str(ROOT / 'Tests/Background/check_mixed_notifications.py'), mode], check=True)
