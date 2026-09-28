@@ -13,7 +13,7 @@ import Foundation
         send { app.audioPlayerDecodeErrorDidOccur(decoder, error: nil) }
         waitUntil { app.audioState.hasPrefix("Waiting to resume") }
         precondition(app.audioEnabled && Timer.live.count == 1)
-        print("PASS: decoder failure on a worker safely schedules one-second recovery")
+        print("PASS: decoder failure on a worker safely schedules 0.5-second recovery")
         Timer.live[0].fire()
         precondition(AVAudioPlayer.instances.last!.isPlaying)
         app.setAudio(false)

@@ -25,7 +25,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     private var resumeAfterRestore = false
     private var servicesUnavailable = false
     private var probingServices = false
-    private static let serviceProbeInterval: TimeInterval = 5
+    private static let audioCheckInterval: TimeInterval = 0.5
     private var ownsAudioSession = false
     private enum SessionTransition { case activating, preparing, deactivating }
     private var sessionTransition: SessionTransition?
@@ -220,7 +220,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         }
         guard !deactivationPending else { deactivateAudio(); return }
         if waitingToRetry {
-            if audioCheck == nil { scheduleAudioCheck(after: 1) }
+            if audioCheck == nil { scheduleAudioCheck() }
             return
         }
         // A second silent stop before a healthy sample is the same failure episode.
@@ -233,7 +233,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         if recreate { discardPlayer() }
         guard audioEnabled, !deactivationPending else { finishAudioRestore(); return }
         if audioIsHealthy() {
-            if audioCheck == nil { scheduleAudioCheck(after: 1) }
+            if audioCheck == nil { scheduleAudioCheck() }
             finishAudioRestore()
             return
         }
@@ -332,7 +332,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
                               userInfo: [NSLocalizedDescriptionKey: "Audio playback could not start or was interrupted during recovery"])
             }
             audioState = "Playing silent WAV continuously"
-            scheduleAudioCheck(after: 1)
+            scheduleAudioCheck()
         } catch {
             retryAudio(error)
         }
@@ -438,7 +438,7 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
             "Waiting to resume: \(error?.localizedDescription ?? "Audio playback stopped")"
         // One deadline for the entire failed episode, including notification storms.
         if audioCheck == nil {
-            scheduleAudioCheck(after: servicesUnavailable ? Self.serviceProbeInterval : 1)
+            scheduleAudioCheck()
         }
     }
 
@@ -499,10 +499,10 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         previous?.stop()
     }
 
-    private func scheduleAudioCheck(after delay: TimeInterval) {
+    private func scheduleAudioCheck() {
         audioCheck?.invalidate()
-        // One timer: one-second health checks or retries until disabled.
-        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] timer in
+        // One interval for health checks, failure retries and service availability probes.
+        let timer = Timer(timeInterval: Self.audioCheckInterval, repeats: false) { [weak self] timer in
             MainActor.assumeIsolated {
                 guard let self, self.audioCheck === timer else { return }
                 self.audioCheck = nil
@@ -542,8 +542,8 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
             if audioEnabled {
                 audioState = "Waiting for audio services"
                 // Do not permanently depend on a reset/end notification being
-                // delivered. A lost service is probed slowly, never on every hint.
-                if audioCheck == nil { scheduleAudioCheck(after: Self.serviceProbeInterval) }
+                // delivered. Service probes use the same interval, never every hint.
+                if audioCheck == nil { scheduleAudioCheck() }
             }
             if deactivationPending { deactivateAudio() }
             return

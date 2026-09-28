@@ -57,25 +57,40 @@ PUBLISHER
         for _ in 0..<40 {
             NotificationCenter.default.post(name: AVAudioSession.renderingModeChangeNotification, object: nil)
         }
-        until({ received == 40 }, timeout: 0.8)
+        until({ received == 40 }, timeout: 0.4)
         precondition(attempts.count == 1)
         until({ attempts.count >= 3 })
         precondition(attempts.count == 3)
-        precondition(attempts[1] - attempts[0] >= 0.85 && attempts[2] - attempts[1] >= 0.85,
-                     "Unexpected rapid retry rather than the requested one-second timer")
+        precondition(attempts[1] - attempts[0] >= 0.45 && attempts[2] - attempts[1] >= 0.45,
+                     "Unexpected rapid retry rather than the requested 0.5-second timer")
         print("PASS: real run-loop timer retries failed activation without a busy loop; observed seconds=\(attempts)")
         session.rejectActivation = false
         let beforeSignal = attempts.count
         NotificationCenter.default.post(name: AVAudioSession.resumptionRecommendationNotification, object: nil)
-        until({ received == 41 && attempts.count > beforeSignal }, timeout: 0.8)
+        until({ received == 41 && attempts.count > beforeSignal }, timeout: 0.4)
         precondition(AVAudioPlayer.instances.last!.isPlaying)
-        print("PASS: a new queued resumption signal recovers before the next one-second retry")
+        print("PASS: a new queued resumption signal recovers before the next 0.5-second retry")
 
         let healthy = session.activations
         for _ in 0..<100 { app!.restore() }
         runFor(1.1)
         precondition(session.activations == healthy && AVAudioPlayer.instances.last!.isPlaying)
         print("PASS: healthy real timer and repeated foreground restoration do not recreate/reactivate playback")
+
+        // The same real timer must also drive known media-service unavailability.
+        session.rejectActivation = true
+        NotificationCenter.default.post(name: AVAudioSession.mediaServicesWereLostNotification, object: nil)
+        until({ received == 42 })
+        let beforeProbes = attempts.count
+        until({ attempts.count >= beforeProbes + 3 })
+        precondition(attempts.count == beforeProbes + 3)
+        let probes = Array(attempts.suffix(3))
+        precondition(probes[1] - probes[0] >= 0.45 && probes[2] - probes[1] >= 0.45)
+        print("PASS: media-service-loss retries share the 0.5-second real timer; observed seconds=\(probes)")
+        session.rejectActivation = false
+        NotificationCenter.default.post(name: AVAudioSession.mediaServicesWereResetNotification, object: nil)
+        until({ received == 43 && AVAudioPlayer.instances.last?.isPlaying == true })
+        let afterProbes = session.activations
 
         let queued = DispatchGroup()
         queued.enter()
@@ -87,21 +102,21 @@ PUBLISHER
         precondition(queued.wait(timeout: .now() + 2) == .success)
         // The worker finished posting, while its RunLoop delivery is still pending.
         app!.setAudio(false)
-        until({ received == 42 })
+        until({ received == 44 })
         runFor(1.1)
-        precondition(session.activations == healthy && app!.audioState == "Off")
+        precondition(session.activations == afterProbes && app!.audioState == "Off")
         print("PASS: Off before queued worker notification delivery remains Off; the old real timer cannot restart audio")
 
         app!.setLocation(true)
         runFor(0.05)
-        precondition(session.activations == healthy && app!.locationEnabled && !app!.audioEnabled)
+        precondition(session.activations == afterProbes && app!.locationEnabled && !app!.audioEnabled)
         app!.setLocation(false)
         token.cancel()
         let deliveries = received
         app = nil
         NotificationCenter.default.post(name: AVAudioSession.interruptionNotification, object: nil)
         runFor(1.1)
-        precondition(received == deliveries && ownerReleased() && session.activations == healthy)
+        precondition(received == deliveries && ownerReleased() && session.activations == afterProbes)
         print("PASS: location independence, observer cancellation and controller release with real timers")
         session.onActivation = nil
         print("SCOPE: native Foundation/Combine execution with audio/device doubles; measured timing is not an iOS real-time guarantee")

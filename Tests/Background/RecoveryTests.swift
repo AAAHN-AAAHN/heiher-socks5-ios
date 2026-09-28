@@ -41,7 +41,7 @@ import Foundation
                 check(session.activations == before + 1 && AVAudioPlayer.instances.last !== old
                       && AVAudioPlayer.instances.last!.isPlaying,
                       "Immediate invalidation recovery: \(event.rawValue), including absent/unknown metadata")
-                check(Timer.live.count == 1 && Timer.live[0].interval == 1, "Invalidation preserves a single one-second timer")
+                check(Timer.live.count == 1 && Timer.live[0].interval == 0.5, "Invalidation preserves a single 0.5-second timer")
             }
         }
         for event in checkpoints {
@@ -79,8 +79,8 @@ import Foundation
             check(session.activations == before + 1 && app.audioEnabled && Timer.live.count == 1,
                   "Failed immediate activation remains enabled: \(event.rawValue)")
             Timer.live[0].fire()
-            check(session.activations == before + 2 && Timer.live[0].interval == 1,
-                  "Activation failure retries on the next one-second callback")
+            check(session.activations == before + 2 && Timer.live[0].interval == 0.5,
+                  "Activation failure retries on the next 0.5-second callback")
         }
         let echoTimer = Timer.live[0]
         let beforeEcho = session.activations
@@ -98,7 +98,7 @@ import Foundation
         let beforeFailure = session.activations
         app.audioPlayerDecodeErrorDidOccur(firstFailed, error: NSError(domain: "Decoder", code: 7))
         check(session.activations == beforeFailure + 1 && AVAudioPlayer.instances.last !== firstFailed,
-              "First decoder failure has no initial one-second delay")
+              "First decoder failure has no initial 0.5-second delay")
         let replacement = AVAudioPlayer.instances.last!
         let retryDeadline = Timer.live[0]
         app.audioPlayerDecodeErrorDidOccur(replacement, error: nil)

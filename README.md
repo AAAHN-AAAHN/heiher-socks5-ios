@@ -1,8 +1,9 @@
-# Continuous Background audio — interruption recovery revision
+# Continuous Background audio — unified 0.5-second checks and retries
 
 This revision retains the build9 design: one AVAudioPlayer loops the unchanged
 50ms silent WAV indefinitely (`numberOfLoops = -1`), with one common-mode main
-RunLoop timer for health checks or recovery. No finite 0.5s playback, 25ms gaps,
+RunLoop timer with one 0.5-second interval for health checks, failure retries and
+media-service availability probes. No finite 0.5s playback, 25ms gaps,
 prepared-player pool, new QoS, or periodic player replacement is used.
 
 The user-rejected `feature/background-cycled-audio` ref was removed in operation
@@ -56,23 +57,24 @@ existing single-player/transition machinery, not a new audio engine or dispatche
 | First decoder failure, unexpected completion, unnotified stop, actual inactive/began/unknown interruption | Recover immediately when no uncancelable operation owns the transition. A second failure before a healthy sample shares the existing retry budget. |
 | Interruption ended or a resumption recommendation | Availability checkpoint, not resource invalidation. Preserve a healthy player and valid in-flight work. The first meaningful opportunity can expedite an existing failed episode; duplicates cannot spin. |
 | iOS27 shouldNotResume recommendation | Do not erase saved On or stop healthy audio; do not bypass the ordinary retry deadline. Missing context preserves the existing explicit-On best-effort policy without forcing recreation. |
-| Reset or resume after an invalidated in-flight operation | Mark old work unusable, drain its completion, then start at most one fresh attempt without an additional unnecessary one-second wait. |
-| Media services lost | Stop old local output and cancel the normal timer. No immediate activation on loss or every duplicate hint. Retain On and one slow five-second availability probe. |
+| Reset or resume after an invalidated in-flight operation | Mark old work unusable, drain its completion, then start at most one fresh attempt without an additional unnecessary retry wait. |
+| Media services lost | Stop old local output and cancel the normal timer. No immediate activation on loss or every duplicate hint. Retain On and one 0.5-second availability probe. |
 | Media services reset, positive resumption advice, foreground/explicit On after loss | Reevaluate immediately; stale resources never become valid merely because an old operation completed. |
-| Missing media-reset notification | The five-second probe makes one serialized activation attempt. Failure retains slow probing; a fresh accepted activation returns to ordinary preparation and one-second health checks. |
+| Missing media-reset notification | The 0.5-second probe makes one serialized activation attempt. Failure retains the same interval; a fresh accepted activation returns to ordinary preparation and 0.5-second health checks. |
 | Own category/activation echoes | Do not duplicate work, cancel a retry or restart healthy playback. |
 | Repeated failures/hints | One retry timer, unchanged deadline, no attempt limit or automatic Off; no event-frequency activation loop. |
 | User Off | Stop locally now; cancel timer, reject stale results, and serialize release after outstanding activation/preparation. Off-On cannot overtake that release. |
 | Off release rejected | Show failure without an Off retry loop; a repeated explicit Off can retry. |
 | Owner destruction | Stop owned player and timer; best-effort release only after this owner requested activation. Pending operations use weak orphan cleanup. |
 
-All normal health/retry intervals remain one second. Five seconds applies only to
-known media-service unavailability: it avoids both high-rate futile calls and an
-end/reset-only permanent latch. A resumed system normally sends an immediate event;
-without it, availability may wait until that probe. The interval is a bounded policy,
-not a measured Apple recovery latency. One Timer is reused, not two polling systems.
+All scheduled audio health checks, recovery-failure retries and media-service-loss
+availability probes use the single `audioCheckInterval = 0.5` constant. No state
+retains a one- or five-second override. Immediate event-driven recovery remains
+immediate: 0.5 seconds is a scheduling interval, not a delay imposed on every event.
+Off still has no retry timer; an uncancelable pending operation must finish before
+another can start. One Timer is reused, not multiple polling systems.
 
-A first valid interruption is not intentionally delayed for a whole second. The
+A first valid interruption is not intentionally delayed for a timer interval. The
 pacing applies to repeated failures before a healthy observation. Genuine user On
 can retry deliberately. Duplicate automatic hints cannot repeatedly consume that
 privilege. A successful healthy timer sample ends the failed episode. Explicit On received
@@ -97,12 +99,12 @@ safely be replaced by a concurrent duplicate operation; no speculative timeout o
 the in-flight gate. No host-wide session arbitration is introduced.
 
 The healthy path adds only configuration reads and small state checks; it does not
-create players, reactivate the session or emit logs each second. The five-second
-probe runs only in known service loss. Additional state and owner cleanup are bounded.
+create players, reactivate the session or emit logs on each check. Service availability probing
+still runs only in known service loss. Additional state and owner cleanup are bounded.
 No energy, throughput, thermal or latency improvement is claimed without measurement.
 
 isPlaying plus configuration is not a physical output meter. Sampling the looping
-50ms currentTime would alias with the one-second timer and is not added as a false
+50ms currentTime would alias with the 0.5-second timer and is not added as a false
 stall detector. User mute, rendering hints or system audio priority are not overridden.
 The OS may refuse activation; an unscheduled/suspended/killed process cannot execute
 its timers, replenish work or relaunch itself. Silent audio is not a general public
@@ -138,8 +140,10 @@ first/repeated silent and decoder stops, reset storms, reentrant Off, cleanup, a
 single-operation/player/timer and eventual explicit recovery. A separate 12000-event
 sequence ends 300 finite histories using only completions and existing timers:
 saved On must recover without another explicit user request once the platform accepts
-work. The policy driver has 34 current scenarios, ten exact-build9 negative controls,
-and two exact-first-repair negative controls per Swift compiler mode. Repetitions are not
+work. The policy driver has 35 current scenarios, ten exact-build9 negative controls,
+two exact-first-repair negative controls and an exact pre-interval-change control
+per Swift compiler mode. Historical recovery controls retain their original interval
+expectations so timing differences cannot falsely satisfy a recovery-defect check. Repetitions are not
 independent device trials. Exact-build9 negative controls must fail the repaired
 properties; old failures are never counted as new-source failures.
 
@@ -149,7 +153,22 @@ iPhoneOS27 SDK check retains warnings-as-errors and records the actual declarati
 The existing uninstrumented Simulator UI test, original deadlines and advisory scan
 remain. Input/index/marker guards and common46-case native-input fixture remain.
 
-### Final verified state — 2026-09-28
+### Execution status for the 0.5-second revision
+
+This interval-only revision is based on `7c410b973181ea8acfeab46a695098268f854498`.
+Production changes are confined to the shared scheduling constant/helper and the
+Audio footer. State classification, immediate recovery, notification coalescing,
+Off priority, infinite playback, all location code, source pins and QoS are unchanged.
+Compared with the preceding policy, requested healthy/retry wakeups double (1s to
+0.5s), and unavailable-service probes increase tenfold (5s to 0.5s). Actual operation
+completion and scheduling can extend these intervals; these are not measured CPU,
+battery or recovery-speed improvements. No busy loop or overlapping work is added.
+Current local and remote validation results will be recorded for the exact changed
+source after execution. Previous results below are historical, not current evidence.
+No new IPA or release integration is requested by this interval-only change.
+
+### Historical evidence — preceding 1-second / 5-second revision
+
 
 Implementation and the scoped Background validation are complete at tested commit
 `6f1ab4fcdd1073b18711112224ef990ab9281cc0`, tree

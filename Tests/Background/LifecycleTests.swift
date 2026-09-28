@@ -78,8 +78,8 @@ import Foundation
             AVAudioPlayer.rejectPlay = failure == 3
             app.setAudio(true)
             check(app.audioEnabled && app.audioState.hasPrefix("Waiting to resume")
-                  && Timer.live.count == 1 && Timer.live[0].interval == 1,
-                  "Initial failure \(failure) retains intent and exactly one one-second retry")
+                  && Timer.live.count == 1 && Timer.live[0].interval == 0.5,
+                  "Initial failure \(failure) retains intent and exactly one 0.5-second retry")
             for _ in 0..<10 { Timer.live[0].fire() }
             check(app.audioEnabled && Timer.live.count == 1,
                   "Repeated failure \(failure) does not auto-disable or accumulate timers")

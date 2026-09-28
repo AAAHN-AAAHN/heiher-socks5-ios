@@ -105,7 +105,10 @@ def main():
     assert all(token not in controller for token in ('UserDefaults', 'AppStorage', 'HevSocks5Server',
                                                     'BGTaskScheduler', 'MPRemoteCommandCenter'))
     assert controller.count('Timer(timeInterval:') == 1
-    assert 'scheduleAudioCheck(after: 2)' not in controller
+    assert 'private static let audioCheckInterval: TimeInterval = 0.5' in controller
+    assert 'Timer(timeInterval: Self.audioCheckInterval, repeats: false)' in controller
+    assert 'scheduleAudioCheck(after:' not in controller
+    assert 'serviceProbeInterval' not in controller
     view = text('Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift')
     assert view.index('Text("Audio")') < view.index('Text("Location")')
     assert 'BackgroundKeepAlive.audioNotifications.map' in view

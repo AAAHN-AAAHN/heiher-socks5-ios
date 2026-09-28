@@ -5,6 +5,11 @@ import Foundation
 @main struct InterruptionPolicyTests {
     @MainActor static func main() {
         let name = CommandLine.arguments[1]
+        // Historical defect controls retain their own timing contract, so an
+        // interval change cannot masquerade as detection of a recovery defect.
+        let historical = CommandLine.arguments.contains("--historical-intervals")
+        let expectedInterval: TimeInterval = historical ? 1 : 0.5
+        let expectedServiceInterval: TimeInterval = historical ? 5 : 0.5
         let session = AVAudioSession.shared
         let app = BackgroundKeepAlive()
         var checks = 0
@@ -35,6 +40,10 @@ import Foundation
             check(session.pending.count + DispatchQueue.pendingUtility.count <= 1,
                   "at most one exclusive platform operation")
             check(Timer.live.count <= 1, "at most one management timer")
+            if !historical {
+                check(Timer.live.allSatisfy { $0.interval == 0.5 },
+                      "every state uses the same independently expected 0.5-second interval")
+            }
             check(AVAudioPlayer.instances.filter(\.isPlaying).count <= 1, "at most one playing object")
             if !app.audioEnabled {
                 check(Timer.live.isEmpty && !AVAudioPlayer.instances.contains(where: \.isPlaying),
@@ -42,6 +51,33 @@ import Foundation
             }
         }
         switch name {
+        case "uniform-intervals":
+            app.setAudio(true)
+            let original = AVAudioPlayer.instances.last!
+            check(Timer.live.count == 1 && Timer.live[0].interval == 0.5,
+                  "normal playback is checked every 0.5 seconds")
+            Timer.live.first?.fire()
+            check(AVAudioPlayer.instances.last === original && session.activations == 1,
+                  "shorter health interval does not recreate healthy playback")
+            session.rejectActivation = true
+            app.audioPlayerDecodeErrorDidOccur(original, error: nil)
+            check(Timer.live.count == 1 && Timer.live[0].interval == 0.5,
+                  "ordinary recovery failure retries after 0.5 seconds")
+            let retry = Timer.live.first
+            for _ in 0..<100 { event(AVAudioSession.renderingModeChangeNotification) }
+            check(Timer.live.first === retry, "hints preserve the half-second deadline")
+            event(AVAudioSession.mediaServicesWereLostNotification)
+            check(Timer.live.count == 1 && Timer.live[0].interval == 0.5,
+                  "known media loss also uses 0.5 seconds, not five seconds")
+            Timer.live.first?.fire()
+            check(Timer.live.count == 1 && Timer.live[0].interval == 0.5,
+                  "failed service availability probe keeps the half-second interval")
+            session.rejectActivation = false
+            Timer.live.first?.fire()
+            check(healthy() && Timer.live.first?.interval == 0.5,
+                  "service recovery returns to the same half-second health interval")
+            app.setAudio(false)
+            check(Timer.live.isEmpty, "Off does not gain an automatic retry loop")
         case "healthy-advice":
             app.setAudio(true)
             let first = AVAudioPlayer.instances.last!
@@ -107,7 +143,7 @@ import Foundation
             drain()
             check(healthy() && session.activations == 2,
                   "latest explicit On follows invalidated completion without an extra retry delay")
-            check(Timer.live.count == 1 && Timer.live[0].interval == 1,
+            check(Timer.live.count == 1 && Timer.live[0].interval == expectedInterval,
                   "explicit recovery returns to one normal health timer")
         case "explicit-during-valid-activation", "explicit-during-valid-preparation":
             session.deferTransitions = name.hasSuffix("activation")
@@ -129,8 +165,8 @@ import Foundation
                 advice(false)
             }
             check(session.activations == before && Timer.live.count == 1
-                  && Timer.live[0].interval == 5 && !healthy() && app.audioEnabled,
-                  "known service absence keeps one slow probe rather than retrying on hints")
+                  && Timer.live[0].interval == expectedServiceInterval && !healthy() && app.audioEnabled,
+                  "known service absence keeps one 0.5-second probe rather than retrying on hints")
             let deadline = Timer.live.first!
             for _ in 0..<100 { event(AVAudioSession.mediaServicesWereLostNotification) }
             check(Timer.live.first === deadline, "duplicate loss does not starve availability probe")
@@ -141,27 +177,27 @@ import Foundation
             app.setAudio(true)
             session.rejectActivation = true
             event(AVAudioSession.mediaServicesWereLostNotification)
-            check(session.activations == 1 && Timer.live.first?.interval == 5,
+            check(session.activations == 1 && Timer.live.first?.interval == expectedServiceInterval,
                   "loss does not attempt immediate use of known-unavailable service")
             for _ in 0..<3 {
                 Timer.live.first?.fire()
-                check(Timer.live.count == 1 && Timer.live[0].interval == 5,
-                      "failed service probe remains slow and bounded")
+                check(Timer.live.count == 1 && Timer.live[0].interval == expectedServiceInterval,
+                      "failed service probe remains paced and bounded")
             }
-            check(session.activations == 4, "one attempt per slow probe")
+            check(session.activations == 4, "one attempt per availability probe")
             session.rejectActivation = false
             Timer.live.first?.fire()
-            check(healthy() && session.activations == 5 && Timer.live.first?.interval == 1,
+            check(healthy() && session.activations == 5 && Timer.live.first?.interval == expectedInterval,
                   "missing reset notification does not permanently latch service loss")
         case "lost-probe-interruption":
             app.setAudio(true)
             event(AVAudioSession.mediaServicesWereLostNotification)
             session.deferTransitions = true
             Timer.live.first?.fire()
-            check(session.pending.count == 1, "slow service probe is an exclusive real request")
+            check(session.pending.count == 1, "service probe is an exclusive real request")
             event(AVAudioSession.didBecomeInactiveNotification)
             session.completeNext()
-            check(!healthy() && Timer.live.first?.interval == 5,
+            check(!healthy() && Timer.live.first?.interval == expectedServiceInterval,
                   "new interruption during probe rejects its obsolete success")
             event(AVAudioSession.mediaServicesWereResetNotification)
             drain()
