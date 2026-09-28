@@ -72,7 +72,12 @@ final class StatisticsUITests: XCTestCase {
                 XCTAssertEqual(volumeLabel.label, "Vol.")
                 XCTAssertEqual(speedLabel.frame.minX, volumeLabel.frame.minX, accuracy: 1)
                 XCTAssertEqual(speedLabel.frame.maxX, volumeLabel.frame.maxX, accuracy: 1)
-                XCTAssertLessThan(speedLabel.frame.width, first.frame.width,
+                // XCTest reports the "In" glyph width, not its allocated Grid
+                // column. Compare against adjacent column-center spacing instead.
+                let nextColumn = app.staticTexts[id + "-column-out"]
+                XCTAssertTrue(nextColumn.exists)
+                let columnWidth = nextColumn.frame.midX - first.frame.midX
+                XCTAssertLessThan(speedLabel.frame.width, columnWidth,
                                   "Abbreviations must leave more room for the value columns")
                 let bytes = (orientation == .portrait ? 64 : 128) * (id == "total" ? 2 : 1)
                 var previousColumnX: CGFloat = -.infinity
