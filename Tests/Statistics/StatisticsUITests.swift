@@ -38,11 +38,13 @@ final class StatisticsUITests: XCTestCase {
             app.tabBars.buttons["Statistics"].tap()
             XCTAssertTrue(app.navigationBars["Statistics"].waitForExistence(timeout: 5))
             let client = app.buttons["client-1"]
+            let form = app.collectionViews.firstMatch
+            XCTAssertTrue(form.waitForExistence(timeout: 5))
             for _ in 0..<6 {
                 if client.isHittable { break }
-                // Statistics is a Form, not the Server tab's ScrollView.
-                // Swipe its visible content without assuming an accessibility type.
-                app.swipeUp()
+                // The recorded Form hierarchy exposes this CollectionView.
+                // Target its content, not the application or floating tab bar.
+                form.swipeUp()
             }
             XCTAssertTrue(client.waitForExistence(timeout: 5))
             XCTAssertTrue(client.isHittable)
