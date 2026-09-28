@@ -163,7 +163,7 @@ activation, without an overlapping operation or retry loop in that segment. Its
 internal cause and relation to other timeouts remain unestablished; no speculative
 forced restart, host/QoS change or timeout relaxation is added here.
 
-### Current audit execution status
+### Preceding audit execution status (8fc29ed4)
 
 Implementation and scoped validation are complete for tested commit
 `8fc29ed478846828486ad9afcb69fe08ad52f63a`, Git tree
@@ -234,3 +234,92 @@ Primary API contracts (not execution evidence):
 - https://developer.apple.com/documentation/avfaudio/avaudiosession/mediaserviceswereresetnotification
 - https://developer.apple.com/documentation/avfaudio/avaudioplayer/preparetoplay()
 - https://developer.apple.com/forums/thread/685525
+
+## Final independent re-review — 2026-09-28
+
+The review baseline is `cbb82a6cdcda981abb1f41a64d2656bb823f0af2`. The new tested
+commit is `1911d5bc21d719cc57f21c658310dcade144148b`, tree
+`a2a70dea7adcb8da0c02bbfd614ea42329538328`. No additional production defect was
+reproduced in this review. All app code, notification membership, UI, project/plist,
+assets, native framework, workflow, timing and QoS remain byte/mode-identical to
+cbb82a6c. Existing recovery behavior was not rewritten merely to produce a change.
+Controller blob/SHA-256 remain `0224ecec67a7c454d7943affc1790542dee13386` /
+`c6217c53f37251ab3cde42fc978512a281abd1c86adb555050ec157f74c280a7`.
+
+Only three test paths changed before validation: `FinalRecoveryTests.swift` and
+`check_final_recovery.py` were added under `Tests/Background`; three lines connect
+the latter to the existing policy driver. They share the existing PlatformMocks,
+not another recovery implementation. These files are not part of the app target.
+The closing documentation commit changes only README and the matching feature
+specification; the other 74 of 76 tested paths are preserved. Device runtime cost
+from these test additions is absent; host/CI test work increases.
+
+Additional tests enumerate all 69,984 ordered triples from 18 inputs, six initial
+phases and accepting/rejecting platform responses. Inputs include timer delivery
+and operation completion between invalidations, missing/malformed advice, On/Off,
+configuration drift, decoder/finish callbacks and silent stops. A separate set of
+65,536 events from 16 seeds contains 1,024 checkpoints that must recover saved On
+using only existing timers/completions after simulated failures end. It also covers
+missing assets, initialization/play/category failures, stale callbacks and a
+contradictory success/error response. Per compiler mode the two groups perform
+3,536,982 and 313,371 assertions. These are finite modeled histories, not independent
+physical interruptions or a proof over every possible history.
+
+The timer guard scans all production Swift: one 0.5-second constant, five calls to
+one scheduling helper, one Timer constructor using that constant, no per-state
+interval override or alternative app polling timer. A test-copy mutation to 1 second
+must fail this guard's runtime invariant. It is intentionally invalid test input,
+not a production change or a newly discovered production bug. Off and uncancelable
+operations still do not create repeated platform calls. Native I/O timeouts and test
+process deadlines are unrelated and unchanged.
+
+Fresh run `36369375869` results:
+
+| Evidence layer | Result and scope |
+| --- | --- |
+| Added ordered-triple and long-history tests | Both compiler modes pass all 69,984 histories and 65,536 events/1,024 liveness checkpoints on the CI Linux and Apple hosts. |
+| Mutation and historical controls | A deliberate 1-second source copy fails the half-second invariant in both modes. All prior recovery and mixed-signal negative controls retain their expected failures. |
+| Existing regression suites | The original 35 policy scenarios, 1,352-pair matrix, reentry/mixed sequences, controller/delegate/lifetime/authorization, async-session/preparation and source-scope drivers pass. |
+| Foundation/Combine | 34 main/worker notification deliveries and cancellation pass. Failure-pacing and loss probes use the real RunLoop with mocked audio: activation times 0.00157/0.51396/1.14685s and loss times 2.29441/2.84106/3.36004s are host observations, not a real-time guarantee. |
+| Apple SDK and WAV | Five Swift files typecheck for ARM64/iOS17.2 against iPhoneOS27, warnings-as-errors, empty diagnostic log. AVAudioFile confirms all 400 silent PCM samples of the unchanged 50ms asset. |
+| Uninstrumented Simulator, attempt 3 | Original iPhone16/iOS27.0 build24A434 XCTest passes: 1 case, 0 failures, 0 skips, 114.623 seconds. Playing/Off screenshots inspected. Targeted audio advisory absent; runtimeWarnings and cleanup empty. |
+| Overall scoped run | Run36369375869 concludes success on attempt3. SDK/Linux are original attempt1 results; only the failed UI job was rerun. |
+| Native archive/IPA and physical targets | Generic verify/archive intentionally skipped by audio-checks-only. No new IPA/release merge; physical SideStore/LiveContainer and actual device interruptions not performed. |
+
+The original SDK and Linux ZIPs came from attempt 1; only the failed Simulator job
+was rerun. Every downloaded original ZIP was SHA-256/CRC checked. Source archives
+were compared against all 76 tested paths and modes, and the Git tree above was
+independently reconstructed. Local Linux/Swift6.2.1 additionally passed the new
+debug/optimized tests and mutation controls, existing current fixtures and policy/
+mixed regressions. A clean extraction of the CI source ZIP reran the new standalone
+driver in both modes. Offline tests do not substitute for actual Apple execution.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| SDK 10948676773 | a47257c98d704c4c7c272357c400fad7fd4c0d06900476f0bae308bebadd9446 |
+| Linux 10949140923 | 912ffb84e8dfffe3481f32cb8dbdd01497f38b965f0f2dcb491efd2a0a1e7e01 |
+| Retained UI attempt1 10948219710 | 1ee2f4127a83178169922707c38bc27a3b18dd947448cd8ee86a23cf987939ac |
+| Retained UI attempt2 10949300216 | 3c300f720ecb2aa58a7a6279113e08584d885e698a308cbbba9815044e7a6d35 |
+| Successful UI attempt3 10949431169 | 7336625d70955a33629f47b58694a3e2433df6249a87718e6ca22f6b6a8427ce |
+
+Attempt 1 passed initial repeated On/Off and Playing observation, then failed the
+original Playing wait after saved-On relaunch: one XCTest failure, 111.949 seconds,
+cleanup empty. No internal cause was established by that uninstrumented log. The
+previous 10.78837-second prepareToPlay observation belongs to its separate historical
+diagnostic and is not presented as this failure's cause. Attempt 2 instead lost the UI snapshot/helper connection at the initial switch lookup before audio On (one failure, 89.916 seconds, cleanup empty). Its termination cause was not established. Attempt 3 passed the unchanged source and original gates.
+
+No timeout, predicate, advisory scan or production source was changed for the retry.
+A passing retry does not erase the failed run or establish bounded startup latency.
+No fixed 500ms execution/recovery guarantee, physical-output certification, or
+unlimited background execution is claimed. Physical iOS27 SideStore and LiveContainer
+runs, actual calls/Siri/Bluetooth/service resets, long locked-iPad operation and
+performance/power comparisons remain unperformed. Other seven branches and build9
+release/IPA remain unchanged; the rejected cyclic branch stays absent.
+
+Standalone reproduction (Swift compiler required, Git history not required):
+
+```sh
+python3 Tests/Background/check_final_recovery.py all
+```
+
+The existing full policy/ancestry drivers still require historical Git objects.
