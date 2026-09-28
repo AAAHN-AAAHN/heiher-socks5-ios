@@ -133,19 +133,89 @@ orientation/scrolling/navigation gates and adds a real locally relayed UDP paylo
 plus expanding its client-IP row. No production source is replaced by test doubles
 in that app. The committed source remains distinct from the disposable product copy.
 
-### Execution status
+### Completed implementation and validation — 2026-09-28
 
-Implementation candidate; current complete native/SDK/Simulator results must be
-recorded after the actual run. Local isolated collector code has passed concurrent
-and failure-boundary tests, including ASan/UBSan, and the new pure Swift model passes
-debug/optimized. Those supplemental local checks are not a complete linked native
-build, Apple SDK or Simulator result. All failures remain failure evidence until
-resolved and a new exact-source run completes; no earlier pass is borrowed.
+The tested source is `065855d41f61dba1c96e8b27e5ec44ad184e68e1`, Git tree
+`4a72eb9d14c3f325cfeb22cc2bf7b61343ee0741`. Run `36382538730`, attempt 1,
+completed all four jobs successfully: exact UDP prerequisites on Linux/macOS and
+statistics on Linux/macOS, including the actual uninstrumented Simulator app.
+The closing commit updates only README and this identical feature specification;
+the other 85 of 87 tested paths retain their exact bytes and Git modes. It does not
+claim a new execution of a documentation-only commit.
+
+| Evidence layer | Actual result and scope |
+| --- | --- |
+| Prerequisite ownership | Both jobs checked out UDP9909aa5f, not the triggering statistics commit. Both original 57-file source archives match. Main ancestry, all 17 mapped owner files, original three UDP patches and source pins remain exact. |
+| Existing aggregate accounting | Linux buffered/splice and macOS buffered pass the original network scenarios (20 executions per mode), eight peer/queue cases, 8 writers/800000 aggregate updates and partial-I/O/cancellation probes. Existing external read/write boundaries and the task-io patch are unchanged. |
+| Real native IP attribution | Each mode passes dual-stack control-peer attribution, same-IP connections/associations, known/unknown UDP endpoints, asymmetric TCP/half-close, UDP-over-TCP, concurrent TCP/UDP, socket-number churn, and Stop/Start retention. Per-IP sums including Unattributed equal aggregate totals at rest. |
+| Collector concurrency/failures | The actual collector fixture passes IPv4-mapped normalization, IPv6 scope, lookup/allocation failures, no hot-path lookup, snapshot capacity/canaries, callbacks outside the lock, concurrent registration/reads and eight writers. ASan/UBSan pass on the included collector and boundary probes; macOS also passes actual-collector and aggregate TSan. These are scoped sanitizer targets, not whole-program sanitizer certification. |
+| Swift models | Existing 10000-sample aggregate model passes. The per-IP model passes debug/optimized: independent rates, first/idle samples, stable IDs, unknown visibility, counter/time edges and resetting view baselines without resetting native totals. |
+| Guards and Apple SDK | Common 46-case and statistics 26-case input/marker checks, three audit-driver and six pipe-reader cases, format/reverse-patch, clean source/index and composition checks pass. Patched native C/headers and five production Swift files typecheck for ARM64/iOS17.2 against iPhoneOS27 with warnings-as-errors and empty diagnostic logs. |
+| Simulator product and UI | The disposable product rebuilds and links the patched native library. iPhone16/iOS27.0 build24A434 runs one XCTest successfully, zero failures, 71.368 seconds case time. Both portrait/landscape exercise actual Start/Stop, SOCKS greetings, a real 64-byte UDP payload, client-row visibility/expansion and tab navigation. Original four screenshots inspected; cleanup is []. No production mocks or injected counter values are used in that app. |
+| Archive/IPA and physical devices | No iPhone archive/IPA or release merge is produced. SideStore standalone and LiveContainer guest execution, physical-device/network behavior and before/after power/throughput/latency are unperformed. |
+
+Original CI artifact ZIPs were SHA-256/CRC verified. Linux native, macOS native and
+Simulator source ZIPs share the expected commit comment and all 87 files/modes;
+independent Git-tree reconstruction matches the tested tree above. The two UDP
+prerequisite source ZIPs independently match the owner ref and each other. The
+closing documentation files are the only final-source differences.
+
+A supplemental Linux/Swift6.2.1 replay independently rebuilt the exact patched native
+source and reran buffered/splice network/accounting/collector tests plus ASan/UBSan,
+and both Swift models in debug/optimized modes. Another local test ran 24 concurrent
+TCP+UDP tasks using distinct IPv4 control peers127.0.0.2/127.0.0.3 to the same
+server/destinations. Their directional totals were20544/20676 bytes, respectively;
+the aggregate was41220 bytes per direction, also retained over Stop/Start. This is
+local loopback verification, not a physical LAN or device test. It does not replace
+the full-history CI provenance checks or Apple execution.
+
+The 2000 sequential 64-byte UDP echo fixture per mode remains only a local timing
+observation: this run's Linux buffered/splice medians were0.141/0.143ms and macOS
+buffered0.166ms. It is not an old/new benchmark, maximum packet-rate test or evidence
+of no overhead. IP-cardinality memory growth and independent live snapshots retain
+the limitations described above. In UI, a single localhost client was exercised;
+multiple actual device rows, every Dynamic Type/keyboard case and iPad layouts were
+not physically tested. Screenshots do not certify every cell is visible at once.
+
+Recorded Apple host: Xcode27.0 27A266a, iPhoneOS27.0, Swift6.4
+swiftlang-6.4.0.34.1, macOS27.0 26A428. Compiler diagnostics are empty, but raw build
+logs retain tool/framework diagnostics; not every warning category is claimed absent.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Statistics Linux10953452120 | 4e3bd8a38d124498902820333f358f33bafbacda572ebcaaa89e3057fa38a823 |
+| Statistics macOS10953129549 | ed426a1edcdaa41cc17bc3ac95b3ca6bb1313d446fc99f61098d66f7d81226be |
+| UDP Linux10953122325 | 9c235a1c7f9b4da9223a84aa2362fd4e632a87471c35253a3b95b2a585ef49c6 |
+| UDP macOS10952633248 | a6712a2508a3041f954d62072f387c0bb4f210762c1dd85fcbf45ab64d59c9af |
+
+### Retained UI failures and their correction
+
+Earlier implementation runs did not pass all UI gates. Run36377790407 left the
+landscape Form at0percent after application-level swipes. Its artifact10951348700
+(SHA25658c031f7412f7e1eb66317d1a6cee60498b3255735a87af7298031ea7af6d420)
+was retained by the preceding resume. Commit12a70a4 targeted the recorded CollectionView
+instead; run36379621481 then scrolled to100percent past the retained expanded client
+header. The raw accessibility snapshot still contained its Total Out0.13KB; the
+header was above the visible cells. That attempt failed the client-button assertion
+(82.596-second XCTest) and subsequently exceeded the existing900-second xcodebuild
+process timeout. Original artifact10953370179 is preserved unchanged, SHA256
+08605fba59db7df76b84f7153b84e79f23f56243e4443613c2774cfffef6770b; cleanup was [].
+This evidence identifies a test scroll-position problem, not lost native counters.
+The later result-completion timeout's internal cause is not established.
+
+Commit065855d4 changes only the test gesture sequence: use a bounded return to the
+existing top section, then short content drags to find the IP header without skipping
+it. The test still requires both orientations, reachable client header, expansion,
+actual payload, Server control behavior and original timeouts. No production layout,
+accounting, sampling, native code, assertion removal or timeout increase was used to
+manufacture a pass. The final fresh run passes all these gates. Earlier failures
+remain failures and are not retrospectively relabeled successful.
 
 The preceding aggregate-only specification and its successful36226383235 results
 are preserved exactly in docs/history/statistics-before-client-ip-20260928.md.
+Only feature/traffic-statistics advances. Background9d87d7cf and its0.5-second audio
+recovery are unchanged, as are the other feature/main/release refs and old build9 IPA.
 Physical SideStore, LiveContainer, real device IPv4/IPv6/VPN/hotspot/Moonlight, long
 locked-iPad operation, power and before/after throughput/latency remain unperformed
-for this new feature unless separately recorded. An old build9 IPA does not contain
-these changes. Final release integration must inherit this feature and run its own
-combined validation.
+for this new feature. The existing build9 IPA does not contain these changes. A
+future release integration must inherit this feature and run its combined validation.
