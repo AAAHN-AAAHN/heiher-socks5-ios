@@ -476,3 +476,59 @@ SideStore or LiveContainer execution, arbitrary font/layout coverage, or a new I
 Background9d87d7cf, other feature/main/release refs and the existing build9 IPA remain
 unchanged. The final documentation commit updates only this README and its identical
 feature specification; the other85 of87 paths correspond to the tested source.
+
+
+## Completed strict statistics audit — 2026-09-28
+
+Baseline `ad2c3e00956b825ce3cdcd59e1a5b4f13fad6139` was reviewed across native
+accounting, IP attribution, snapshots, numeric formatting, table layout and task
+lifetime. The actual branch is feature/traffic-statistics. Detailed scope, design
+choices and test boundaries are in `docs/reviews/statistics-strict-20260928.md`.
+
+The only production change publishes the client model once per native snapshot:
+build a local value with the existing per-IP sampler, then assign it to State.
+This replaces unnecessary per-row State writes and can avoid repeated copying when
+value storage is shared. No native miscount or per-row SwiftUI render was measured.
+The original sample-body guard reverses only these explicit edits before checking
+all remaining bytes. No new persistent property, cache, timer, queue, API, native
+patch, layout, model formula or sampling interval is introduced.
+
+Tested commit `bdcb3fbb8cac9ac88ba8c47108977592ecd46a8b`, tree
+`2ea2ff8b213598a0e1222062fa251d9e7f24265c`, passed run `36425863911` on
+attempt1. All four jobs succeeded: exact UDP prerequisites on Linux/macOS and
+statistics on Linux/macOS, including the rebuilt uninstrumented Simulator product.
+New exact-method tests pass98,516 conditions per compiler mode for512 clients and
+64 intervals. The exact prior view fails the new one-publication condition with513
+setters, not incorrect native totals. Expanded native tests add2,048 IP keys beyond
+256 hash buckets, collisions, fd aliases, ten capacity/canary conditions, concurrent
+registration/snapshot boundaries, unsigned wrap conservation and allocation fallback.
+Normal/ASan/UBSan pass on both hosts; macOS TSan passes in its collector scope.
+
+All existing native accounting, partial-I/O, peer, ownership, format, source/index,
+Swift models and Decimal controls remain and pass. Five production Swift files and
+native C/headers pass iPhoneOS27 ARM64/iOS17.2 checks with warnings-as-errors and
+empty diagnostics. iPhone16/iOS27.0 build24A434 passes the original XCTest:1case,
+0failures/0skips,88.733seconds; runtimeWarnings=[] and cleanup=[]. Original portrait
+and landscape attachments were inspected. This small two-client UI test does not
+measure a512-client SwiftUI frame rate or certify PB/maximum-font-size layout.
+
+The four original artifact ZIPs were SHA-256/CRC verified, and the91-path statistics
+sources agree in commit comment, bytes and Git file modes. Independent reconstruction
+matches the tested tree. Local extracted-source buffered/splice replay and a fresh
+exact-sample replay in both compiler modes are supplemental to the full-history CI.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Statistics Linux10971144098 | 643443f36533961d6b27fcf930b9b952cdecda6a0d48bc6eed6ca49016e5e3bf |
+| Statistics macOS10971980948 | ce48113eb9582fa92caa578e01dec3fe65a75d984838b60e9c6c2bbd0dd42a48 |
+| UDP Linux10970558868 | d566e77d19a46bcee7389976a18c30e516f620cca0e5f794851c0616e54408af |
+| UDP macOS10971074297 | f154c20df49d466a0fe1458ef538ae32d192179366add1aa6d21b82e3140288b |
+
+The closing commit changes this README, its identical feature specification and the
+audit report only; the other88 of91 paths retain the tested source. No additional
+native-accounting defect was reproduced in this review. Finite tests are not a
+proof of every system or event history. IP-cardinality memory growth, independent
+live snapshot reads and possible truncation at the50% scale floor remain documented
+limits. No new IPA/release merge, physical SideStore/LiveContainer, long locked-iPad
+or comparative power/throughput test is claimed. Other seven refs and build9 IPA,
+including Background9d87d7cf and its0.5second recovery, remain unchanged.

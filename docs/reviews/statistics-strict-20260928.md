@@ -1,6 +1,6 @@
 # Statistics strict audit — 2026-09-28
 
-## Scope and candidate status
+## Scope and completed status
 
 Review baseline: `ad2c3e00956b825ce3cdcd59e1a5b4f13fad6139` on the actual branch
 `feature/traffic-statistics` (there is no separate `feature/statistics` ref).
@@ -81,7 +81,7 @@ UI predicates/timeouts, source pin/ownership or clean-worktree/index checks.
   active; native accounting remains independent. Background's0.5second is separate.
 
 No additional reproducible native accounting or state-lifetime defect was identified
-in the inspected code and finite tests so far. This is not proof of every possible
+in the inspected code and finite tests. This is not proof of every possible
 system, adversarial input or infinite history. Registry memory grows with distinct
 IPs and is not silently bounded/evicted; changing that would alter the requested
 process-lifetime per-IP contract. Extremely high cardinality can still consume
@@ -91,15 +91,46 @@ traffic measurements. Long strings and extreme accessibility sizes can truncate 
 the scale floor. Unrelated host code in LiveContainer is not coordinated by this
 registry or sampler. No new IPA or release integration is requested.
 
-## Execution status
+## Completed execution evidence
 
-Local extracted-source buffered native tests and both new drivers passed. The
-sample-body test passed debug/optimized and rejected the exact previous per-row
-publication control as intended. Expanded native contracts passed normal/ASan/UBSan.
-These local runs are supplemental and do not pretend to be a full historical Git
-checkout or Apple execution. Fresh candidate CI native/SDK/Simulator results must
-be recorded before closing the audit. No new real SideStore/LiveContainer run,
-physical network/locked-device test or comparative energy/throughput claim is made.
+Tested commit: `bdcb3fbb8cac9ac88ba8c47108977592ecd46a8b`.
+Tested tree: `2ea2ff8b213598a0e1222062fa251d9e7f24265c` (91 paths).
+Run36425863911, attempt1, completed all four jobs successfully. The final closing
+commit changes README, the identical feature specification and this report only;
+all other88 paths remain byte/mode-identical to the tested source. This documentation
+commit is not counted as another execution.
+
+| Layer | Actual result and scope |
+| --- | --- |
+| Exact-method sampling | Both compiler modes pass98,516 checks. Original view gives513 setters and fails the intended publication-count control. No claim of513 actual SwiftUI renders or a native miscount. |
+| Additional native registry | Linux buffered/splice and macOS buffered pass2,048 extra keys, aliases, ten capacity/canary cases, registration race, wrap conservation and allocation failure. Normal/ASan/UBSan pass; macOS TSan passes for the instrumented collector. |
+| Retained tests | Original network/partial-I/O/peer/concurrency and models, including10001 original and20002 TB/PB Decimal references, pass without weaker expectations. Source pin/owner/format/reverse-patch,46 common input cases,26 statistics cases,3 driver and6 reader checks pass. |
+| Apple SDK | Xcode27.0 27A266a, iPhoneOS27.0, Swift6.4 swiftlang-6.4.0.34.1, macOS27.0 26A428. Patched C/headers and five production Swift files typecheck for ARM64/iOS17.2 with warnings-as-errors; compiler logs are empty. |
+| Actual Simulator | iPhone16, iOS27.0 build24A434, original uninstrumented XCTest1pass/0fail/0skip in88.733seconds. Initial Total, table layout, real IPv4/IPv6 UDP payloads, registered IP order, portrait/landscape and original Server controls pass. runtimeWarnings=[]; cleanup=[]. |
+| Local replay | Exact extracted native source passes buffered/splice tests and added normal/ASan/UBSan registry contracts. Models and sample-body fixture pass debug/optimized on Linux/Swift6.2.1. A fresh CI-source extraction repeats sample tests with only the exact old blob supplied for its control; no fake commit history. |
+| Physical/products | No iPhone archive/IPA, release integration, physical SideStore/LiveContainer execution, real-device large-cardinality layout, long lock-screen operation or power/throughput comparison. |
+
+Original ZIP hashes/CRCs were verified. Statistics Linux, macOS native and UI source
+archives have identical91file bytes/modes and the tested commit comment; a separate
+Git-tree reconstruction matches the tree above. Both57file UDP archives retain
+owner9909aa5f. Original screenshots were inspected without editing their pixels.
+The UI uses two small local network clients; it does not substitute for the512-client
+state fixture or measure large-list rendering. The runtime improvement is6added and
+2removed lines in one production file, including comments/indentation.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Statistics Linux10971144098 | 643443f36533961d6b27fcf930b9b952cdecda6a0d48bc6eed6ca49016e5e3bf |
+| Statistics macOS10971980948 | ce48113eb9582fa92caa578e01dec3fe65a75d984838b60e9c6c2bbd0dd42a48 |
+| UDP Linux10970558868 | d566e77d19a46bcee7389976a18c30e516f620cca0e5f794851c0616e54408af |
+| UDP macOS10971074297 | f154c20df49d466a0fe1458ef538ae32d192179366add1aa6d21b82e3140288b |
+
+No current CI retry, relaxed assertion, larger timeout, host switch or production
+instrumentation was required. Earlier UI/test failures remain recorded in the
+preceding README sections, not reclassified by this success. Native memory growth,
+nontransactional live counters, finite test coverage,50percent scaling limits and
+separate physical target requirements above remain. No additional reproducible
+native-accounting or state-lifetime defect was found within this audit's scope.
 
 Primary API background, not project execution evidence:
 https://developer.apple.com/documentation/swiftui/state
