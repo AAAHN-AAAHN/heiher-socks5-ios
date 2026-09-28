@@ -94,7 +94,8 @@ tap is required. The existing
 TrafficStatistics delta/format model is reused per native ID; no second formula or
 native sampling thread is added. Counters are subtracted as UInt64 before Double
 conversion. First samples, nonincreasing times or decreased counters establish a
-zero-rate baseline. Decimal KB/MB/GB and Kbps/Mbps/Gbps retain their existing meaning.
+zero-rate baseline. Decimal KB/MB/GB/TB/PB and Kbps/Mbps/Gbps/Tbps/Pbps use the
+same 1,000-based scaling. Value cells may shrink to 50% of their normal text size.
 
 One visible/active-tab task samples the aggregate and rows immediately and about
 once per second using monotonic systemUptime. Leaving the tab or inactive scene
@@ -406,3 +407,72 @@ standalone, LiveContainer guest, extreme Dynamic Type and very long address/valu
 layouts remain unperformed. This scoped task creates no iPhone archive/IPA and
 performs no release integration. Background9d87d7cf and its0.5second recovery,
 other feature/main/release refs and the existing build9 IPA remain unchanged.
+
+## TB/PB units and 50-percent minimum text size — 2026-09-28
+
+This display-only revision starts at78610b59. Speed now scales through
+Kbps/Mbps/Gbps/Tbps/Pbps; transferred amounts use KB/MB/GB/TB/PB. Every step is
+1000-based, and the final unit remains PB/Pbps even above1000PB/Pbps. The common
+formatter selects the unit from the unrounded amount using at most four bounded
+steps. It then applies the existing numeric half-away-from-zero rounding and
+exactly three printed decimals. Existing KB/MB/GB results below the new threshold
+are unchanged, including display rounding to1000.000 just below a unit boundary.
+Native UInt64 counters, raw rate deltas, raw-first In/Out/Sum and one-second visible
+sampling are not rounded or modified. There is no accounting or Background change.
+
+Examples:1000.000GB becomes1.000TB at1e12bytes,1000.000TB becomes1.000PB at1e15bytes.
+362234.567GB is now362.235TB. A UInt64 maximum displays18446.744PB, and the combined
+maximum of two counters displays36893.488PB. Speed follows the same SI steps after
+the existing bytes-per-second to bits-per-second conversion. Units are not capacity
+or throughput limits; no physical PB traffic or Pbps transfer is claimed.
+
+The shared cell's minimumScaleFactor changes from0.7 to0.5. Text may remain at its
+normal size or shrink as needed down to50percent; it is not fixed at half size.
+Three-decimal values, header labels, Grid layout, gray rules, colors and ordering
+are otherwise unchanged. The left-side Speed/Transferred labels retain their
+existing sizing. Very large strings or extreme accessibility sizes may still be
+truncated after the minimum scale is reached; this is not a universal fit guarantee.
+The on-screen units explanation includes the two new levels.
+
+Production changes are limited to TrafficStatistics.swift and the cell scale/footer
+in TrafficStatisticsView.swift. No new timer, state, native patch, sampling task,
+project/permission change or live-data fixture is added. Unit selection adds at most
+two bounded iterations relative to selecting among three units; this is display
+formatting, not per-packet work. No energy/throughput measurement is inferred.
+
+Tested commit `631c8524c01d9b12cca9ca52527ec2a0279c0f1a`, tree
+`2ba7818125a2ca1f1910b060c9c823247fbcfbc9`, passed run `36419879916` on
+attempt 1. Both exact UDP prerequisites and Statistics Linux/macOS jobs succeeded.
+The original native accounting, source/index/ownership and scoped sanitizer checks
+remain intact. Both aggregate/client models pass debug/optimized, retaining10001
+original Decimal controls and adding20002 TB/PB reference values checked for both
+capacity and speed, new thresholds/ties, PB cap/UInt64 maxima and cross-unit Sum.
+A supplemental local comparison verifies100000 inputs against the actual preceding
+formatter below the TB threshold; a deliberate test copy missing PB is rejected.
+
+Apple host: Xcode27.0 27A266a, iPhoneOS27.0, Swift6.4 swiftlang-6.4.0.34.1,
+macOS27.0 26A428. Native C/headers and five production Swift files pass ARM64/iOS17.2
+SDK checks with warnings-as-errors and empty compiler logs. The original uninstrumented
+iPhone16/iOS27.0 build24A434 XCTest passes in122.047seconds: one test, zero failures,
+zero skips, runtimeWarnings=[] and cleanup=[]. This checks ordinary table behavior
+and real small UDP totals, not synthetic PB-valued layout or a measured50% glyph size.
+No UI predicate, test deadline or production sampling path was relaxed.
+
+Original Statistics ZIP digests/CRCs and all87 source paths, Git modes and commit
+comments were independently verified; the three native/UI source snapshots agree
+and reconstruct the tested tree. Local Linux/Swift6.2.1 model execution and SwiftUI
+syntax checks are supplemental, not substitutes for Apple SDK/Simulator execution.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Statistics Linux10968793414 | d3b7d333d56dfe3e93f5ff91ba32c54ab33803f71b555a847894485b6d34b2f1 |
+| Statistics macOS10969675512 | 599a1deaa0970db4f0d3d3583ddf6dbd3322ada4ac2694939baace656292adfb |
+
+
+The prior long-values capture run36416219714 used the preceding three-unit/70percent
+layout and synthetic display values. It is historical layout evidence, not validation
+of the new PB/50percent rendering. This revision does not claim new physical iPad,
+SideStore or LiveContainer execution, arbitrary font/layout coverage, or a new IPA.
+Background9d87d7cf, other feature/main/release refs and the existing build9 IPA remain
+unchanged. The final documentation commit updates only this README and its identical
+feature specification; the other85 of87 paths correspond to the tested source.
