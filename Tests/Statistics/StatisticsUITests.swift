@@ -40,7 +40,9 @@ final class StatisticsUITests: XCTestCase {
             let client = app.buttons["client-1"]
             for _ in 0..<6 {
                 if client.isHittable { break }
-                app.scrollViews.firstMatch.swipeUp()
+                // Statistics is a Form, not the Server tab's ScrollView.
+                // Swipe its visible content without assuming an accessibility type.
+                app.swipeUp()
             }
             XCTAssertTrue(client.waitForExistence(timeout: 5))
             XCTAssertTrue(client.isHittable)
