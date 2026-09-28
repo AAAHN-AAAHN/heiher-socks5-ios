@@ -1,4 +1,5 @@
 diff --git a/src/hev-main.c b/src/hev-main.c
+index 0695ce6..e4a9bbc 100644
 --- a/src/hev-main.c
 +++ b/src/hev-main.c
 @@ -131,6 +131,44 @@ hev_socks5_server_quit (void)
@@ -47,6 +48,7 @@ diff --git a/src/hev-main.c b/src/hev-main.c
  main (int argc, char *argv[])
  {
 diff --git a/src/hev-main.h b/src/hev-main.h
+index 37a3c8c..79270d4 100644
 --- a/src/hev-main.h
 +++ b/src/hev-main.h
 @@ -10,6 +10,9 @@
@@ -59,7 +61,7 @@ diff --git a/src/hev-main.h b/src/hev-main.h
  #ifdef __cplusplus
  extern "C" {
  #endif
-@@ -51,6 +53,41 @@ int hev_socks5_server_main_from_str (const unsigned char *config_str,
+@@ -51,6 +54,41 @@ int hev_socks5_server_main_from_str (const unsigned char *config_str,
   */
  void hev_socks5_server_quit (void);
  
@@ -96,7 +98,7 @@ diff --git a/src/hev-main.h b/src/hev-main.h
 + * not devices behind NAT. Rows/counter pairs are sampled independently.
 + */
 +size_t hev_socks5_server_client_stats (HevSocks5ClientStats *rows,
-+                                      size_t capacity);
++                                       size_t capacity);
 +
  #ifdef __cplusplus
  }

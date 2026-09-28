@@ -44,7 +44,7 @@ final class StatisticsUITests: XCTestCase {
             }
             XCTAssertTrue(client.waitForExistence(timeout: 5))
             XCTAssertTrue(client.isHittable)
-            client.tap()
+            if !app.staticTexts["Out speed"].exists { client.tap() }
             XCTAssertTrue(app.staticTexts["Out speed"].exists)
             let statistics = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             statistics.name = "statistics-tab-\(orientation.rawValue)"

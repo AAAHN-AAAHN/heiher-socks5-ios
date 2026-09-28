@@ -78,7 +78,7 @@ writer (void *data)
 
 static void
 reentrant_reader (uint64_t id, const char *address, uint64_t received,
-                   uint64_t sent, void *data)
+                  uint64_t sent, void *data)
 {
     (void)address;
     (void)received;
@@ -125,8 +125,10 @@ main (void)
     assert (!strcmp (rows[3].address, "fe80::1%4"));
     assert (!strcmp (rows[4].address, "fe80::1%5"));
     assert (hev_socks5_transfer_clients (reentrant_reader, &visits) == count);
-    assert (visits == count && hev_socks5_server_client_stats (NULL, 0) == count + 1);
-    puts ("PASS: mapped normalization, scope, unknown/failure fallback, no hot-path lookup, bounded snapshot writes and unlocked callback");
+    assert (visits == count &&
+            hev_socks5_server_client_stats (NULL, 0) == count + 1);
+    puts (
+        "PASS: mapped normalization, scope, unknown/failure fallback, no hot-path lookup, bounded snapshot writes and unlocked callback");
 
     for (intptr_t i = 0; i < 8; i++)
         assert (!pthread_create (&threads[i], NULL, writer, (void *)i));
@@ -152,6 +154,7 @@ main (void)
     assert (received == sum_in && sent == sum_out);
     assert (rows[1].received == 17 + 40000 * 3);
     assert (rows[1].sent == 29 + 40000 * 7);
-    puts ("PASS: concurrent registration/snapshot/8 writers, unique IDs, per-IP attribution and quiescent aggregate equality");
+    puts (
+        "PASS: concurrent registration/snapshot/8 writers, unique IDs, per-IP attribution and quiescent aggregate equality");
     return 0;
 }
