@@ -84,8 +84,9 @@ Do not add global per-packet locking merely to force a visual live snapshot equa
 
 ## Swift model and screen
 
-The existing total sections remain. A new Clients by IP section lists stable rows
-with expandable In/Out speeds and accumulated In/Out/combined usage. The existing
+The total appears first, followed by IP entries in native registration order. Each
+entry has an identifying section header and exactly two always-visible data lines:
+In/Out speed, then accumulated In/Out/Total usage. No expansion tap is required. The existing
 TrafficStatistics delta/format model is reused per native ID; no second formula or
 native sampling thread is added. Counters are subtracted as UInt64 before Double
 conversion. First samples, nonincreasing times or decreased counters establish a
@@ -128,10 +129,12 @@ the included collector; macOS TSan additionally checks its actual concurrent pat
 Test-only injection is not a physical network event. Swift model tests cover per-IP
 baselines/rates, unknown visibility, idle counters, overflow/time edges and tab reset.
 
-The uninstrumented Simulator test retains original Server controls, real greetings,
-orientation/scrolling/navigation gates and adds a real locally relayed UDP payload
-plus expanding its client-IP row. No production source is replaced by test doubles
-in that app. The committed source remains distinct from the disposable product copy.
+The uninstrumented Simulator test retains original Server controls, real greetings
+and orientation/scrolling/navigation gates. The compact-UI test uses real IPv4/IPv6
+UDP round trips and verifies both data lines without expansion. No production source
+is replaced by test doubles. The source stays distinct from the disposable product.
+The preceding expandable-UI execution below is historical; the compact UI has its
+own final result recorded in the last section.
 
 ### Completed implementation and validation — 2026-09-28
 
@@ -219,3 +222,85 @@ Physical SideStore, LiveContainer, real device IPv4/IPv6/VPN/hotspot/Moonlight, 
 locked-iPad operation, power and before/after throughput/latency remain unperformed
 for this new feature. The existing build9 IPA does not contain these changes. A
 future release integration must inherit this feature and run its combined validation.
+
+## Compact two-line presentation — 2026-09-28
+
+This UI-only revision starts at3a740eba. Aggregate Total comes first, then registered
+IP rows by stable native ID. A nonzero Unattributed row retains its ID0 ordering
+before identified peers. The section header names the aggregate/IP; the two data
+lines beneath it show In/Out speed and In/Out/Total accumulated bytes, respectively.
+Both kinds of entry call one shared summary renderer; formatting and delta arithmetic
+reuse the existing model. Values use monospaced digits and single-line labels with
+limited text scaling to reduce truncation on narrow layouts. Extreme user font sizes
+and arbitrarily large formatted values are not guaranteed to fit a small screen.
+All explanations follow the data rather than separating aggregate and IP entries.
+
+There is no native, model, accounting-boundary, sampling-task, source-pin, entitlement,
+project or Background change. Normal Statistics sampling remains1second visible/active;
+Background retains its independently validated0.5second interval. No additional timer,
+persistent state, snapshot lock, player pool or packet inspection is introduced.
+
+The UI test keeps Server Start/Stop, actual native greetings and portrait/landscape
+requirements. It now generates actual UDP round trips through IPv4 and IPv6 control
+peers, verifies Total then registration-ID order and both unexpanded data lines, and
+captures original Simulator screenshots. Native counters are not injected. Captures
+are taken after Stop, so zero displayed speeds are expected; retained nonzero totals
+come from those completed socket transfers. XCTest attachments are exported by
+xcresulttool and retain original pixels. No mockup is presented as a Simulator capture.
+
+### Completed compact-UI verification
+
+Tested commit `2c7c6d9ee79897e7a6014bbcb9b4983397d9237e`, tree
+`d56a297a9c133e65297ce08ec95944cd5de490fa`, passed run `36386541673` on attempt 1.
+All four jobs succeeded: the exact UDP prerequisites on Linux/macOS and statistics
+on Linux/macOS, including the rebuilt uninstrumented Simulator app. The closing
+commit changes only README and this identical specification; all other 85 of the
+87 tested paths retain the same bytes and Git modes. A documentation-only commit
+is not represented as a separately executed build.
+
+The fresh native accounting/attribution, collector and boundary sanitizer, Swift
+model and source/patch/ownership checks pass. Five production Swift files and the
+patched native C/header inputs pass the iPhoneOS27 ARM64/iOS17.2 SDK checks with
+warnings-as-errors; both SDK diagnostic logs are empty. The UI-only guard verifies
+that native/model/project paths and the task/sample bodies remain unchanged.
+
+On iPhone16 Simulator, iOS27.0 build24A434, the original Server/navigation gates and
+new two-line/order assertions pass: one XCTest, zero failures, zero skips,
+78.837 seconds case time. Both orientations relay a real 64-byte UDP round trip from
+127.0.0.1 and then ::1. Both speed/usage lines must be reachable without expansion;
+the portrait header positions confirm Total before the two registration-ordered IPs.
+The raw summary reports runtimeWarnings=[], and cleanup=[]. This does not claim
+that every tool/framework diagnostic category is absent.
+
+Original exported portrait and landscape screenshots were inspected and retain their
+pixels. Portrait shows Total and both IP entries together. Landscape is captured
+after scrolling to the IP entries; it does not show all entries at once. Each client
+has64bytes per direction after the first portrait cycle; the second orientation
+adds another transfer without resetting counters. Values are formatted by the
+unchanged decimal model, not injected for a screenshot. Speed is0 because the
+server has been stopped before sampling. The original screenshot SHA-256 values are:
+
+| Capture | SHA-256 |
+| --- | --- |
+| Portrait | 7e255d539402505f9b2b15bc58d12c9a7ef216f26361da2a758c123ab8853cbd |
+| Landscape | 619861b52ddc8ed54e5e273b617f58524a0d45cb8bc1acbfd84ce546d471f624 |
+
+All four original artifact digests and ZIP CRCs were verified. The statistics native
+and UI source archives match the tested commit and87 paths; both prerequisite
+archives contain the exact57-file UDP owner9909aa5f. Local Swift parse, Python AST,
+whitespace and source preservation checks, plus debug/optimized per-IP model tests,
+also pass; these local checks do not substitute for Apple execution.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Statistics Linux10954058773 | 8282575b34d49ea83b7a77607b48c8f4aeecf2d4d4030ad5bb098c8881389294 |
+| Statistics macOS10955007837 | 6d3ee7ddcbdb4d8f050588f52a0723d065bf4724ad7d52f0fc26ced0cf0280ba |
+| UDP Linux10955175423 | 9a8145f4614f2ebe7f3bee699a5ad9b95144b1ec9f9eb98781983584c41d6124 |
+| UDP macOS10954163229 | 59d42b25b184390cda91e044971be5a0dcfce2a81558ebd7119a9a6a491f1816 |
+
+No IPA or release merge is produced. Background9d87d7cf, its0.5second recovery and
+all other branches remain unchanged. Physical SideStore/LiveContainer execution,
+iPad layouts, extreme Dynamic Type, very long IPv6 strings, many-client scrolling,
+actual LAN devices and comparative performance remain unperformed for this UI.
+Earlier failed implementation UI runs remain the historical records above; this
+presentation revision passed its first exact-source workflow without retries.
