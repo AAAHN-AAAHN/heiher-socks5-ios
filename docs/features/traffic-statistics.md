@@ -134,11 +134,11 @@ Test-only injection is not a physical network event. Swift model tests cover per
 baselines/rates, unknown visibility, idle counters, overflow/time edges and tab reset.
 
 The uninstrumented Simulator test retains original Server controls, real greetings
-and orientation/scrolling/navigation gates. The compact-UI test uses real IPv4/IPv6
-UDP round trips and verifies both data lines without expansion. No production source
+and orientation/scrolling/navigation gates. The current table test uses real IPv4/IPv6
+UDP round trips and verifies both data rows without expansion. No production source
 is replaced by test doubles. The source stays distinct from the disposable product.
-The preceding expandable-UI execution below is historical; the compact UI has its
-own final result recorded in the last section.
+Expandable and compact-UI execution records below are historical; the current table
+revision has its own final result recorded in the last section.
 
 ### Completed implementation and validation — 2026-09-28
 
@@ -348,9 +348,61 @@ IPv4/IPv6 registration order, Stop/Start, both orientations and existing timeout
 They additionally require an initial zero-valued Total before IP creation, aligned
 In/Out/Sum columns, both rows without expansion and exact three-decimal amounts.
 
-Candidate status: local Swift syntax and numeric model tests pass. A fresh full
-statistics workflow, actual Apple SDK/Simulator results and original screenshots
-must be recorded for this exact revision before completion. Physical iPad, SideStore
-and LiveContainer execution, extreme Dynamic Type/very long addresses and large
-value-cell layouts remain separate tests; no new IPA or release integration is
-part of this table-only request.
+### Completed table-UI verification
+
+The tested source is `9af714c6ae31ec28efc06bc3b50e28c0fc732345`, tree
+`1955cc006f737cddea863c2d381c3766d3a8708c`. Run `36408272957`, attempt 1,
+finished successfully in all four jobs: UDP prerequisites and statistics on both
+Linux and macOS, including the rebuilt uninstrumented iOS Simulator product.
+The closing commit changes only this README and its matching feature specification;
+the other 85 of 87 paths retain the tested contents and Git modes. No new execution
+is attributed to the documentation-only commit.
+
+| Verification | Result and scope |
+| --- | --- |
+| Numerical model | The existing 10000-sample aggregate model passes. The per-IP suite passes in debug and optimized builds, including 10001 independent Decimal rounding controls, fourth-decimal ties, SI boundaries, raw-first Sum and preservation of unrounded counters/rate baselines. |
+| Native regression | Existing Linux buffered/splice and macOS buffered accounting, partial-I/O and IP-attribution tests pass. Collector and boundary ASan/UBSan, macOS collector/counter TSan, source/index/patch/ownership and previous input/driver controls pass in their existing scopes. Native patches are unchanged by this UI revision. |
+| Apple SDK | Five production Swift files and the patched native C/header inputs pass ARM64/iOS17.2 type checks with iPhoneOS27 and warnings-as-errors. Both compiler diagnostic logs are empty. |
+| Actual Simulator | iPhone16, iOS27.0 build24A434: one XCTest passes, zero failures and zero skips, 111.793 seconds case time. Initial zero Total, table heading order, six three-decimal values per table, aligned columns, Total/IP registration order, both orientations and original Start/Stop/native UDP gates pass. |
+| Runtime and cleanup | Exported result reports runtimeWarnings=[] and cleanup=[]. This is not a claim that every raw tool/framework diagnostic category is absent. |
+| Preservation | All three statistics source archives agree on the 87 paths and tested commit. Independent reconstruction matches the tested Git tree. Both 57-file prerequisite archives agree on UDP9909aa5f. Task/sample bodies, raw delta calculation, IP registry/model ordering, native inputs and every other branch remain unchanged. |
+
+The original portrait and landscape screenshots were exported from XCTest with
+xcresulttool and inspected directly, without redrawing, counter injection or pixel
+editing. Portrait shows Total, 127.0.0.1 and ::1 together; the IPs were registered
+in that order by real loopback UDP round trips. It displays 0.128KB In/Out and
+0.256KB Sum for Total, with 0.064/0.064/0.128KB for each IP. The landscape capture
+is scrolled to the IP tables and does not show the top Total title simultaneously.
+A second round trip per peer raises each IP to 0.128/0.128/0.256KB there. Speeds
+are 0.000Kbps because the test stops the server before sampling. Nonzero Sum-speed
+and rounding behavior are checked separately in the numeric model, not inferred
+from a zero-speed screenshot. Captures cover normal font size and these actual
+values, not arbitrary large numbers, long IPv6 addresses or every device layout.
+
+| Original screenshot | SHA-256 |
+| --- | --- |
+| Portrait B260B102-581E-4889-963E-425FFAB5E3FC.png | 66e1f3420d6d188f7ae0c32abc3e5b9384332e9f1e73251b5c2aabeac37a3799 |
+| Landscape 1AF225F3-9086-4A85-99B1-3AC3E8707B4B.png | 2a682b101377704573efa96bbbb9c30d87072148a0e96856f5f301a74d53f324 |
+
+Original artifact ZIP digests and CRCs were checked. The resumed local review also
+reran both aggregate and client models in Swift6.2.1 debug/optimized modes and
+parsed the SwiftUI source. Git-mode normalization distinguishes ZIP permission
+metadata from tracked Git modes; independently reconstructed current and baseline
+trees match the actual commits. These checks do not substitute for Apple execution.
+The table implementation was already committed before this resume; no duplicate
+runtime patch, new workflow run, relaxed assertion or increased timeout was needed.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Statistics Linux10963636735 | 0aa1305112e3aa668c9a3f363ce71009aa29b920a206ce3cbe1ec1525d67f282 |
+| Statistics macOS10964006405 | f8ba1705d2557d3b48dab45250773c2b886a59269c4b9e63361c382608b355f7 |
+| UDP Linux10963461765 | cfbdc2d08814d214ff45c4599a2a8a47942aa4c30e65bf7ace5ec25226288778 |
+| UDP macOS10963038090 | 9670e3f1b34da6e9d8c3f942eb28cb3bc427c113965ac1ddca3fffaf6160be13 |
+
+Recorded Apple host: Xcode27.0 27A266a, iPhoneOS27.0, Swift6.4
+swiftlang-6.4.0.34.1, macOS27.0 26A428. The minimum deployment setting remains17.2;
+this is not an execution claim for every OS version. Physical iPad, SideStore
+standalone, LiveContainer guest, extreme Dynamic Type and very long address/value
+layouts remain unperformed. This scoped task creates no iPhone archive/IPA and
+performs no release integration. Background9d87d7cf and its0.5second recovery,
+other feature/main/release refs and the existing build9 IPA remain unchanged.
