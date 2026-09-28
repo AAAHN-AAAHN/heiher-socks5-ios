@@ -165,12 +165,64 @@ forced restart, host/QoS change or timeout relaxation is added here.
 
 ### Current audit execution status
 
-Local exact-controller tests, all35 current policy scenarios and the new mixed-signal
-suite pass their stated expectations, including exact pre-audit negative controls.
-Fresh Apple SDK/Combine/live scheduling and uninstrumented Simulator validation are
-pending for the audit candidate and must be recorded against its actual commit.
-The generic native/archive/IPA job is outside the audio-checks-only scope and must
-not be labeled passed. No new IPA is created by this request.
+Implementation and scoped validation are complete for tested commit
+`8fc29ed478846828486ad9afcb69fe08ad52f63a`, Git tree
+`8d400532a6fa1f8e00aadc6125b334fbcc6a4e5a`. Run `36365407358` is successful
+on attempt 2. The closing commit changes only this README and the identical feature
+specification. The remaining 72 of 74 tracked paths, including production, tests,
+workflow and assets, are byte/mode-identical to that tested source. Controller blob:
+`0224ecec67a7c454d7943affc1790542dee13386`; controller SHA-256:
+`c6217c53f37251ab3cde42fc978512a281abd1c86adb555050ec157f74c280a7`.
+
+| Evidence | Actual result and boundary |
+| --- | --- |
+| Exact-source recovery policy | All 35 current scenarios pass in debug and optimized modes, including 98 reentry combinations, 12000 mixed transitions and the separate 12000-event/300-history automatic recovery sequence. |
+| Mixed-notification regressions | Deadline, storm and 1352-pair matrix pass with 9, 611 and 23896 assertions per compiler mode. Exact pre-audit source fails deadline/storm with 3/4 observed failures; those are retained negative controls, not current-source failures. |
+| Earlier negative controls | Ten build9, two first-repair and one pre-interval-change scenario per mode retain their expected failures and historical timing assumptions. |
+| Existing regression suites | Controller/delegate, recovery, lifecycle, callback lifetime and 49 current authorization checks pass. Async session 38 checks/3000 transitions and preparation 22 checks/3000 transitions pass in both compiler modes. Historical authorization control retains 28 expected failures. |
+| Foundation/Combine and worker boundaries | All 34 main/worker deliveries and cancellation pass. Real scheduling fixtures cover failure pacing, immediate opportunity, healthy preservation, lost-service probing and Off. Observed activation times 0.00137/0.50858/1.05069 seconds and loss-probe times 2.72847/3.25339/3.88186 seconds are host observations, not exact 500ms guarantees. Original blocking/implicit-preparation and utility-helper controls pass. |
+| Apple SDK and asset | Five production Swift files typecheck for ARM64/iOS17.2 against iPhoneOS27 with warnings-as-errors and empty diagnostics. AVAudioFile validates all 400 silent PCM samples. |
+| Guards and provenance | The 46 common input/marker cases, 37 audit-entry cases, original marker controls, source pins, main ancestry, composition and clean worktree/index checks pass. |
+| Uninstrumented Simulator | iPhone 16, iOS27.0 build24A434: the original XCTest passes with 0 failures and 0 skips, 111.254 seconds case time. On/Off, rapid choices, tabs and saved-intent relaunch are checked; original Playing/Off screenshots were inspected. |
+| Advisory/cleanup | The targeted main-thread audio advisory is absent in the completed console and xcresult. runtimeWarnings and cleanup are empty; other tool/framework diagnostics are not claimed absent. |
+| Native archive/IPA | The generic verify/archive job is intentionally skipped by audio-checks-only, not counted as passing. No IPA or release merge is produced. |
+
+SDK and Linux results are from attempt 1; only the Simulator job was rerun on
+attempt 2. All original ZIP digests/CRCs and the three matching source archives were
+independently checked. The complete 74-file Git tree was reconstructed using Git
+file-type/executable modes, with unspecified regular ZIP modes normalized to100644;
+a raw-ZIP-mode draft did not match and was corrected before accepting the result.
+Local Linux/Swift6.2.1 additionally recompiled the exact controller (framework imports
+only substituted) for all35 policies, all three mixed groups and both pre-audit
+negative groups in debug/optimized modes, plus eight existing current fixture
+executables in debug. This supplemental offline replay does not replace the complete
+original CI drivers, historical Git checks, SDK, or Simulator execution.
+
+Recorded Apple host: Xcode27.0 27A266a, iPhoneOS27.0, Swift6.4
+swiftlang-6.4.0.34.1, macOS27.0 26A428. The uninstrumented source contains no temporary
+tracing helper, altered UI predicate, relaxed timeout or suppressed advisory gate.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| SDK 10947083221 | 6591092244ff0a72bc8b4277d82a9109b506534fcaa3e83d2fa2342b1eaa3a75 |
+| Linux 10946762860 | 909aedc8657b1370c1633193e8133a82f30291c064b77201e1902820b1aa0937 |
+| UI attempt2 10947518070 | f701d6278ac86ccb094f6c0656d015ccf2d122a2859a6b503801fc39eefd428f |
+| Retained UI attempt1 10947077665 | 5f7bcc837d659b003345b1232d5e8db83e2ea283300b3a18cec730ff0b9616a2 |
+
+Attempt1 failed the original Playing-state wait (one failed XCTest,87.199seconds)
+with cleanup completed. The identical-source attempt2 passed the original gates.
+This retry does not erase the first failure, establish its internal cause, or repair
+all external startup latency. The earlier10.78837second prepareToPlay observation
+belongs to its separate diagnostic run, not this attempt. No speculative overlap,
+new player pool, high QoS or timeout relaxation is introduced to manufacture a pass.
+
+No further controller defect was reproduced within the inspected source and finite
+recovery scenarios after the mixed-signal repair. This is scoped code/validation
+completion, not proof of every possible platform event history, fixed maximum
+recovery time, continuous physical output, or unlimited background execution.
+The previous interval-only completion record is now posted above; no documentation
+upload remains pending. Only feature/background advances; the deleted cyclic ref
+stays absent and the other seven branches and build9 release/IPA remain unchanged.
 
 Physical iOS27 SideStore installation, LiveContainer guest execution, real calls,
 Siri, Bluetooth, actual media-service resets, long locked-iPad operation, power,
