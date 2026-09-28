@@ -112,7 +112,19 @@ def main():
     assert 'DisclosureGroup' not in view
     assert view.count('summary(statistics, id: "total")') == 1
     assert view.count('summary(client.traffic, id: "client-\\(client.id)")') == 1
-    assert view.split('    private func sample()', 1)[1] == old_view.split('    private func sample()', 1)[1]
+    # Reverse only the batched publication; preserve every native call, copy bound,
+    # timestamp and per-IP delta from the already validated sample body.
+    sample_body = view.split('    private func sample()', 1)[1]
+    restored = sample_body.replace(
+        '        // Build one value snapshot before publishing; per-row State writes can\n'
+        '        // repeatedly copy the dictionary and invalidate the same view state.\n'
+        '        var sampledClients = clients\n', '', 1).replace(
+        '            sampledClients.sample(', '            clients.sample(', 1).replace(
+        '                                 sent: row.sent, at: time)',
+        '                           sent: row.sent, at: time)', 1).replace(
+        '        clients = sampledClients\n', '', 1)
+    assert restored == old_view.split('    private func sample()', 1)[1]
+    assert sample_body.count('        clients = sampledClients\n') == 1
     # Only a shared renderer was inserted between the existing task and sample.
     assert view.split('        .task(id:', 1)[1].split('    /// One shared', 1)[0] == \
         old_view.split('        .task(id:', 1)[1].split('    /// One shared', 1)[0]

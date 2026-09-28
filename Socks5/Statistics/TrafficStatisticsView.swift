@@ -139,12 +139,16 @@ struct TrafficStatisticsView: View {
         clientsIncomplete = required > capacity
         let time = ProcessInfo.processInfo.systemUptime
         statistics.sample(received: received, sent: sent, at: time)
+        // Build one value snapshot before publishing; per-row State writes can
+        // repeatedly copy the dictionary and invalidate the same view state.
+        var sampledClients = clients
         for var row in rows.prefix(min(capacity, required)) {
             let address = withUnsafePointer(to: &row.address) {
                 $0.withMemoryRebound(to: CChar.self, capacity: 64) { String(cString: $0) }
             }
-            clients.sample(id: row.id, address: address, received: row.received,
-                           sent: row.sent, at: time)
+            sampledClients.sample(id: row.id, address: address, received: row.received,
+                                 sent: row.sent, at: time)
         }
+        clients = sampledClients
     }
 }

@@ -139,6 +139,8 @@ def native_checks(mode):
     run([*common, *client_includes, 'Tests/Statistics/client_probe.c', *libs,
          '-o', OUT / 'client-probe'], mode + '-client-build.log')
     run([OUT / 'client-probe'], mode + '-client.log')
+    run([sys.executable, 'Tests/Statistics/registry_contract.py', CORE, OUT, mode],
+        mode + '-registry-contract.log', timeout=300)
     sanitize = ['-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
                 '-fno-omit-frame-pointer']
     env = dict(os.environ, ASAN_OPTIONS='detect_leaks=0', UBSAN_OPTIONS='halt_on_error=1')
@@ -258,6 +260,7 @@ def main():
              'Socks5/Statistics/TrafficStatistics.swift', 'Tests/Statistics/client_model.swift',
              '-o', OUT / 'client-model'], label + '-build.log')
         run([OUT / 'client-model'], label + '.log')
+    run([sys.executable, 'Tests/Statistics/sampling_contract.py'], 'sampling-contract.log')
     if sys.platform == 'darwin':
         ios_checks(changed)
     for name, expected in hashes.items():
