@@ -76,3 +76,6 @@ print('PASS: current recovery invariants and exact-build9 negative controls; not
 
 # Mixed-signal regressions run against the same exact controller and platform doubles.
 subprocess.run([sys.executable, str(ROOT / 'Tests/Background/check_mixed_notifications.py'), mode], check=True)
+
+# Longer event ordering and every existing operation boundary retain the same source.
+subprocess.run([sys.executable, str(ROOT / 'Tests/Background/check_final_recovery.py'), mode], check=True)
