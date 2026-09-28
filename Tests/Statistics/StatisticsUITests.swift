@@ -40,11 +40,22 @@ final class StatisticsUITests: XCTestCase {
             let client = app.buttons["client-1"]
             let form = app.collectionViews.firstMatch
             XCTAssertTrue(form.waitForExistence(timeout: 5))
+            // A previously expanded client and scroll offset survive tab/orientation
+            // changes. Reanchor at the existing top section before seeking its header.
+            let top = app.staticTexts["Transfer speed"]
             for _ in 0..<6 {
-                if client.isHittable { break }
-                // The recorded Form hierarchy exposes this CollectionView.
-                // Target its content, not the application or floating tab bar.
-                form.swipeUp()
+                if top.exists && top.isHittable { break }
+                form.swipeDown()
+            }
+            XCTAssertTrue(top.exists && top.isHittable)
+            for _ in 0..<6 {
+                if client.exists && client.isHittable { break }
+                // Short content drags avoid skipping the header in landscape. The
+                // recorded full swipe reached 100% with that header above the view.
+                let from = form.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.65))
+                let to = form.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.40))
+                from.press(forDuration: 0.05, thenDragTo: to,
+                           withVelocity: .slow, thenHoldForDuration: 0.1)
             }
             XCTAssertTrue(client.waitForExistence(timeout: 5))
             XCTAssertTrue(client.isHittable)
