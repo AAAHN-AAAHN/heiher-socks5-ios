@@ -1,6 +1,6 @@
 # Background services — continuous audio and location
 
-## Final-review checkpoint — 2026-09-30
+## Completed final review — 2026-09-30
 
 Reviewed owner: `9d87d7cf3c5be3a96e1b36b5a14b944cf80a35c1`. The complete prior
 specification, source/run identities and retained failure history remain at that
@@ -13,8 +13,10 @@ That can affect a session this controller never activated. It is reproduced with
 exact production controller and scripted platform failures, not a physical host.
 The repair uses the existing `ownsAudioSession` flag at the release boundary. When
 no activation was requested, clear local pending release without calling the platform;
-if a reentrant Off-On requested fresh work, service only that latest On. After an
-activation request, keep the existing serialized release and failure behavior.
+if a reentrant Off-On requested fresh work, consume that recorded request and service
+only the latest On. Clear its deferred-resume flag before starting new work, so a
+failure cannot consume the same request twice. After an activation request, keep the
+existing serialized release and failure behavior.
 
 The production change is confined to this release decision: no new state, API,
 allocation, timer, queue, lock, notification or retry interval. New tests preserve
@@ -22,8 +24,10 @@ all earlier input cases and add pre-activation failure/reentry, owned failure an
 healthy dual-service reuse. One old async expectation explicitly required the
 unowned release; its scenario is retained with the corrected no-release/one-latest-
 activation invariant. No timeout, warning policy or physical claim is relaxed.
-Fresh full-history native/model, Apple SDK and actual Simulator results are required
-before this checkpoint is closed. README and `docs/features/background.md` match.
+The final source `ef334cfbda66b12fad6c6c8e9a7294e6da559720` passed the fresh
+full-history Linux, Apple SDK/host and actual Simulator jobs in run `36646138081`,
+attempt 1. The exact results and earlier failed candidate are recorded below.
+README and `docs/features/background.md` match. Physical execution remains untested.
 
 ## Environment, responsibility and immutable inputs
 
@@ -171,3 +175,100 @@ long locked-device/background survival, OS suspension/termination, device CPU/RA
 energy and maximum throughput remain unperformed until actual evidence exists.
 Location mocks and Simulator audio do not certify these paths. No finite suite proves
 all possible OS, scheduler, input and resource-failure histories defect-free.
+
+## Final exact-source evidence — 2026-09-30
+
+Run `36646138081`, attempt 1, completed successfully; terminal metadata updated at
+2026-09-29T23:46:13Z. The executed commit is
+`ef334cfbda66b12fad6c6c8e9a7294e6da559720`, tree
+`1065326f1b8b32d022fbc3874d8de7a819081e8a`, with 78 tracked files.
+Linux recovery, Apple audio/SDK, and the separate actual Simulator job all passed.
+The generic native/archive/IPA job was deliberately skipped by the unchanged
+checks-only workflow. It is not a new native server build or IPA success.
+
+| Layer | Inspected result |
+| --- | --- |
+| New ownership boundaries | 135 current assertions in both debug and optimized modes on Linux and macOS. Setup rejection, reentrant Off-On, sixteen immediate/delayed post-request failure combinations, failed owned release, and 10,000 healthy dual-service reuse iterations passed. Exact prior controller fails 13 of 30 unowned assertions as required. |
+| Existing recovery | All 35 policy cases, 98 reentry combinations and 1,352 mixed ordered pairs remain. Both modes pass 69,984 ordered triples/3,536,977 assertions and 65,536 events/1,024 recovery checkpoints/313,217 assertions. Deliberate one-second mutation remains rejected. |
+| Delayed operations and lifetime | Existing 38 asynchronous-session assertions and 22 preparation assertions, each including 3,000 mixed transitions, pass in both modes. Existing controller/delegate/recovery/lifetime/location suites and old authorization-reset control remain successful. |
+| Actual host scheduling | Real Foundation/Combine delivers all 17 registered names from main and worker, 34 deliveries total. Cancellation detaches the subscriber. Real RunLoop retries and queued advice, Off priority, controller release and independent location pass with audio/location doubles. This is not a real telephone interruption. |
+| WAV and SDK | Apple AVAudioFile decodes all 400 samples as zero, mono 8kHz/50ms. All five production Swift files pass iPhoneOS27/ARM64 minimum17.2 typechecking with warnings-as-errors; the diagnostic log is empty. |
+| Audit integrity | 46 common baseline controls, 37 audit-entry boundaries and three original marker controls pass; exact ancestry/source pins, source scope, worktree/index and whitespace gates pass. |
+| Actual Simulator | Unchanged XCTest on iPhone16/iOS27.0 passes one case, zero failures/skips, in108.037s. Repeated On/Off, saved-On relaunch, final-Off relaunch and tab navigation retain their existing requirements and timeouts. |
+| Runtime evidence | Two original Playing/Off screenshots inspected. runtimeWarnings=[], cleanup=[]. No matching synchronous-audio main-thread advisory in the completed console or result object. AppIntents extraction notices remain in the raw build log; this is not a universally warning-free claim. |
+
+Finite histories and scripted platform failures are not physical deployment trials.
+The Simulator test does not exercise actual location permissions, calls, route/service
+failures or another process/host's audio session. Its app executable SHA-256 is
+`f28d40a9655e11b982ec68c7a5a661100120497721578994ad4e4b64fa9969d2`.
+The source/archive/runtime values identify this execution, not a user-installable IPA.
+
+The real host failure-retry observations were at 0.002039, 0.507877 and 1.014083s;
+service-loss observations were at 2.627838, 3.146110 and 3.717973s. These actual
+intervals include scheduling delay and do not turn the 0.5-second timer into an OS
+completion deadline. Healthy checks did not recreate or reactivate the player.
+Recorded tools: Xcode27.0 27A266a, iPhoneOS27.0, Apple Swift6.4
+swiftlang-6.4.0.34.1, macOS27.0 26A428; Simulator iOS27.0 24A434.
+Linux CI used Swift6.4; supplemental local replay used Swift6.2.1, not the Apple SDK.
+
+### Retained development failures and negative evidence
+
+The initial exact-old probe showed zero activations but one deactivation after failed
+category setup and Off; the preexisting active session double became inactive.
+The first repair at `3bf3ece42aa22a79b740a54ff91c2be4da936be3` removed that release.
+A stricter local rejected-activation probe then found it left a deferred On flag,
+causing two immediate activation attempts. The final version clears the already
+consumed flag and passes sixteen corresponding failure/reentry combinations, without
+new state or a changed retry interval. That intermediate candidate is not a final pass.
+
+Run `36645555618` also failed the new ownership fixture's Apple compilation because
+a local weak variable was never mutated and warnings are errors. A weak-capture
+closure replaces that test-only declaration, retaining its release check. Earlier
+policy successes do not make the failed Apple job or skipped UI successful. Its
+original failed ZIP and first Linux ZIP are retained; the final run is a new source,
+not a relabeled retry. No host setting, cache, timeout or diagnostic suppression was
+used to obtain the final success.
+
+The earlier async test had explicitly expected an unowned deactivation during
+configuration Off-On. Its input case remains, but now asserts zero unrelated release
+and one latest activation. All other old input cases and deadlines are preserved.
+The prior review's saved-On Playing wait and Simulator helper failures remain in the
+immutable old README; they are not assigned an unproved cause or erased by this run.
+
+| Original archive | SHA-256 |
+| --- | --- |
+| Final Linux11068811485 | 486924f8ca96882cb2c7c8ecf3628679829972597238227fee1b2860c9f33408 |
+| Final Apple SDK11067873729 | 762d0d3babc834559a26256fab6c9093fb4fc75d0e88ed38e0ac91453466c12a |
+| Final Simulator11068664473 | ccd8f69855ff509e67220140f3aa36fff67fe8bd2032c9c041ee0c5c6f4365d3 |
+| First failed Apple11068717036 | 32021e4c6b8fd4f3a82557f22b8c570d78e46bde81547e9ca6ed81b6a1889468 |
+| First Linux11067688592 | 6ad03c37f6c267a0e8a6741ab2da25d3765fc9e6910d9ce0b02c64909c7db80e |
+
+All five original ZIP digests/CRCs were checked. Final Linux/SDK/Simulator source
+archives contain identical 78 file bytes and Git modes; the SDK/UI full manifests
+agree and the tree was independently reconstructed. The starting 76-file tree and
+its complete README were also reconstructed from authenticated prior sources and
+matched to the original Git objects. Local snapshot replays do not invent full Git
+history or replace the connected CI. The original controller and first candidate
+negative probes and corrected results remain in the companion evidence package.
+
+### Final source and publication boundary
+
+The complete production delta since `9d87d7cf` is seven added lines and one removed
+line, including two comments, only in `deactivateAudio()`. Every other byte of that
+controller is unchanged. Root/view/server, notifications, timing, WAV, project/plist,
+framework, all pins and the other four production Swift files are preserved.
+Four test/driver paths and the identical README/specification complete the seven-path
+review delta, including two new test files. No native patch or feature merge is added.
+
+The closing commit changes only this README and its identical feature specification.
+The other 76 of 78 paths retain the exact tested bytes and Git modes. Its own parent,
+commit and tree identify publication; the executed source and run above identify the
+runtime evidence. A documentation-only closure is not a new execution. Other seven
+branch heads and release/build9 are unchanged.
+
+All reproduced ownership defects and required current-suite failures are resolved
+within this executed scope. Source guards are checkpoint comparisons, not a proof
+against every transient tool/filesystem change. Physical SideStore/LiveContainer,
+actual interruptions/location/background survival and device resources remain the
+explicit unperformed layers above; this finite audit is not an unconditional
+zero-defect guarantee for every possible deployment or scheduler history.
