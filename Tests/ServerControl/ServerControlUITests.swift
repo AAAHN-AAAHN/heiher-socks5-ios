@@ -12,13 +12,22 @@ final class ServerControlUITests: XCTestCase {
         let start = app.buttons["Start"]
         let stop = app.buttons["Stop"]
         let workers = app.textFields.element(boundBy: 0)
+        let ipv6Only = app.switches.matching(identifier: "Listen IPv6 only").firstMatch
         XCTAssertTrue(workers.waitForExistence(timeout: 10))
         XCTAssertEqual(app.textFields.count, 9)
         XCTAssertEqual(app.secureTextFields.count, 1)
-        XCTAssertEqual(app.switches.count, 1)
+        // SwiftUI may expose a container and backing switch for one Toggle.
+        // Identify the actual setting rather than counting implementation nodes.
+        XCTAssertTrue(ipv6Only.exists)
+        XCTAssertEqual(ipv6Only.value as? String, "0")
         XCTAssertEqual(workers.value as? String, "4")
         XCTAssertEqual(app.textFields.element(boundBy: 1).value as? String, "::")
         XCTAssertEqual(app.textFields.element(boundBy: 2).value as? String, "1080")
+        reveal(ipv6Only, in: app, upward: true)
+        ipv6Only.tap()
+        XCTAssertEqual(ipv6Only.value as? String, "1")
+        ipv6Only.tap()
+        XCTAssertEqual(ipv6Only.value as? String, "0")
         reveal(start, in: app, upward: true)
         XCTAssertTrue(start.isEnabled)
         XCTAssertFalse(stop.isEnabled)
@@ -48,14 +57,14 @@ final class ServerControlUITests: XCTestCase {
             XCTAssertTrue(Self.handshake(ipv6: true), "Default dual-stack listener must retain IPv6")
             for index in 0..<9 { XCTAssertFalse(app.textFields.element(boundBy: index).isEnabled) }
             XCTAssertFalse(app.secureTextFields.firstMatch.isEnabled)
-            XCTAssertFalse(app.switches.firstMatch.isEnabled)
+            XCTAssertFalse(ipv6Only.isEnabled)
             capture("running-\(orientation.rawValue)")
             stop.tap()
             XCTAssertTrue(waitUntil { start.isEnabled && !stop.isEnabled })
             XCTAssertTrue(waitUntil { !Self.handshake() && !Self.handshake(ipv6: true) }, "Stop must release both listener paths")
             for index in 0..<9 { XCTAssertTrue(app.textFields.element(boundBy: index).isEnabled) }
             XCTAssertTrue(app.secureTextFields.firstMatch.isEnabled)
-            XCTAssertTrue(app.switches.firstMatch.isEnabled)
+            XCTAssertTrue(ipv6Only.isEnabled)
             capture("stopped-\(orientation.rawValue)")
         }
         // Drafts and desired state are intentionally not persisted by this owner.
