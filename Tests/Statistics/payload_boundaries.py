@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Revalidate destination payload accounting and explicitly observe UDP size limits.
+"""Revalidate full destination payload accounting after the dynamic UDP owner merge.
 
 No production source is edited. Socket-wrapper fixtures inject syscall outcomes;
-network cases use the real linked server and actual loopback datagrams. A passing
-boundary observation does not mean that truncated/rejected payload was relayed.
+network cases use the real linked server and actual loopback datagrams. The former 1500-byte boundaries now require complete payloads; protocol and
+allocation limits remain separate from successful destination-side accounting.
 """
 import json
 import os
@@ -13,6 +13,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from traffic_stats_regression import Host, wait_server, check_delta
@@ -239,9 +240,18 @@ misc:
         wait_server(port)
         assert host.stats() == (0, 0)
 
+        expected_clients = {'Unattributed': (0, 0)}
+
         def verify(before, incoming, outgoing):
             check_delta(host, before, incoming, outgoing)
-            rows = host.clients()
+            prior = expected_clients.get(ip, (0, 0))
+            expected_clients[ip] = (prior[0] + incoming, prior[1] + outgoing)
+            for _ in range(100):
+                rows = host.clients()
+                if rows == expected_clients:
+                    break
+                time.sleep(.01)
+            assert rows == expected_clients, (rows, expected_clients)
             assert (sum(r[0] for r in rows.values()),
                     sum(r[1] for r in rows.values())) == host.stats()
 
@@ -254,17 +264,22 @@ misc:
             with socket.socket(family, socket.SOCK_DGRAM) as destination:
                 destination.bind((ip, 0))
                 destination.settimeout(2)
+                destination.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 256 * 1024)
+                destination.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 512 * 1024)
                 endpoint = destination.getsockname()[:2]
                 address = (b'\x03' + bytes([len(ip)]) + ip.encode('ascii') +
                            struct.pack('!H', endpoint[1])) if domain else encode(*endpoint)
                 cap = 1500 - 3 - len(address)
                 with association((ip, port), 'known') as (_, udp):
-                    for size in [1, cap - 1, cap, cap + 1, 1500, 1501, 2048, 4096]:
+                    udp.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 256 * 1024)
+                    udp.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 512 * 1024)
+                    for size in [0, 1, cap - 1, cap, cap + 1, 1500, 1501, 1999, 2000, 2001,
+                                 2048, 4096, 9192, 9216, 30001, 48001, 65000]:
                         before = host.stats()
                         payload = bytes(i % 251 for i in range(size))
                         udp.send(b'\0\0\0' + address + payload)
                         actual, peer = destination.recvfrom(65535)
-                        copied = min(size, cap)
+                        copied = size
                         assert actual == payload[:copied]
                         destination.sendto(actual, peer)
                         response = udp.recv(65535)
@@ -274,9 +289,9 @@ misc:
                         verify(before, copied, copied)
                         record(case='outbound', address_type='domain' if domain else ip,
                                original=size, external_sent=copied, counted_out=copied,
-                               truncated=size > cap)
+                               truncated=False)
                     # Use a small request to test independently oversized destination replies.
-                    for size in [0, 1, 1499, 1500, 1501, 2048, 4096]:
+                    for size in [0, 1, 1499, 1500, 1501, 2048, 4096, 9216, 30001, 48001, 65000]:
                         before = host.stats()
                         udp.send(b'\0\0\0' + address + b'R')
                         request, peer = destination.recvfrom(65535)
@@ -285,44 +300,34 @@ misc:
                         destination.sendto(payload, peer)
                         response = udp.recv(65535)
                         source, offset = decode_bytes(response[3:])
-                        copied = min(size, 1500)
+                        copied = size
                         assert source == endpoint and response[3 + offset:] == payload[:copied]
                         verify(before, copied, 1)
                         record(case='inbound', address_type='domain' if domain else ip,
                                original=size, external_copied=copied, counted_in=copied,
-                               truncated=size > 1500)
-                # UDP-over-TCP strips its first three framing bytes before the capacity check.
+                               truncated=False)
+                # Former UDP-over-TCP capacity boundaries must now relay in full.
                 limit = 1500 - len(address)
-                for size in [limit - 1, limit, limit + 1]:
+                for size in [0, limit - 1, limit, limit + 1, 2048, 4096, 30001, 48001, 65000]:
                     before = host.stats()
                     with socket.create_connection((ip, port), timeout=2) as tcp:
                         handshake(tcp, 5, ('::' if family == socket.AF_INET6 else '0.0.0.0', 0))
                         payload = b'T' * size
-                        tcp.sendall(struct.pack('!HB', size, 3 + len(address)) + address + payload)
-                        if size <= limit:
-                            actual, peer = destination.recvfrom(65535)
-                            assert actual == payload
-                            destination.sendto(actual, peer)
-                            length, header = struct.unpack('!HB', exact(tcp, 3))
-                            exact(tcp, header - 3)
-                            assert exact(tcp, length) == payload
-                            verify(before, size, size)
-                        else:
-                            # Bounded observation: the declared frame is rejected before external send.
-                            destination.settimeout(.25)
-                            try:
-                                destination.recvfrom(65535)
-                            except socket.timeout:
-                                pass
-                            else:
-                                raise AssertionError('Oversized UDP-over-TCP frame was forwarded')
-                            finally:
-                                destination.settimeout(2)
-                            verify(before, 0, 0)
+                        frame = struct.pack('!HB', size, 3 + len(address)) + address + payload
+                        tcp.sendall(frame[:2])
+                        tcp.sendall(frame[2:5])
+                        tcp.sendall(frame[5:])
+                        actual, peer = destination.recvfrom(70000)
+                        assert actual == payload
+                        destination.sendto(actual, peer)
+                        length, header = struct.unpack('!HB', exact(tcp, 3))
+                        assert length == size
+                        exact(tcp, header - 3)
+                        assert exact(tcp, length) == payload
+                        verify(before, size, size)
                     record(case='udp-over-tcp', address_type='domain' if domain else ip,
-                           original=size, limit=limit, external_sent=size if size <= limit else 0,
-                           rejected=size > limit)
-        print('PASS:', len(records), 'real network boundary cases; exact copied/sent bytes and quiescent IP sums; size limitations observed, not fixed', flush=True)
+                           original=size, former_limit=limit, external_sent=size, rejected=False)
+        print('PASS:', len(records), 'real full-payload network cases; former truncation/rejection boundaries pass; exact In/Out and IP sums', flush=True)
     finally:
         host.close()
 

@@ -14,6 +14,7 @@ static int receive_result = 3;
 static int send_result = 3;
 static int io_error = EAGAIN;
 static int bind_error;
+static unsigned int truncated_mask;
 static size_t lengths[3] = { 3, 7, 11 };
 
 static int
@@ -97,6 +98,7 @@ audit_recv (int fd, void *messages, unsigned int num, int flags,
         }
         memset ((char *)iov->iov_base + offset, 'x', lengths[i]);
         vec[i].msg_len = offset + lengths[i];
+        vec[i].msg_hdr.msg_flags = (truncated_mask & (1u << i)) ? MSG_TRUNC : 0;
     }
     return receive_result;
 }
@@ -111,15 +113,27 @@ audit_send (int fd, void *messages, unsigned int num, int flags,
     (void)flags;
     (void)yielder;
     (void)data;
-    assert (num == (unsigned int)receive_result);
+    unsigned int expected_count = 0;
+    for (int j = 0; j < receive_result; j++)
+        expected_count += !(fd == 10 && (truncated_mask & (1u << j)));
+    assert (num == expected_count);
     for (i = 0; i < num; i++) {
         struct msghdr *msg = &vec[i].msg_hdr;
         assert (msg->msg_iovlen == (fd == 11 ? 1 : 3));
-        assert (msg->msg_iov[msg->msg_iovlen - 1].iov_len == lengths[i]);
+        unsigned int original = i;
+        if (fd == 10 && truncated_mask) {
+            unsigned int accepted = 0;
+            for (original = 0; original < (unsigned int)receive_result;
+                 original++) {
+                if (!(truncated_mask & (1u << original)) && accepted++ == i)
+                    break;
+            }
+        }
+        assert (msg->msg_iov[msg->msg_iovlen - 1].iov_len == lengths[original]);
         /* Unsuccessful suffix entries must never contribute to Out. */
         vec[i].msg_len = 0xdeadbeef;
         if (send_result > 0 && i < (unsigned int)send_result)
-            vec[i].msg_len = lengths[i] + (fd == 10 ? 22 : 0);
+            vec[i].msg_len = lengths[original] + (fd == 10 ? 22 : 0);
     }
     if (send_result < 0)
         errno = io_error;
@@ -185,6 +199,18 @@ main (void)
     }
     puts (
         "PASS: UDP In survives partial or failed client delivery without double counting");
+    /* Rejected destination reads are still actual In; lookup/peek is not. */
+    for (truncated_mask = 1; truncated_mask < 8; truncated_mask++) {
+        send_result = -1;
+        io_error = EIO;
+        hev_socks5_transfer_get (&before_in, &before_out);
+        hev_socks5_udp_fwd_b (&self, 11, vec, 3, NULL);
+        hev_socks5_transfer_get (&received, &sent);
+        assert (received == before_in + 21 && sent == before_out);
+    }
+    truncated_mask = 0;
+    puts (
+        "PASS: every rejected/mixed destination prefix remains counted once as In");
     receive_result = -1;
     hev_socks5_transfer_get (&before_in, &before_out);
     for (i = 0; i < 2; i++) {

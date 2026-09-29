@@ -14,20 +14,32 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 CLIENT_BASE = 'bb07d1795f010d624b1924cc06203af9aeb3c6a2'
-UDP = '9909aa5f5f41ec87bb3edd976923b2d668e00f08'
+UDP = '6f9848e42fb221b21ea31ce8ab8b00333cc0ecd5'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 UDP_FILES = {
     '.github/workflows/udp-compat-audit.yml': '.github/workflows/verify-build.yml',
     'docs/branches/feature-udp-compat.md': 'README.md',
     **{p: p for p in ('Patches/hev-udp-port-zero.patch', 'Patches/hev-udp-sockaddr.patch',
-                     'Patches/hev-udp-peer-filter.patch', 'Tests/udp_peer_regression.py',
+                     'Patches/hev-udp-peer-filter.patch', 'Patches/hev-udp-dynamic-buffer.patch',
+                     'Tests/udp_peer_regression.py',
                      'Tests/udp_queue_observation.py',
                      'Tests/udp_compat_audit.py', 'Tests/udp_sockaddr_regression.py',
                      'Tests/udp_sockaddr_unit.c', 'Tests/udp_audit_driver_regression.py',
                      'docs/reviews/udp-compat-20260923.md', 'docs/features/udp-compatibility.md',
                      'docs/reviews/udp-compat-20260922.md', 'Socks5/Info.plist',
                      'docs/history/udp-before-final-audit-20260926.md',
-                     'docs/history/udp-before-project-alignment-20260926.md')}
+                     'docs/history/udp-before-project-alignment-20260926.md',
+                     'Tests/udp_buffer_benchmark.py',
+                     'Tests/udp_buffer_io.c',
+                     'Tests/udp_buffer_live_hold.c',
+                     'Tests/udp_buffer_network.py',
+                     'Tests/udp_buffer_send.c',
+                     'Tests/udp_buffer_timer.c',
+                     'Tests/udp_buffer_unit.c',
+                     'Tests/udp_header_regression.py',
+                     'docs/history/udp-before-dynamic-buffer-20260929.md',
+                     'docs/reviews/udp-dynamic-resume-20260929.md',
+                     'docs/reviews/udp-header-validation-20260929.md')}
 }
 
 
@@ -70,11 +82,15 @@ def inspect_sources():
                               'Socks5', 'Socks5.xcodeproj', 'Patches').decode().splitlines())
     allowed = {'Socks5/Statistics/TrafficStatistics.swift',
                'Socks5/Statistics/TrafficStatisticsView.swift',
-               'Patches/hev-stats-core.patch', 'Patches/hev-stats-server.patch'}
+               'Patches/hev-stats-core.patch', 'Patches/hev-stats-server.patch',
+               'Patches/hev-udp-dynamic-buffer.patch'}
     assert runtime_changes <= allowed, runtime_changes - allowed
     git('diff', '--exit-code', CLIENT_BASE, 'HEAD', '--',
         'Patches/hev-stats-task-io.patch')
     git('merge-base', '--is-ancestor', UDP, 'HEAD')
+    git('diff', '--exit-code', 'a5c4e6af4f51b64e1e47c0b2c84fd4cc2af661ee',
+        'HEAD', '--', 'Socks5', 'Socks5.xcodeproj',
+        'Patches/hev-stats-task-io.patch', 'Patches/hev-stats-server.patch')
     run([sys.executable, 'Build/check.py', 'baseline'], 'baseline.log')
     run([sys.executable, 'Tests/baseline_audit.py'], 'baseline-driver.log')
     run([sys.executable, 'Build/check.py', 'composition'], 'composition.log')
@@ -125,6 +141,11 @@ def native_checks(mode):
     # Exercise peer rejection and queued continuation with the real stats-linked core.
     run([sys.executable, 'Tests/udp_peer_regression.py', CORE / 'bin/hev-socks5-server',
          '--output', OUT / (mode + '-peer.json')], mode + '-peer.log', timeout=45)
+    run([sys.executable, 'Tests/udp_header_regression.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / (mode + '-header.json')], mode + '-header.log', timeout=120)
+    run([sys.executable, 'Tests/udp_buffer_network.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / (mode + '-dynamic-network.json')],
+        mode + '-dynamic-network.log', timeout=120)
     for repeat in (1, 2):
         run([sys.executable, '-u', 'Tests/traffic_stats_regression.py', host],
             mode + '-network-' + str(repeat) + '.log', timeout=120)
@@ -133,6 +154,8 @@ def native_checks(mode):
     run([OUT / 'counter'], mode + '-counter.log')
     run([sys.executable, 'Tests/Statistics/client_network.py', host],
         mode + '-client-network.log', timeout=120)
+    run([sys.executable, 'Tests/Statistics/udp_integration.py', host],
+        mode + '-udp-integration.log', timeout=120)
     run([sys.executable, 'Tests/Statistics/payload_boundaries.py', host, CORE],
         mode + '-payload-boundaries.log', timeout=120)
     client_includes = ['-I' + str(CORE / 'src'),
@@ -158,6 +181,22 @@ def native_checks(mode):
              *(libs if kind == 'udp' else [libs[-1]]), '-o', OUT / kind],
             mode + '-' + kind + '-build.log')
         run([OUT / kind], mode + '-' + kind + '.log', env=env)
+    # Same owner source fixtures now execute against the statistics-composed core.
+    for source in ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
+                   'udp_buffer_send.c', 'Statistics/udp_accounting_probe.c'):
+        for label, extra in [('asan', sanitize), ('optimized', ['-O3', '-fstrict-aliasing'])]:
+            executable = OUT / ('composed-' + Path(source).stem + '-' + label)
+            run([*common, *extra, '-Wno-unused-function', *client_includes,
+                 ROOT / 'Tests' / source, *libs, '-o', executable],
+                mode + '-' + executable.name + '-build.log')
+            run([executable], mode + '-' + executable.name + '.log', env=env)
+            executable.unlink()
+    if not splice:
+        executable = OUT / 'statistics-live-retention'
+        run([*common, *client_includes, 'Tests/Statistics/udp_lifecycle.c',
+             *libs, '-o', executable], 'statistics-live-retention-build.log')
+        run([executable], 'statistics-live-retention.log', timeout=490)
+        executable.unlink()
     if sys.platform == 'darwin':
         # Instrument the real counter implementation, not merely an external mock.
         run([*common, '-O1', '-g', '-fsanitize=thread', '-I' + str(CORE / 'src'),

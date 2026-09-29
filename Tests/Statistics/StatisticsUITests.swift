@@ -38,6 +38,12 @@ final class StatisticsUITests: XCTestCase {
             XCTAssertTrue(waitUntil { Self.handshake() }, "Start must reach the real native listener")
             XCTAssertTrue(Self.handshake(recordPayload: true), "First IP row must come from real IPv4 UDP relay")
             XCTAssertTrue(Self.handshake(recordPayload: true, ipv6: true), "Second IP row must come from real IPv6 control-peer relay")
+            // Retain both original small relays, then verify newly supported sizes
+            // reach the same actual Total and control-peer IP rows.
+            for size in [2048, 48001] {
+                XCTAssertTrue(Self.handshake(recordPayload: true, payloadSize: size))
+                XCTAssertTrue(Self.handshake(recordPayload: true, ipv6: true, payloadSize: size))
+            }
             stop.tap()
             XCTAssertTrue(waitUntil { start.isEnabled && !stop.isEnabled })
             XCTAssertTrue(waitUntil { !Self.handshake() }, "Stop must release the real native listener")
@@ -79,7 +85,7 @@ final class StatisticsUITests: XCTestCase {
                 let columnWidth = nextColumn.frame.midX - first.frame.midX
                 XCTAssertLessThan(speedLabel.frame.width, columnWidth,
                                   "Abbreviations must leave more room for the value columns")
-                let bytes = (orientation == .portrait ? 64 : 128) * (id == "total" ? 2 : 1)
+                let bytes = ((64 + 2048 + 48001) * (orientation == .portrait ? 1 : 2)) * (id == "total" ? 2 : 1)
                 var previousColumnX: CGFloat = -.infinity
                 for (column, title) in [("in", "In"), ("out", "Out"), ("sum", "Sum")] {
                     let heading = app.staticTexts[id + "-column-" + column]
@@ -142,7 +148,7 @@ final class StatisticsUITests: XCTestCase {
         return false
     }
 
-    private static func handshake(recordPayload: Bool = false, ipv6: Bool = false) -> Bool {
+    private static func handshake(recordPayload: Bool = false, ipv6: Bool = false, payloadSize: Int = 64) -> Bool {
         let family = ipv6 ? AF_INET6 : AF_INET
         let fd = Darwin.socket(family, SOCK_STREAM, 0)
         guard fd >= 0 else { return false }
@@ -199,11 +205,19 @@ final class StatisticsUITests: XCTestCase {
         guard connectLoopback(udp, ipv6: ipv6, port: relayPort),
               setsockopt(udp, SOL_SOCKET, SO_RCVTIMEO, &timeout,
                          socklen_t(MemoryLayout.size(ofValue: timeout))) == 0 else { return false }
-        let payload = [UInt8](repeating: 0x5a, count: 64)
+        var sendCapacity: Int32 = 256 * 1024
+        var receiveCapacity: Int32 = 512 * 1024
+        for socket in [destination, udp] {
+            guard setsockopt(socket, SOL_SOCKET, SO_SNDBUF, &sendCapacity,
+                             socklen_t(MemoryLayout.size(ofValue: sendCapacity))) == 0,
+                  setsockopt(socket, SOL_SOCKET, SO_RCVBUF, &receiveCapacity,
+                             socklen_t(MemoryLayout.size(ofValue: receiveCapacity))) == 0 else { return false }
+        }
+        let payload = (0..<payloadSize).map { UInt8($0 % 251) }
         let packet: [UInt8] = [0, 0, 0, 1, 127, 0, 0, 1,
                                UInt8(destinationPort >> 8), UInt8(destinationPort & 255)] + payload
         guard packet.withUnsafeBytes({ Darwin.send(udp, $0.baseAddress, $0.count, 0) }) == packet.count else { return false }
-        var external = [UInt8](repeating: 0, count: 64)
+        var external = [UInt8](repeating: 0, count: payloadSize)
         var peer = sockaddr_storage()
         var peerLength = socklen_t(MemoryLayout<sockaddr_storage>.size)
         let count = withUnsafeMutablePointer(to: &peer) { pointer in
@@ -222,11 +236,14 @@ final class StatisticsUITests: XCTestCase {
             }
         }
         guard echoed == payload.count else { return false }
-        var response = [UInt8](repeating: 0, count: 128)
+        var response = [UInt8](repeating: 0, count: payloadSize + 32)
         let responseCount = response.withUnsafeMutableBytes {
             Darwin.recv(udp, $0.baseAddress, $0.count, 0)
         }
-        return responseCount >= payload.count && Array(response.prefix(responseCount).suffix(payload.count)) == payload
+        guard responseCount >= 4, Array(response.prefix(3)) == [0, 0, 0] else { return false }
+        let headerSize = response[3] == 1 ? 10 : (response[3] == 4 ? 22 : 0)
+        return headerSize > 0 && responseCount == headerSize + payload.count &&
+            Array(response.prefix(responseCount).suffix(payload.count)) == payload
     }
 
     private static func connectLoopback(_ fd: Int32, ipv6: Bool, port: UInt16) -> Bool {

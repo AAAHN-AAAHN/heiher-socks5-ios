@@ -2,7 +2,7 @@
 """Actual statistics UI interaction on a temporary Simulator product; never an IPA.
 
 The committed app/project and baseline XCFramework are not edited. A source copy
-gets a test target and a Simulator-only library rebuilt from the six pinned patches.
+gets a test target and a Simulator-only library rebuilt from the seven declared patches.
 XCTest drives actual scrolling, taps, tab switches and a native SOCKS greeting.
 """
 import hashlib
@@ -101,12 +101,19 @@ def main():
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'input-index.log')
     if not output('xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version').strip().startswith('27.'):
         raise SystemExit('An iOS 27 Simulator SDK is required')
-    # Table presentation plus explicit three-decimal formatting; native inputs stay frozen.
+    # Preserve the completed table presentation while integrating declared native changes.
     ui_base = '803a1ef26209c23af7338c1effa4fe7d90ead857'
     changed = set(output('git', 'diff', '--name-only', ui_base, 'HEAD', '--',
                          'Socks5', 'Socks5.xcodeproj', 'Patches').splitlines())
     assert changed <= {'Socks5/Statistics/TrafficStatisticsView.swift',
-                       'Socks5/Statistics/TrafficStatistics.swift'}, changed
+                       'Socks5/Statistics/TrafficStatistics.swift',
+                       'Patches/hev-udp-dynamic-buffer.patch',
+                       'Patches/hev-stats-core.patch'}, changed
+    # UDP ownership and patch ordering are validated by the preceding native audit.
+    # This integration may not modify the already completed production UI/model.
+    run(['git', 'diff', '--exit-code',
+         'a5c4e6af4f51b64e1e47c0b2c84fd4cc2af661ee', 'HEAD', '--',
+         'Socks5', 'Socks5.xcodeproj'], 'preserved-production-ui.log')
     view = (ROOT / 'Socks5/Statistics/TrafficStatisticsView.swift').read_text()
     old_view = output('git', 'show', ui_base + ':Socks5/Statistics/TrafficStatisticsView.swift')
     assert 'DisclosureGroup' not in view
