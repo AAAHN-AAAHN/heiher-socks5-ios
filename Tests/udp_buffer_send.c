@@ -16,7 +16,7 @@
 
 #include <stdio.h>
 
-static int script[8], script_count, calls, gets, sets, capacity, refuse;
+static int script[8], script_count, calls, get_calls, sets, capacity, refuse;
 static unsigned int expected_offset[8];
 static struct mmsghdr *origin;
 
@@ -49,7 +49,7 @@ get_fixture (int fd, int level, int option, void *value, socklen_t *length)
 {
     assert (fd == 19 && level == SOL_SOCKET && option == SO_SNDBUF);
     assert (*length == sizeof (int));
-    gets++;
+    get_calls++;
     *(int *)value = capacity;
     return 0;
 }
@@ -73,7 +73,7 @@ static void
 reset (struct mmsghdr *messages)
 {
     origin = messages;
-    calls = gets = sets = refuse = 0;
+    calls = get_calls = sets = refuse = 0;
     capacity = 9216;
     memset (expected_offset, 0, sizeof (expected_offset));
     for (int i = 0; i < 2; i++)
@@ -94,12 +94,12 @@ main (void)
     script[0] = 2;
     script_count = 1;
     assert (udp_sendmmsg (&self, 19, messages, 2) == 2);
-    assert (calls == 1 && !gets && !sets);
+    assert (calls == 1 && !get_calls && !sets);
     assert (messages[0].msg_len == 7 && messages[1].msg_len == 48001);
     reset (messages);
     script[0] = -EIO;
     assert (udp_sendmmsg (&self, 19, messages, 2) == -1);
-    assert (calls == 1 && !gets && !sets);
+    assert (calls == 1 && !get_calls && !sets);
 #if defined(__APPLE__)
     reset (messages);
     script[0] = 1;
@@ -107,7 +107,7 @@ main (void)
     expected_offset[1] = 1;
     script_count = 2;
     assert (udp_sendmmsg (&self, 19, messages, 2) == 2);
-    assert (calls == 2 && gets == 1 && sets == 1 && capacity == 48001);
+    assert (calls == 2 && get_calls == 1 && sets == 1 && capacity == 48001);
     assert (messages[0].msg_len == 7 && messages[1].msg_len == 48001);
     for (int failure = 0; failure < 3; failure++) {
         reset (messages);
@@ -117,7 +117,7 @@ main (void)
         origin = &messages[1];
         refuse = failure;
         assert (udp_sendmmsg (&self, 19, &messages[1], 1) == -1);
-        assert (calls == (failure == 1 ? 1 : 2) && gets == 1 && sets == 1);
+        assert (calls == (failure == 1 ? 1 : 2) && get_calls == 1 && sets == 1);
         assert (messages[1].msg_len == 0xdead);
     }
     reset (messages);
@@ -126,7 +126,7 @@ main (void)
     expected_offset[1] = 1;
     script_count = 2;
     assert (udp_sendmmsg (&self, 19, messages, 2) == 1);
-    assert (calls == 2 && gets == 1 && sets == 1);
+    assert (calls == 2 && get_calls == 1 && sets == 1);
     assert (messages[0].msg_len == 7 && messages[1].msg_len == 0xdead);
     puts (
         "PASS: Darwin lazy send-space repair, preserved successful prefix, rejected/clamped/repeated failure bounded to one retry");
@@ -135,7 +135,7 @@ main (void)
     script[0] = 1;
     script_count = 1;
     assert (udp_sendmmsg (&self, 19, messages, 2) == 1);
-    assert (calls == 1 && !gets && !sets);
+    assert (calls == 1 && !get_calls && !sets);
     puts (
         "PASS: non-Darwin sender preserves original single wrapper call and successful prefix");
 #endif
