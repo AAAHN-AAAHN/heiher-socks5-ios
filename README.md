@@ -1,13 +1,20 @@
 # Traffic statistics with the latest UDP compatibility owner
 
-## Integration checkpoint — 2026-09-29
+## Completion — 2026-09-29
+
+The latest UDP integration and all applicable full-history native, SDK and Simulator
+checks passed at the exact source recorded in the final section below. The original
+implementation checkpoint is retained as historical context, not a current pending
+CI result. Physical installation/execution remains untested for this revision.
+
+## Integration and ancestry
 
 This composition integrates completed UDP owner
 `6f9848e42fb221b21ea31ce8ab8b00333cc0ecd5` into statistics owner
 `a5c4e6af4f51b64e1e47c0b2c84fd4cc2af661ee`. Both are actual parents of the
 integration, not merely labels. Main `75335d201cb1e541bb153e9899badbc11ccf1973`
-remains the baseline ancestor. Fresh full-history Linux/macOS native and iOS27
-Simulator results must be inspected before this checkpoint is closed.
+remains the baseline ancestor. The full-history Linux/macOS native and iOS27
+Simulator verification is now complete; exact evidence is recorded below.
 
 The exact preceding README is retained in
 `docs/history/statistics-before-dynamic-udp-20260929.md`; earlier reviews remain
@@ -178,3 +185,87 @@ survival, calls/Bluetooth, device energy and maximum throughput remain separate
 unperformed evidence levels until actual records exist. This composition does not
 update release/integrated or the other feature owners. All evidence is scoped, not
 a proof that every possible network and scheduler history is free of defects.
+
+## Exact-source verification — 2026-09-29
+
+Run `36550874934`, attempt 1, completed successfully at 2026-09-29T10:09:34Z.
+All four jobs passed: independent Linux/macOS UDP prerequisites at
+`6f9848e42fb221b21ea31ce8ab8b00333cc0ecd5`, and Linux/macOS statistics at
+`c89a2d8bf4dcdae0320d0340bb4f2d9ceb9d4757`. The latter merge has both the prior
+statistics owner and this UDP owner as real parents, tree
+`be4647c36c54e659d4e6981edf5313306da2345d`. No source rewrite or retry was needed
+to obtain the terminal CI result. A documentation-only closure is not a new execution.
+
+Each native mode passed the retained TCP/UDP and registry gates, 111 complete-payload
+boundary cases, 24 composed accounting cases in sanitizer and optimized modes, and
+18 additional mixed/concurrent/restarted associations. Linux exercised buffered and
+splice I/O; macOS exercised buffered I/O plus the applicable ThreadSanitizer gates.
+The 111 cases require full original bytes beyond the former 1500-byte limits, not
+truncated-prefix success. Normalized peer rows and the aggregate are checked together.
+Queries, headers and unused capacity do not count. Successful send prefixes and
+actual destination reads remain counted even when later work fails or is rejected.
+
+Actual elapsed reclamation retained Total and peer In=78002, Out=0 after real
+48001-byte and 30001-byte inputs and no subsequent payload. Capacity 48500 -> 30500
+occurred at 300.103060s on Linux / 300.024134s on macOS after the first input;
+30500 -> 1500 occurred at 420.209849s / 420.038323s. The fixture uses its own long
+communication timeout, not a changed application timeout. These are observations,
+not hard scheduling guarantees under blocked I/O or process suspension.
+
+The unchanged production app also passed one iPhone16/iOS27.0 Simulator XCTest,
+zero failures/skips, case time 121.009s, with empty runtimeWarnings and cleanup.
+In each orientation it relayed 64, 2048 and 48001 payload bytes through each of
+127.0.0.1 and ::1. Portrait Total In/Out=100.226KB and each peer=50.113KB;
+landscape after Stop/Start Total In/Out=200.452KB and each peer=100.226KB.
+The corresponding Sum cells were checked from the unrounded values. Screenshots,
+exact source archives and XCTest results were inspected, not just a status badge.
+
+The native/Simulator toolchain was Xcode27.0 27A266a, iPhoneOS27.0, Swift6.4,
+and macOS27.0 26A428. Required C/Swift SDK compiler diagnostic files are empty.
+The UI build retains AppIntents metadata-extraction notices; an empty compiler or
+runtime-warning result does not mean every tool emitted no diagnostic.
+
+All four original artifact ZIP digests and CRCs were checked. The three statistics
+source archives contain the same 110 files and Git modes at the tested merge; both
+UDP prerequisite archives contain the same 69-file UDP owner. All 29 mapped UDP
+paths and five production Swift files are preserved. Native archives agree on 243
+regular-file bytes/modes and 30 symbolic-link targets. POSIX symlink permission bits
+differ between host tar formats (0777/0755); Git symlink types/targets, not these
+host permission bits, establish their source identity. Compared with the prior
+statistics native source, only hev-socks5-udp.c changes. Within that file, the latest
+UDP owner gains fourteen statistics C lines and no removals.
+
+Supplementary archive-based Linux rebuilds passed actual-source accounting in ASan/
+UBSan and optimized modes, all 111 network cases and the 18-association integration.
+Three disposable mutations (skip rejected In, drop partial Out, remove IP attribution)
+each fail the unrelaxed oracle. Mutants and test substitutions are not production.
+These supplemental checks do not replace the full-history CI or Apple results above.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Statistics Linux11026110312 |09b0421a690186e205a2769c02f14e569684b3d58ce8102d9fdc6f4d45889a33|
+| Statistics macOS11024774724 |657475d0b98db511773958a84951cd42b7bf88e56a17cdc465176f8dc76f32f6|
+| UDP Linux11025051707 |18fe21af5c73cf440e576d93d74bc2f0adfe091441d2c381912900ee4bb9c679|
+| UDP macOS11025317455 |1ef49780f7bd87b82cdf03ba72d91eabf4cb643ea9ce7f2329f2ade460f59095|
+
+No failing mandatory case remains in this executed integration scope. Existing
+fixed-port unknown-peer association lifetime restrictions, valid same-IP first-peer
+races, independent live snapshot reads, process-lived IP-registry growth, wire/path
+bounds and allocation failures are not eliminated. No claim is made for physical
+SideStore standalone or LiveContainer guest execution, device background/power or
+maximum throughput. No IPA or release integration occurred. Other branch heads are
+unchanged. The operational statistics boundary remains successful destination-side
+payload I/O, not all application or interface wire traffic and not remote delivery ACKs.
+
+## Documentation closure and correspondence
+
+This closure changes only README.md, its byte-identical feature specification and
+`docs/reviews/statistics-dynamic-udp-20260929.md`. All other 107 of the 110 tracked
+paths retain the tested commit's exact bytes and Git modes, including the runtime,
+all seven patches, tests, workflows and pinned dependencies. The completed UDP
+owner remains `6f9848e42fb221b21ea31ce8ab8b00333cc0ecd5`.
+
+The publication commit descends directly from the tested statistics merge
+`c89a2d8bf4dcdae0320d0340bb4f2d9ceb9d4757`. Its own Git metadata supplies the final
+commit/tree identity; the run above supplies execution evidence for the unchanged
+code. No new runtime execution is claimed for this documentation-only commit.
