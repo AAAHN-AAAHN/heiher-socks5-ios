@@ -1,6 +1,6 @@
 # UDP compatibility — adaptive contiguous datagram buffers
 
-## UDP header validation follow-up — 2026-09-29
+## UDP header validation completed — 2026-09-29
 
 The final review of owner `164cdfb89fd1c4c3889ec00bbee97dd6ca4c7eb4` reproduced
 an inherited RSV/FRAG validation omission. This follow-up adds only a two-line
@@ -15,8 +15,22 @@ and queue continuation. The existing actual-source address fixture additionally
 checks every nonzero value in each of the three bytes, both receive address families
 and both association states. All previous assertions, negative controls, timeouts,
 source guards and Linux/Apple checks remain. Exact results and limitations belong in
-`docs/reviews/udp-header-validation-20260929.md`. Local tests are preliminary;
-fresh exact-commit CI and artifact inspection are required to close this follow-up.
+`docs/reviews/udp-header-validation-20260929.md`. Run `36544027330`, attempt 1,
+passed both Linux and Xcode27 jobs at tested commit
+`d7c2d56c351298d771cc04b0bd601d8229f42e6b`, tree
+`5be8bf675f91cf157d916df02e39bef5bef3156c`. Both original artifacts and all 69
+source files/modes were verified. Each host passed 3060 byte/family/association
+cases in sanitizer and optimized modes, 34 real header profiles, four old controls,
+and all prior mandatory dynamic-buffer, timer, source and SDK checks. Actual
+48500 -> 30500 -> 1500 retention occurred without input after the second demand.
+
+The identified header and documentation defects are resolved within this verified
+scope. This closure changes only README, its identical feature specification and
+the dated review; the other 66 paths remain the tested bytes/modes. Documentation
+closure is not another CI execution. The accepted fixed-port unknown-peer ownership
+limit, valid same-IP first-sender race and physical deployment boundaries remain.
+No IPA, release integration, new Simulator or physical SideStore/LiveContainer
+execution is added. The following older run records are historical evidence only.
 
 ## Prior dynamic-buffer completion — 2026-09-29
 
@@ -251,7 +265,7 @@ Primary API contracts, not execution evidence:
 - https://pubs.opengroup.org/onlinepubs/9699919799/functions/recvmsg.html
 
 
-## Final verification record
+## Prior dynamic-buffer verification record
 
 The final source was checked out with complete history on both hosts. All required
 jobs passed in run36535518245 on attempt1, updated2026-09-29T07:25:32Z. No original
