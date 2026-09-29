@@ -138,8 +138,11 @@ family_test (int family)
      * remain flagged and must not become a recorded successful full demand. */
     short_query = 1;
     assert (send (output, payload, 2048, 0) == 2048);
-    assert (udp_buffer_recvmmsg (&self, input, messages, 1, MSG_DONTWAIT,
-                                 buffers) == 1);
+    int result = udp_buffer_recvmmsg (&self, input, messages, 1, MSG_DONTWAIT,
+                                      buffers);
+    fprintf (stderr, "truncation result=%d errno=%d flags=%d family=%d\n",
+             result, errno, messages[0].msg_hdr.msg_flags, family);
+    assert (result == 1);
     assert (messages[0].msg_hdr.msg_flags & MSG_TRUNC);
     assert (!buffers[0].history);
     short_query = 0;
