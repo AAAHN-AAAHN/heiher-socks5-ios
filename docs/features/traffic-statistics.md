@@ -631,3 +631,34 @@ The other inherited0648dc65 run36432235733 also failed; its completed job log re
 a900second xcodebuild timeout. Its internal cause is not assumed to be identical to
 the observed width-assertion failure in36432364605. Both earlier executions remain
 failure evidence; the corrected-source success does not retroactively change them.
+
+## Destination-side payload completeness audit — 2026-09-29
+
+The payload-only review resumes at16449f74, after the completed Spd./Vol. UI work.
+All production code, native patches, UI, sampling, source pins and framework input
+remain unchanged. `Tests/Statistics/payload_boundaries.py` adds actual socket-wrapper
+source tests and54 real loopback boundary cases per native mode; two lines attach
+it to the existing native audit. No original gate, assertion or timeout is relaxed.
+Detailed coverage, exact results and artifact identities are recorded in
+`docs/reviews/payload-accounting-20260929.md`.
+
+For successful destination-side reads/writes, the inspected paths and tests reveal
+no omitted payload counter. This is not a claim that every original datagram is
+relayed in full: the1500byte receive buffer includes SOCKS framing on the incoming
+client side. UDP-in-UDP outbound payload capacity is1490bytes for IPv4,1478for IPv6,
+and1493-N for an N-byte domain. Destination replies have1500payload bytes of receive
+capacity. Oversized datagrams can be truncated before counting. UDP-over-TCP instead
+rejects declared payload beyond1493/1481/(1496-N), respectively. These existing
+relay limits are observed, not repaired or silently redefined as accounting success.
+
+Only actual successful Out prefixes are counted; external In remains after failed
+client delivery. Relayed HTTP/TLS/QUIC or DNS bytes inside the destination socket
+payload are included; system resolver traffic and client SOCKS/IP/TCP/UDP framing
+are not added separately. Independent live snapshots, batch publication delay,
+finite counters and possible process termination retain their documented limits.
+
+The validation source is d3f1c35984e7cc383de59608bae41e3aa389d71e, tree
+55e97808ca0ab926b9d445ebca93e07b27c3c287, run36513303702. Its complete execution
+and original-artifact checks are distinguished from this documentation-only closure
+in the dated review. The other seven branch refs and build9 remain unchanged.
+No IPA/release integration or physical SideStore/LiveContainer execution is added.

@@ -66,7 +66,7 @@ live aggregate/row snapshots are not transactional, and UInt64 is finite. Thus t
 result cannot honestly be phrased as all original application payload is always
 relayed or represented regardless of size, failure, loss or process termination.
 
-## Execution checkpoint
+## Supplemental local execution
 
 Before publication, Linux rebuilt both native modes from the preceding authenticated
 CI source archive and passed the existing native suites and four debug/optimized
@@ -76,14 +76,72 @@ fixed its compile error without changing production headers. A separate full-his
 sample driver could not run in the archive-only checkout; that failure is not a
 native accounting failure and is not labeled a completed full local audit.
 
-Fresh exact-commit Linux/macOS CI, source archives and applicable Apple verification
-must be inspected before closing this checkpoint. Earlier run36435371952 is prior
-source evidence, not the new run. Physical iOS27 SideStore standalone, LiveContainer
-guest execution, device background survival, power and throughput remain unperformed.
-No IPA or release merge is part of this payload-only audit.
+The final published boundary driver also passed separately with both local compiled
+hosts. Earlier run36435371952 is preserved prior-source evidence, not the new run.
+The full-history CI below supplies the Git-dependent sample/ownership checks that
+the archive-only local workspace could not execute. Physical iOS27 SideStore
+standalone, LiveContainer guest execution, device background survival, power and
+throughput remain unperformed. No IPA or release merge is part of this audit.
 
 Reproduce from a clean full-history checkout:
 
 ```sh
 python3 Tests/Statistics/audit.py
 ```
+
+
+## Final exact-source verification
+
+Tested commit: `d3f1c35984e7cc383de59608bae41e3aa389d71e`.
+Tested tree: `55e97808ca0ab926b9d445ebca93e07b27c3c287`.
+Run `36513303702`, attempt1, completed all four jobs successfully: the exact UDP
+owner prerequisites on Linux/macOS and the current statistics audit on Linux/macOS,
+including its unchanged actual Simulator test. No retry, assertion deletion,
+warning suppression or timeout increase was used to reach this result.
+
+| Layer | Inspected current results |
+| --- | --- |
+| New wrapper fixture | Linux buffered and splice each pass34 platform-batch plus32 forced-single-message cases. Actual macOS buffered passes32 native single-message cases. ASan/UBSan run on the included real wrapper. |
+| New network boundaries | Each of the three native modes passes54 real loopback cases:24 client-outbound,21 destination-inbound and9 UDP-over-TCP. The162 executions repeat the same54-case design, not162 distinct specifications or physical iPhone trials. Actual lengths, payload bytes, counter deltas and quiescent IP sums are checked. |
+| Existing network/accounting | The original10 scenarios pass twice per mode; peer rejection/queue continuation, real client-IP TCP/UDP attribution, socket churn, Stop/Start and2000 small echoes per mode retain their original tests. |
+| Partial I/O and counters | Existing actual-source TCP/UDP probes retain partial success, EAGAIN, EOF, errors, cancellation and failed-client-delivery checks. Eight writers/800000 updates retain exact sums. Collector/snapshot/cardinality guards, scoped ASan/UBSan and macOS aggregate/client/expanded-registry TSan pass. |
+| Models and guards | Existing aggregate/client models, rounding controls and98,516 exact-sample checks per compiler mode pass. Source pins, main/UDP ancestry, tracked worktree/index checks, baseline/driver controls, formatter and exact native reverse checks pass. |
+| Apple SDK | Five production Swift files and patched C/headers pass iPhoneOS27 ARM64/iOS17.2 checks with warnings-as-errors. Both compiler diagnostic logs are empty. |
+| Simulator | Original uninstrumented iPhone16/iOS27.0 build24A434 XCTest passes:1case,0failures,0skips,129.013seconds case time. Original Start/Stop, native UDP, Spd./Vol. table and portrait/landscape conditions remain. runtimeWarnings=[] and cleanup=[]. Five original exported PNGs were inspected; no injected counter values or edited screenshot pixels. |
+| Physical/product scope | No physical SideStore/LiveContainer, device background/energy/throughput verification, new iPhone archive/IPA or release merge. |
+
+Apple host: Xcode27.0 27A266a, iPhoneOS27.0, Apple Swift6.4
+swiftlang-6.4.0.34.1, macOS27.0 26A428. The raw build log still contains, for example,
+AppIntents metadata-extraction diagnostics. Empty compiler/runtime-warning summaries
+do not mean that every tool/framework message is absent.
+
+## Original artifacts and preservation
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Statistics Linux11010008605 | 54f1df2fe088fa15ef8eec9a82d3d52d4a3730ef480865eac26c4e2fd07f0d0e |
+| Statistics macOS11009979380 | 20ca14f4bfa9f9eb5feafc20604c8337ebd72e98222bdf63ce9711db5feb8970 |
+| UDP Linux11010451592 | ed28590b32ef81ac702220cafcf6193cfc98cb89001e59c4dd3a7ea1f006e8c0 |
+| UDP macOS11009717370 | 7333902025025c913bad5db2a5ef04564c4f58b179a5279d3f08612d44086771 |
+
+All four downloaded ZIP digests match GitHub metadata and all CRCs pass. The three
+Statistics source archives have the exact tested commit comment and93 identical
+tracked file bytes/Git modes; independently reconstructed trees equal55e97808.
+The two prerequisite archives contain57 identical files from UDP9909aa5f, not the
+triggering statistics commit. The243 regular native-source files/modes also match
+between current Linux/macOS and the preceding successful artifacts. No native patch
+or production Swift change is concealed by the added tests.
+
+The closing commit changes only this dated review and the identical README/feature
+specification. The README update appends the new contract/results reference while
+preserving all45,977 preceding bytes. The other90 of93 paths remain byte/mode-equal
+to the tested source. This documentation closure is not a separately executed build.
+Other seven branch refs are retained; no feature composition, background interval,
+settings, icon, release or build9 IPA is changed.
+
+The final conclusion is successful-I/O accounting coverage within the defined
+socket boundary, not lossless transport of arbitrary original datagrams. Known
+fixed-port multi-association, buffer/truncation, snapshot timing, finite-counter,
+malformed-protocol and physical-deployment limits are not erased by a passing run.
+This completes the requested payload accounting revalidation without inventing a
+production repair or expanding the measurement boundary.
