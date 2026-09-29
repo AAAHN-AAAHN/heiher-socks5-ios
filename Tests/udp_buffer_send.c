@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 
+int get_fixture (int fd, int level, int option, void *value, socklen_t *length);
+int set_fixture (int fd, int level, int option, const void *value,
+                 socklen_t length);
+
 #define hev_task_io_socket_sendmmsg send_fixture
 #define getsockopt get_fixture
 #define setsockopt set_fixture
