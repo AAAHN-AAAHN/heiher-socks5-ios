@@ -1,6 +1,6 @@
 # Application icon — current-main resource verification
 
-## Current status — 2026-09-26
+## Previous completed review — 2026-09-26
 
 This independent feature now inherits main75335d201cb1e541bb153e9899badbc11ccf1973
 as an actual parent and exact base_commit. Run36225581121 attempt1 passed on source
@@ -70,7 +70,7 @@ is audit-time Git/hash/fixture work, not app allocations, threads, timers, disk 
 or network traffic. The source guards are checkpoint comparisons, not an atomic
 adversarial snapshot of untracked inputs, external tools or transient modifications.
 
-## Inspected new execution
+## Previous inspected execution — 2026-09-26
 
 The first-attempt Xcode27 job and artifact upload succeeded. All46 common cases,
 13 retained resource methods/30728 mutations,38 compiled/input/marker/cwd boundary
@@ -109,3 +109,55 @@ SideStore signing/install,LiveContainer loading/guest-list/web-clip/cache behavi
 real device cache refresh,manual Dark/Tinted/clear modes,iPad runtime,other devices/OS
 versions and energy remain unperformed. The generic iPhone archive/IPA job was skipped
 in this resource-only run. No installer/host version or physical success is inferred.
+
+## Final pre-release review — 2026-09-29 (execution checkpoint)
+
+The approved PNG, catalog, both production Swift files, Xcode project/plist,
+framework, source pins, main ancestry, shared build scripts and workflow are
+preserved. No resource or runtime defect requiring artwork or app-code changes
+has been identified. This review strengthens test-only boundaries and reruns the
+existing Xcode27 resource/Simulator path. It does not create an IPA or integrate
+other features. The code reviewed starts at639de66aa2265f3beffc1d0b433981d2e8073cb2.
+
+Two compiled-reference cases previously accepted a single phone-specific PNG as
+proof for the iPad mapping, or the reverse. The checker now requires a compatible
+idiom or generic fallback for each mapping, and an actual filename array. Generic
+and correctly paired device variants remain valid. The two prior positive fixture
+expectations were false accepts and now require rejection; no input case is removed.
+
+The independent ImageIO decoder previously accepted any opaque square up to1024
+pixels, including a tiny PNG under a120px fallback name, a wrongly sized source,
+a non-PNG image with a.png extension or an empty invocation. It now checks PNG type,
+1024-square source dimensions and point-size/scale-derived fallback dimensions.
+A new native-only driver runs17 fixtures against the exact prior and new decoder:
+34 real ImageIO executions with positive source/2x/3x/fractional-pad cases and
+negative size/type/name/opacity/empty cases. Synthetic fixtures never enter the app.
+Apple compilation and old-decoder execution remain pending at this checkpoint.
+
+Simulator Assets.car is now inspected with the same phone/pad rendition contract
+as device actool output. Both installed CFBundleIcons mappings, the installed
+identity, and every generated icon PNG plus Assets.car must match the built app.
+Only the copied test bundle's identity/signature differs. Seven isolated mutation
+cases cover identity, iPad metadata, CAR, either PNG and extra files. The original
+clean/dirty/index/optimization/marker/timeout and source PNG controls remain intact.
+
+The Linux source suite passed13 methods including30728 one-bit mutations; the
+updated audit-boundary suite passed5 methods/46 cases and all3 shell controls.
+The filename helper was separately compiled with Linux Swift/Foundation; this is
+not ImageIO or iOS evidence. A combined local launcher hit its own20second tool
+limit after the boundary suite, so the remaining shell check ran separately; no
+repository timeout was changed. Fresh full-history Xcode27 CI must pass before
+closing this checkpoint. Original failure/diagnostic evidence remains historical.
+
+These changes add no app CPU/RAM work: no new runtime instructions, allocations,
+threads, timers, image loader, network or API. Audit cost is compile-time/CI-only.
+The static image and OS-rendered/cache resources still have a footprint;3841 source
+bytes are not a promise of3841 resident bytes or zero system rendering cost. This
+review does not claim a measured device-wide speedup, battery saving or zero bugs
+across all OS and installation histories. Physical SideStore/LiveContainer and
+manual icon appearances remain separate unperformed validations.
+
+Reference contracts (not substitutes for this run):
+https://developer.apple.com/documentation/xcode/configuring-your-app-icon
+https://developer.apple.com/library/archive/qa/qa1686/_index.html
+https://developer.apple.com/library/archive/documentation/2DDrawing/Conceptual/DrawingPrintingiOS/SupportingHiResScreensInViews/SupportingHiResScreensInViews.html
