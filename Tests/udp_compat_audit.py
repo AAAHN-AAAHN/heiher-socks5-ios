@@ -124,7 +124,7 @@ def main():
     if 'version 18.' not in version:
         raise RuntimeError(version)
     run([formatter, CORE / 'src/core/src/hev-socks5-udp.c'], 'expected-dynamic-core.c')
-    for name in ('udp_buffer_unit.c', 'udp_buffer_io.c', 'udp_buffer_timer.c', 'udp_buffer_send.c'):
+    for name in ('udp_buffer_unit.c', 'udp_buffer_io.c', 'udp_buffer_timer.c', 'udp_buffer_send.c', 'udp_buffer_live_hold.c'):
         run([formatter, '--style=file:' + str(CORE / '.clang-format'), ROOT / 'Tests' / name],
             'expected-' + name)
         if (OUT / ('expected-' + name)).read_bytes() != (ROOT / 'Tests' / name).read_bytes():
@@ -191,6 +191,11 @@ def main():
     run([compiler, '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread', *includes,
          ROOT / 'Tests/udp_buffer_timer.c', *libs, '-o', executable], 'buffer-real-timer-build.log')
     run([executable], 'buffer-real-timer.log', timeout=90)
+    executable.unlink()
+    executable = OUT / 'buffer-live-hold'
+    run([compiler, '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread', *includes,
+         ROOT / 'Tests/udp_buffer_live_hold.c', *libs, '-o', executable], 'buffer-live-hold-build.log')
+    run([executable], 'buffer-live-hold.log', timeout=490)
     executable.unlink()
     run([sys.executable, 'Tests/udp_buffer_network.py', CORE / 'bin/hev-socks5-server',
          '--output', OUT / 'buffer-network.json'], 'buffer-network.log', timeout=120)

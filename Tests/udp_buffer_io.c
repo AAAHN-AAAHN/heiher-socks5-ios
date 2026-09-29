@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <assert.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -61,6 +62,40 @@ io_getsockopt (int fd, int level, int option, void *value, socklen_t *length)
     return getsockopt (fd, level, option, value, length);
 }
 
+/* Nonblocking send completion is not receive readiness on every host.
+ * Bound the fixture's readiness wait without changing production I/O policy. */
+static void
+wait_readable (int fd, uint64_t deadline)
+{
+    uint64_t now = udp_buffer_now ();
+    struct pollfd event = { .fd = fd, .events = POLLIN };
+    assert (now < deadline);
+    int delay = (int)((deadline - now) / 1000000 + 1);
+    assert (poll (&event, 1, delay) == 1 && (event.revents & POLLIN));
+}
+
+static int
+receive_ready (HevSocks5 *self, int fd, struct mmsghdr *messages,
+               unsigned int num, UDPBuffer *buffers)
+{
+    uint64_t deadline = udp_buffer_now () + 2 * UDP_NSEC_PER_SEC;
+    unsigned int done = 0;
+    while (done < num) {
+        int result;
+        wait_readable (fd, deadline);
+        result = udp_buffer_recvmmsg (self, fd, messages + done, num - done,
+                                      MSG_DONTWAIT, buffers + done);
+        if (result < 0 && errno == EAGAIN)
+            continue;
+        if (result <= 0)
+            return done ? (int)done : result;
+        done += result;
+        if (!HEV_SOCKS5 (self)->timeout)
+            break;
+    }
+    return done;
+}
+
 static void
 family_test (int family)
 {
@@ -117,9 +152,9 @@ family_test (int family)
     assert (send (output, payload, 0, 0) == 0);
     assert (send (output, payload, 2048, 0) == 2048);
     assert (send (output, payload, sizeof (payload), 0) == sizeof (payload));
+    wait_readable (input, udp_buffer_now () + 2 * UDP_NSEC_PER_SEC);
     assert (udp_buffer_datagram_size (input, &buffers[0]) == 0);
-    assert (udp_buffer_recvmmsg (&self, input, messages, 3, MSG_DONTWAIT,
-                                 buffers) == 3);
+    assert (receive_ready (&self, input, messages, 3, buffers) == 3);
     const unsigned int sizes[] = { 0, 2048, 48001 };
     for (int i = 0; i < 3; i++) {
         size_t capacity;
@@ -138,11 +173,7 @@ family_test (int family)
      * remain flagged and must not become a recorded successful full demand. */
     short_query = 1;
     assert (send (output, payload, 2048, 0) == 2048);
-    int result =
-        udp_buffer_recvmmsg (&self, input, messages, 1, MSG_DONTWAIT, buffers);
-    fprintf (stderr, "truncation result=%d errno=%d flags=%d family=%d\n",
-             result, errno, messages[0].msg_hdr.msg_flags, family);
-    assert (result == 1);
+    assert (receive_ready (&self, input, messages, 1, buffers) == 1);
     assert (messages[0].msg_hdr.msg_flags & MSG_TRUNC);
     assert (!buffers[0].history);
     short_query = 0;
@@ -152,8 +183,7 @@ family_test (int family)
     fail_allocation = 1;
     assert (send (output, payload, 7, 0) == 7);
     assert (send (output, payload, 2048, 0) == 2048);
-    assert (udp_buffer_recvmmsg (&self, input, messages, 2, MSG_DONTWAIT,
-                                 buffers) == 1);
+    assert (receive_ready (&self, input, messages, 2, buffers) == 1);
     assert (messages[0].msg_len == 7 && !self.timeout);
     assert (recv (input, received, sizeof (received), 0) == 2048);
     assert (!memcmp (received, payload, 2048));
