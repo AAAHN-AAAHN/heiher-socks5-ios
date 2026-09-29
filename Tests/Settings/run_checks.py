@@ -68,6 +68,9 @@ extension URL {
               (['CoordinationMocks.swift', 'ImportTests.swift'], [], None),
               (['PersistenceRevalidation.swift'], provider, '33 persistence revalidation assertions; 4 failed'),
               (['LoadAccessTests.swift'], provider, '6 access-boundary assertions; 1 failed')]
+    if not baseline and not previous:
+        groups.append((['FinalPersistenceTests.swift'], provider, None))
+        groups.append((['FinalCoordination.swift'], [], None))
     if baseline:
         groups = groups[2:3]
     elif previous:
@@ -80,9 +83,20 @@ extension URL {
         preexec = drop_privileges
     for index, (tests, platform, expected) in enumerate(groups):
         executable = temp / f'checks-{index}'
+        store = temp / 'SettingsStore.swift'
+        if tests == ['FinalCoordination.swift']:
+            # Redirect only the two OS-scope calls to counted test boundaries.
+            # The store's coordination, cancellation, revision and write body is exact.
+            body = store.read_text()
+            for original_name, test_name in [('startAccessingSecurityScopedResource', 'testScopeStart'),
+                                             ('stopAccessingSecurityScopedResource', 'testScopeStop')]:
+                assert body.count(original_name + '()') == 1
+                body = body.replace(original_name + '()', test_name + '()')
+            store = temp / 'SettingsStore-scope-boundary.swift'
+            store.write_text(body)
         subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
                         *ui, *platform, *([] if baseline else [str(temp / 'ServerSettings.swift')]),
-                        str(temp / 'AppSettings.swift'), str(temp / 'SettingsStore.swift'),
+                        str(temp / 'AppSettings.swift'), str(store),
                         *[str(Path(__file__).with_name(p)) for p in tests],
                         '-o', str(executable)], check=True, timeout=120)
         result = subprocess.run([str(executable)], text=True, capture_output=True, timeout=45,
