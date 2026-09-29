@@ -1,6 +1,38 @@
 # Server execution control — current main
 
-## Completed project alignment — 2026-09-26
+## Final review closure — 2026-09-30
+
+The resumed final review is complete within its source/native/SDK/Simulator scope.
+No production change was required. Run `36574631457`, attempt 1, passed Linux and
+Xcode27 at `78fb9e1521c3f57d76385617a97b6f5f2c626fea`, tree
+`46d0c110c74d1622a8ca6c862378eee0538aa3a9`. The actual iPhone16/iOS27.0 XCTest
+passed one test, zero failures/skips, in92.845seconds; runtimeWarnings and cleanup
+are empty. Six original captures, native logs, both complete source manifests and
+both original artifact SHA256/CRCs were inspected. Three source archives agree on
+all78 file bytes/Git modes and independently reconstruct the recorded tree.
+
+The existing controller/native behavior remains unchanged. New review tests cover
+1250 four-intent schedules/25544 assertions, held completion and owner lifetime,
+18 actual-native records at workers1/4/64, and actual UI/dual-stack listener checks.
+The final resume also ran a separate Linux6250 five-intent extension with152576
+assertions and repeated current native/control tests; it does not replace Apple CI.
+
+The prior run36571798495 failed a UI assertion that counted two accessibility
+Switch nodes as two logical settings. Only that test assumption was corrected;
+the actual IPv6 setting, on/off values and enabled states are now tested. The old
+failure and its later diagnostic-collection timeout remain failure evidence.
+No production code, timeout or assertion about required behavior was weakened.
+
+The detailed current results and artifact correspondence are in
+`docs/reviews/server-control-final-20260929.md`. The September26 sections below
+describe the earlier alignment run; their source IDs and counts remain historical.
+This closing commit changes only README, its identical feature specification and
+that review; the other75 of78 tested paths retain their bytes and Git modes.
+Physical iOS27 SideStore standalone and LiveContainer guest execution, device
+background/power and an iPhone archive/IPA remain unperformed. Settings-persistence
+and release still need their own deliberate inheritance/product validation.
+
+## Completed project alignment — 2026-09-26 (historical)
 
 This independent branch inherits main75335d201cb1e541bb153e9899badbc11ccf1973 as
 an actual ancestor. Both Build/features.json and the separate membership document
@@ -136,5 +168,5 @@ source/test/document inputs, and release must revalidate the combined compositio
 Physical SideStore signing/install, LiveContainer loading/shared-process behavior,
 actual permission UI, VPN/hotspot, calls/Bluetooth, lock/suspend/termination, prolonged
 execution, crash/power-loss and energy are unperformed. Saved Start is intent, not
-auto-relaunch or an override of OS scheduling. No ordinary archive/IPA or Simulator
-execution was performed by this dedicated no-IPA verification.
+auto-relaunch or an override of OS scheduling. The September26 run did not perform an archive/IPA or Simulator execution.
+The final review above adds Simulator coverage, not a physical install or IPA.
