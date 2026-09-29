@@ -133,6 +133,8 @@ def native_checks(mode):
     run([OUT / 'counter'], mode + '-counter.log')
     run([sys.executable, 'Tests/Statistics/client_network.py', host],
         mode + '-client-network.log', timeout=120)
+    run([sys.executable, 'Tests/Statistics/payload_boundaries.py', host, CORE],
+        mode + '-payload-boundaries.log', timeout=120)
     client_includes = ['-I' + str(CORE / 'src'),
                        '-I' + str(CORE / 'src/core/src'),
                        '-I' + str(task / 'include')]
