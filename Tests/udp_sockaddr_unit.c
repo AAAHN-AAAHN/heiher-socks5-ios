@@ -21,6 +21,9 @@ static int foreign_batches;
 static int retry_yields;
 static int empty_after_foreign;
 static int cancel_yield;
+static unsigned char header_prefix[3];
+static int header_batches;
+static int empty_after_header;
 
 static int family = AF_INET;
 static int receive_error;
@@ -133,7 +136,8 @@ audit_recv (int fd, void *messages, unsigned int num, int flags,
         if (fd == 11)
             assert (vec[i].msg_hdr.msg_namelen == sizeof (v6));
     }
-    if (receive_error || (empty_after_foreign && !foreign_batches)) {
+    if (receive_error || (empty_after_foreign && !foreign_batches) ||
+        (empty_after_header && !header_batches)) {
         errno = EAGAIN;
         return -1;
     }
@@ -155,6 +159,11 @@ audit_recv (int fd, void *messages, unsigned int num, int flags,
     assert (vec[0].msg_hdr.msg_iov[0].iov_len >= sizeof (packet));
     memcpy (vec[0].msg_hdr.msg_iov[0].iov_base, packet, sizeof (packet));
     vec[0].msg_len = sizeof (packet);
+    if (header_batches) {
+        header_batches--;
+        memcpy (vec[0].msg_hdr.msg_iov[0].iov_base, header_prefix,
+                sizeof (header_prefix));
+    }
     return 1;
 }
 
@@ -234,6 +243,71 @@ addresses (void)
     }
     puts (
         "PASS: 65536 port values; mapping, canaries, idempotence and IPv6 preservation");
+}
+
+/* Every nonzero byte value is rejected before first-peer binding. The real
+ * receiver also has to drain rejected batches and preserve cancellation. */
+static void
+headers (void)
+{
+    HevObjectClass klass = { .iface = get_iface };
+    HevSocks5 self = { .base.klass = &klass,
+                       .type = HEV_SOCKS5_TYPE_UDP_IN_UDP };
+    unsigned char buffer[64];
+    HevSocks5UDPMsg msg;
+    unsigned int cases = 0;
+    int pass, associated, field, value, mode;
+
+    for (pass = 0; pass < 2; pass++) {
+        family = pass ? AF_INET6 : AF_INET;
+        for (associated = 0; associated < 2; associated++) {
+            for (field = 0; field < 3; field++) {
+                for (value = 1; value <= 255; value++) {
+                    int before = connect_calls;
+                    memset (header_prefix, 0, sizeof (header_prefix));
+                    header_prefix[field] = value;
+                    header_batches = 1;
+                    retry_yields = 0;
+                    self.udp_associated = associated;
+                    msg.buf = buffer;
+                    msg.len = sizeof (buffer);
+                    assert (hev_socks5_udp_recvmmsg_udp (&self, &msg, 1, 1,
+                                                         NULL) == 1);
+                    assert (!header_batches && retry_yields == 1);
+                    assert (connect_calls == before + !associated);
+                    assert (self.udp_associated && msg.len == 1);
+                    assert (*(unsigned char *)msg.buf == 42);
+                    cases++;
+                }
+            }
+        }
+        for (mode = 0; mode < 3; mode++) {
+            int before = connect_calls;
+            int result;
+            memset (header_prefix, 0xff, sizeof (header_prefix));
+            header_batches = 12;
+            empty_after_header = mode == 1;
+            cancel_yield = mode == 2;
+            retry_yields = 0;
+            self.udp_associated = 0;
+            msg.buf = buffer;
+            msg.len = sizeof (buffer);
+            result = hev_socks5_udp_recvmmsg_udp (&self, &msg, 1, 1, NULL);
+            if (mode == 0) {
+                assert (result == 1 && retry_yields == 12);
+                assert (connect_calls == before + 1 && msg.len == 1);
+            } else {
+                assert (result == -1 && !self.udp_associated);
+                assert (connect_calls == before);
+                assert (errno == (mode == 1 ? EAGAIN : ECANCELED));
+                assert (retry_yields == (mode == 1 ? 12 : 1));
+            }
+            header_batches = empty_after_header = cancel_yield = 0;
+        }
+    }
+    printf (
+        "PASS: %u RSV/FRAG byte/family/association cases; rejected queues and cancellation\n",
+        cases);
 }
 
 int
@@ -321,5 +395,6 @@ main (void)
     assert (send_calls == 20);
     puts (
         "PASS: actual reply path; all 10 capacities reset, mixed families serialized correctly");
+    headers ();
     return 0;
 }

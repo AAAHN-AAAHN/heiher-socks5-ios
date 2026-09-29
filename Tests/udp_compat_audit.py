@@ -113,6 +113,9 @@ def main():
     run([sys.executable, 'Tests/udp_buffer_network.py', old_binary,
          '--old-control', '--output', OUT / 'buffer-old-control.json'],
         'buffer-old-control.log', timeout=45)
+    run([sys.executable, 'Tests/udp_header_regression.py', old_binary,
+         '--old-control', '--output', OUT / 'header-old-control.json'],
+        'header-old-control.log', timeout=45)
     run(['make', 'clean'], 'clean.log', CORE)
     patch('hev-udp-dynamic-buffer.patch', CORE / 'src/core')
     build()
@@ -197,6 +200,8 @@ def main():
          ROOT / 'Tests/udp_buffer_live_hold.c', *libs, '-o', executable], 'buffer-live-hold-build.log')
     run([executable], 'buffer-live-hold.log', timeout=490)
     executable.unlink()
+    run([sys.executable, 'Tests/udp_header_regression.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / 'header-regression.json'], 'header-regression.log', timeout=45)
     run([sys.executable, 'Tests/udp_buffer_network.py', CORE / 'bin/hev-socks5-server',
          '--output', OUT / 'buffer-network.json'], 'buffer-network.log', timeout=120)
     run([sys.executable, 'Tests/udp_buffer_benchmark.py', old_binary,

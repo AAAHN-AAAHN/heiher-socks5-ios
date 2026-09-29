@@ -1,6 +1,24 @@
 # UDP compatibility — adaptive contiguous datagram buffers
 
-## Completion — 2026-09-29
+## UDP header validation follow-up — 2026-09-29
+
+The final review of owner `164cdfb89fd1c4c3889ec00bbee97dd6ca4c7eb4` reproduced
+an inherited RSV/FRAG validation omission. This follow-up adds only a two-line
+receive guard to the existing fourth patch, after the size/truncation checks and
+before address parsing or first-peer binding. Nonzero reserved bytes and unsupported
+SOCKS fragments are discarded; valid zero-header datagrams retain their behavior.
+The 1500/500/300s/60s buffer policy and all other runtime inputs remain unchanged.
+No fragmentation/reassembly support or new buffer/timer/host change is introduced.
+
+`Tests/udp_header_regression.py` covers real loopback rejection, first-peer acquisition
+and queue continuation. The existing actual-source address fixture additionally
+checks every nonzero value in each of the three bytes, both receive address families
+and both association states. All previous assertions, negative controls, timeouts,
+source guards and Linux/Apple checks remain. Exact results and limitations belong in
+`docs/reviews/udp-header-validation-20260929.md`. Local tests are preliminary;
+fresh exact-commit CI and artifact inspection are required to close this follow-up.
+
+## Prior dynamic-buffer completion — 2026-09-29
 
 The agreed dynamic-buffer implementation and scoped verification are complete.
 Run `36535518245`, attempt 1, passed both Linux and Xcode27 jobs at tested commit
@@ -126,8 +144,10 @@ coroutine scheduling remain. Empty UDP payload is valid and forwarded as zero by
 empty queue is EAGAIN, not an empty datagram or EOF. All-rejected input continues
 through the original cooperative yield instead of mistaking rejection for queue
 exhaustion. Peer IP/port filtering and normalized IPv4/IPv6 behavior are preserved.
-The first peer is bound only after basic header/length validation; malformed/truncated
-input cannot be forwarded as a valid prefix. No SOCKS fragment reassembly is added.
+The first peer is bound only after the implemented size, truncation, RSV/FRAG and
+address-length checks. Both reserved bytes and FRAG must be zero; unsupported SOCKS
+fragments are dropped, not reassembled or forwarded as standalone payloads. These
+specific checks are not a certification of every malformed protocol or address.
 
 The non-Apple/non-Linux fallback uses full non-consuming probes with geometric
 capacity growth. That fallback is not the optimized target path and may temporarily

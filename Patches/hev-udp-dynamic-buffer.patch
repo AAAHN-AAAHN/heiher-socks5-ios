@@ -1,5 +1,5 @@
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index a4ee285..7c9a16e 100644
+index a4ee285..fb6cfb6 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -9,6 +9,10 @@
@@ -581,11 +581,13 @@ index a4ee285..7c9a16e 100644
          int addrlen;
          int doff;
  
-@@ -308,6 +691,15 @@ retry:
+@@ -308,6 +691,17 @@ retry:
               peer.sin6_port != taddr[i].sin6_port))
              continue;
  
 +        if ((mvec[i].msg_hdr.msg_flags & MSG_TRUNC) || mvec[i].msg_len < 4)
++            continue;
++        if (udp->rsv[0] || udp->rsv[1] || udp->rsv[2])
 +            continue;
 +        if (udp->addr.atype == HEV_SOCKS5_ADDR_TYPE_NAME && mvec[i].msg_len < 5)
 +            continue;
@@ -597,7 +599,7 @@ index a4ee285..7c9a16e 100644
          if (!HEV_SOCKS5 (self)->udp_associated) {
              if (connect (fd, (struct sockaddr *)&taddr[i], sizeof (taddr[i])) <
                  0)
-@@ -316,68 +708,63 @@ retry:
+@@ -316,68 +710,63 @@ retry:
              HEV_SOCKS5 (self)->udp_associated = 1;
          }
  
@@ -695,7 +697,7 @@ index a4ee285..7c9a16e 100644
      if (res > 0) {
          struct sockaddr_in6 addr[res];
          struct mmsghdr dvec[res];
-@@ -387,7 +774,7 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
+@@ -387,7 +776,7 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
          for (i = 0; i < res; i++) {
              int family;
  
@@ -704,7 +706,7 @@ index a4ee285..7c9a16e 100644
                  LOG_D ("%p socks5 udp invalid", self);
                  return -1;
              }
-@@ -422,8 +809,7 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
+@@ -422,8 +811,7 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
              *bind = 1;
          }
  
@@ -714,7 +716,7 @@ index a4ee285..7c9a16e 100644
      }
      if (res <= 0) {
          if (res == -1 && errno == EAGAIN)
-@@ -437,28 +823,35 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
+@@ -437,28 +825,35 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
  
  static int
  hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
@@ -759,7 +761,7 @@ index a4ee285..7c9a16e 100644
      }
      if (res <= 0) {
          if (res == -1 && errno == EAGAIN)
-@@ -477,16 +870,32 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
+@@ -477,16 +872,32 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
      int res_f = 1, res_b = 1;
      int bind = 0;
      void *buf;
@@ -793,7 +795,7 @@ index a4ee285..7c9a16e 100644
      fd_a = hev_socks5_udp_get_fd (self);
      if (hev_task_mod_fd (task, fd_a, POLLIN | POLLOUT) < 0)
          hev_task_add_fd (task, fd_a, POLLIN | POLLOUT);
-@@ -513,10 +922,14 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
+@@ -513,10 +924,14 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
          for (;;) {
              HevTaskYieldType type;
  
@@ -810,7 +812,7 @@ index a4ee285..7c9a16e 100644
  
              if (res_f > 0 || res_b > 0)
                  type = HEV_TASK_YIELD;
-@@ -525,11 +938,16 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
+@@ -525,11 +940,16 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
              else
                  break;
  
