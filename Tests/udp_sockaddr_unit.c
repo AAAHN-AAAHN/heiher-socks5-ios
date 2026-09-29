@@ -258,14 +258,14 @@ main (void)
             msgs[i].len = sizeof (buffers[i]);
         }
         receive_error = 1;
-        assert (hev_socks5_udp_recvmmsg_udp (&self, msgs, 10, 1) == -1);
+        assert (hev_socks5_udp_recvmmsg_udp (&self, msgs, 10, 1, NULL) == -1);
         assert (!self.udp_associated && connect_calls == pass * 2);
         receive_error = 0;
         connect_error = 1;
-        assert (hev_socks5_udp_recvmmsg_udp (&self, msgs, 10, 1) == -1);
+        assert (hev_socks5_udp_recvmmsg_udp (&self, msgs, 10, 1, NULL) == -1);
         assert (!self.udp_associated && errno == EACCES);
         connect_error = 0;
-        assert (hev_socks5_udp_recvmmsg_udp (&self, msgs, 10, 1) == 1);
+        assert (hev_socks5_udp_recvmmsg_udp (&self, msgs, 10, 1, NULL) == 1);
         assert (self.udp_associated && msgs[0].len == 1);
         assert (peer.sin6_port == htons (5300));
         assert (!!IN6_IS_ADDR_V4MAPPED (&peer.sin6_addr) == !pass);
@@ -285,7 +285,7 @@ main (void)
             retry_yields = 0;
             empty_after_foreign = i == 1;
             cancel_yield = i == 2;
-            result = hev_socks5_udp_recvmmsg_udp (&self, msgs, 1, 1);
+            result = hev_socks5_udp_recvmmsg_udp (&self, msgs, 1, 1, NULL);
             if (i == 0) {
                 assert (result == 1 && retry_yields == 2);
                 assert (connect_calls == before + 1 && msgs[0].len == 1);
@@ -314,9 +314,9 @@ main (void)
         for (i = 0; i < 10; i++)
             vec[i].msg_hdr.msg_namelen = sizeof (struct sockaddr_in);
         receive_error = 1;
-        assert (hev_socks5_udp_fwd_b (&self, 11, vec, 10) == 0);
+        assert (hev_socks5_udp_fwd_b (&self, 11, vec, 10, NULL) == 0);
         receive_error = 0;
-        assert (hev_socks5_udp_fwd_b (&self, 11, vec, 10) == 1);
+        assert (hev_socks5_udp_fwd_b (&self, 11, vec, 10, NULL) == 1);
     }
     assert (send_calls == 20);
     puts (

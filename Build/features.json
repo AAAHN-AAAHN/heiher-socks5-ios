@@ -16,6 +16,10 @@
     {
       "file": "hev-udp-peer-filter.patch",
       "repository": "src/core"
+    },
+    {
+      "file": "hev-udp-dynamic-buffer.patch",
+      "repository": "src/core"
     }
   ],
   "sources": {
