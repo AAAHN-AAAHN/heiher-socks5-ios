@@ -53,7 +53,16 @@ final class SettingsPersistenceUITests: XCTestCase {
             app.terminate()
             app.launch()
             XCTAssertTrue(app.buttons["Export JSON"].waitForExistence(timeout: 10), "Selected tab must be restored")
-            XCTAssertTrue(waitUntil { Self.handshake() && Self.handshake(ipv6: true) }, "Saved Start resumes when app executes")
+            let restored = waitUntil { Self.handshake() && Self.handshake(ipv6: true) }
+            if !restored {
+                // Diagnose an already failed deadline; never retry Start or pass
+                // based on this later observation.
+                serverTab.tap()
+                reveal(stop, in: app, upward: true)
+                print("FAILED RESTORATION STATE: " + app.debugDescription)
+                capture("failed-restoration-\(orientation.rawValue)")
+            }
+            XCTAssertTrue(restored, "Saved Start resumes when app executes")
             serverTab.tap()
             reveal(stop, in: app, upward: true)
             XCTAssertFalse(start.isEnabled)

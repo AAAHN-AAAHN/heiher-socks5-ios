@@ -9,7 +9,6 @@ import hashlib
 import json
 from pathlib import Path
 import platform
-import plistlib
 import shutil
 import subprocess
 import sys
@@ -153,6 +152,15 @@ def main():
                 raise RuntimeError('Audit modified a tracked source: ' + path)
     except Exception as exc:
         failure = exc
+        # Preserve the actual file on a failed run without changing app state or
+        # masking the original failure. No diagnostic code enters production.
+        if identifier:
+            try:
+                container = Path(output('xcrun', 'simctl', 'get_app_container', identifier, 'hev.Socks5', 'data').strip())
+                saved = container / 'Library/Application Support/Socks5/settings.json'
+                (OUT / 'failed-settings.json').write_bytes(saved.read_bytes())
+            except Exception as diagnostic:
+                (OUT / 'failed-settings-read.txt').write_text(str(diagnostic) + '\n')
     finally:
         if identifier:
             for action in ('shutdown', 'delete'):
