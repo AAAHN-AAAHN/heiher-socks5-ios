@@ -1,5 +1,23 @@
 # UDP compatibility — adaptive contiguous datagram buffers
 
+## Completion — 2026-09-29
+
+The agreed dynamic-buffer implementation and scoped verification are complete.
+Run `36535518245`, attempt 1, passed both Linux and Xcode27 jobs at tested commit
+`1c5b37d5a6901d455ddecf604b55ad60b91a35cb`, tree
+`cb394fdad0e088c5b8b8d9ee32553fcd04967b4a`. Its 67-file source and both original
+artifact archives were independently verified. This closing commit changes only
+README, the identical feature specification and the dated completion review; the
+other 64 paths retain the tested bytes and Git modes. It is not a new execution.
+The implementation was already posted at04f570c0 when this resume began. The resume
+corrected test readiness/Apple fixture defects and added real elapsed retention
+coverage; production remains byte-identical to that initial implementation.
+
+Full failure history, additional replay boundaries and resource observations are in
+`docs/reviews/udp-dynamic-resume-20260929.md`. No known new implementation failure
+remains within the executed scope. This is not a proof over every input/event history
+or a substitute for physical SideStore and LiveContainer tests. No IPA is produced.
+
 ## Scope and target
 
 This revision starts at `feature/udp-compat@9909aa5f5f41ec87bb3edd976923b2d668e00f08`.
@@ -185,7 +203,7 @@ parent's peak; it must not be represented as the native server's footprint. Resu
 are noisy local host observations, not maximum throughput, device power, or a claim
 that the extra length query is free or always faster.
 
-## Execution checkpoint
+## Retained initial implementation checkpoint — superseded by completion below
 
 Local Linux rebuilt the exact prior native archive after reversing only the statistics
 patches. Original default9 UDP and8 peer/queue tests, the old address fixture, new
@@ -200,8 +218,8 @@ required EOF even when the OS correctly reset a connection with unread data; it 
 accepts only EOF or ECONNRESET and still requires no destination payload. Original
 failure logs are retained. No failure is retroactively counted as a pass.
 
-Fresh exact-source Linux/macOS CI results and artifact identities must be checked
-before closing this checkpoint. No new Simulator, device archive/IPA or release
+At the initial implementation checkpoint, fresh exact-source Linux/macOS CI and
+artifact verification were still required. They are completed in the record below. No new Simulator, device archive/IPA or release
 integration has been performed. Physical iOS27 SideStore and LiveContainer, actual
 calls/background suspension, extended network/energy/throughput measurements remain
 unperformed. Known fixed-port unknown-peer multi-association ownership limits remain.
@@ -211,3 +229,88 @@ Primary API contracts, not execution evidence:
 - https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/sys/socket.h
 - https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/netinet/udp_usrreq.c
 - https://pubs.opengroup.org/onlinepubs/9699919799/functions/recvmsg.html
+
+
+## Final verification record
+
+The final source was checked out with complete history on both hosts. All required
+jobs passed in run36535518245 on attempt1, updated2026-09-29T07:25:32Z. No original
+assertion, warning gate, formatting gate or timeout was removed or relaxed. The
+new real-hold test has its own490s deadline; the preceding timer test retains90s.
+Earlier failed executions are retained, not retrospectively classified as passing.
+
+| Evidence | Actual result and scope |
+| --- | --- |
+| Original UDP behavior | Each host passes all58 mandatory profile executions, eight peer/queue cases, address/canary/strict-aliasing tests and retained exact-old controls. |
+| Dynamic network behavior | Each host completes426 recorded cases covering full empty/small/large datagrams through65000bytes, both directions, IPv4/IPv6/numeric DOMAIN, known/unknown peers, mixed queues, UDP-over-TCP, malformed/partial frames, workers1/4 and grouped concurrency. These are not426 independent physical-device trials. The exact old three-patch control still forwards only1490 of2048bytes. |
+| Policy and failures | Actual helper tests in ASan/UBSan and optimized modes pass192000 demand updates and10738 cleanup sweeps against full-history reference,500B rounding beyond65536, arithmetic overflow, growth/shrink failure, no timestamp/allocation calls for small demand, independent timeout and Stop. All test-owned allocations are released. |
+| Actual socket paths | IPv4/IPv6 empty queue and zero datagram, mixed input, lengths/content/capacity, forced MSG_TRUNC and valid-prefix-before-allocation-failure pass. Apple lazy SO_SNDBUF repair retains successful prefixes and has bounded rejected/clamped/repeated-failure retries. |
+| Real idle timer | Linux cleanup60.038222s and separate communication exit70.001896s; macOS60.009056s and70.003721s. No I/O or extra production task is needed for the cleanup wake. |
+| Real300s retention | The added live fixture receives48001bytes and30001bytes about120s apart. With no subsequent packets, capacity48500 becomes30500 at300.228695s on Linux /300.018513s on macOS, then1500 at420.318498s /420.030160s. Production clock, interval constants, allocation, receive and owner timer are not substituted. This is an isolated native fixture, not a physical installation. |
+| Build/source guards | The46 common source/marker controls,10 dedicated driver tests, main ancestry, original pins/framework/patch preservation, formatter18, exact fourth/all-patch reversal and clean input/final worktree/index gates pass. |
+| Apple compilation | The patched C/session sources pass ARM64/iOS17.2 checks against iPhoneOS27. The two unchanged production Swift files pass the existing SDK typecheck. Both diagnostic logs are empty. Toolchain: Xcode27.0 27A266a, Apple Swift6.4 swiftlang-6.4.0.34.1, macOS27.0 26A428. |
+| Unperformed levels | No new Simulator, iPhone archive/IPA, release integration, SideStore standalone installation, LiveContainer guest execution, physical background survival or device power/throughput benchmark. |
+
+The live-retention fixture adds only test tasks. It uses its own600s communication
+wait to observe both holds; application timeout/defaults are not changed. Its timing
+assertions allow bounded scheduling slack and do not establish a real-time deadline.
+The earlier seeded60s timer test remains separately useful and is not relabeled as
+a new300s wait. The old fixture's original readiness failure returned EAGAIN before
+input arrival; fixed two-second test-only readiness waiting now preserves the
+original content/truncation/failure conditions. Sender fixture names/prototypes were
+corrected for Apple compilation without changing the production sender.
+
+### CPU and memory observations, not a device performance guarantee
+
+The unchanged interleaved benchmark checks12000 roundtrips per trial, window16,
+workers1 and three trials per variant/payload. The figures below are medians of
+server-child CPU microseconds per relayed datagram, including startup/Stop. Client/
+echo CPU is excluded. Both variants transfer identical small payloads in full.
+
+| Host / payload | Original three patches | Dynamic buffers | Median ratio change |
+| --- | ---: | ---: | ---: |
+| Linux /64bytes |12.951|13.079|+0.98%|
+| Linux /1200bytes |13.811|15.493|+12.18%|
+| macOS /64bytes |11.455|10.679|-6.78%|
+| macOS /1200bytes |12.282|10.608|-13.63%|
+
+These short hosted loopback trials vary; they neither prove a universal speedup nor
+bound the worst regression. In particular the extra length query and loss of Linux
+receive batching are real costs. No performance assertion was weakened to pass;
+the benchmark is observation-only. Post-exec live-association median RSS differed
+by8KiB/4KiB on Linux and16KiB/16KiB on macOS for64/1200byte cases. These snapshots
+are not peaks or iOS app footprints. Raw wait4 high-water values are retained but
+can include the forking Python parent's pre-exec memory and are not used as footprint.
+Large-message retention/RSS and all physical energy/performance remain distinct.
+
+A supplemental controlled-clock allocation replay performs1000000 repeated large
+bucket updates with one initial allocation,49252 unchanged owned bytes, unchanged
+cleanup phase and zero remaining ownership after cleanup, in ASan/optimized modes.
+It verifies bounded bookkeeping/allocation behavior, not real-clock CPU latency.
+The original base memory remains additional to that replacement/history figure.
+
+### Artifact identity and preserved scope
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Linux11018901052 |2bb559389f0ab1c0b957374201490382bd5d2928fd1e8cbfc52d4ad1b35510d4|
+| macOS11018841278 |dfe718d6df052b2640f52d29a1ac7204fb488c840a96f3a6bd0038044b467f27|
+
+Both original ZIPs pass CRC/digest verification. Their source archives have the same
+actual tested commit comment and all67 bytes/modes; independent tree reconstruction
+matchescb394fda. Their native archives agree on243 regular files and30 symbolic
+links including executable modes. Patched UDP C remains blob
+`7c9a16e398873ce4bc4a5f2eb5f68f9261c750a7`, SHA256
+`8d1c54239db15a068ae13c394ca5b71f0109add0d2ea6e26ca1884696e901bf7`.
+The fourth patch SHA256 is
+`72303ae2d482a7fd8eb87c34219a9247956f508281438411fbcb21538342bd56`.
+
+No new production correction was needed after the initial04f570c0 implementation.
+The three original patch files, all public headers, app/Swift/project/plist/resources,
+source pins, baseline framework, shared build/check scripts and workflow remain
+unchanged. Fixed-port unknown-peer concurrent ownership limitations remain: this
+run's observation-only independent-close case fails for workers1/4 on both hosts.
+That accepted pre-existing restriction is not relabeled as repaired by this work.
+The other seven refs, previous statistics owner and release/build9 remain unchanged.
+A downstream build must deliberately incorporate the new UDP owner and revalidate
+its own patches and counters; standalone UDP success is not integrated success.
