@@ -79,6 +79,8 @@ for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
         (cd "$OUT/compiled-headers" && shasum -a 256 hev-main.h module.modulemap > SHA256SUMS.txt)
         python3 Tests/ServerControl/active_clients_check.py "$CORE" "$OUT/active-clients" \
             > "$OUT/active-clients.log" 2>&1
+        python3 Tests/ServerControl/final_native_check.py "$CORE" "$OUT/final-native" \
+            > "$OUT/final-native.log" 2>&1
     fi
     make -C "$CORE" clean >> "$OUT/$mode-build.log" 2>&1
 done

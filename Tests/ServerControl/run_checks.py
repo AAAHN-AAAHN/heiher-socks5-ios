@@ -26,6 +26,13 @@ with tempfile.TemporaryDirectory() as name:
                         str(Path(__file__).with_name('ServerMocks.swift')),
                         str(Path(__file__).with_name(test + '.swift')), '-o', str(executable)], check=True, timeout=120)
         subprocess.run([str(executable)], check=True, timeout=45)
+    # Exhaust four-intent suffixes with the actual controller and held engine return.
+    matrix = temp / 'transition-matrix'
+    subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors', *mocks, *sources,
+                    str(Path(__file__).with_name('TransitionBoundary.swift')),
+                    str(Path(__file__).with_name('TransitionMatrix.swift')), '-o', str(matrix)],
+                   check=True, timeout=120)
+    subprocess.run([str(matrix)], check=True, timeout=45)
     # The old equality must fail the same byte-sensitive postconditions.
     old = temp / 'OldServerSettings.swift'
     old.write_bytes(subprocess.check_output(['git', '-C', str(ROOT), 'show',

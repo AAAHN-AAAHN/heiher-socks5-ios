@@ -38,6 +38,9 @@ jobs:
       - name: Actual iOS 27 API type checks
         if: runner.os == 'macOS'
         run: bash Build/check_swift_sdk.sh
+      - name: Actual server-control UI and native listener on iOS 27 Simulator
+        if: runner.os == 'macOS' && github.ref == 'refs/heads/feature/server-control'
+        run: python3 Tests/ServerControl/ui_audit.py
       - name: Record exact tested source
         if: always()
         run: python3 Build/record_evidence.py
