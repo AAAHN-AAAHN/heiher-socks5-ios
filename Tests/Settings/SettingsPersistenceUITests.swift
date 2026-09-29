@@ -84,17 +84,18 @@ final class SettingsPersistenceUITests: XCTestCase {
         for title in ["Import JSON", "Export JSON", "Import JSON", "Export JSON"] {
             let button = app.buttons[title]
             XCTAssertTrue(button.waitForExistence(timeout: 5) && button.isHittable)
+            let began = ProcessInfo.processInfo.systemUptime
             button.tap()
             if title == "Import JSON" {
-                let cancel = app.descendants(matching: .any).matching(identifier: "Cancel").firstMatch
-                XCTAssertTrue(cancel.waitForExistence(timeout: 10) && cancel.isHittable)
+                let cancel = app.buttons["Cancel"].firstMatch
+                XCTAssertTrue(presented(cancel, since: began, title: title))
                 capture("dialog-import")
                 cancel.tap()
                 XCTAssertTrue(waitUntil { button.isHittable && !cancel.exists })
             } else {
                 let save = app.buttons["DOCPicker.actionButton"]
                 let filename = app.textFields["DOCPicker.filenameTextField"]
-                XCTAssertTrue(save.waitForExistence(timeout: 10) && save.isHittable)
+                XCTAssertTrue(presented(save, since: began, title: title))
                 XCTAssertEqual(filename.value as? String, "Socks5-settings")
                 let bar = app.navigationBars["FullDocumentManagerViewControllerNavigationBar"]
                 XCTAssertTrue(bar.exists)
@@ -110,6 +111,22 @@ final class SettingsPersistenceUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Export JSON"].waitForExistence(timeout: 10))
         XCTAssertFalse(Self.handshake(), "Saved Stop persists across process restart")
         capture("relaunched-settings-stopped")
+    }
+
+    @MainActor private func presented(_ element: XCUIElement, since began: TimeInterval, title: String) -> Bool {
+        // A cold system provider can expose an empty/non-hittable surface first.
+        // Record the original 10s window separately; allow one 60s functional
+        // presentation budget, with no retap, cache warming or app replacement.
+        func ready(until seconds: TimeInterval) -> Bool {
+            let remaining = max(0, seconds - (ProcessInfo.processInfo.systemUptime - began))
+            let predicate = NSPredicate(format: "exists == true AND hittable == true")
+            return XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: element)],
+                                 timeout: remaining) == .completed
+        }
+        let withinTen = ready(until: 10)
+        let result = withinTen || ready(until: 60)
+        print("FILE DIALOG: \(title); elapsed=\(ProcessInfo.processInfo.systemUptime - began); initial10s=\(withinTen); ready=\(result)")
+        return result
     }
 
     @MainActor private func reveal(_ element: XCUIElement, in app: XCUIApplication, upward: Bool) {
