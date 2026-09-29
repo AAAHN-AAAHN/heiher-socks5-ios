@@ -153,15 +153,17 @@ import Foundation
         check(!session.isActive && Timer.live.isEmpty, "Retry-disposal Off leaves no system session or retry")
 
         let beforeCanceledConfiguration = session.activations
+        let releasesBeforeCanceledConfiguration = session.deactivations
         session.onCategory = {
             session.onCategory = nil
             app.setAudio(false)
             app.setAudio(true)
         }
         app.setAudio(true)
-        check(session.activations == beforeCanceledConfiguration && session.pending.count == 1 && !session.pending[0].active,
-              "Off-On inside configuration drains release without launching the canceled activation")
-        session.completeNext()
+        check(session.activations == beforeCanceledConfiguration + 1
+              && session.deactivations == releasesBeforeCanceledConfiguration
+              && session.pending.count == 1 && session.pending[0].active,
+              "Off-On inside unowned configuration starts only the latest activation without an unrelated release")
         session.completeNext()
         check(AVAudioPlayer.instances.last!.isPlaying, "The latest On restarts after configuration cancellation cleanup")
         off()

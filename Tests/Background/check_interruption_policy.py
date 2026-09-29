@@ -79,3 +79,6 @@ subprocess.run([sys.executable, str(ROOT / 'Tests/Background/check_mixed_notific
 
 # Longer event ordering and every existing operation boundary retain the same source.
 subprocess.run([sys.executable, str(ROOT / 'Tests/Background/check_final_recovery.py'), mode], check=True)
+
+# Shared-session release must also respect failures before the first activation.
+subprocess.run([sys.executable, str(ROOT / 'Tests/Background/check_session_ownership.py'), mode], check=True)
