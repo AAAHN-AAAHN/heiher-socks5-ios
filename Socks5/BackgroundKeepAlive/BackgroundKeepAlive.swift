@@ -364,7 +364,10 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         // A category/preference failure can precede any activation request.
         // Off must not release an unrelated shared session in that case.
         if ownsAudioSession { beginSessionTransition(active: false) }
-        else if audioEnabled { resumeAudio() }
+        else {
+            resumeAfterRestore = false
+            if audioEnabled { resumeAudio() }
+        }
     }
 
     private func audioDeactivated(_ success: Bool, error: Error?) {

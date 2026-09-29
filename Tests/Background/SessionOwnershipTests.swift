@@ -6,7 +6,7 @@ import Foundation
         var checks = 0
         var failures = 0
         let mode = CommandLine.arguments.dropFirst().first ?? "all"
-        precondition(["all", "unowned", "owned", "reuse"].contains(mode))
+        precondition(["all", "unowned", "owned", "reuse", "reentrant-failure"].contains(mode))
         let session = AVAudioSession.shared
         func check(_ value: @autoclosure () -> Bool, _ message: String) {
             checks += 1
@@ -47,9 +47,9 @@ import Foundation
             check(!app!.audioEnabled && app!.audioState == "Off" && Timer.live.isEmpty, "Unowned Off clears local retry state")
             check(app!.locationEnabled && manager.starts == 1 && manager.stops == 0, "Failed audio/Off leaves independent location running")
             app!.setLocation(false)
-            weak var released = app
+            let released = { [weak app] in app == nil }
             app = nil
-            check(released == nil && session.deactivations == 0, "Unowned destruction has no late release")
+            check(released() && session.deactivations == 0, "Unowned destruction has no late release")
 
             for boundary in 0..<2 {
                 for turnBackOn in [false, true] {
@@ -70,6 +70,48 @@ import Foundation
                     owner.setAudio(false)
                     check(session.deactivations == (turnBackOn ? 1 : 0), "A subsequently acquired session is released exactly once")
                     check(Timer.live.isEmpty, "Reentrant sequence leaves no timer after Off")
+                }
+            }
+        }
+        if mode == "all" || mode == "reentrant-failure" {
+            for boundary in 0..<2 {
+                for delayed in [false, true] {
+                    for failure in 0..<4 {
+                        reset()
+                        let owner = BackgroundKeepAlive()
+                        session.deferTransitions = delayed
+                        session.rejectActivation = failure == 0
+                        AVAudioPlayer.rejectInit = failure == 1
+                        AVAudioPlayer.rejectPreparation = failure == 2
+                        AVAudioPlayer.rejectPlay = failure == 3
+                        let callback = {
+                            session.onCategory = nil; session.onPreference = nil
+                            owner.setAudio(false)
+                            owner.setAudio(true)
+                        }
+                        if boundary == 0 { session.onCategory = callback }
+                        else { session.onPreference = callback }
+                        owner.setAudio(true)
+                        if delayed { session.completeNext() }
+                        check(session.activations == 1 && session.deactivations == 0,
+                              "Failed reentrant latest On cannot consume the same resume request twice")
+                        check(session.pending.isEmpty && Timer.live.count == 1,
+                              "Failed latest On waits for its single retry deadline")
+                        check(owner.audioEnabled && owner.audioState.hasPrefix("Waiting to resume"),
+                              "Failure preserves On without claiming playback")
+                        session.rejectActivation = false
+                        AVAudioPlayer.rejectInit = false
+                        AVAudioPlayer.rejectPreparation = false
+                        AVAudioPlayer.rejectPlay = false
+                        Timer.live.first?.fire()
+                        if delayed { session.completeNext() }
+                        check(session.activations == 2 && AVAudioPlayer.instances.last?.isPlaying == true,
+                              "One scheduled retry recovers after platform failure ends")
+                        owner.setAudio(false)
+                        if delayed { session.completeNext() }
+                        check(session.deactivations == 1 && Timer.live.isEmpty && session.pending.isEmpty,
+                              "Owned cleanup after reentrant failure completes exactly once")
+                    }
                 }
             }
         }
