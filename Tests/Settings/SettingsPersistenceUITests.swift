@@ -51,6 +51,8 @@ final class SettingsPersistenceUITests: XCTestCase {
             XCTAssertTrue(app.buttons["Import JSON"].exists)
             capture("settings-running-\(orientation.rawValue)")
             app.terminate()
+            XCTAssertTrue(waitUntil { !Self.handshake() && !Self.handshake(ipv6: true) },
+                          "The old process must release its listener before restoration is credited")
             app.launch()
             XCTAssertTrue(app.buttons["Export JSON"].waitForExistence(timeout: 10), "Selected tab must be restored")
             let restored = waitUntil { Self.handshake() && Self.handshake(ipv6: true) }
@@ -76,25 +78,32 @@ final class SettingsPersistenceUITests: XCTestCase {
         }
         XCUIDevice.shared.orientation = .portrait
         settingsTab.tap()
-        // File-provider startup is external to the app. Retain the original 10s
-        // observation, but give the system dialog one bounded 60s cold-start budget.
-        // No button retap, relaunch, injected provider or production workaround.
+        // The import picker exposes Cancel; the export page exposes Save and
+        // its filename field, with interactive sheet dismissal rather than a
+        // visible Cancel button. Exercise the actual system controls/gesture.
         for title in ["Import JSON", "Export JSON", "Import JSON", "Export JSON"] {
             let button = app.buttons[title]
             XCTAssertTrue(button.waitForExistence(timeout: 5) && button.isHittable)
-            let began = ProcessInfo.processInfo.systemUptime
             button.tap()
-            let cancel = app.buttons["Cancel"].firstMatch
-            let withinOriginalBudget = cancel.waitForExistence(timeout: 10)
-            let remaining = max(0, 60 - (ProcessInfo.processInfo.systemUptime - began))
-            let presented = withinOriginalBudget || cancel.waitForExistence(timeout: remaining)
-            print("DIALOG PRESENTATION: \(title); elapsed=\(ProcessInfo.processInfo.systemUptime - began); within10s=\(withinOriginalBudget)")
-            if !presented { print("FAILED DIALOG STATE: " + app.debugDescription) }
-            capture("dialog-\(title)")
-            XCTAssertTrue(presented && cancel.isHittable, title + " sheet must be dismissible")
-            cancel.tap()
-            XCTAssertTrue(waitUntil { button.isHittable && !cancel.exists })
-            XCTAssertFalse(Self.handshake(), "Cancelling a file dialog must preserve Stop")
+            if title == "Import JSON" {
+                let cancel = app.descendants(matching: .any).matching(identifier: "Cancel").firstMatch
+                XCTAssertTrue(cancel.waitForExistence(timeout: 10) && cancel.isHittable)
+                capture("dialog-import")
+                cancel.tap()
+                XCTAssertTrue(waitUntil { button.isHittable && !cancel.exists })
+            } else {
+                let save = app.buttons["DOCPicker.actionButton"]
+                let filename = app.textFields["DOCPicker.filenameTextField"]
+                XCTAssertTrue(save.waitForExistence(timeout: 10) && save.isHittable)
+                XCTAssertEqual(filename.value as? String, "Socks5-settings")
+                let bar = app.navigationBars["FullDocumentManagerViewControllerNavigationBar"]
+                XCTAssertTrue(bar.exists)
+                capture("dialog-export")
+                bar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))
+                    .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)))
+                XCTAssertTrue(waitUntil { button.isHittable && !save.exists })
+            }
+            XCTAssertFalse(Self.handshake() || Self.handshake(ipv6: true), "Cancelling a file dialog must preserve Stop")
         }
         app.terminate()
         app.launch()
