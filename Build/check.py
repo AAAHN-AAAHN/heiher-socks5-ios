@@ -40,10 +40,11 @@ def baseline():
         base = CONFIG['base_commit']
         git(ROOT, 'merge-base', '--is-ancestor', base, 'HEAD')
         for path in ('Build/upstream.json', 'Build/baseline-framework.json', 'Build/build.sh',
-                     'docs/main-baseline.md', 'HevSocks5Server.xcframework'):
+                     'HevSocks5Server.xcframework'):
             assert git(ROOT, 'rev-parse', 'HEAD:' + path) == git(ROOT, 'rev-parse', base + ':' + path), path
     # Feature validation evolves with its source; the runtime build script,
     # engine pins and committed framework above remain byte-locked to main.
+    subprocess.run([sys.executable, str(ROOT / 'Build/check_documentation.py')], check=True)
     print('PASS: shared source pins, baseline framework, app identity and main ancestry')
 
 
