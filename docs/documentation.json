@@ -1,6 +1,6 @@
 {
   "branch": "release/integrated",
-  "frozen_source": "b9dcac6da65fb7eed7ba5aad19d5208f45d5abcc",
+  "frozen_source": "b65f126741a9a9a65cac7f1eae79166c69d1ea45",
   "parents": {
     "feature/app-icon": "d2e2430046b2987d37fdc25733565c8d407a7b38",
     "feature/background": "193dd692040b84f6f0f154e5e405fe4e83769571",
@@ -16,11 +16,11 @@
   "readme_mirror": "docs/features/integrated.md",
   "validation_files": {
     "Build/check.py": "c952262492f5623ddcae1aae38216c3906de7e59",
-    "Build/check_documentation.py": "92a3208bc3d17c7267bec32fbd1c57b4ec4d88de",
+    "Build/check_documentation.py": "87ce67a78aaa6ad06d536f5b9d81a98a516b2bcc",
     "Build/check_ownership.py": "32e5764411831c9db0755e8fc9f76c475bb03813",
     "Tests/AppIcon/check_icon.py": "4a3124da0696858401bee966ac015da368ade44b",
     "Tests/Background/check_scope.py": "fbacaed3e63162aa3527d0ea224237397ad8210b",
-    "Tests/Statistics/audit.py": "5e904e12729747874dccadb894625b6c171e913d",
+    "Tests/Statistics/audit.py": "18337fff5810d0b53bb4628036ffecf4a5294feb",
     "Tests/documentation_contract.py": "3f93f6e1d5913b8cc2af0da6390e532252df8c41"
   }
 }
