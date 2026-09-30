@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 
 if not __debug__:
     raise SystemExit('Assertions must be enabled')
@@ -23,6 +24,7 @@ def content(path):
 
 
 def main():
+    subprocess.run([sys.executable, str(ROOT / 'Build/check_documentation.py')], check=True)
     assert 'server' in FEATURES
     manifest = json.loads((ROOT / 'docs/feature-membership.json').read_bytes())
     model = content('Socks5/Server/ServerSettings.swift')

@@ -28,10 +28,6 @@
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
       "sha256": "6705e3f54c41ec3e61929d2062cb3eae1d8b64841c40c170059bbe5d6ccd941d"
     },
-    "docs/features/server-control.md": {
-      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
-      "sha256": "0af7a48048856784f447480dd68ba73d822a4a3d000b71d38445456ad0dacb69"
-    },
     "Tests/ServerControl/ConfigurationParity.swift": {
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
       "sha256": "6e4acbcb6e1ece2952d61bca84a9849f9c9cd45acc4e662b7c0831167306a808"
@@ -100,14 +96,6 @@
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
       "sha256": "a8fff4b29de1f90de8b1a7134d6e7de834e5cd40ba1b0046c88f031c82695c28"
     },
-    "docs/history/server-control-before-final-audit-20260926.md": {
-      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
-      "sha256": "ac32484853b75a64c1a6e8034ac0c1a9c9359154ba537f38fa5d3a95604907ce"
-    },
-    "docs/history/server-control-before-project-alignment-20260926.md": {
-      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
-      "sha256": "5a541f41b23b97aa2e8cbc0ccac7fced03487177a1252ee0fe7d5a58826a33f9"
-    },
     "Tests/ServerControl/ServerControlUITests.swift": {
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
       "sha256": "a7233610f24dbb13251a0442c92ce39949474ea5a65abe374097b39d0cfa5558"
@@ -127,10 +115,6 @@
     "Tests/ServerControl/ui_audit.py": {
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
       "sha256": "ddc564e546da945ea5c9433b263474cb85d9cd50347db3567e925db358866b91"
-    },
-    "docs/reviews/server-control-final-20260929.md": {
-      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
-      "sha256": "3b9f1916d30441fdcf3c92c217083f613aae43edf878e6faf3ffb53abc5f3c87"
     }
   },
   "files": {
