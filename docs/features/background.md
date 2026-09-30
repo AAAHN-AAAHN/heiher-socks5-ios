@@ -6,6 +6,8 @@ This feature supplies explicit, independent controls for continuous silent audio
 
 Background services are independent of Server Start/Stop and tab visibility. The standalone root persists its two choices through AppStorage; the integrated root supplies the same choices from its single JSON settings owner. `BackgroundKeepAlive` itself does not read storage or invoke the Hev server.
 
+In the standalone branch, the AppStorage keys are `background.continuousLocation` and `background.silentAudio`, both initially false; its Server/Background tab selection is not saved by this feature. In release, both choices are fields in the shared AppSettings snapshot and the root applies them only when the corresponding controller value differs. Neither route adds a second writer inside BackgroundKeepAlive.
+
 ## Functional behavior
 
 ### Continuous location
@@ -16,9 +18,13 @@ Permission requests are deduplicated and issued only while the app is active. A 
 
 A valid nonempty update from the current active manager increments the diagnostic callback count and records a read time. Coordinates and a location history are not stored or transmitted. Temporary location errors remain visible while retaining intent. Off stops updates, detaches the delegate, releases the manager and rejects stale callbacks from a different manager. The diagnostic count is not a promise of a fixed sensor cadence.
 
+Reads counts accepted callbacks, not the number of CLLocation samples inside the delivered array. Last read is the callback observation time rather than a stored coordinate timestamp. These diagnostics remain in the controller across a location Off/On cycle and are not written to persistent settings; creating a new controller starts a new count.
+
 ### Continuous silent audio
 
 One AVAudioPlayer loops the original 50-millisecond, mono, 8-kHz silent WAV indefinitely. The audio session uses playback, default mode and mix-with-others. The best-effort preference concerning system alerts does not override operating-system interruption policy.
+
+Session category setup is required and its error enters the existing recovery path. The request to prefer no interruptions from system alerts is best-effort: rejection of that preference alone does not prevent an activation attempt. Playback reports Playing only after preparation, `play()` success, `isPlaying`, current player identity and the non-invalidated enabled state all agree.
 
 A single nonrepeating common-mode timer uses the same 0.5-second interval for healthy playback inspection, retry pacing and unavailable-service probes. Healthy inspection keeps the existing player and session rather than reconfiguring or restarting them. Off invalidates the timer and stops local playback immediately.
 
@@ -40,7 +46,7 @@ The first unexpected player stop, decoder error or actual interruption can initi
 
 ## Implementation and ownership
 
-`BackgroundKeepAlive` is MainActor-owned. It owns location state, player state, one timer, failure-episode flags and an activation/preparation/deactivation gate. The root owns exactly one controller. The view binds the two independent choices and subscribes to the controller's explicit notification registry, so subscription and handling use the same names.
+`BackgroundKeepAlive` is MainActor-owned. It owns location state, player state, one timer, failure-episode flags and an activation/preparation/deactivation gate. The root owns exactly one controller. `BackgroundKeepAliveView` binds the two independent choices. The root-attached `BackgroundKeepAliveEvents` modifier, not the removable tab view, merges the controller's explicit notification registry onto RunLoop.main and separately calls `restore()` when the application becomes active. Subscription therefore remains attached when another tab is selected.
 
 On iOS 27, session activation and deactivation use completion APIs. The supported-system compatibility path runs synchronous session work on its utility adapter rather than waiting on MainActor. Player preparation also uses the existing worker adapter. While preparation owns a player, that player is detached from controller/delegate access until completion. This prevents Off, timers and callbacks from concurrently touching the object being prepared.
 
