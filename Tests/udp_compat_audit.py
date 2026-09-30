@@ -127,7 +127,7 @@ def main():
     if 'version 18.' not in version:
         raise RuntimeError(version)
     run([formatter, CORE / 'src/core/src/hev-socks5-udp.c'], 'expected-dynamic-core.c')
-    for name in ('udp_buffer_unit.c', 'udp_buffer_io.c', 'udp_buffer_timer.c', 'udp_buffer_send.c', 'udp_buffer_live_hold.c'):
+    for name in ('udp_buffer_unit.c', 'udp_buffer_io.c', 'udp_buffer_timer.c', 'udp_buffer_send.c', 'udp_buffer_live_hold.c', 'udp_stream_boundaries.c'):
         run([formatter, '--style=file:' + str(CORE / '.clang-format'), ROOT / 'Tests' / name],
             'expected-' + name)
         if (OUT / ('expected-' + name)).read_bytes() != (ROOT / 'Tests' / name).read_bytes():
@@ -180,7 +180,7 @@ def main():
     run([executable], 'unit-optimized.log')
     executable.unlink()
 
-    for name in ('udp_buffer_unit', 'udp_buffer_io', 'udp_buffer_send'):
+    for name in ('udp_buffer_unit', 'udp_buffer_io', 'udp_buffer_send', 'udp_stream_boundaries'):
         for mode, flags in [('asan', ['-O1', '-g', '-fsanitize=address,undefined',
                                      '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']),
                             ('optimized', ['-O3', '-fstrict-aliasing'])]:
