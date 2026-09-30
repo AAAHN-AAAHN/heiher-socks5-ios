@@ -24,6 +24,8 @@ Where an existing source guard also checked prose against an executable-source r
 
 `Tests/documentation_contract.py` creates disposable worktrees and verifies acceptance of the complete valid tree and rejection of damaged documentation or frozen inputs. It does not modify a user's working branch. The checker supports normal offline verification using available Git objects and a separate live-parent check when current remote refs are required.
 
+Repository-qualified document links are resolved against the current checkout and its recorded parent Git objects. Local files and heading anchors are checked directly. Ordinary external links are checked for an allowed URL form, not fetched to prove remote availability or authority. Link validation therefore does not replace reading the linked source or checking whether a technical statement matches the implementation.
+
 ## Design rationale and resource cost
 
 Executable composition and explanatory documents have different ownership boundaries. Separating their references makes it possible to preserve a tested implementation while improving its explanation. Requiring actual parent ancestry and byte-identical inherited prose prevents a copied document from drifting independently of its owner.
@@ -43,6 +45,8 @@ Valid documents must still pass all applicable unchanged feature/source checks. 
 Run `python3 Build/check_documentation.py` from a full-history checkout. Run `python3 Build/check_documentation.py --live-parents` when the current remote parent tips must also match the document manifest. Run `python3 Tests/documentation_contract.py` for the documentation-specific rejection tests. Missing Git objects are reported rather than reconstructed from prose or a source ZIP.
 
 An authorized documentation change must keep parent snapshots consistent from main through dependent features and release. A new document at a shared path must have one unambiguous owner. Exact upstream text and governing principles are exempt from the authored-guide section template, but not from byte-identity verification. License dates in the preserved legal text are not editorial progress entries.
+
+The live-parent option checks the recorded direct and transitive repository branch parents. It deliberately keeps the upstream source revision pinned and does not turn it into a floating upstream update. It does not verify that the checkout is itself the current tip of its own remote branch; publication verification must compare that tip separately. A parent advanced after a check requires a new parent comparison before claiming current inheritance.
 
 Code freezing does not claim that every device environment is proven correct. SideStore standalone, LiveContainer guest operation, actual permissions/providers, interruption sequences, prolonged background execution and device resources require their own evidence. Documentation must distinguish a defined behavior, an executed check and an unperformed deployment test.
 

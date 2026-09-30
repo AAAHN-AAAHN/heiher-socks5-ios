@@ -14,6 +14,8 @@ On Linux, the applicable paths execute native networking, C fixtures and platfor
 
 The integrated release validates a freshly generated patched framework, twelve production Swift files, an ARM64 archive and an unsigned IPA. It also exercises seeded original/remapped Simulator installations and the actual integrated, background-audio and traffic-statistics UI tests. These are separate gates, not a single interchangeable success flag.
 
+Each result applies to its recorded source, toolchain and executed stage. The retained runtime evidence covers native host execution, the iPhoneOS SDK, archive/unsigned IPA and Simulator behavior. It does not establish SideStore installation, LiveContainer guest execution or physical background survival. A documentation-only revision preserves the runtime inputs but is not a new execution of those layers.
+
 ## Implementation and ownership
 
 `Build/features.json` supplies the composition name, features, native source revisions and ordered patch list. `Build/upstream.json` and `Build/baseline-framework.json` bind the common native inputs and committed unpatched framework. Build code selects behavior from declared features rather than a branch-name substring.
@@ -46,9 +48,13 @@ Verification scripts and temporary XCTest code are outside the application targe
 
 The baseline/input/package regression fixtures retain their valid inputs and deliberate invalid controls. Checks do not relax assertion policy, warning thresholds, formatting requirements, subprocess limits or cleanup failures to obtain success. Source and product manifests retain exact identities even when a later stage fails. Machine-readable evidence is not rewritten into a narrative claim that an unexecuted stage passed.
 
+Verification is organized by the invariant under test: input identity before patching, exact restored source after patch reversal, service and payload behavior during execution, and complete source-to-product correspondence at packaging. Deliberately invalid controls must be rejected for the intended reason; their rejection is not an application failure. An observational profile documenting a known limitation remains distinct from a required supported-profile test.
+
 ## Operation and limitations
 
 Use a full-history checkout and a clean workspace. For the baseline, start with `python3 Build/check.py baseline`, `python3 Build/check.py composition` and `bash Build/build.sh`. Feature READMEs specify their dedicated audit entry points. The integrated path uses `bash Build/build.sh`, `bash Build/check_swift_sdk.sh`, `python3 Build/verify_release.py`, `python3 Build/simulator_review.py`, `python3 Build/ui_review.py` and `python3 Build/record_evidence.py` on the applicable platform.
+
+On an Apple host the release build defaults `BUILD_IPA` to `1`; `BUILD_IPA=1 bash Build/build.sh` makes that archive-producing choice explicit, while `BUILD_IPA=0` skips it. The release workflow explicitly supplies `1`. Run the SDK/product/Simulator commands on an Apple host only after their required source/native/archive stages succeed. A source archive without the recorded Git history cannot satisfy ancestry or exact-owner checks merely by being unpacked and initialized as a new repository.
 
 Run `python3 Build/check_documentation.py` for reproducible document and frozen-input validation. The optional `--live-parents` mode additionally compares recorded parent revisions with current remote refs. `python3 Tests/documentation_contract.py` exercises document-contract rejection cases without modifying application branches or products.
 
