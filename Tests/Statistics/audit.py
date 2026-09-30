@@ -14,8 +14,11 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 CLIENT_BASE = 'bb07d1795f010d624b1924cc06203af9aeb3c6a2'
-UDP = '6f9848e42fb221b21ea31ce8ab8b00333cc0ecd5'
+UDP = '93e6bd8f09e169aaf62fff3ad67949b454327096'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
+UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
+                        'udp_buffer_send.c', 'udp_stream_boundaries.c',
+                        'Statistics/udp_accounting_probe.c')
 UDP_FILES = {
     '.github/workflows/udp-compat-audit.yml': '.github/workflows/verify-build.yml',
     'docs/branches/feature-udp-compat.md': 'README.md',
@@ -53,6 +56,39 @@ def run(args, log, cwd=ROOT, timeout=180, env=None):
                        stderr=subprocess.STDOUT, check=True, timeout=timeout, env=env)
 
 
+def check_udp_inheritance():
+    """Keep the executable UDP prerequisite, inherited tests and prose on one parent."""
+    parent = json.loads((ROOT / 'docs/documentation.json').read_bytes())['parents']['feature/udp-compat']
+    assert parent == UDP, 'Executable UDP prerequisite differs from document parent'
+    workflow = (ROOT / '.github/workflows/verify-build.yml').read_text()
+    assert ('    uses: ./.github/workflows/udp-compat-audit.yml\n'
+            f'    with:\n      ref: {UDP}\n') in workflow, 'UDP workflow prerequisite differs'
+    assert '    needs: udp-prerequisite\n' in workflow
+    assert 'udp_stream_boundaries.c' in UDP_COMPOSED_SOURCES, 'Missing composed stream execution'
+    entries = {}
+    for record in git('ls-tree', '-rz', UDP).split(b'\0'):
+        if record:
+            meta, path = record.split(b'\t', 1)
+            entries[path.decode()] = tuple(meta.decode().split())
+    # Discover the whole parent test tree, not a hand-maintained partial inventory.
+    paths = dict(UDP_FILES)
+    paths.update({p: p for p in entries if p.startswith('Tests/')})
+    preserved = {}
+    for target, source in paths.items():
+        if target.endswith('.md'):
+            continue  # The independent document contract checks exact current prose.
+        mode, kind, blob = entries[source]
+        path = ROOT / target
+        assert kind == 'blob' and not path.is_symlink() and path.is_file(), target
+        data = path.read_bytes()
+        actual_mode = '100755' if path.stat().st_mode & 0o111 else '100644'
+        assert data == git('show', UDP + ':' + source) and actual_mode == mode, target
+        index = git('ls-files', '--stage', '--', target).decode().split()
+        assert index[:3] == [mode, blob, '0'], ('Inherited UDP index', target)
+        preserved[target] = hashlib.sha256(data).hexdigest()
+    return preserved
+
+
 def inspect_sources():
     import runpy
     documents = runpy.run_path(str(ROOT / 'Build/check_documentation.py'))
@@ -64,17 +100,7 @@ def inspect_sources():
     for key in ('base_commit', 'sources', 'upstream_app'):
         assert CONFIG[key] == udp_config[key], key
     assert CONFIG['patches'][:len(udp_config['patches'])] == udp_config['patches']
-    workflow = (ROOT / '.github/workflows/verify-build.yml').read_text()
-    assert ('    uses: ./.github/workflows/udp-compat-audit.yml\n'
-            f'    with:\n      ref: {UDP}\n') in workflow
-    assert '    needs: udp-prerequisite\n' in workflow
-    preserved = {}
-    for target, source in UDP_FILES.items():
-        if documents['documentation_input'](ROOT, target):
-            continue
-        data = (ROOT / target).read_bytes()
-        assert data == git('show', UDP + ':' + source), target
-        preserved[target] = hashlib.sha256(data).hexdigest()
+    preserved = check_udp_inheritance()
     # UDP and shared build logic stay frozen; only the explicit statistics-owned
     # runtime paths below may differ from the completed aggregate-only baseline.
     # Exact prefix ownership above and the original suffix below reject missing,
@@ -112,7 +138,7 @@ def inspect_sources():
     (OUT / 'inventory.json').write_text(json.dumps({
         'base': CONFIG['base_commit'], 'start': START, 'udp': UDP,
         'files_vs_main': inventory, 'excluded_udp_files': preserved,
-        'statistics_owned_paths': [p for p in inventory if p not in UDP_FILES],
+        'statistics_owned_paths': [p for p in inventory if p not in UDP_FILES and p not in preserved],
         'statistics_production_unchanged': False,
         'client_ip_base': CLIENT_BASE, 'allowed_runtime_changes': sorted(runtime_changes), 'udp_dependency_updated': True}, indent=2) + '\n')
     run(['git', 'diff', CONFIG['base_commit'], 'HEAD'], 'main-to-feature.diff')
@@ -197,8 +223,7 @@ def native_checks(mode):
         run([executable], mode + '-' + executable.name + '.log', env=env)
         executable.unlink()
     # Same owner source fixtures now execute against the statistics-composed core.
-    for source in ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
-                   'udp_buffer_send.c', 'Statistics/udp_accounting_probe.c'):
+    for source in UDP_COMPOSED_SOURCES:
         for label, extra in [('asan', sanitize), ('optimized', ['-O3', '-fstrict-aliasing'])]:
             executable = OUT / ('composed-' + Path(source).stem + '-' + label)
             run([*common, *extra, '-Wno-unused-function', *client_includes,
@@ -265,6 +290,7 @@ def main():
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'input-index.log')
     inspect_sources()
     run([sys.executable, 'Tests/Statistics/audit_driver_probe.py'], 'audit-driver.log')
+    run([sys.executable, 'Tests/Statistics/udp_inheritance_regression.py'], 'udp-inheritance.log')
     run([sys.executable, 'Tests/Statistics/input_probe.py'], 'input-probe.log')
     run([sys.executable, 'Tests/Statistics/host_probe.py'], 'host-reader.log')
     run(['git', 'clone', '--no-checkout', 'https://github.com/heiher/hev-socks5-server.git', CORE], 'clone.log')
@@ -297,7 +323,7 @@ def main():
     assert len(hashes) == 9
     (OUT / 'statistics-source-hashes.json').write_text(json.dumps(hashes, indent=2) + '\n')
     # Test-only C follows the same formatter; never silently rewrite reviewed files.
-    for path in (ROOT / 'Tests/Statistics').glob('*.c'):
+    for path in [*(ROOT / 'Tests/Statistics').glob('*.c'), ROOT / 'Tests/udp_stream_boundaries.c']:
         target = OUT / ('formatted-' + path.name)
         formatted = subprocess.check_output([formatter, '--style=file:' + str(CORE / '.clang-format'), str(path)])
         target.write_bytes(formatted)

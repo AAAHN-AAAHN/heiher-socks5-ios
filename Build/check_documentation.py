@@ -23,7 +23,7 @@ FROZEN = {
     'feature/background': '5480cbf9859b8d58c20f9001b0c9fda8e23fd6df',
     'feature/server-control': '368aa4cf89436651414a8885a2a171f5cff9abd5',
     'feature/settings-persistence': 'a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7',
-    'feature/traffic-statistics': 'dc6feaadb9061eb320bbce5d66c56a7c814c93d3',
+    'feature/traffic-statistics': '0ed4c4a3d4ec910f02cd519fd6df8c52ddce412f',
     'feature/udp-compat': '84d47e88de993a8f4b4cc084f9240f29565c78ed',
     'release/integrated': 'b9dcac6da65fb7eed7ba5aad19d5208f45d5abcc',
 }

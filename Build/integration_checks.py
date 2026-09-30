@@ -70,11 +70,13 @@ def main():
         assert owner['sources'] == config['sources'] and owner['upstream_app'] == config['upstream_app']
         assert owner['base_commit'] == config['base_commit'], 'Owner baseline differs'
         git('merge-base', '--is-ancestor', config['base_commit'], ref)
-    # The latest UDP review changed tests/docs only after statistics pinned its
-    # dependency. Preserve that real dependency and prove exact runtime equivalence;
-    # release itself must still contain both latest owner tips via ownership checks.
+    # Test inheritance and executable prerequisites use the same current parents;
+    # runtime equivalence alone cannot excuse a missing parent verification input.
     stats_audit = git('show', refs['feature/traffic-statistics'] + ':Tests/Statistics/audit.py').decode()
     dependency = re.search(r"^UDP = '([0-9a-f]{40})'$", stats_audit, re.M).group(1)
+    documents = json.loads((ROOT / 'docs/documentation.json').read_bytes())
+    assert refs['feature/traffic-statistics'] == documents['parents']['feature/traffic-statistics']
+    assert dependency == refs['feature/udp-compat'] == documents['parents']['feature/udp-compat']
     git('merge-base', '--is-ancestor', dependency, refs['feature/traffic-statistics'])
     git('merge-base', '--is-ancestor', dependency, refs['feature/udp-compat'])
     udp = json.loads(git('show', refs['feature/udp-compat'] + ':Build/features.json'))
@@ -85,6 +87,26 @@ def main():
         path = 'Patches/' + item['file']
         assert git('show', refs['feature/udp-compat'] + ':' + path) == git('show', dependency + ':' + path)
         assert (ROOT / path).read_bytes() == git('show', refs['feature/traffic-statistics'] + ':' + path)
+
+    # Preserve the complete statistics test tree. Its workflows are inert source
+    # copies: the integrated workflow already executes the eight-patch engine.
+    for record in git('ls-tree', '-rz', refs['feature/traffic-statistics']).split(b'\0'):
+        if not record:
+            continue
+        meta, source = record.split(b'\t', 1)
+        source = source.decode()
+        if not source.startswith(('Tests/', '.github/workflows/')):
+            continue
+        if source == 'Tests/udp_buffer_network.py':
+            continue  # The exact release-only half-close adaptation is checked below.
+        target = ('Build/inherited-workflows/traffic-statistics-' + Path(source).name
+                  if source.startswith('.github/workflows/') else source)
+        mode, kind, blob = meta.decode().split()
+        path = ROOT / target
+        assert kind == 'blob' and path.is_file() and not path.is_symlink(), target
+        actual_mode = '100755' if path.stat().st_mode & 0o111 else '100644'
+        assert actual_mode == mode and git('hash-object', str(path)).decode().strip() == blob, target
+        assert git('ls-files', '--stage', '--', target).decode().split()[:3] == [mode, blob, '0'], target
 
     parent = json.loads(git('show', refs['feature/settings-persistence'] + ':docs/feature-membership.json'))
     assert parent['branches']['feature/server-control'] == refs['feature/server-control']
