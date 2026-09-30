@@ -1,0 +1,21 @@
+{
+  "branch": "main",
+  "frozen_source": "75335d201cb1e541bb153e9899badbc11ccf1973",
+  "parents": {
+    "upstream": "180012e8b9dbaa2002a68ebd2c75bccebcfb789c"
+  },
+  "owned_documents": [
+    "README.md",
+    "docs/README.md",
+    "docs/build-and-validation.md",
+    "docs/documentation.md",
+    "docs/main-baseline.md",
+    "docs/top-level-principles.md"
+  ],
+  "readme_mirror": "docs/main-baseline.md",
+  "validation_files": {
+    "Build/check.py": "23c3fa056323d42d6738fb3d708e5a5e18225f3c",
+    "Build/check_documentation.py": "92a3208bc3d17c7267bec32fbd1c57b4ec4d88de",
+    "Tests/documentation_contract.py": "3f93f6e1d5913b8cc2af0da6390e532252df8c41"
+  }
+}

@@ -1,129 +1,51 @@
-# Shared upstream baseline — complete project review
+# Shared application and native-server baseline
 
-## Current contract — 2026-09-26
+## Purpose and scope
 
-Main combines unmodified latest verified `heiher/socks5-ios` application sources
-with the pinned, unpatched `heiher/hev-socks5-server` engine. It is not a byte-for-
-byte mirror of the app repository's older bundled binary. The governing four
-instructions are retained verbatim in `docs/top-level-principles.md`. Original
-maintenance documentation is preserved byte-for-byte in
-`docs/history/main-before-project-audit-20260926.md`.
+The main branch supplies the common application source, native-server inputs and verification infrastructure from which the feature branches are composed. Its purpose is to make every feature build use the same explicit starting implementation instead of silently combining unrelated dependency revisions.
 
-- App: `180012e8b9dbaa2002a68ebd2c75bccebcfb789c`.
-- Engine: `b3585289622561caf4b8789b436cc8820ecd6be0`.
-- All three submodules use that engine's exact gitlinks in `Build/upstream.json`.
-- Main has no feature/native patches. App/project/LICENSE stay exact upstream.
-- The committed 16-file framework and its historical Xcode16.4/iPhoneOS18.5
-  provenance remain unchanged; fresh product compilation is a separate result.
+Main contains the upstream Socks5 application and Xcode project without application-source changes. The upstream README is retained verbatim in `docs/upstream/README.md`; the upstream `LICENSE` is retained at the repository root. The committed XCFramework is an unpatched baseline built from the locked native sources, not a substitute for a feature-enabled generated framework. Main itself does not include the feature patches, persistent settings, traffic tables, background services or custom icon integration supplied by their respective branches.
 
-The intended environment is a physical iOS27 iPhone, either SideStore standalone
-or a LiveContainer guest. They have different signing, container and host boundaries.
-Configured minimum iOS17.2, supported target, actual build environment, Simulator
-execution and physical installation/execution are not interchangeable. No host patch,
-permission, relaunch mechanism or background service is added to main.
+## Functional behavior
 
-## Shared source integrity correction
+The upstream application exposes the server through its existing interface. The native engine supports IPv4/IPv6, SOCKS CONNECT, UDP ASSOCIATE, the supported UDP-over-TCP command and username/password authentication. The exact feature set and app resources for a checkout are declared in `Build/features.json`; the baseline declares no feature patches.
 
-The former native `apply` precondition checked only tracked C/H changes. A changed
-Makefile or build script could pass while the recorded commit stayed unchanged.
-The former reverse check compared worktree to index rather than both to HEAD;
-a staged change could therefore pass as an exact upstream restoration. All declared
-native repositories now require both whole tracked worktree and index equality to
-HEAD before patching and after reversal. Recursive submodule checks remain enabled.
-The Python check entry rejects optimization so assertions cannot silently disappear.
-Pinned commits, patch contents/order and formatting rules are not changed.
+The feature relationships are one-way. UDP compatibility supplies transport behavior to traffic statistics. Server control supplies configuration and lifecycle management to settings persistence. Background services and the app icon are independent feature owners. The integrated release combines all six owners through its root view and ordered native-patch list.
 
-The former generic build also retained an obsolete SUCCESS on early failure and
-mutated the tracked framework during packaging. It now invalidates the overall
-verdict before rejection, verifies worktree/index, and packages a disposable exact-
-HEAD source copy containing the rebuilt framework. The original checkout and its
-committed baseline are never overwritten. Packaging staging and previous IPA output
-are cleared before writing a new package. Old diagnostic logs remain; partial output
-is not overall success. Source archive, tested commit and reachable history are
-recorded independently from generated products. Generated binary reproducibility
-is not inferred merely from equality of source hashes.
+Documentation inheritance is independent of the frozen executable-composition reference. `Build/features.json` and `Build/upstream.json` identify functional inputs. `docs/documentation.json` identifies the branch's document parents and frozen-code comparison boundary. This separation lets documentation follow the current parent without changing dependency versions, native behavior or test inputs.
 
-`Tests/baseline_audit.py` executes exact-old/current functions and shell entries:
-46 tracked-source, reverse, Python-optimization and stale-marker cases in isolated
-real Git fixtures. Only shell fixtures stop at a deliberately failing next validator;
-no fake native or Apple success is used. This is audit-tool validation, not runtime
-coverage. Existing app/native tests and operation deadlines are retained.
+## Implementation and ownership
 
-These checks are provenance checkpoints in a clean isolated checkout, not protection
-against adversarial concurrent modification/restoration, unrelated untracked files,
-external toolchain compromise or an OS process that cannot make progress. No runtime
-cost, production timer/thread/state or energy improvement is claimed.
+`Build/upstream.json` records the upstream application revision and the server, core, task-system and YAML revisions. The three submodules use the server's selected gitlinks rather than independently selected heads. `Build/baseline-framework.json` records the committed framework inventory. The source identifiers are machine inputs to reproducibility checks; they are not instructions to fetch floating dependencies.
 
-## Inheritance and build paths
+`Build/check.py` checks source-lock agreement, framework contents and feature composition. Before applying a native patch it requires the complete tracked working tree and index to match the declared native revision. Reversing the patches must restore those same tracked inputs, including build scripts and Makefiles, not only C and header files. Formatting follows the pinned native project's clang-format rules.
 
-All six feature branches must contain the current completed main as an actual
-ancestor and record it as `Build/features.json:base_commit`. Shared pins, baseline
-framework/inventory, this specification, principles and common audit fixture remain
-identical. Branch-specific build/check logic is not incorrectly required to equal
-main when that feature owns a reviewed extension. Source checks still verify each
-branch's declared composition and its native patch inventory.
+A feature build applies only the ordered patch entries from its manifest. Generated frameworks are placed into disposable product-source copies. The tracked baseline framework and source checkout remain unchanged. An application archive is therefore associated with both its exact source and the generated native implementation it actually links.
 
-UDP is the parent of traffic-statistics; server-control is the parent of settings-
-persistence. Background and icon are independent. Release must contain all six
-completed owner tips, preserve exact owner file mappings and rerun the combined
-checks. Main ancestry alone does not prove current sibling-owner membership.
-Updates preserve old ancestry and never reset or force-rebase feature histories.
+The main specification is mirrored by the root README. Shared build guidance, documentation rules, governing principles and upstream documentation are inherited byte-for-byte by descendants. A child's root README describes that child's functionality; the parent's README is retained under the branch-document path defined by the documentation contract.
 
-Use a full Git checkout and a clean build workspace. The ordinary entry is:
+## Design rationale and resource cost
 
-```sh
-python3 Build/check.py baseline
-python3 Build/check.py composition
-python3 Tests/baseline_audit.py
-bash Build/build.sh
-```
+A common unpatched baseline prevents accidental feature coupling and makes native patch order reviewable. Explicit immutable source inputs avoid depending on whatever a remote branch happens to contain during a build. Separate product copies prevent a generated binary from being confused with the source artifact that produced it.
 
-The generic Apple entry archives `.build/<name>-product-source/Socks5.xcodeproj`,
-not a root project linked with an outdated committed baseline. Release has its own
-strict generated-framework and complete IPA-payload verifier. Its dedicated source
-copy remains `.build/integrated-product-source`. Source ZIPs do not supply all exact
-historical Git objects required by the negative controls.
+These mechanisms operate in build and verification processes. They introduce no app timer, packet-processing allocation, observer, worker or networking layer. The underlying native server still uses resources according to its own implementation. A reproducible source inventory does not by itself establish binary reproducibility, application correctness or minimum energy consumption.
 
-## Execution evidence and limits
+## Verification contract
 
-This source change requires fresh Linux native and Xcode27 Apple checks before a
-completion claim. Baseline TCP relay, source identity, exact upstream reversal,
-46 audit controls and actual unsigned ARM64 packaging are distinct from feature
-runtime tests. Historical successful feature/release runs do not validate this change.
-The original main app and unpatched native limitations remain intentional baseline
-behavior. Use the audited integrated release for the six-feature application.
+`Tests/baseline_audit.py` exercises the real source-check functions in isolated Git fixtures. It verifies rejection of modified and staged native inputs, preservation of diagnostic records, invalidation of stale success markers and rejection of Python execution that disables required assertions. Negative controls establish that a checker distinguishes valid input from an implementation that omits the required safeguard.
 
-Physical SideStore/LiveContainer installation, host arbitration, permissions,
-call/Siri/Bluetooth, VPN/hotspot, lock/suspension, long-duration and energy tests are
-not performed by these scripts. An unsigned IPA must go through the user's signing/
-import workflow; its hash is not the hash of a later signed copy. No original build7
-or build8 package is relabeled as a fresh product.
+The normal source checks are `python3 Build/check.py baseline` and `python3 Build/check.py composition`. The baseline contract invokes `Build/check_documentation.py`, which separately checks current-parent document copies, uniform authored structure, links and frozen non-document inputs. `Tests/documentation_contract.py` tests those documentation checks using disposable worktrees; it does not change app test oracles.
 
-## Completed baseline verification — 2026-09-26
+`bash Build/build.sh` runs the applicable native and model checks. On an Apple host, the relevant build route also creates the generated framework and application archive. Source checks, native execution, SDK compilation, archive creation, Simulator execution and physical-device execution are distinct results. A source ZIP alone does not provide the complete reachable Git objects required by the repository's exact-input controls.
 
-Run **36218740219**, attempt 1, executed exact source
-`3e7047cfa52f446e5c5d2f6c15e49e8bbfd7cd8b`, tree
-`c9cdbbac0c00ebe1e0ef26f047c443b959ce3689`. Linux and Xcode27 jobs both
-passed on their first execution. All46 old/current audit cases, actual native TCP
-echo, baseline/composition and exact native source reversal passed on both hosts.
-Input and final worktree/index logs are empty. Actual Apple framework generation,
-ARM64 app archive and package/ZIP checks completed without changing the tracked
-checkout. This is baseline packaging, not the integrated six-feature deliverable.
+## Operation and limitations
 
-Original artifacts10898635468 (Linux) and10898475964 (macOS) were inspected:
-SHA-256 respectively
-`86d1932980659a1ef74d691faab0d9e49e8fd5d3e8cce406aa5a6e78a58d7f51` and
-`7a2821c131bb129bbda3c8859e311632a292aa0ae608d6706ad55406732687a0`.
-Both ZIP CRCs, genuine source comments and all42 file contents/modes match the
-executed tree. Source/history and native/Apple results are distinct evidence.
-The baseline unsigned IPA is72545bytes, SHA-256
-`33dd1ff63510b11b225b67d93f157e032f0b503087ff6d6b1d2cfbed89c1cd83`.
-Its inventory contains the original app executable, plist and PkgInfo only; no
-feature resources or tests were added. No device/Simulator execution is implied.
-Platform-specific empty-symbol libtool warnings and AppIntents metadata warnings
-remain in original logs. No assertion, timeout or warning rule was relaxed.
+Use a clean full-history checkout and the commands selected by the checkout's feature manifest and workflow. Main is a baseline, not the integrated six-feature deliverable. Do not link a feature app against the committed unpatched framework when its public native interface requires a generated feature framework.
 
-This result completion changes only the identical README/main-specification pair;
-the other40 files are the executed bytes/modes. The subsequent features must inherit
-this completed main commit before final integration; their old successes are not
-counted as verification of this new common audit implementation.
+The committed baseline framework's inventory records Xcode 16.4 and iPhoneOS SDK 18.5 as its build environment. This identifies that checked-in artifact; it is not evidence of runtime execution on the target phone. Feature and release product checks use their own recorded SDK and generated framework rather than treating the baseline build environment as the device's environment.
+
+The configured minimum iOS version is 17.2. The primary intended deployment is a physical iOS 27 device through SideStore standalone installation or LiveContainer guest execution. Those environments have different signing, containers, permissions and shared-session boundaries. Host and Simulator results do not certify either physical installation route, background survival or device power consumption.
+
+## Related documents
+
+The [build and verification guide](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/main/docs/build-and-validation.md) describes execution layers. The [documentation contract](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/main/docs/documentation.md) defines inheritance and code preservation. The [upstream README](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/main/docs/upstream/README.md) and [governing principles](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/main/docs/top-level-principles.md) are retained as exact source documents.
