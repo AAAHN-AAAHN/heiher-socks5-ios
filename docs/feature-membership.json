@@ -110,8 +110,8 @@
       "sha256": "f32cebe2d501b259b6c28bcf63c1e2f7d96fb311d8c93efe1b610e194a4eea67"
     },
     "Tests/AppIcon/check_icon.py": {
-      "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
-      "sha256": "82a052a6aebc35259e04fae49d7647a157784f0a582586e0f21b2ac4ccb24245"
+      "commit": "87d5cb3c612603653ed04cbd1784c9eb42186011",
+      "sha256": "4acbc6ac84e28d723878a39bc0d3a0f0218fb0dc0d4b63af2db586e5a054ff77"
     },
     "Tests/AppIcon/run_checks.sh": {
       "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
@@ -226,8 +226,8 @@
       "sha256": "b17c5233214664de6dba3f0b0adb97e00892e0dbd189a26db850ca00ce3c18ea"
     },
     "Tests/Background/check_scope.py": {
-      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
-      "sha256": "1488308cd367be51629c4130bc04b5bc4be5738b258dbff625f8dcb837baf91d"
+      "commit": "28cbf5f4d2acbfdb763bbacb1edc294db8fa0790",
+      "sha256": "6c8b620de33dbec40e819588ebc1955e2c0efad411951c9ef5ffd65886a622a3"
     },
     "Tests/Background/check_session_ownership.py": {
       "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
@@ -398,8 +398,8 @@
       "sha256": "b98a9fa6d2b9c5688d49d4ee7b73ed84bb9fd76c89de52bed78081da0712fd07"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "79452798852f241cc53a180a511943ba8d35f57246015ae402ab8558bfe94fdc"
+      "commit": "28fed6719c056a0f445b66eabd65a5e11ac49635",
+      "sha256": "8e82db619a2936ed3e48dba215f300d7701df83c56c8ea08eafe24af0dd83dfe"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
@@ -548,180 +548,6 @@
     "Tests/udp_stream_boundaries.c": {
       "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
       "sha256": "d1495f6a424ea8cee2aa13a17116a52b2f488c6a271bd50319be4f26881796db"
-    },
-    "docs/branches/feature-app-icon.md": {
-      "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
-      "sha256": "4bb5e2049266685a147f935f8fb4f44e01930ec7bbf8712f2387c50441b62c53",
-      "path": "README.md"
-    },
-    "docs/branches/feature-background.md": {
-      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
-      "sha256": "704453741dd787751b39872c3ee1f8c8a6d8c852a4d7d8f3f2ab816553d5e6e4",
-      "path": "README.md"
-    },
-    "docs/branches/feature-server-control.md": {
-      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
-      "sha256": "0af7a48048856784f447480dd68ba73d822a4a3d000b71d38445456ad0dacb69",
-      "path": "README.md"
-    },
-    "docs/branches/feature-settings-persistence.md": {
-      "commit": "a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7",
-      "sha256": "27c3c37f083fd1aad251f9572c9c3aa64698f7a0b6ecef8d0d0e5ee70ee44e5e",
-      "path": "README.md"
-    },
-    "docs/branches/feature-traffic-statistics.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "9e285427c2fb15c8e0f3d90f9308cc7ea9c3c007248d6be76173033c0510310f",
-      "path": "README.md"
-    },
-    "docs/branches/feature-udp-compat.md": {
-      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
-      "sha256": "234700a8603fd665b58192b49045b879586bfb8435d90ccb958b1b01ba11b308",
-      "path": "README.md"
-    },
-    "docs/features/app-icon.md": {
-      "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
-      "sha256": "4bb5e2049266685a147f935f8fb4f44e01930ec7bbf8712f2387c50441b62c53"
-    },
-    "docs/features/background.md": {
-      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
-      "sha256": "704453741dd787751b39872c3ee1f8c8a6d8c852a4d7d8f3f2ab816553d5e6e4"
-    },
-    "docs/features/server-control.md": {
-      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
-      "sha256": "0af7a48048856784f447480dd68ba73d822a4a3d000b71d38445456ad0dacb69"
-    },
-    "docs/features/settings-persistence.md": {
-      "commit": "a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7",
-      "sha256": "27c3c37f083fd1aad251f9572c9c3aa64698f7a0b6ecef8d0d0e5ee70ee44e5e"
-    },
-    "docs/features/traffic-statistics.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "9e285427c2fb15c8e0f3d90f9308cc7ea9c3c007248d6be76173033c0510310f"
-    },
-    "docs/features/udp-compatibility.md": {
-      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
-      "sha256": "234700a8603fd665b58192b49045b879586bfb8435d90ccb958b1b01ba11b308"
-    },
-    "docs/history/app-icon-before-final-audit-20260926.md": {
-      "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
-      "sha256": "baf94d18261071316d014d113fbc1e5328d35dd99d69bb70d53178cec081528b"
-    },
-    "docs/history/background-before-async-20260925.md": {
-      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
-      "sha256": "9469a5bd5631a5587543956bde5bf05d2865f5aeddba0b16c6fb6f2b108ad3b8"
-    },
-    "docs/history/background-before-final-audit-20260926.md": {
-      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
-      "sha256": "09fe4de727723ba005d65544ec4895240e7b29d6ea3ab44ff65d593ddce1249d"
-    },
-    "docs/history/main-before-project-audit-20260926.md": {
-      "commit": "75335d201cb1e541bb153e9899badbc11ccf1973",
-      "sha256": "e331961624089b6176e19525f0b010ccfc02ea18d5b22aa893fe95c1ba06d3e3"
-    },
-    "docs/history/server-control-before-final-audit-20260926.md": {
-      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
-      "sha256": "ac32484853b75a64c1a6e8034ac0c1a9c9359154ba537f38fa5d3a95604907ce"
-    },
-    "docs/history/server-control-before-project-alignment-20260926.md": {
-      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
-      "sha256": "5a541f41b23b97aa2e8cbc0ccac7fced03487177a1252ee0fe7d5a58826a33f9"
-    },
-    "docs/history/settings-before-final-review-20260930.md": {
-      "commit": "a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7",
-      "sha256": "bc9f42416775b10a9b17c955d195e8c19b6578a7236f77f2a64f867cf3fe3431"
-    },
-    "docs/history/settings-before-project-alignment-20260926.md": {
-      "commit": "a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7",
-      "sha256": "682f298179f6524379eb7ddbb9d4bb777de9134698c3255c3f9c3bccfe09ea1f"
-    },
-    "docs/history/settings-before-split.md": {
-      "commit": "a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7",
-      "sha256": "a27287360f2dcbc217c69873d05a931d38c103e054261cb7e40526549623cb48"
-    },
-    "docs/history/settings-persistence-before-final-audit-20260926.md": {
-      "commit": "a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7",
-      "sha256": "2df473c22ddb10d8bd1c9f967ddb12749ad18cb202faa2cdab82a1d5c0a53522"
-    },
-    "docs/history/statistics-before-client-ip-20260928.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "b42a505875c6f90bd380286b9895e064e8604251ff512ecd6b8b44ecea3715f8"
-    },
-    "docs/history/statistics-before-dynamic-udp-20260929.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "d7eb0af73e0a991a81a4e2e97b336ce40da4f21da0a0f256bb77939be35d7385"
-    },
-    "docs/history/statistics-before-final-audit-20260926.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "76623cbea5ea64c6162d1c612f32bbac2ee437639c93f9aadd2c27423386b5cf"
-    },
-    "docs/history/statistics-before-project-alignment-20260926.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "739b8c5194843d54c569977b065c966d82b41d6a22fce6a15b267be3e75819ef"
-    },
-    "docs/history/udp-before-dynamic-buffer-20260929.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "bd7f6ece52d664cbd82dfd164443484d7035b72ec1180d1d741bee7dfcb454c6"
-    },
-    "docs/history/udp-before-final-audit-20260926.md": {
-      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
-      "sha256": "600cc198204c2436657a69daac2264cd33a49413efa802f44121651d1c56c325"
-    },
-    "docs/history/udp-before-project-alignment-20260926.md": {
-      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
-      "sha256": "428f47b285f720034be4af217939321b564107ad416ee929fcbd7d9b8e74f16e"
-    },
-    "docs/reviews/payload-accounting-20260929.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "7e57ce476895d7b3663583efda535628936e0d841f7ca3215437763af7455ff8"
-    },
-    "docs/reviews/server-control-final-20260929.md": {
-      "commit": "a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7",
-      "sha256": "3b9f1916d30441fdcf3c92c217083f613aae43edf878e6faf3ffb53abc5f3c87"
-    },
-    "docs/reviews/settings-final-20260930.md": {
-      "commit": "a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7",
-      "sha256": "6f0268df96d40bb8f8d8321eb3ed3cee1a2b8b8f4f9576a6f4c733d1d1dbb533"
-    },
-    "docs/reviews/statistics-dynamic-udp-20260929.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "9441cd26b721ee3b1fbb5e2c727fe34ac2c413036ebfd3b1925ebd17a019722f"
-    },
-    "docs/reviews/statistics-strict-20260928.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "53a5428208d635e8d22c4acec7bdb156cf9ee601b0b0b60a6e67c4e5cef20ef5"
-    },
-    "docs/reviews/traffic-statistics-20260922.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "cd706847b442af854220aad71e37de825d2b4fc02fe65b1a86586f5905c57a39"
-    },
-    "docs/reviews/traffic-statistics-20260923.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "607ae5edcea1773568e8971519d541fbed1d13ad0d4aa13dfbdf086639869f6d"
-    },
-    "docs/reviews/udp-compat-20260922.md": {
-      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
-      "sha256": "265da4ed8e7c9fdb47317d8cd8e4568b723f9b34416b0d0cab49d681a4a2d606"
-    },
-    "docs/reviews/udp-compat-20260923.md": {
-      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
-      "sha256": "d44bcb1f38bd355080df0277b4608c85a112de12442453c6c9c623ccc2468e7a"
-    },
-    "docs/reviews/udp-dynamic-resume-20260929.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "2408a6375a845a7b75063ef0ef1e49aeda460d65b1c921af9c19ead93b6ec995"
-    },
-    "docs/reviews/udp-header-validation-20260929.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "3f9cf2fd1fda1911c5f768b7872192b2c75a91e1d28c7ca9f4359fbb4281f375"
-    },
-    "docs/reviews/udp-statistics-alignment-20260923.md": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "7b8e93c5aec5c22cf7af4ba8d4a71d6d8a03328c7320cbcf658811fef7791f40"
-    },
-    "docs/top-level-principles.md": {
-      "commit": "75335d201cb1e541bb153e9899badbc11ccf1973",
-      "sha256": "8e07f6c60cc83426b5e66e4d9140fb62f97c2b1b9cb38a549d5f898f0b946cf8"
     }
   },
   "files": {

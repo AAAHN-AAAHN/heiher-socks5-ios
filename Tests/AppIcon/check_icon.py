@@ -106,16 +106,19 @@ def git(*args):
 
 
 def main():
+    import runpy
+    documents = runpy.run_path(str(ROOT / 'Build/check_documentation.py'))
+    documents['check'](ROOT)
     result = catalog(ROOT / CATALOG)
     git('merge-base', '--is-ancestor', BASE, 'HEAD')
     git('merge-base', '--is-ancestor', INPUT, 'HEAD')
-    paths = git('ls-files').decode().splitlines()
-    originals = git('ls-tree', '-r', '--name-only', INPUT).decode().splitlines()
+    paths = documents['code_paths'](ROOT, git('ls-files').decode().splitlines())
+    originals = documents['code_paths'](ROOT, git('ls-tree', '-r', '--name-only', INPUT).decode().splitlines())
     allowed = {'.github/workflows/verify-build.yml', 'README.md', 'docs/features/app-icon.md'}
     shared = {'Build/build.sh', 'Build/check.py', 'docs/main-baseline.md'}
     inherited = {'Tests/baseline_audit.py', 'docs/top-level-principles.md',
                  'docs/history/main-before-project-audit-20260926.md'}
-    for path in shared | inherited:
+    for path in documents['code_paths'](ROOT, shared | inherited):
         require((ROOT / path).read_bytes() == git('show', BASE + ':' + path),
                 'Current main source: ' + path)
     old_config = json.loads(git('show', INPUT + ':Build/features.json'))
@@ -127,10 +130,7 @@ def main():
         if path not in allowed | shared | {'Build/features.json'}:
             require((ROOT / path).read_bytes() == git('show', INPUT + ':' + path), path)
             preserved.append(path)
-    history = 'docs/history/app-icon-before-final-audit-20260926.md'
-    require((ROOT / history).read_bytes() == git('show',
-            '1beaefa4e068a3b4e9473bab478b27526b88defd:README.md'), 'Original audit history')
-    require(all(p.startswith('Tests/AppIcon/') or p == history or p in inherited
+    require(all(p.startswith('Tests/AppIcon/') or p in inherited
                 for p in set(paths) - set(originals)),
             'Unexpected feature addition')
     baseline_config = json.loads(git('show', BASE + ':Build/features.json'))

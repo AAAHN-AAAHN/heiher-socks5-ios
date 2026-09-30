@@ -41,9 +41,12 @@ def fields(project, name):
 
 
 def main():
+    import runpy
+    documents = runpy.run_path(str(ROOT / 'Build/check_documentation.py'))
+    documents['check'](ROOT)
     git('merge-base', '--is-ancestor', BASE, 'HEAD')
-    base_paths = git('ls-tree', '-r', '--name-only', BASE).decode().splitlines()
-    current_paths = git('ls-files').decode().splitlines()
+    base_paths = documents['code_paths'](ROOT, git('ls-tree', '-r', '--name-only', BASE).decode().splitlines())
+    current_paths = documents['code_paths'](ROOT, git('ls-files').decode().splitlines())
     allowed = {'.github/workflows/verify-build.yml', 'Build/check.py',
                'Build/features.json', 'README.md', 'Socks5/Socks5App.swift',
                'Socks5.xcodeproj/project.pbxproj'}

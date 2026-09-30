@@ -54,6 +54,9 @@ def run(args, log, cwd=ROOT, timeout=180, env=None):
 
 
 def inspect_sources():
+    import runpy
+    documents = runpy.run_path(str(ROOT / 'Build/check_documentation.py'))
+    documents['check'](ROOT)
     if CONFIG['name'] != 'traffic-statistics' or CONFIG['features'] != ['udp', 'statistics']:
         raise RuntimeError('This review is for the statistics composition only.')
     inventory = git('diff', '--name-only', CONFIG['base_commit'], 'HEAD').decode().splitlines()
@@ -67,6 +70,8 @@ def inspect_sources():
     assert '    needs: udp-prerequisite\n' in workflow
     preserved = {}
     for target, source in UDP_FILES.items():
+        if documents['documentation_input'](ROOT, target):
+            continue
         data = (ROOT / target).read_bytes()
         assert data == git('show', UDP + ':' + source), target
         preserved[target] = hashlib.sha256(data).hexdigest()
