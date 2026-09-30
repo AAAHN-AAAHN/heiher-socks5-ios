@@ -1,271 +1,73 @@
-# UDP compatibility — adaptive contiguous datagram buffers
+# UDP compatibility and adaptive datagram buffers
 
-## Scope, environment and prior evidence
+## Purpose and scope
 
-This is the standalone `feature/udp-compat` owner. Its complete preceding README,
-including all historical results and failures, is retained at immutable commit
-`6f9848e42fb221b21ea31ce8ab8b00333cc0ecd5`. The detailed earlier reviews remain in
-`docs/reviews/udp-header-validation-20260929.md` and
-`docs/reviews/udp-dynamic-resume-20260929.md`; the pre-buffer specification remains
-`docs/history/udp-before-dynamic-buffer-20260929.md`. They describe their own
-revisions, not new executions. The current README and feature specification match.
-`docs/top-level-principles.md` applies unchanged.
+This feature preserves complete SOCKS UDP messages, correct address reporting and peer isolation while retaining the native engine's compact association and task model. It also handles UDP-over-TCP framing without treating an incomplete byte stream as a completed datagram.
 
-The primary targets are a physical iOS27 device installed independently by SideStore
-and a LiveContainer guest. These signing, container, permission and process/session
-environments are distinct. Configured minimum OS remains iOS17.2. Actual builds in
-this review are native Linux/macOS and iPhoneOS27 syntax/type checks, not runtime
-certification for every OS at or above that minimum. No new Simulator, physical
-installation, iPhone archive, IPA or release integration is part of this review.
+The branch adds native transport behavior to the shared baseline. It does not implement traffic counters, persistent settings, background services or a new SOCKS protocol. A datagram remains one message; larger payloads are not split into independent UDP messages. The configured fixed-port policy is retained, including its explicit multiple-unknown-peer limitation.
 
-Main75335d201cb1e541bb153e9899badbc11ccf1973 is the real baseline ancestor.
-Server b3585289622561caf4b8789b436cc8820ecd6be0, core162dd996299fc2d2bff2dd63728f8a2cd71ed31a,
-task328f35d903221b51811b3d02b277d665dfbdc75f and yaml162227cd7d2b6108bc8bc133273e11413222ddf4
-remain pinned. The committed XCFramework is the unpatched baseline input, not a new
-compiled product containing these changes. A product build must rebuild its declared
-patches. No UI, app setting, entitlement, host, NetworkExtension or background mode
-is changed here. The other feature owners and release retain their independent refs.
+## Functional behavior
 
-## Four patches and preserved runtime contract
+### Association setup and source identity
 
-Apply the existing patches in this order, using their declared repository roots:
+A client may request UDP ASSOCIATE without knowing its UDP source port. The server does not attempt to connect the relay socket to port zero. It binds the relay and reports its usable address and assigned port. With a known client endpoint, the existing connected-socket path remains available.
 
-1. `hev-udp-port-zero.patch`: server root; avoid connecting an unknown UDP port zero.
-2. `hev-udp-sockaddr.patch`: core; normalize IPv4 socket addresses for IPv6 storage.
-3. `hev-udp-peer-filter.patch`: core; enforce the control peer and learned UDP port.
-4. `hev-udp-dynamic-buffer.patch`: core; complete datagrams, adaptive buffers and
-   the existing RSV/FRAG guard. It changes only `src/core/src/hev-socks5-udp.c`.
+For an unknown endpoint, the first accepted datagram must match the TCP control peer's IP and pass the SOCKS header and address checks before its source port is learned. Subsequent datagrams must match the established endpoint. Queued packets are checked individually, including packets queued before the UDP socket became connected. Discarding a batch of foreign packets does not incorrectly signal that the entire socket queue is empty.
 
-The public `HevSocks5UDPMsg` addr/buf/len representation and interfaces are unchanged.
-Payload remains contiguous; existing header/address/payload send vectors remain.
-One datagram is never silently cut into two independent UDP messages. An allocation
-limit is not a protocol length limit, and neither implies delivery through every path.
+IPv4, IPv4-mapped IPv6, native IPv6 and address scope are normalized for the native APIs and SOCKS address representation. The address in a reply describes the actual remote sender. Address conversion preserves complete IPv6 storage and respects strict-aliasing requirements rather than reinterpreting incompatible structures in place.
 
-### Capacity, demand history and cleanup
+### Complete message and frame handling
 
-```c
-#define UDP_BUF_SIZE 1500
-#define UDP_BUFFER_GROW_STEP 500
-#define UDP_BUFFER_HOLD_SECONDS (5 * 60)
-#define UDP_BUFFER_CLEANUP_SECONDS 60
-```
+Standard UDP input validates minimum length, address form and length, reserved bytes, unsupported fragmentation and actual truncation flags. Nonzero RSV or FRAG input is discarded before peer learning. A malformed or truncated prefix is not forwarded as a normal complete payload. Empty payload datagrams remain messages and are distinct from an empty receive queue or TCP EOF.
 
-Each slot starts in the original 1,500-byte slab. Reserve max(1500,ceil(required/500)*500)
-in one jump: 48,001 ->48,500;30,001 ->30,500;65,537 ->66,000. There is no separate
-65,536-byte allocation cap. Rounding, metadata and pointer arithmetic reject numeric
-overflow, and allocation failure remains possible. Required length includes the
-address/header bytes actually occupying that slot, not just forwarded payload.
-The UDP wire format and existing 16-bit UDP-over-TCP payload field remain bounded;
-IPv6 jumbograms are not supported by this change.
+UDP-over-TCP uses its own frame-length interpretation. The standard zero-RSV/FRAG rule is not applied to the frame's length field. Headers and bodies must be fully read before a message is reported complete. Successful messages preceding a later receive failure retain their completed count. A partially written stream frame is not reported as a successfully sent datagram, and a new frame is not appended as though the incomplete frame had succeeded.
 
-An extended slot owns one allocation: a 64-bit bucket-expiry array followed by its
-contiguous payload capacity. Each 500-byte bucket above 1,500 retains only its last
-actual demand time plus 300 seconds. Smaller input never renews a higher bucket;
-packet count does not accumulate history. Resizing copies history, not stale payload.
-Capacity is reused without repeated per-packet allocation, full-capacity initialization
-or a separate joining copy; allocation remains necessary at growth/shrink. Small demand skips history timestamp/allocator work; this does not mean
-the entire relay can never read a clock while large buffers remain allocated.
+### Adaptive buffer policy
 
-The original base slab stays allocated. Default batch count10 means20 base slots,
-30,000 base bytes, plus32-byte per-slot descriptors on ARM64. A48,500-byte replacement
-has752 history bytes;66,000 has1,032. These are requested ownership sizes, not RSS or
-allocator-size-class guarantees. Holding large messages across many associations
-still needs real memory; this policy cannot make that required memory disappear.
+The base payload allocation is 1,500 bytes. Larger required capacities are rounded up in 500-byte steps. A requirement of 48,001 bytes obtains 48,500 bytes; 30,001 obtains 30,500. The required size includes any protocol header stored in the same receive region. Allocation does not impose a separate arbitrary 65,536-byte ceiling, but wire-format, arithmetic, allocator, socket and network-path limits still apply.
 
-One cleanup deadline per association checks the highest bucket whose expiry is
-strictly later than now. It is not reset by every packet. With demand48,001 at A,
-30,001 at A+120s and a sweep phase A+17s, capacities become30,500 atA+317s and1,500
-atA+437s, absent later large demand. Return to1,500 frees replacement and history.
-A failed shrink keeps the old usable allocation and retries only at the next sweep;
-new allocation and old allocation can coexist momentarily during a successful shrink.
+Each 500-byte demand bucket records one expiry time based on a 300-second holding interval. A demand refreshes its own bucket, not every smaller or larger capacity. Small messages therefore do not keep a large buffer alive indefinitely. Cleanup checks the recent demands at a 60-second cadence and returns unused expanded storage toward the largest still-needed bucket or the 1,500-byte base.
 
-The existing owner Hev task/timer can wake an idle relay at its60s cleanup deadline.
-There is no new thread, task, Swift timer, registry, global lock or logger. Base-only
-owners need no maintenance wakeups. Cleanup wakeups do not reset the communication
-timeout; the app's original60s UDP timeout is unchanged and can close an association
-before a300s hold expires. Closing frees owned buffers without waiting for retention.
+For example, a large demand followed two minutes later by a smaller expanded demand permits the first capacity to expire independently. Cleanup needs no subsequent application packet to run. It never moves storage still referenced by active I/O, and it does not treat maintenance activity as new client traffic that extends the communication timeout.
 
-Shrink occurs only after I/O references are released. Pending send or incomplete
-TCP-frame receive, scheduler delay, sleep and process suspension can postpone it.
-Apple uses its continuous CLOCK_MONOTONIC_RAW clock; Linux uses CLOCK_BOOTTIME where
-available. User wall-clock edits do not alter this policy. Free releases ownership,
-not a promise of immediate or byte-exact physical RAM reduction.
+## Implementation and ownership
 
-### Receive, peer validation and forwarding
+The feature is expressed by `hev-udp-port-zero.patch`, `hev-udp-sockaddr.patch`, `hev-udp-peer-filter.patch` and `hev-udp-dynamic-buffer.patch`, applied at their manifest roots. The public message representation remains address, contiguous buffer and length. The existing association owns the sockets; its native task owns buffer lifetime and cleanup scheduling.
 
-Apple sizes the next datagram with SO_NREAD, not aggregate FIONREAD. A zero result
-uses a one-byte non-consuming probe and requery to distinguish an empty queue from
-an empty datagram. Linux uses MSG_PEEK|MSG_TRUNC without copying payload to user space.
-The owner is the sole reader between sizing and consuming in the supported path.
-Each mixed-queue message is sized separately; actual MSG_TRUNC/capacity are checked
-again. The existing recvmmsg wrapper receives one message at a time so flags reach
-the caller. This costs a length-query syscall and Linux bulk-receive amortization;
-existing send batching and cooperative scheduling remain.
+Receive sizing occurs before consuming a message. Darwin queries the next datagram length through its socket interface; Linux uses a length query that does not copy the whole payload. Actual receive length, flags and capacity are checked again when the message is consumed. Different queued datagrams are sized individually rather than assuming that a batch has the first message's size.
 
-Zero-length UDP payload is valid; an empty queue is EAGAIN, not an empty message or
-TCP EOF. Rejected batches yield and continue rather than falsely claim exhaustion.
-Peer IP/port/scope filtering is preserved. First-peer binding follows implemented
-size, truncation, RSV/FRAG and address-length checks. Both reserved bytes and FRAG
-must be zero; unsupported SOCKS fragments are dropped, not reassembled. These checks
-do not certify every malformed address, DNS answer or untrusted-network history.
+Expansion allocates the required rounded space directly. Bucket metadata records capacity demand rather than a per-packet history. Allocation failures do not leave dangling buffer references. A failed shrink retains usable storage for a subsequent cleanup attempt. Association teardown releases its owned expanded storage independently of the holding interval.
 
-The non-Apple/non-Linux fallback uses geometric full non-consuming probes, with
-500-byte-rounded reservation. It may temporarily reserve excess capacity and is not
-certified on a third OS by Apple/Linux results. The actual target paths reserve from
-the next message's queried length, not repeated500-byte full-payload peeks.
+The task's existing timer supports cleanup and communication timeout without a new production thread, Swift timer or global buffer registry. When no expanded capacity remains, unnecessary cleanup wakeups stop. The timeout applies to communication, not to the bookkeeping wakeup itself.
 
-UDP-over-TCP requires the complete declared frame and validates address/header
-consistency and subtraction bounds before use. Incomplete bytes, invalid frames and
-cancellation cannot masquerade as positive message counts. A completed preceding
-message is preserved when a later frame fails. Partial outgoing frames are terminal,
-not followed by another frame. Public supplied-buffer callers keep their capacity
-and signatures; only owner-managed relay buffers acquire dynamic growth/reclamation.
-Growth failure terminates the association after a completed prefix rather than
-consuming a misleading partial datagram or retrying the same queue head indefinitely.
+On Darwin, a valid large send rejected with EMSGSIZE may require a larger socket send-buffer allowance. Only that failure path queries and adjusts the affected socket as needed, with at most one retry of unsent work. Completed messages are not retransmitted. This socket-level allowance is distinct from the user-space payload retention policy and may persist for the socket's lifetime.
 
-On Apple EMSGSIZE only, the existing sender examines that socket's SO_SNDBUF and
-raises its limit only when insufficient for the next unsent message. At most one retry
-per message is allowed; completed prefixes are not duplicated. Normal sends add no
-getsockopt/setsockopt. This is not a host/sysctl edit. Its socket queue limit lasts
-until close, separately from300s/60s user-space retention, and is not eager equal-sized
-resident allocation. Path, family and framing limits remain errors when unresolved.
+## Design rationale and resource cost
 
-### Supported boundary and reproduction
+Contiguous messages preserve the engine's existing parsers, send interfaces and ownership model. Direct rounded growth avoids repeated reallocations through every intermediate size. Keeping recently useful space avoids allocating and freeing large buffers for each packet. Expiry per capacity bucket provides bounded metadata per supported capacity range without recording every message timestamp.
 
-Fixed-port multiple unknown-peer associations have a retained ownership/independent-
-close limitation. It remains an observation-only failure, not a current passing
-configuration. The valid same-IP first-sender race is also not resolved here. The
-ordinary port-zero/default and declared fixed-known profiles are separately required.
-No new throughput, physical background-survival or unlimited delivery claim is made.
+The implementation has real costs: next-datagram sizing calls, some loss of Linux receive-batching benefit, bucket metadata, expanded capacity and temporary old/new storage during a shrink. The existing base storage can coexist with an expanded region. Memory returned to an allocator need not immediately reduce process RSS. These costs are different from continuously allocating a maximum-size buffer for every small message.
 
-Run the unchanged complete-history entrypoint:
+The fixed-port/unknown-peer policy is not silently changed to reduce association ambiguity. Multiple unknown clients sharing one fixed relay endpoint can be associated with the wrong control connection. A forced dynamic-port fallback would change the configured behavior and network reachability requirements; it is not part of this implementation.
 
-```sh
-python3 Tests/udp_compat_audit.py
-```
+## Verification contract
 
-It needs a clean full-history checkout, pinned native sources, clang-format18 and the
-appropriate host tools. An archive-only local replay cannot provide missing Git
-ancestry or Apple execution. No older test/assertion/timeout/warning gate is removed.
-Primary contracts, not execution evidence, remain Apple's recvmsg/getsockopt and XNU
-SO_NREAD/socket behavior, POSIX recvmsg, and RFC1928 SOCKS framing. Historic references
-and detailed original failure records remain in the immutable preceding README.
+`Tests/udp_compat_audit.py` executes real native networking and separate controlled-boundary fixtures. Source, native patch order, formatting and exact patch reversal are checked independently from behavior. The address fixture covers port values, normalized addresses, canaries and IPv6 preservation. Peer tests cover foreign first senders, wrong ports, queued packets and continued progress after rejected batches.
 
+The buffer fixtures exercise demand rounding, expiry, large-to-small retention, overflow and allocation failure, queue/zero-length distinctions, truncation, partial success, cancellation and final cleanup. A reference history calculation checks the bucket policy rather than assuming the implementation's own result is correct. The live-hold and timer fixtures use actual sockets, clock, allocator and Hev scheduling; their test-only communication timeout is distinct from the application's configured timeout.
 
-## Final submission recheck — 2026-09-30
+The stream-boundary fixture checks complete frames, every tested truncation point, address/header consistency, partial sends and wire-length rejection in sanitizer and optimized configurations. The network suite compares full payload content and address, including payloads above the base capacity. Negative controls prove that missing peer, address, length or completion checks are detected. Observational fixed-unknown failures remain explicitly separate from required supported profiles.
 
-This review starts at `6f9848e42fb221b21ea31ce8ab8b00333cc0ecd5` and the
-four-patch native source described above. No new production defect was reproduced.
-All four patches, public interfaces, native pins, app/Swift/project/plist/defaults,
-framework, workflow and 1500/500/300s/60s policy remain byte/mode-identical.
-Only `Tests/udp_stream_boundaries.c` and two existing driver lists changed before
-validation. The new fixture is not part of the app and adds no runtime allocation,
-copy, syscall, timer, thread, polling or packet-recording cost.
+The feature's SDK checks compile the actual patched C/session and applicable Swift source for the configured target. They do not constitute a new device installation or an IPA produced by a native-only audit route. The documentation checker validates inherited prose without changing any of these functional test inputs or oracles.
 
-The fresh tested commit is `411bd82df80e8f0d3d66242431c36d9be840b1e0`, tree
-`bb82c72d0487e05da448d9cc2536bf95c38df2e8`, 70 tracked files. Run
-`36665546022`, attempt 1, passed both Linux and Xcode27 jobs without a rerun; terminal metadata was updated
-at 2026-09-30T03:52:45Z. These results belong to this exact source;
-all referenced earlier run records remain historical, not replacement evidence.
+## Operation and limitations
 
-### Additional framing and completed-I/O boundaries
+Use a clean full-history checkout and `python3 Tests/udp_compat_audit.py` for the standalone audit. Feature manifests identify the source roots and patch order. The application's server configuration accepts UDP port zero, but its default and configured fixed-port behavior are not automatically migrated. A client must use the relay endpoint returned by its association response.
 
-The new fixture includes the actual patched C implementation and substitutes only
-three stream-I/O wrapper results. It does not rewrite parsing, allocation, clock,
-cleanup or the public API. Each sanitizer/optimized execution checks 145,459 cases:
+Correct independent shutdown of multiple unknown-peer associations on a single fixed UDP endpoint is an explicit limitation. Peer checks are not cryptographic authentication, and a valid first sender sharing the expected IP can still compete to establish an unknown source port. NAT, firewall and socket/path limits are not overridden by a larger buffer.
 
-- Valid IPv4, IPv6 and maximum-length NAME frames, payloads from zero through 65,535,
-  five first-header splits, caller-supplied and managed buffers, with/without an
-  already completed prefix. Exact address/payload bytes and chosen capacity match.
-- Every missing-byte position of a 2,048-byte payload frame for those address forms,
-  with EOF, EAGAIN or cancellation-style results. Incomplete bytes are not returned
-  as a positive message count; a preceding complete message stays available.
-- All 65,536 type/header-byte pairs at a fixed NAME-length boundary. Inconsistent
-  headers cannot request a body or publish an address; consistent but incomplete
-  frames still fail. This is not all possible DOMAIN contents or DNS behavior.
-- Every completed-send result from -2 through the full two-frame byte count. Partial
-  frames are terminal, never successful messages followed by another frame. A
-  65,536-byte payload is rejected before sending because the wire field is 16-bit;
-  this does not impose a 65,536-byte allocation cap.
+The configured minimum is iOS 17.2 and the primary target is physical iOS 27 through SideStore standalone or LiveContainer guest execution. Actual installer, host, VPN/hotspot, suspension, long-background and device-resource behavior require separate evidence. Timer intervals are scheduling policies, not deadlines that override blocked I/O or process suspension.
 
-The exact suite total is 660 complete-receive, 77,172 truncated-receive, 65,536
-header and 2,091 send cases. These are deterministic codec-boundary cases, not
-145,459 independent network or physical-device trials. Existing live socket tests
-remain separate. Three disposable local mutations that accept an incomplete body,
-accept a short send, or return partial bytes as message count fail the new assertions;
-none is committed. Original assertions, negative controls, deadlines, warning gates
-and formatter18 requirements were retained.
+## Related documents
 
-### New execution results and provenance
-
-| Layer | Actual new result |
-| --- | --- |
-| Stream boundaries | 145,459 cases pass in ASan/UBSan and O3/strict-aliasing modes on both native hosts. Required formatter18 output matches the new fixture exactly. |
-| Existing buffers | 192,000 demand updates and 10,738 sweeps match the full-history oracle. Rounding/overflow, growth and shrink failures, zero-length/queued/truncated input and independent timeout/Stop tests pass. |
-| Address/peer/header | 65,536 port values, normalized families/canaries and 3,060 RSV/FRAG combinations pass. Actual required profiles total 58, plus eight peer cases, 34 header profiles and 426 large/mixed network records per host. Grouped records are not independent device trials. |
-| Prior failure controls | Old address/port/peer defects and the three-patch 2,048-to-1,490 truncation remain observable in their specific old controls. Four old header controls reproduce invalid forwarding/first-peer behavior. Their expected failures are not current implementation successes. |
-| Real retention | Linux demands 120.025654s apart, shrink to 30,500 at 300.184861s and 1,500 at 420.296662s. macOS demands 120.002862s apart, corresponding shrink times 300.019727s and 420.031822s. No input follows the second demand. |
-| Real idle maintenance | Linux cleanup/communication exit 60.055956/70.010857s; macOS 60.001892/70.008528s. Maintenance and idle expiry remain separate. |
-| Source/tooling | Common 46 input/marker cases, ten driver tests, full-history ancestry/pins, clean worktree/index, formatter18 and exact native reversal pass. |
-| Actual Apple SDK | Patched C/session syntax and the unchanged two Swift files pass iPhoneOS27/ARM64 minimum17.2 checks with empty required compiler diagnostics. Xcode27.0 27A266a, Swift6.4, macOS27.0 26A428 are recorded. No Simulator or IPA is generated by this workflow. |
-
-The 300-second hold observation uses real UDP, allocator, clock and Hev timers in a
-native helper fixture, with a test-only 600-second communication timeout. It sends
-48,001 bytes and, about 120 seconds later, 30,001 bytes; no data follow. This is not
-a full server-splice retention measurement or a change to the app's 60-second UDP
-timeout. The separate idle fixture seeds expired history and observes 60-second
-maintenance independently from a 70-second communication deadline. Neither implies
-a hard scheduling deadline under stalled I/O, sleep or iOS suspension.
-
-| Original new artifact | SHA-256 |
-| --- | --- |
-| Linux 11076331860 | 27018bac6f52c23bc5d3f3a09846102cbf304262124aec84d23a5988dd08c056 |
-| macOS 11076044234 | aaf2455d59663cbd5745247fd9776f5e492d1b5b91e2da9587d99549f4d572aa |
-
-Both new original ZIP digests/CRCs and source archives were inspected. Their 70 file
-bytes/Git modes reconstruct the tested tree and preserve the existing 69 source
-paths except the driver. Native archives match the preceding verified source on all
-243 regular files and 30 symbolic-link targets. Native UDP remains blob
-`fb6cfb61ca6e1b466c6e20ff3018cda814ecc4f4`, SHA-256
-`84ae81b486940a4ae15370f3708908cd6d2163abdf1549e7079b96f4876448b0`.
-The original baseline tree and both prior native archives were independently checked.
-
-Supplemental local archive replay completed 30 build/run commands: five actual-source
-fixtures in ASan/UBSan and O3/strict-aliasing modes, four existing live network drivers,
-and three mutation build/failing-run pairs. It is not full-history CI or Apple/device
-execution. Local clangd17 formatting was provisional; the new CI's unchanged
-clang-format18 gate is authoritative. Sanitizer scope includes the actual C unit in
-the fixture, not every prebuilt library path in the whole application.
-
-An exploratory Clang17 analyzer still reports the existing `getpeername` output /
-address-family initialization path warning. It was not reproduced as a runtime
-memory error. Its full diagnostic is retained; no warning suppression or speculative
-runtime edit was made to turn that exploratory result into a clean report. Mandatory
-Apple syntax/typechecking is a separate result, not proof all tools emit no notices.
-
-The existing extra receive-length syscall, Linux receive-batching tradeoff, base-plus-
-replacement memory and shrink-allocation costs remain. The unchanged observation-only
-benchmark compares the old three-patch binary with the full dynamic implementation,
-not this test-only revision with its identical production parent. Median server CPU
-microseconds per relayed datagram at 64/1,200 bytes are Linux 7.356/7.670 old versus
-7.567/8.133 dynamic (+2.87%/+6.03%), macOS 14.293/12.497 versus 10.829/11.270
-(-24.24%/-9.82%). Three interleaved 12,000-roundtrip/window16 trials per condition
-remain noisy host observations, not universal speedups or device footprints. This
-review adds no product overhead and does not claim measured global minimum CPU/RAM,
-zero resident footprint, or a device-energy improvement. Avoiding unnecessary
-production changes is deliberate, not omission of an identified fix.
-
-Only README and its identical feature specification change in the final publication;
-the other 68 of 70 paths retain the tested bytes and modes. Its parent/commit/tree
-identify publication, not another runtime execution. The other seven branches and
-release are unchanged. The preceding statistics-still-old wording is corrected:
-statistics has independently incorporated the prior UDP owner, while this new test/
-document review is not automatically merged into any downstream branch.
-
-No new reproducible production regression or required current-test failure remains
-within this executed scope. The accepted fixed-port unknown-peer multi-association
-ownership limit and valid same-IP first-sender race remain explicit restrictions,
-not repairs performed by this review. No new Simulator, IPA, release integration,
-physical SideStore standalone, LiveContainer guest, real background/suspension or
-device CPU/RAM/energy/maximum-throughput trial was performed. Those layers require
-their own evidence; finite tests do not certify every possible deployment/history.
+The [shared baseline](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/main/docs/main-baseline.md) describes source inputs. The [build and verification guide](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/main/docs/build-and-validation.md) distinguishes execution layers. `Build/features.json` is the executable composition and `docs/documentation.json` is the current-parent document contract.

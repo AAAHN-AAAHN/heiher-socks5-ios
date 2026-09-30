@@ -1,94 +1,59 @@
-# Build, validation, and release infrastructure
+# Build and verification infrastructure
 
-## Source identity and branch ownership
+## Purpose and scope
 
-Main combines latest verified iOS source and a freshly built unpatched engine.
-See [the shared baseline specification](main-baseline.md). Feature branches inherit
-identical pins and framework objects from main. They rebuild from pinned
-server `b3585289622561caf4b8789b436cc8820ecd6be0`, core
-`162dd996299fc2d2bff2dd63728f8a2cd71ed31a`, task system
-`328f35d903221b51811b3d02b277d665dfbdc75f`, and YAML
-`162227cd7d2b6108bc8bc133273e11413222ddf4`.
+The build system creates a product from an explicit feature composition and records evidence for the implementation actually exercised. It must not substitute a source review for a runtime test, a compiled SDK interface for an installed application, or a feature-owner result for the integrated release's execution.
 
-Every feature branch is buildable as a checkout, not a patch-only placeholder.
-Traffic statistics explicitly depends on UDP compatibility; the other four are
-not a cumulative ladder. The final release has all five feature tips in its Git
-ancestry, contains the same feature module files and specification documents, and
-has a small explicit root view composing them. Branch-specific root READMEs are
-also copied byte-for-byte into `docs/branches` in the release. A file/hash membership
-manifest verifies module identity and documents the intentional composition glue.
+This guide describes the common responsibilities shared by the branches. Each branch's root README specifies its applicable feature tests and commands. The workflow and `Build/features.json` are authoritative about which stages are enabled for that checkout; a feature-only workflow is not automatically an IPA-producing workflow.
 
-`Build/features.json` selects actual patches, tests and app modules. Build code
-must not infer the composition from a branch-name substring. This makes a detached
-checkout unambiguous. `Build/build.sh` fails on an unexpected source revision, patch
-mismatch, style mismatch, test failure or incorrect app packaging. It never updates
-upstream branches. The committed framework is the fresh unpatched main baseline. Feature builds
-replace it only in the disposable build workspace; it is not a prepatched library.
-Source ZIPs preserve the composition but use a git checkout to run the full build,
-which records the actual commit and produces a git source archive.
+## Functional behavior
 
-## Commands
+The build validates input identity before native patching, applies each declared patch at its declared repository root, tests the resulting native engine, checks source formatting and reverses the patches to prove exact restoration. A rejected input or failed operation must not leave an overall success marker that can be reused as a valid verdict.
 
-On macOS with Xcode, Python 3, git, and clang-format-18 (or clang-format 18 on PATH):
+On Linux, the applicable paths execute native networking, C fixtures and platform-independent Swift models. Statistics-enabled compositions exercise buffered and splice paths. Apple execution adds Darwin networking, the actual iPhoneOS SDK, resource compilation and the product or Simulator stages selected by the branch. Expected platform-specific skips remain skips, not successful executions.
 
-```sh
-bash Build/build.sh
-```
+The integrated release validates a freshly generated patched framework, twelve production Swift files, an ARM64 archive and an unsigned IPA. It also exercises seeded original/remapped Simulator installations and the actual integrated, background-audio and traffic-statistics UI tests. These are separate gates, not a single interchangeable success flag.
 
-The script checks out the pinned recursive core into `.build/core` when absent,
-applies only the manifest's patches, runs native tests, builds the Apple framework,
-and creates an unsigned iPhone Release archive and IPA. The core checkout must be
-clean; use a fresh worktree or remove `.build` before changing compositions. The
-workflow uses a clean runner and installs the pinned formatter. Tests and docs are
-not compiled into the IPA. Dependencies needed by upstream are built by its own
-Makefiles; no network library or package manager is added to the app.
+## Implementation and ownership
 
-On Linux the same script performs applicable native tests, C style checks and Swift
-model/controller/storage tests, then stops without pretending to build iOS. The
-statistics feature is tested in both buffered and Linux splice configurations.
-macOS exercises Darwin UDP behavior using actual socket endpoints. Every feature
-also receives its own ARM64 iPhone archive; the final release is not the only build.
+`Build/features.json` supplies the composition name, features, native source revisions and ordered patch list. `Build/upstream.json` and `Build/baseline-framework.json` bind the common native inputs and committed unpatched framework. Build code selects behavior from declared features rather than a branch-name substring.
 
-## Test scope
+`Build/check.py` owns baseline, patch-application, formatting, reversal, composition and resource checks. Whole tracked working-tree and index equality is required at native input and restoration boundaries. The source checkout is not overwritten by generated frameworks. The product is built from a disposable source copy with the exact declared generated framework substituted into that copy.
 
-- UDP: real Hev, TCP/UDP echo, addresses, payloads, known/unknown ports, multiple peers.
-- Statistics: exact payload totals, asymmetric traffic, idle, concurrency, restarts;
-  independent Swift delta and unit formatting checks.
-- Background: production controller with scripted platform doubles, late callbacks,
-  fixed retry cadence and explicit Off; real Apple WAV decoder on macOS.
-- Settings: actual temporary JSON files, imports, UTF-8 limits, newlines, stored intent,
-  controller doubles and a separate real multi-worker stop-before-start C probe.
-- Icon: source image structure/opacity and archived app icon metadata.
-- Integration: feature file identity, patch inventory, tab order, bindings, unique
-  Xcode objects, API compile checks, scene/background permissions, unchanged silence.
+Source-composition checks compare feature-owned paths, contents and executable modes with their immutable owners. Documentation has its own current-parent contract in `docs/documentation.json`; it does not change executable source locks. Where a standalone feature's source predicate is inapplicable to the combined application, the original predicate runs in that feature's exact worktree. File equality and separate integrated checks connect the owned implementation to release.
 
-Mocks are explicitly not iPhone call/suspension tests. Native host networking is
-not hotspot/VPN/Sunshine emulation. No CPU, battery, or absolute optimality claim is
-inferred from passing functional tests. The minimal UDP peer-selection behavior and
-other known upstream limits remain documented rather than silently redesigned.
+In the release, `Build/release_source.py` verifies the generated framework inventory, source identity, completion prerequisites and copied non-framework files. `Build/verify_release.py` checks the actual device product. The IPA comparison requires the complete regular-file inventory and bytes, Unix file types and permissions, valid CRCs, unique entries and only expected usable directories. Directory records may be omitted without changing the actual payload contract. Source symlinks and unexpected package file types are not accepted as ordinary resources.
 
-## Style and minimality audit
+Resource verification checks the original silent WAV, permissions and scene declarations, the compiled AppIcon catalog and fallback images, actual ARM64/iPhoneOS/minimum-OS metadata, required native definitions and the executable/dSYM UUID correspondence. Actual product hashes identify bytes; source identities identify the code. An unsigned CI product and a subsequently signed installation are different byte-level objects.
 
-The C changes are checked against their own pinned upstream `.clang-format` using
-formatter version 18. Swift follows the existing four-space, native-framework style;
-new feature boundaries use ordinary bindings, value models and MainActor controllers.
-No wholesale reformatting of unchanged upstream files is done merely to change
-appearance. Standard frontend/actual Xcode compilation checks remain required.
-Python build/test files use standard-library code, explicit exit checks, subprocess
-deadlines for potential hangs, and bounded input reads. No test or helper process
-is included in the app's runtime target.
+## Design rationale and resource cost
 
-## History, artifacts, and failure policy
+Explicit composition keeps independent features separable and prevents a test from silently exercising an unintended engine. Clean source and generated-product boundaries make artifacts traceable without replacing source files in place. Exact patch reversal detects changes outside the intended native edits. Package type and permission checks matter because identical file contents are not sufficient to make a valid executable or ordinary resource.
 
-Before old branch names are deleted their exact tips are preserved as
-`archive/2026-09-22/<old-branch>` tags. A history bundle and old-ref manifest are also
-provided. No commits are garbage-collected or force-deleted. Main restoration and
-old-branch cleanup occur only after all feature and integrated checks succeed;
-updates use expected old SHAs so concurrent changes are not overwritten.
+Verification scripts and temporary XCTest code are outside the application target. Their subprocesses, hashing, temporary worktrees and package scans are build-time costs. They add no runtime payload copy, audio timer, registry lock or networking dependency. Feature runtime costs remain described by their owners; a successful build does not establish minimum CPU, RAM, latency or battery use.
 
-CI produces per-composition logs, core version identities, patch hashes, source ZIP,
-unsigned IPA, SHA256SUMS, and debug symbols. A successful CI badge means those named
-checks passed, not that all operating-system states or every network input are
-proved correct. Build failures preserve logs and do not get reclassified as a lack
-of GitHub permissions. The normal build workflow has read-only repository permissions.
-Only the explicitly authorized one-time reorganization workflow writes branches.
+## Verification contract
+
+| Layer | What is checked | What the result does not prove |
+| --- | --- | --- |
+| Documentation and source | Current-parent copies, structure, links, frozen code, declared ownership, source locks and worktree/index state | Behavior of every possible input or device state |
+| Model and controlled-boundary tests | Actual model/controller or C implementation with specified return values, failures and orderings | Unscripted operating-system or physical-network behavior |
+| Native networking | Actual sockets, complete payloads, address/peer rules, cancellation and cumulative accounting | Phone radio, hotspot, VPN or installer behavior |
+| Sanitizer and optimized builds | Required fixture memory/undefined-behavior checks and optimized-path invariants | Instrumentation of every library path or absence of every possible defect |
+| SDK and archive | Real target compilation, linked implementation and complete unsigned product structure | Signed-device installation or prolonged background survival |
+| Simulator | Real application/UI execution, saved state and selected original/remapped identities | SideStore or LiveContainer physical execution |
+| Physical deployment | Only a separately recorded device installation and execution qualifies | Any unexecuted permission, interruption, resource or survival scenario |
+
+The baseline/input/package regression fixtures retain their valid inputs and deliberate invalid controls. Checks do not relax assertion policy, warning thresholds, formatting requirements, subprocess limits or cleanup failures to obtain success. Source and product manifests retain exact identities even when a later stage fails. Machine-readable evidence is not rewritten into a narrative claim that an unexecuted stage passed.
+
+## Operation and limitations
+
+Use a full-history checkout and a clean workspace. For the baseline, start with `python3 Build/check.py baseline`, `python3 Build/check.py composition` and `bash Build/build.sh`. Feature READMEs specify their dedicated audit entry points. The integrated path uses `bash Build/build.sh`, `bash Build/check_swift_sdk.sh`, `python3 Build/verify_release.py`, `python3 Build/simulator_review.py`, `python3 Build/ui_review.py` and `python3 Build/record_evidence.py` on the applicable platform.
+
+Run `python3 Build/check_documentation.py` for reproducible document and frozen-input validation. The optional `--live-parents` mode additionally compares recorded parent revisions with current remote refs. `python3 Tests/documentation_contract.py` exercises document-contract rejection cases without modifying application branches or products.
+
+Configured minimum iOS 17.2, the physical iOS 27 target and the actual SDK used by an artifact are different properties. SideStore standalone and LiveContainer guest installation require their own signing, container and runtime evidence. Physical permissions, external providers, audio interruptions, lock/suspension, prolonged background execution and device resource measurements cannot be inferred from host or Simulator success.
+
+## Related documents
+
+The [shared baseline](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/main/docs/main-baseline.md) defines common inputs. The [documentation contract](https://github.com/AAAHN-AAAHN/heiher-socks5-ios/blob/main/docs/documentation.md) separates prose inheritance from executable source identity. Each checkout's root README and `docs/features` directory describe its current functional and verification composition.

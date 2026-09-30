@@ -40,8 +40,9 @@ def baseline():
         base = CONFIG['base_commit']
         git(ROOT, 'merge-base', '--is-ancestor', base, 'HEAD')
         for path in ('Build/upstream.json', 'Build/baseline-framework.json', 'Build/build.sh',
-                     'Build/check.py', 'docs/main-baseline.md', 'HevSocks5Server.xcframework'):
+                     'HevSocks5Server.xcframework'):
             assert git(ROOT, 'rev-parse', 'HEAD:' + path) == git(ROOT, 'rev-parse', base + ':' + path), path
+    subprocess.run([sys.executable, str(ROOT / 'Build/check_documentation.py')], check=True)
     print('PASS: shared source pins, baseline framework, app identity and main ancestry')
 
 
