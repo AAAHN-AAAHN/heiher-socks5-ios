@@ -14,6 +14,8 @@ In is payload successfully read from destination sockets into the proxy. Out is 
 
 SOCKS and transport headers, length queries, peeks, retransmissions, client-side duplicate measurements and system-resolver internals are excluded. UDP-over-TCP framing bytes are excluded from payload counts. An empty datagram is a valid message with zero payload bytes. This is a precise measurement boundary, not a claim that the destination application received every socket-accepted byte.
 
+Retransmission exclusion refers to lower-layer retransmission outside these measured I/O calls. If an application submits identical payload again and the proxy performs another successful destination-side read or write, those bytes count again. The collector neither inspects content nor deduplicates application messages.
+
 Total combines all counted clients. Every association retains the reference for its normalized TCP control-peer IP. Multiple connections from that same IP use one registered entry. Attribution failures use Unattributed without dropping the aggregate measurement. Closing an association or using Server Stop/Start does not reset process totals; a new application process starts new counters.
 
 ### Rate and display
@@ -26,15 +28,19 @@ The native counters continue as traffic is processed. The view samples only whil
 
 ## Implementation and ownership
 
-`hev-stats-task-io.patch` provides the I/O accounting hook without changing the behavior of callers that use the existing entry or a null callback. `hev-stats-core.patch` connects successful destination-side TCP/UDP I/O to accounting. `hev-stats-server.patch` owns aggregate counters, normalized peer registration and the public snapshot interface. These three patches follow the inherited UDP patches in the manifest.
+`hev-stats-task-io.patch` provides the I/O accounting hook without changing the behavior of callers that use the existing entry or a null callback. `hev-stats-core.patch` owns aggregate counters, normalized control-peer registration and per-IP counters in `src/hev-socks5-misc.c` within the core repository; it also connects destination-side TCP/UDP I/O to those counters. `hev-stats-server.patch` exposes the server-facing snapshot functions and copies core snapshots into caller-owned public rows in `src/hev-main.c` and `src/hev-main.h` within the server repository. These three patches follow the inherited UDP patches in the manifest.
 
 The native registry is process-lived and entries are append-only. Registration and snapshot coordination occur outside the per-packet lookup path. An association obtains its client reference once; successful I/O updates the appropriate counters through that reference rather than searching or reallocating the registry for every payload. Aggregate and per-IP reads are independent atomic snapshots, not one globally locked transaction.
+
+`hev_socks5_transfer_client()` reads the TCP control peer, normalizes IPv4-mapped addresses and includes a native IPv6 scope identifier in the registry key. A 256-bucket table and one registration mutex locate or create a process-lived entry with a stable positive ID. ID 0 is the Unattributed fallback when lookup, address conversion or allocation cannot provide an entry. `hev_socks5_transfer_add()` uses relaxed atomic additions for the aggregate and chosen entry; snapshots take a stable list reference and invoke row callbacks after releasing the registry mutex.
 
 UDP accounting uses the actual successful send result, message count and per-message length. It does not add a failed suffix or count completed messages again when an Apple send is retried. Destination receive bytes are accounted at the successful read boundary before a later rejection or client-forwarding failure could discard that observation. Peeking to learn a receive size never contributes payload.
 
 The UDP buffer owner retains the association's client reference independently of payload storage. Growing, shrinking or releasing a temporary buffer therefore does not replace IP attribution or erase cumulative counters. The buffer hold interval and cleanup cadence belong to the UDP owner, not the statistics registry.
 
 `TrafficStatisticsView` uses one visibility/scene-keyed Swift task. It samples immediately, then awaits approximately one second between samples and exits on cancellation. There is no hidden-tab sampling loop. A capacity query followed by a bounded native row snapshot tolerates concurrent registration: existing rows fit and newly required rows are reported for the next visible sample.
+
+`hev_socks5_server_stats()` requires two non-null output pointers. `hev_socks5_server_client_stats(nil, 0)` returns required row capacity, including ID 0; a subsequent call copies up to the supplied capacity and returns the currently required count, not merely the copied count. No registry pointer escapes through this interface. A larger return causes the view to show that new clients will be included in the next sample instead of indexing beyond its row array.
 
 The view builds a local `ClientTrafficStatistics` value snapshot and publishes it once, rather than publishing dictionary state after each row. All rows use the same Grid renderer, consistent directional columns, monospaced numbers and accessibility identifiers. The table is scrollable; view tests distinguish content accessibility from simultaneous visibility of every footer or row.
 
