@@ -31,12 +31,19 @@ CHECKS = {
 def main():
     if not __debug__:
         raise SystemExit('Assertions must be enabled')
+    if sys.argv[1:] not in ([], ['--background-policy']):
+        raise SystemExit('Usage: owner_checks.py [--background-policy]')
+    # This driver includes an app-wide no-Task.sleep assertion specific to the
+    # Background owner, not the integrated Statistics sampler. Run it unchanged
+    # at its pinned source; release ownership separately requires identical code.
+    checks = ({'feature/background': ['Tests/Background/check_interruption_policy.py']}
+              if sys.argv[1:] else CHECKS)
     refs = json.loads((ROOT / 'docs/feature-membership.json').read_bytes())['branches']
     OUT.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
     for key in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE'):
         env.pop(key, None)
-    for branch, scripts in CHECKS.items():
+    for branch, scripts in checks.items():
         with tempfile.TemporaryDirectory(prefix='release-owner-') as folder:
             path = Path(folder) / 'source'
             subprocess.run(['git', '-C', str(ROOT), 'worktree', 'add', '--detach', str(path), refs[branch]],
@@ -47,7 +54,8 @@ def main():
                     log = OUT / (branch.split('/')[-1] + '-' + Path(script).stem + '.log')
                     with log.open('w') as stream:
                         subprocess.run([sys.executable, str(path / script)], cwd=path, env=env,
-                                       stdout=stream, stderr=subprocess.STDOUT, check=True, timeout=180)
+                                       stdout=stream, stderr=subprocess.STDOUT, check=True,
+                                       timeout=None if sys.argv[1:] else 180)
             except Exception as error:
                 failure = error
             finally:

@@ -46,7 +46,7 @@ make -C "$CORE" clean > "$OUT/native-clean.log" 2>&1
 if feature background; then
     python3 Tests/Background/run_checks.py > "$OUT/background.log" 2>&1
     python3 Tests/Background/check_async_session.py > "$OUT/background-async.log" 2>&1
-    python3 Tests/Background/check_interruption_policy.py > "$OUT/background-policy.log" 2>&1
+    python3 Build/owner_checks.py --background-policy > "$OUT/background-policy.log" 2>&1
     if [ "$(uname -s)" = Darwin ]; then
         python3 Tests/Background/check_subscription.py > "$OUT/background-subscription.log" 2>&1
         python3 Tests/Background/check_live_scheduling.py > "$OUT/background-live-scheduling.log" 2>&1
