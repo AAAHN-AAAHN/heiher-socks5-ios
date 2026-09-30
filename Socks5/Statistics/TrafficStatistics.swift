@@ -8,6 +8,9 @@ struct TrafficStatistics {
     private(set) var sendRate = 0.0
     private var sampledAt: TimeInterval?
 
+    /// Sum before display rounding so small directional rates are not lost.
+    var sumRate: Double { receiveRate + sendRate }
+
     mutating func sample(received: UInt64, sent: UInt64, at time: TimeInterval) {
         if let previous = sampledAt, time > previous,
            received >= self.received, sent >= self.sent {
@@ -23,16 +26,48 @@ struct TrafficStatistics {
     }
 
     static func capacity(_ bytes: Double) -> String {
-        scaled(bytes, units: ["KB", "MB", "GB"])
+        scaled(bytes, units: ["KB", "MB", "GB", "TB", "PB"])
     }
 
     static func speed(_ bytesPerSecond: Double) -> String {
-        scaled(bytesPerSecond * 8, units: ["Kbps", "Mbps", "Gbps"])
+        scaled(bytesPerSecond * 8, units: ["Kbps", "Mbps", "Gbps", "Tbps", "Pbps"])
     }
 
     private static func scaled(_ amount: Double, units: [String]) -> String {
-        let index = amount >= 1_000_000_000 ? 2 : (amount >= 1_000_000 ? 1 : 0)
-        let divisor = [1_000.0, 1_000_000.0, 1_000_000_000.0][index]
-        return String(format: "%.2f %@", amount / divisor, units[index])
+        var index = 0
+        var divisor = 1_000.0
+        while index + 1 < units.count && amount >= divisor * 1_000 {
+            index += 1
+            divisor *= 1_000
+        }
+        // Round the numeric value in the selected SI unit, then display exactly
+        // three decimals. Keep raw counters/rates intact for subsequent samples.
+        let rounded = (amount / (divisor / 1_000)).rounded(.toNearestOrAwayFromZero) / 1_000
+        return String(format: "%.3f %@", locale: Locale(identifier: "en_US_POSIX"), rounded, units[index])
+    }
+}
+
+/// The native registry owns attribution and lifetime; this is only a visible-tab
+/// sampler. Stable IDs combine all connections for the same normalized peer IP.
+struct ClientTrafficStatistics {
+    struct Entry: Identifiable {
+        let id: UInt64
+        let address: String
+        var traffic = TrafficStatistics()
+    }
+
+    private(set) var entries: [UInt64: Entry] = [:]
+
+    var rows: [Entry] {
+        entries.values.filter {
+            $0.id != 0 || $0.traffic.received != 0 || $0.traffic.sent != 0
+        }.sorted { $0.id < $1.id }
+    }
+
+    mutating func sample(id: UInt64, address: String, received: UInt64,
+                         sent: UInt64, at time: TimeInterval) {
+        var entry = entries[id] ?? Entry(id: id, address: address)
+        entry.traffic.sample(received: received, sent: sent, at: time)
+        entries[id] = entry
     }
 }

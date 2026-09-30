@@ -66,11 +66,10 @@ import Foundation
         let invalidated = beginPreparation()
         app.audioEvent(Notification(name: AVAudioSession.mediaServicesWereResetNotification))
         DispatchQueue.completeUtility()
-        check(invalidated.plays == 0 && invalidated.stops == 1 && Timer.live.count == 1,
+        check(invalidated.plays == 0 && invalidated.stops == 1 && Timer.live.isEmpty,
               "A reset during preparation prevents stale playback success")
-        check(Timer.live[0].interval == 1 && session.pending.isEmpty,
-              "Invalidated preparation retains the one-second retry without overlapping work")
-        Timer.live[0].fire()
+        check(session.pending.count == 1 && session.pending[0].active,
+              "Reset requests fresh activation only after the old preparation drains")
         session.completeNext()
         DispatchQueue.completeUtility()
         check(AVAudioPlayer.instances.last!.isPlaying, "A fresh prepared request recovers after invalidation")

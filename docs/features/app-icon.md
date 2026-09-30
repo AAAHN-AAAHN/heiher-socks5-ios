@@ -1,6 +1,15 @@
 # Application icon — current-main resource verification
 
-## Current status — 2026-09-26
+## Final status — 2026-09-29
+
+The icon-resource review and the identified verifier repairs are complete. Approved
+artwork, app runtime and build settings are unchanged. Run36564261479 attempt2
+passed the exact54-file source6b8a900073e4dbf06559a01c32c1ec08f5bb3fbc. The first
+attempt's120second Simulator-install timeout remains recorded below; it was not
+reclassified as success. Physical SideStore/LiveContainer and manual icon-mode
+checks remain unperformed. The final documentation-only commit is not a new run.
+
+## Previous completed review — 2026-09-26
 
 This independent feature now inherits main75335d201cb1e541bb153e9899badbc11ccf1973
 as an actual parent and exact base_commit. Run36225581121 attempt1 passed on source
@@ -62,7 +71,7 @@ This alignment adopts the exact current-main shared build/check code and46-case
 input fixture, with full native worktree/index/reversal checks and immutable generic
 product copies. Icon source checks explicitly compare those inherited files to the
 new main rather than accepting arbitrary modifications. The exact old input freeze
-is preserved for every unrelated file; configuration may change only its base_ref.
+is preserved for every unrelated file; configuration may change only its base_commit.
 The normal icon entry never calls the generic archive/IPA path.
 
 No resource/runtime defect requiring code or artwork changes was found. Added cost
@@ -70,7 +79,7 @@ is audit-time Git/hash/fixture work, not app allocations, threads, timers, disk 
 or network traffic. The source guards are checkpoint comparisons, not an atomic
 adversarial snapshot of untracked inputs, external tools or transient modifications.
 
-## Inspected new execution
+## Previous inspected execution — 2026-09-26
 
 The first-attempt Xcode27 job and artifact upload succeeded. All46 common cases,
 13 retained resource methods/30728 mutations,38 compiled/input/marker/cwd boundary
@@ -109,3 +118,113 @@ SideStore signing/install,LiveContainer loading/guest-list/web-clip/cache behavi
 real device cache refresh,manual Dark/Tinted/clear modes,iPad runtime,other devices/OS
 versions and energy remain unperformed. The generic iPhone archive/IPA job was skipped
 in this resource-only run. No installer/host version or physical success is inferred.
+
+## Final pre-release review — 2026-09-29
+
+The approved PNG, catalog, both production Swift files, Xcode project/plist,
+framework, source pins, main ancestry, shared build scripts and workflow are
+preserved. No resource or runtime defect requiring artwork or app-code changes
+has been identified. This review strengthens test-only boundaries and reruns the
+existing Xcode27 resource/Simulator path. It does not create an IPA or integrate
+other features. The code reviewed starts at639de66aa2265f3beffc1d0b433981d2e8073cb2.
+
+Two compiled-reference cases previously accepted a single phone-specific PNG as
+proof for the iPad mapping, or the reverse. The checker now requires a compatible
+idiom or generic fallback for each mapping, and an actual filename array. Generic
+and correctly paired device variants remain valid. The two prior positive fixture
+expectations were false accepts and now require rejection; no input case is removed.
+
+The independent ImageIO decoder previously accepted any opaque square up to1024
+pixels, including a tiny PNG under a120px fallback name, a wrongly sized source,
+a non-PNG image with a.png extension or an empty invocation. It now checks PNG type,
+1024-square source dimensions and point-size/scale-derived fallback dimensions.
+A new native-only driver runs17 fixtures against the exact prior and new decoder:
+34 real ImageIO executions with positive source/2x/3x/fractional-pad cases and
+negative size/type/name/opacity/empty cases. Synthetic fixtures never enter the app.
+Apple compilation and exact-old/new decoder executions now passed as recorded below.
+
+Simulator Assets.car is now inspected with the same phone/pad rendition contract
+as device actool output. Both installed CFBundleIcons mappings, the installed
+identity, and every generated icon PNG plus Assets.car must match the built app.
+Only the copied test bundle's identity/signature differs. Seven isolated mutation
+cases cover identity, iPad metadata, CAR, either PNG and extra files. The original
+clean/dirty/index/optimization/marker/timeout and source PNG controls remain intact.
+
+The Linux source suite passed13 methods including30728 one-bit mutations; the
+updated audit-boundary suite passed5 methods/46 cases and all3 shell controls.
+The filename helper was separately compiled with Linux Swift/Foundation; this is
+not ImageIO or iOS evidence. A combined local launcher hit its own20second tool
+limit after the boundary suite, so the remaining shell check ran separately; no
+repository timeout was changed. The subsequent full-history Xcode27 execution passed on attempt2 as recorded below. Original failure/diagnostic evidence remains historical.
+
+These changes add no app CPU/RAM work: no new runtime instructions, allocations,
+threads, timers, image loader, network or API. Audit cost is compile-time/CI-only.
+The static image and OS-rendered/cache resources still have a footprint;3841 source
+bytes are not a promise of3841 resident bytes or zero system rendering cost. This
+review does not claim a measured device-wide speedup, battery saving or zero bugs
+across all OS and installation histories. Physical SideStore/LiveContainer and
+manual icon appearances remain separate unperformed validations.
+
+Reference contracts (not substitutes for this run):
+https://developer.apple.com/documentation/xcode/configuring-your-app-icon
+https://developer.apple.com/library/archive/qa/qa1686/_index.html
+https://developer.apple.com/library/archive/documentation/2DDrawing/Conceptual/DrawingPrintingiOS/SupportingHiResScreensInViews/SupportingHiResScreensInViews.html
+
+## Final exact-source results and retained failure
+
+Tested commit6b8a900073e4dbf06559a01c32c1ec08f5bb3fbc has parent639de66a and tree
+`e224bf788ed5e042399e8646d4f6c7966ac44273`. Run `36564261479` completed successfully
+on attempt2; terminal metadata updated2026-09-29T12:05:03Z. Job109395512271 ran the
+existing icon-checks workflow and uploaded the original artifact. The generic
+archive/IPA verify job was intentionally skipped by the unchanged icon-only selector;
+it is not a successful IPA build or an independent Linux job.
+
+Attempt1/job109392245341 passed source, compiler and ImageIO checks and built the
+Simulator app, then simctl install exceeded its original120second limit. The source
+of that delay is not established. Shutdown/delete completed, cleanup was[], and no
+SUCCESS or successful registration result was left. Its original artifact11031262494
+is preserved. Attempt2 reran the same commit, assertions and deadlines on a new runner;
+installation, registration, launch, uninstall and cleanup passed. No code, host,
+cache, sleep allowance or timeout was changed to obtain the second result. This
+comparison does not prove the environment cannot stall again.
+
+| Verification layer | Inspected result |
+| --- | --- |
+| Full-history source scope | Exact main ancestry/pins, immutable artwork/catalog/app/project/plist/framework and shared scripts; baseline/composition and entry/final index/worktree checks passed. |
+| Source decoder | 13 existing methods, including all30728 one-bit corruptions and malformed PNG/catalog negative controls, passed. Independent Pillow RGB hash agrees with the unchanged approved image. |
+| Audit boundaries | 5 methods/46 cases plus3 original shell controls passed; 46 separate common baseline cases also passed. Cases use exact historical control blobs or deliberately isolated metadata, not fabricated native success. |
+| Real Apple decoder | 17 fixtures/34 old/current executions passed. Nine formerly accepted invalid inputs now fail with their expected error domains, and prior non-square/transparency rejections remain. Valid source,120/180/152/167 and60pixel examples pass. |
+| Device asset compilation | Actual iPhoneOS27 actool built phone/pad assets without asset warnings/errors. CAR contains exact AppIcon Icon Image records for both families,1024square and opaque. |
+| Simulator product | Release app built; its own CAR passed the same contract. ImageIO decoded source1024 and device/Simulator120/152pixel fallbacks as complete opaque PNGs. All five decoded images retain the prior RGBA hashes. |
+| Install/registration | hev.Socks5 and copied-test hev.Socks5.ICONREVIEW installed, registered, launched, terminated and uninstalled. Both phone/iPad mappings and all three icon-resource hashes match the built app. |
+| Visible result | Four actual original/remapped light/dark system-UI screenshots were opened and show the unchanged icon and Socks5 label. This is not an XCTest interaction suite or a manual Dark/Tinted/clear icon-mode test. |
+| Cleanup and evidence | cleanup=[]; successful command exits, source archive/manifest and output bytes inspected. Both attempt archives pass digest/CRC and contain identical54-file tested sources. |
+
+Recorded tools: Xcode27.0 27A266a, iPhoneOS27.0, Apple Swift6.4
+swiftlang-6.4.0.34.1, macOS27.0 26A428; iPhone16 Simulator iOS27.0 24A434.
+The17 fixture verdicts include deliberate decoder errors; their failure diagnostics
+are expected negative evidence, not crashes in the app. Xcode destination-selection
+warnings and AppIntents metadata notices remain in raw logs. No universal
+warning-free, hang-free, memory-free or physical deployment claim is made.
+
+| Original archive | SHA-256 |
+| --- | --- |
+| Prior10900427492 / run36225581121 | a2e45af553069cb0cb1bc5f158a2960b69466e9f9b8557ca0a515d6cbb154653 |
+| Attempt1 11031262494 | 08d90e907c98d75298af234f41ec0c3f419de8bb4c1277bf803dc0e12e052388 |
+| Attempt2 11030969804 | 8738d77170b8171847808db631eef4f6531f4cf7b63bf2638f02ad07cd041352 |
+
+The final closure changes only this README and its byte-identical feature
+specification after testing. The other52 of54 paths retain tested bytes and Git
+modes. The complete source change since639de66a is limited to those two documents
+and four feature-owned audit paths (one newly added); every production path and
+all48 common unchanged paths retain their original bytes/modes. No native patch,
+asset recompression, alternate icon, dynamic image code or runtime API is introduced.
+There is no new app CPU/RAM work from these audit-only changes; OS icon decoding,
+rendering and caching are not free and were not measured as device footprint.
+
+All identified icon-audit false accepts are closed within the executed scope.
+This does not certify every possible input or transient filesystem/tool change.
+Physical signing/install, SideStore standalone, LiveContainer guest/host/cache or
+web-clip behavior, manual icon modes, iPad runtime and device energy remain distinct
+unperformed checks. Release incorporation and any future IPA need their own exact
+source/product validation. Other seven branch refs and release/build9 are unchanged.

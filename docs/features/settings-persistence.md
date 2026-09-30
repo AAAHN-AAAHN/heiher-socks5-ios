@@ -1,160 +1,223 @@
-# Persistent settings — completed current-main alignment
+# Persistent settings — final review
 
-## Current verification — 2026-09-26
+## Completed review — 2026-09-30
 
-This branch inherits completed server-control
-`be4bdd14d46b6bcd35dfad0c4923edda771c6ac6` and main
-`75335d201cb1e541bb153e9899badbc11ccf1973` as actual Git ancestors. Both the
-composition and membership metadata name the new baseline. Run **36226873958**,
-attempt1, executed `ffbeed20b18cb5f9b04c34ac1d10b534bcd06d40`, tree
-`f5c96462f0cf289482612fcc097672dd41fd2bd1`. Linux and Xcode27 both passed.
+This review starts at settings `472ef5a3ec5626539e4649341d9b7d1bc4a57a9f` and
+inherits completed server-control `368aa4cf89436651414a8885a2a171f5cff9abd5` as
+an actual merge parent. Main remains `75335d201cb1e541bb153e9899badbc11ccf1973`.
+All 32 mapped server-owned source, test and document files are exact owner bytes.
+The complete preceding README is preserved at
+`docs/history/settings-before-final-review-20260930.md`. Earlier reports and negative
+control references describe their own revisions, not this new execution.
 
-The resumed review independently checked both original artifact digests/CRCs,
-source comments,89-file bytes/modes/manifests and Git tree. The result completion
-changes only this README and its identical docs/features/settings-persistence.md
-and adds the exact preceding README at
-`docs/history/settings-before-project-alignment-20260926.md`. All87 other files
-remain the tested bytes/modes. The existing server/store and pre-split histories
-are unchanged. Earlier results and known limits are not relabeled as this run.
+No production change has been required by this review. All eight Swift files,
+schema, defaults, project/plist, native prepare/Stop patch, baseline framework and
+source pins remain identical to the starting settings owner. The latest controller
+verification is inherited; additional file/provider-boundary and actual Simulator
+persistence checks are included. Run 36638749884, attempt 1, passed both Linux and
+Xcode 27 at source 6a3d23029c7bcf6d0eeaf2f36f8088f6138ccdaf. The actual Simulator
+case passed in 158.123 seconds. Final evidence and the changed system-dialog test
+budget are recorded below. README and the feature specification are identical.
 
-## Target and responsibility
+## Target environment and ownership
 
-The intended environment is physical iOS27 on an iPhone, separately using SideStore
-standalone or LiveContainer guest execution. Signing, container/identity, file
-protection, provider access and shared host process state differ. Configured minimum
-iOS17.2 is not proof of execution on every supported OS. Native files/host execution,
-SDK compilation, Simulator, IPA and physical installation are separate evidence.
-The exact four governing principles remain in docs/top-level-principles.md.
+The primary target is a physical iOS 27 iPhone, installed independently with SideStore
+or running as a LiveContainer guest. These are distinct signing, container, identity,
+file-protection, provider and shared-process environments. A successful native host,
+iOS SDK or Simulator test does not certify either physical installation path.
+The configured minimum is iOS 17.2, not proof of execution on every intervening OS.
+The four original instructions remain unchanged in `docs/top-level-principles.md`.
 
-The dependency is one-way main -> server-control -> persistence. All26 mapped
-server-owned source/test/document inputs are byte-identical to the completed parent.
-ServerSettings, ServerController and ContentView do not read JSON or own storage.
-One root-owned SettingsStore supplies bindings and intent to one ServerController;
-there is no parallel engine or UserDefaults store. Runtime counters/errors are not
-portable settings. This branch stores Background preferences but does not contain
-or execute Background, UDP/statistics patches or custom icon functionality.
+Ownership is one way: main -> server-control -> settings-persistence. One root-owned
+SettingsStore supplies bindings and intent to one MainActor ServerController.
+ServerSettings, ServerController and ContentView never read JSON or own persistence.
+There is one independent native engine per process; a LiveContainer host's process
+arbitration is not implemented or overridden here. No UDP/statistics, Background or
+custom icon feature is merged. Background preferences are portable data only here.
 
-The standalone screen has Server/Settings tabs. Other stored tab values are shown
-as Server without silently rewriting the portable value merely to render it.
-Integrated use retains the full four-tab enum. Project/plist, server defaults,
-schema, app/source/submodule pins, native patch and committed baseline framework
-are unchanged from4b57a3b8. The generic product must rebuild the inherited native
-patch; the committed unpatched framework does not supply the prepare symbol.
+The standalone screen contains Server and Settings tabs. Portable statistics or
+background tab values render as Server without rewriting the stored value simply
+for display. The full four-case tab enum remains for downstream integration. The
+standalone server owner starts stopped, whereas this persistence root reapplies
+saved Start intent when the app actually executes. Saved intent is not automatic
+process relaunch, background permission or confirmed native listen readiness.
 
-## Preserved file and model contract
+## Complete configuration and validation
 
-Schema1 AppSettings contains all11 ServerSettings options, serverRunning, the two
-Background switches and selectedTab. Defaults remain stopped, both Background
-switches false and portable selectedTab statistics. Unknown JSON fields are not a
-forward-schema migration promise; unsupported version or invalid required types are
-rejected by the existing decoder. Import requires an executable server configuration.
-A stopped local draft may be saved without becoming executable.
+Schema 1 includes the eleven ServerSettings options, serverRunning, continuousLocation,
+silentAudio and selectedTab. Defaults remain workers4, TCP address::/port1080, empty
+UDP address/port1080, bind IPv4 0.0.0.0, bind IPv6 ::, empty bind interface and both
+credentials, IPv6-only false; serverRunning and both Background switches are false,
+and the portable selectedTab default is statistics.
 
-The sole file is Application Support/Socks5/settings.json. JSON is pretty-printed
-with sorted keys, limited to65536 bytes. Reads request at most65537 bytes before
-decoding; encoded output is bounded too. Parent directories are created as required.
-Writes are atomic; iOS requests completeFileProtectionUntilFirstUserAuthentication.
-This is not a guarantee of power-loss durability, secure deletion or credentials
-being encrypted separately. JSON/export contains authentication plaintext.
+Workers must be 1-64, TCP port 1-65535 and UDP port 0-65535. Seven text options must
+be single-line/control-free and at most 255 UTF-8 bytes. Authentication is both empty
+or both supplied; YAML quote escaping and byte-sensitive string equality are retained.
+Canonically equivalent strings with different credential bytes are not equal.
+A stopped invalid draft can be saved and restored, but validation prevents starting
+it. Import requires a complete executable server configuration before any commit.
+Unsupported schema version, missing required values and invalid required types fail.
+Unknown keys are ignored within schema 1, not a promise of future-schema migration.
 
-Load distinguishes explicit no-such-file from access/unknown/corrupt-file failures.
-Only a genuine first launch migrates the two legacy Background keys; those keys are
-removed only after a successful new file write, including a later successful retry.
-An inaccessible existing file is not treated as absent and does not restore legacy
-On over unknown data. Load errors remain visible and preserve the source file.
-Startup reads and bounded local writes remain synchronous; no latency guarantee is
-made for all storage failures. No polling/debounce/background writer is introduced.
+## Storage, errors and costs
 
-A set request first supersedes pending file imports, even for unchanged Stop. Equal
-settings cause no write unless an earlier explicit save is pending. A write failure
-retains savePending and a visible error but still applies the live choice: storage
-failure cannot prevent Stop/Off. Repeating the same choice can explicitly retry the
-pending write without changing options or waiting for a timer. Until a successful
-retry, disk may retain older Start/On intent. A clean unchanged choice after a load
-error is not an instruction to overwrite an inaccessible existing file.
+The sole persistent file is Application Support/Socks5/settings.json. JSON is sorted
+and pretty-printed; decoding and output are bounded to 65,536 bytes. The read requests
+at most 65,537 bytes to detect oversize input. Writes use atomic replacement and,
+on iOS, completeFileProtectionUntilFirstUserAuthentication. These APIs do not guarantee
+power-loss durability, secure deletion, a fixed physical memory footprint or separate
+credential encryption. JSON and exports contain plaintext authentication; keep them
+private and import trusted files. No extra keychain or encryption policy is introduced.
 
-UTF-8-sensitive ServerSettings equality preserves byte-distinct credentials and raw
-drafts without Unicode normalization or serialization for every comparison. No
-persistent second representation, per-packet record or service-check disk write is
-added. Existing small atomic writes and model comparisons have nonzero cost.
+Only explicit file absence triggers migration of the two legacy Background keys.
+A denied, corrupt or unknown existing file leaves the original untouched and reports
+an error without restoring legacy On. Legacy keys are removed only after a successful
+new write, including an explicit later retry. Existing JSON never triggers migration.
 
-## Import/export ordering and asynchronous boundaries
+A setter supersedes pending imports even when the requested Stop is unchanged.
+Equal clean values do not write. Failed explicit writes preserve savePending and a
+visible error but still publish the live choice: storage failure cannot prevent
+Stop/Off. The same choice can explicitly retry the pending save. Until successful,
+disk can retain old Start/On intent; this is visible and not silently called durable.
+An unchanged clean choice after load failure does not authorize overwriting the source.
+Export uses current in-memory values, potentially different from disk after failure.
 
-ImportData decodes and validates the entire file and server options, writes it,
-then publishes the new live value. A failed import cannot partially update the file
-or live services. ImportFile coordinates on a detached worker, uses the coordinator's
-accessor URL and balances acquired security scope with defer. Cancellation and the
-monotonic import revision are checked before applying the result. Stop, an edit or
-a newer import prevents a slow earlier result from restoring old intent.
+The store has no packet-related operations, polling, save timer, debounce, background
+writer, redundant serialized cache or unbounded packet history. Small synchronous
+startup reads/writes and equality comparisons still consume resources and may block
+on slow storage. This review adds test work, not runtime CPU/RAM work. Repeated no-op
+sets are checked against exact bytes, modification time and inode; host elapsed times
+are observations, not an iPhone energy or worst-case latency guarantee.
 
-An OS/provider operation already blocked inside coordination cannot be forcibly
-cancelled by discarding its result. Synchronous init/writes and the unbounded wall
-clock of a blocked provider are documented limits. Import/export UI reports errors;
-export uses current in-memory settings, which may differ from disk after a failed
-save. Users should keep exported credentials private and import trusted files.
-Saved Start/On is intent when the app executes, not automatic relaunch or permission
-to run while suspended. The store never calls Hev; the root applies the intent through
-the existing controller, retaining explicit Start retry and Stop precedence.
+## Import ordering and provider boundaries
 
-## Current-main audit alignment
+ImportData decodes and validates everything, then writes the complete file before
+publishing live values. A failed import does not partially replace either snapshot.
+ImportFile coordinates on a detached worker, reads the accessor URL supplied by
+NSFileCoordinator and balances acquired security scope using defer. Cancellation and
+an import revision are checked before application. Stop, a changed or unchanged set,
+a direct import, or a newer file import supersedes an older blocked result.
 
-The inherited common validator checks all tracked native inputs and index before
-patching and after reversal, including Makefiles/scripts. Python optimization is
-rejected before assertions. The identical46-case exact-old/current fixture is added
-without removing server/persistence tests or boundary conditions. Both base_commit
-and the separate membership base/source references now identify the same actual
-ancestors, rather than relying only on a string in one file.
+A provider already blocked inside synchronous OS coordination cannot be forcibly
+stopped by discarding its result. Overlapping user imports may keep their workers
+alive until the provider returns; this is not per-packet work or a background-service
+promise. Changing host/cache/permissions or adding a new scheduler is not justified
+by these tests. The actual Files/iCloud picker and protection behavior on a physical
+device are distinct from regular-file and controlled-provider checks.
 
-The existing26 native/SDK input-and-header cases and six success-marker controls
-remain. SDK requires native SUCCESS, the same HEAD and matching hashes of hev-main.h
-and module.modulemap. Source/index checkpoints remain at entry and completion.
-The optional generic packaging path uses an exact-HEAD disposable product copy with
-the patched framework instead of changing tracked files, while preserving all
-persistence-specific steps. BUILD_IPA=0 in this dedicated workflow means that optional
-packaging path was not executed here. These are provenance checkpoints, not an
-atomic adversarial filesystem snapshot; untracked inputs, external tools and changes
-restored between comparisons are not certified. Extra cost is audit-time work only.
+The root applies restored/imported intent through the existing controller. Replacing
+configuration or stopping asks the previous engine to quit once; a replacement waits
+for native return and MainActor completion. Repeated identical intent does not create
+parallel engines or retry a failed start indefinitely; explicit Start can retry.
 
-## Inspected execution results
+## Verification and reproduction
 
-Each host passed all209 current store assertions:39 model/file,116 validation,
-15 controlled import/migration,33 persistence and6 access-boundary assertions.
-Exact-old controls retain13 import,4 pending-save and1 access failures as expected
-negative controls, not failures in the current implementation.
+Use a clean full-history checkout. Run `BUILD_IPA=0 bash Build/build.sh`, then on
+Xcode 27 `bash Build/check_swift_sdk.sh` and `python3 Tests/Settings/ui_audit.py`.
+`python3 Build/record_evidence.py` records the tested source. The workflow performs
+these stages with original source/index/pin/ownership, formatter18, old failure and
+same-HEAD header guards. A source ZIP cannot replace the historical Git objects.
+The optional generic archive/IPA path is not invoked by this review.
 
-Actual JSON/store/Swift-controller/patched-Hev integration produced16 passing records
-and4 old/current delayed records. These include byte-distinct and255-byte credentials,
-real process relaunch, invalid import preserving live/disk state, failed saves still
-stopping Hev, explicit same-Stop pending retry and restored Stop. All inherited server
-model/native suites were rerun on this composition, not borrowed from the parent:
-7 scenarios,84 current assertions,512 parity cases,14 native records including40
-active Stop/restarts,12 active-client cases and the existing delay/cancellation probes.
+All original 209 store assertions and exact-old import/save/access failures remain.
+All inherited server cases run on this composition, including the final transition
+matrix and actual native workers1/4/64 driver; they are not borrowed success badges.
+Additional tests cover exact 65,536/65,537-byte inputs, full field reconstruction,
+256 mixed roundtrips, 20,000 no-op requests, coordinated accessor remapping, security
+scope balance, provider errors, cancellation and eight newer-intent races. Boundary
+fixtures redirect OS outcomes only; store/decoder/write bodies and files remain real.
+The native integration still checks real authenticated listeners, relaunch, failed
+save Stop and explicit retry, plus delayed completion.
 
-The46 common cases,26 input/header cases and six marker controls passed. Baseline,
-composition,26 exact owner mappings,formatter and native reverse checks passed;
-input/final source/index logs are empty. Xcode27.0 27A266a/iPhoneOS27.0 typechecked
-all8 production Swift files at ARM64/iOS17.2 with warnings-as-errors and an empty
-diagnostic log. Native header commit/digests match. Compiler/macOS versions absent
-from the saved toolchain file are not inferred from another run. Linux did not run
-Apple-only stages. Counts include repeats, doubles and expected old failures, not
-independent physical trials or iOS provider/protection policy tests.
+The settings-specific Simulator target is generated only in a disposable product
+using the completed server owner's target builder. The tracked project and framework
+are never overwritten. Tests use the actual app root, file and patched native engine,
+not injected runtime settings: invalid draft relaunch, saved Start auto-application,
+saved Stop, tab/field persistence and dual-stack replies in both orientations.
+Import/export sheets are opened, dismissed and reopened. Import uses its visible
+Cancel control; export uses its actual Save page and interactive sheet dismissal.
+Presentation requires an actionable control, not only an accessibility placeholder.
+The first 10-second observation is recorded separately; only the newly added system
+file-dialog presentation test has a 60-second total functional observation budget.
+The original 5-second service/restoration/dismissal checks and 900-second runner
+remain unchanged. This is not a 10-second performance guarantee or a provider transfer
+claim. The runner also verifies the final full JSON and absence of leftover files.
+Exact results, source identities, diagnostics and artifacts are recorded in
+`docs/reviews/settings-final-20260930.md`.
 
-| Original artifact | SHA-256 |
+## Deployment and remaining boundaries
+
+No new IPA, release integration or physical SideStore/LiveContainer execution is
+claimed. Physical signing/loading, Files/iCloud security scope, file-protection timing,
+lock/suspension, crash/power-loss durability, long-running behavior, shared-process
+signal state and device CPU/RAM/energy remain separate evidence levels. The committed
+unpatched framework does not contain the native prepare symbol: a product must rebuild
+the declared patch before linking. Other feature owners and release are not advanced.
+
+Apple API references describe contracts, not results of this revision:
+- https://developer.apple.com/documentation/foundation/nsfilecoordinator/coordinate(readingitemat:options:error:byaccessor:)
+- https://developer.apple.com/documentation/foundation/nsdata/writingoptions/atomic
+- https://developer.apple.com/documentation/foundation/nsdata/writingoptions/completefileprotectionuntilfirstuserauthentication
+
+## Final executed evidence
+
+Tested source: `6a3d23029c7bcf6d0eeaf2f36f8088f6138ccdaf`, tree
+`f53c01bb64f07060be4633baab7afa75275b4e45`, 102 tracked files.
+Run `36638749884`, attempt 1, completed successfully at 2026-09-29T22:31:07Z.
+Linux and Xcode 27 native jobs both passed; Apple also passed same-source iOS SDK
+checking and the settings-specific Simulator suite. The separate standalone-server
+UI step was intentionally skipped, not counted as a settings-composition execution.
+No iPhone archive or IPA was generated.
+
+| Verification layer | Actual result |
 | --- | --- |
-| Linux10900828524 | bcf081b73928dc38821cac364e596c8c0a6ba0fe06d2a92e72fd463fd0678c1f |
-| macOS10900613397 | d9f22d7b0fef7a46b01af1f72d90500b6581956cacd10962e64af63fdd306205 |
+| Store and schema | 889 current assertions per host: 209 retained plus 625 file/model and 55 coordination-boundary assertions. These include 65,536/65,537-byte limits, all fields/tabs, invalid input, 256 mixed roundtrips and 20,000 no-op setters without changing file bytes, mtime or inode. |
+| Import ordering | Actual store and regular files with controlled OS coordination/scope outcomes verify redirected accessor URLs, balanced access, cancellation and newer-intent protection. These fixtures are not external cloud-provider or physical security-scope trials. |
+| Native integration | 16 actual file/store/controller/Hev records, 18 additional server records at workers 1/4/64 and 12 active-client cases pass; original authentication, delayed completion, initial cancellation and old-failure controls remain. |
+| Controller and source | Seven scenarios, 84 assertions, 1,250 finite transition schedules/25,544 assertions, 512 configuration/YAML parity cases and required historical failures pass. The 32 inherited owner mappings, ancestry, pins, formatter18, clean index/worktree and exact native reversal pass. |
+| Apple SDK | All eight production Swift files pass ARM64/iOS17.2 typechecking against same-HEAD native headers. Required SDK diagnostics are empty. Actual recorded Xcode is 27.0 (27A266a), iPhoneOS SDK 27.0. |
+| Actual Simulator | One iPhone 16 / iOS 27.0 test passes, zero failures/skips, case 158.123 seconds; runtimeWarnings and cleanup are empty. Invalid draft, saved Start/Stop, both orientation paths, tab/field restoration and real dual-stack SOCKS replies are verified. |
+| Actual stored file | 485-byte JSON exactly matches the expected full snapshot: workers 2, stopped, selected Settings, unchanged other defaults. The owned configuration directory contains only settings.json. This is not the full application's filesystem inventory. |
+| Dialogs | Import and export open, dismiss and reopen twice without restarting services. The exporter filename is Socks5-settings. No file is selected from or written through an external provider by this UI test. |
 
-## Reproduction and remaining work boundaries
+Observed actionable-dialog times from the original button tap were 12.718289 seconds
+(first Import), 5.962281 (first Export), 4.408139 (second Import), and 4.727287 (second
+Export). The first Import did not meet the earlier 10-second observation. Its success
+under the explicitly declared functional budget is not relabeled as a 10-second pass.
+No second tap, cache warming, injected provider, host repair or product timeout was
+used. The initial budget flags are observations, not hard real-time guarantees.
 
-Use a complete clean Git checkout. Run BUILD_IPA=0 bash Build/build.sh, then on
-Xcode27 bash Build/check_swift_sdk.sh and python3 Build/record_evidence.py.
-Historical controls/ancestors require actual Git objects. A source ZIP, offline
-integrity verifier or previous pass is not a new native/Apple run. The release must
-inherit the exact completed server and persistence owners and verify its combination.
+The earlier review attempts remain failures: an initial saved-Start deadline, a
+Simulator setup/cleanup timeout, several incomplete Files presentations and an
+incorrect Export Cancel-button assumption. Native/SDK successes in those attempts
+do not make their UI results successful. Subsequent runs of identical production
+passed saved Start, but do not establish a root cause for the first missed deadline.
+The final test locates actual Import/Export controls, waits for actionability, and
+requires genuine dismissal. Detailed source/run/diagnostic history is in the review.
 
-No new Simulator, iPhone archive or IPA was created in this dedicated run. Physical
-SideStore/LiveContainer installation or guest/shared-process operation, actual
-Files/iCloud/security-scope UI, permission/file-protection timing, crash/power-loss
-durability, VPN/hotspot, lock/suspension, long-duration execution and energy remain
-unperformed. No new host workaround or runtime policy was introduced to conceal
-these boundaries.
+| Original successful artifact | SHA-256 |
+| --- | --- |
+| Linux 11064924378 | 36aef9c1b661b5e5be7015b1c54ffb4c6e32ad9d2e8f23816ff07ba549dd4fba |
+| macOS 11066740409 | f08952ac3533f7d450e8cf323857f321399dac525aa5fbeae78e3faea86eab80 |
+
+Both original ZIP digests/CRCs and all three native/UI source archives were checked.
+They contain the same 102 bytes-and-mode entries and reconstruct the tested tree.
+The complete source manifests, native header identities, ten original screenshots
+and exact 485-byte JSON were inspected. Its SHA-256 is
+`67e8bc53e6d3079b97b3683fcf55fa92d2d152d9cbef2ec657ae7f8e23553118`.
+Required compiler diagnostics are empty; retained AppIntents metadata notices have a
+different scope and are not silently removed.
+
+Supplemental archive-based Linux runs repeated the 889 assertions, actual native
+integration and active-client checks. Three disposable mutations (stale import wins,
+failed save blocks Stop, no-op writes) each fail the original checks. The native patch
+reverse/reapply restores all 243 regular source files and 30 symlink targets. These
+are supplemental results, not additional Apple CI or physical-device executions.
+
+This closure changes only README, its identical feature specification and the dated
+review. All other 99 of 102 paths retain the tested bytes and Git modes. Its parent
+and Git tree identify the publication, not a new runtime test. All eight production
+Swift files and the native patch remain unchanged from settings owner 472ef5a3.
+There is no additional app CPU/RAM work from these test/document-only repairs; the
+original storage and OS/provider costs and physical-deployment limits remain above.
+No other branch, release, schema, default, permission, host or runtime is modified.

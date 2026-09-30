@@ -21,7 +21,7 @@ ARCHIVE = ROOT / '.build/integrated.xcarchive'
 APP = ARCHIVE / 'Products/Applications/Socks5.app'
 info = plistlib.loads((APP / 'Info.plist').read_bytes())
 assert info['CFBundleIdentifier'] == 'hev.Socks5'
-assert info['CFBundleShortVersionString'] == '1.1.0' and info['CFBundleVersion'] == '9'
+assert info['CFBundleShortVersionString'] == '1.1.0' and info['CFBundleVersion'] == '10'
 assert info['MinimumOSVersion'] == '17.2'
 assert info['DTSDKName'].startswith('iphoneos27.')
 assert set(info['UIBackgroundModes']) == {'audio', 'location'}
@@ -63,7 +63,7 @@ uuids = subprocess.check_output(['xcrun', 'dwarfdump', '--uuid', str(APP / 'Sock
 ids = re.findall(r'UUID: ([0-9A-Fa-f-]+) \(arm64\)', uuids)
 assert len(ids) == 2 and ids[0] == ids[1]
 symbols = subprocess.check_output(['xcrun', 'nm', '-g', str(dwarf)], text=True)
-for name in ('hev_socks5_server_stats', 'hev_socks5_server_prepare'):
+for name in ('hev_socks5_server_stats', 'hev_socks5_server_client_stats', 'hev_socks5_server_prepare'):
     assert re.search(r'^[0-9a-fA-F]+\s+[Tt]\s+_' + name + '$', symbols, re.M), name
 (OUT / 'archive-symbols.txt').write_text(symbols)
 (OUT / 'archive-uuid.txt').write_text(uuids)

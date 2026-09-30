@@ -108,6 +108,17 @@ def main():
     build()
     run([sys.executable, 'Tests/udp_peer_regression.py', CORE / 'bin/hev-socks5-server',
          '--output', OUT / 'peer-filtered.json'], 'peer-filtered.log', timeout=45)
+    old_binary = OUT / 'three-patch-server'
+    shutil.copy2(CORE / 'bin/hev-socks5-server', old_binary)
+    run([sys.executable, 'Tests/udp_buffer_network.py', old_binary,
+         '--old-control', '--output', OUT / 'buffer-old-control.json'],
+        'buffer-old-control.log', timeout=45)
+    run([sys.executable, 'Tests/udp_header_regression.py', old_binary,
+         '--old-control', '--output', OUT / 'header-old-control.json'],
+        'header-old-control.log', timeout=45)
+    run(['make', 'clean'], 'clean.log', CORE)
+    patch('hev-udp-dynamic-buffer.patch', CORE / 'src/core')
+    build()
 
     formatter = shutil.which('clang-format-18') or shutil.which('clang-format')
     if not formatter:
@@ -115,6 +126,12 @@ def main():
     version = subprocess.check_output([formatter, '--version'], text=True)
     if 'version 18.' not in version:
         raise RuntimeError(version)
+    run([formatter, CORE / 'src/core/src/hev-socks5-udp.c'], 'expected-dynamic-core.c')
+    for name in ('udp_buffer_unit.c', 'udp_buffer_io.c', 'udp_buffer_timer.c', 'udp_buffer_send.c', 'udp_buffer_live_hold.c', 'udp_stream_boundaries.c'):
+        run([formatter, '--style=file:' + str(CORE / '.clang-format'), ROOT / 'Tests' / name],
+            'expected-' + name)
+        if (OUT / ('expected-' + name)).read_bytes() != (ROOT / 'Tests' / name).read_bytes():
+            raise RuntimeError('New unit fixture differs from upstream formatting: ' + name)
     run([sys.executable, 'Build/check.py', 'format', CORE, formatter], 'core-format.log')
     # The test follows the same project formatting as the C code it exercises.
     formatted = subprocess.check_output([formatter, '--style=file:' + str(CORE / '.clang-format'),
@@ -162,10 +179,42 @@ def main():
          *includes, ROOT / 'Tests/udp_sockaddr_unit.c', *libs, '-o', executable], 'unit-optimized-build.log')
     run([executable], 'unit-optimized.log')
     executable.unlink()
+
+    for name in ('udp_buffer_unit', 'udp_buffer_io', 'udp_buffer_send', 'udp_stream_boundaries'):
+        for mode, flags in [('asan', ['-O1', '-g', '-fsanitize=address,undefined',
+                                     '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']),
+                            ('optimized', ['-O3', '-fstrict-aliasing'])]:
+            executable = OUT / (name + '-' + mode)
+            run([compiler, '-std=gnu11', '-Wall', '-Werror', '-pthread', *flags,
+                 *includes, ROOT / 'Tests' / (name + '.c'), *libs, '-o', executable],
+                name + '-' + mode + '-build.log')
+            run([executable], name + '-' + mode + '.log')
+            executable.unlink()
+    executable = OUT / 'buffer-real-timer'
+    run([compiler, '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread', *includes,
+         ROOT / 'Tests/udp_buffer_timer.c', *libs, '-o', executable], 'buffer-real-timer-build.log')
+    run([executable], 'buffer-real-timer.log', timeout=90)
+    executable.unlink()
+    executable = OUT / 'buffer-live-hold'
+    run([compiler, '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread', *includes,
+         ROOT / 'Tests/udp_buffer_live_hold.c', *libs, '-o', executable], 'buffer-live-hold-build.log')
+    run([executable], 'buffer-live-hold.log', timeout=490)
+    executable.unlink()
+    run([sys.executable, 'Tests/udp_header_regression.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / 'header-regression.json'], 'header-regression.log', timeout=45)
+    run([sys.executable, 'Tests/udp_buffer_network.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / 'buffer-network.json'], 'buffer-network.log', timeout=120)
+    run([sys.executable, 'Tests/udp_buffer_benchmark.py', old_binary,
+         CORE / 'bin/hev-socks5-server', '--output', OUT / 'buffer-benchmark.json'],
+        'buffer-benchmark.log', timeout=180)
+    # Preserve exact patched C and header bytes before the mandatory reversal.
+    run(['tar', '--exclude=./.git', '--exclude=*/.git', '--exclude=./bin',
+         '--exclude=*/bin', '--exclude=./build', '--exclude=*/build',
+         '-czf', OUT / 'native-patched-source.tar.gz', '.'], 'native-archive.log', CORE)
     run([sys.executable, 'Build/check.py', 'reverse', CORE], 'reverse.log')
     run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'final-worktree.log')
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'final-index.log')
-    (OUT / 'SUCCESS.txt').write_text('Scoped UDP repair audit passed. Read summary.json for observation-only failures. No IPA was built.\n')
+    (OUT / 'SUCCESS.txt').write_text('Scoped UDP repair and dynamic-buffer audit passed. Read summary.json and buffer evidence for limits and observations. No IPA was built.\n')
 
 
 if __name__ == '__main__':

@@ -13,20 +13,33 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
-UDP = '9909aa5f5f41ec87bb3edd976923b2d668e00f08'
+CLIENT_BASE = 'bb07d1795f010d624b1924cc06203af9aeb3c6a2'
+UDP = '6f9848e42fb221b21ea31ce8ab8b00333cc0ecd5'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 UDP_FILES = {
     '.github/workflows/udp-compat-audit.yml': '.github/workflows/verify-build.yml',
     'docs/branches/feature-udp-compat.md': 'README.md',
     **{p: p for p in ('Patches/hev-udp-port-zero.patch', 'Patches/hev-udp-sockaddr.patch',
-                     'Patches/hev-udp-peer-filter.patch', 'Tests/udp_peer_regression.py',
+                     'Patches/hev-udp-peer-filter.patch', 'Patches/hev-udp-dynamic-buffer.patch',
+                     'Tests/udp_peer_regression.py',
                      'Tests/udp_queue_observation.py',
                      'Tests/udp_compat_audit.py', 'Tests/udp_sockaddr_regression.py',
                      'Tests/udp_sockaddr_unit.c', 'Tests/udp_audit_driver_regression.py',
                      'docs/reviews/udp-compat-20260923.md', 'docs/features/udp-compatibility.md',
                      'docs/reviews/udp-compat-20260922.md', 'Socks5/Info.plist',
                      'docs/history/udp-before-final-audit-20260926.md',
-                     'docs/history/udp-before-project-alignment-20260926.md')}
+                     'docs/history/udp-before-project-alignment-20260926.md',
+                     'Tests/udp_buffer_benchmark.py',
+                     'Tests/udp_buffer_io.c',
+                     'Tests/udp_buffer_live_hold.c',
+                     'Tests/udp_buffer_network.py',
+                     'Tests/udp_buffer_send.c',
+                     'Tests/udp_buffer_timer.c',
+                     'Tests/udp_buffer_unit.c',
+                     'Tests/udp_header_regression.py',
+                     'docs/history/udp-before-dynamic-buffer-20260929.md',
+                     'docs/reviews/udp-dynamic-resume-20260929.md',
+                     'docs/reviews/udp-header-validation-20260929.md')}
 }
 
 
@@ -57,17 +70,27 @@ def inspect_sources():
         data = (ROOT / target).read_bytes()
         assert data == git('show', UDP + ':' + source), target
         preserved[target] = hashlib.sha256(data).hexdigest()
-    # Update only the inherited UDP boundary, not statistics production. Shared build logic stays locked to current main.
+    # UDP and shared build logic stay frozen; only the explicit statistics-owned
+    # runtime paths below may differ from the completed aggregate-only baseline.
     # Exact prefix ownership above and the original suffix below reject missing,
     # reordered, extra or silently edited patches without freezing an obsolete parent.
     original = json.loads(git('show', START + ':Build/features.json'))
     statistics_patches = [p for p in original['patches'] if p['file'].startswith('hev-stats-')]
     assert CONFIG == dict(original, base_commit=udp_config['base_commit'],
                           patches=udp_config['patches'] + statistics_patches)
-    git('diff', '--exit-code', START, 'HEAD', '--', 'Socks5', 'Socks5.xcodeproj',
-        'Patches/hev-stats-core.patch', 'Patches/hev-stats-server.patch',
+    runtime_changes = set(git('diff', '--name-only', CLIENT_BASE, 'HEAD', '--',
+                              'Socks5', 'Socks5.xcodeproj', 'Patches').decode().splitlines())
+    allowed = {'Socks5/Statistics/TrafficStatistics.swift',
+               'Socks5/Statistics/TrafficStatisticsView.swift',
+               'Patches/hev-stats-core.patch', 'Patches/hev-stats-server.patch',
+               'Patches/hev-udp-dynamic-buffer.patch'}
+    assert runtime_changes <= allowed, runtime_changes - allowed
+    git('diff', '--exit-code', CLIENT_BASE, 'HEAD', '--',
         'Patches/hev-stats-task-io.patch')
     git('merge-base', '--is-ancestor', UDP, 'HEAD')
+    git('diff', '--exit-code', 'a5c4e6af4f51b64e1e47c0b2c84fd4cc2af661ee',
+        'HEAD', '--', 'Socks5', 'Socks5.xcodeproj',
+        'Patches/hev-stats-task-io.patch', 'Patches/hev-stats-server.patch')
     run([sys.executable, 'Build/check.py', 'baseline'], 'baseline.log')
     run([sys.executable, 'Tests/baseline_audit.py'], 'baseline-driver.log')
     run([sys.executable, 'Build/check.py', 'composition'], 'composition.log')
@@ -85,7 +108,8 @@ def inspect_sources():
         'base': CONFIG['base_commit'], 'start': START, 'udp': UDP,
         'files_vs_main': inventory, 'excluded_udp_files': preserved,
         'statistics_owned_paths': [p for p in inventory if p not in UDP_FILES],
-        'statistics_production_unchanged': True, 'udp_dependency_updated': True}, indent=2) + '\n')
+        'statistics_production_unchanged': False,
+        'client_ip_base': CLIENT_BASE, 'allowed_runtime_changes': sorted(runtime_changes), 'udp_dependency_updated': True}, indent=2) + '\n')
     run(['git', 'diff', CONFIG['base_commit'], 'HEAD'], 'main-to-feature.diff')
     run(['git', 'diff', UDP, 'HEAD'], 'udp-to-statistics.diff')
     run(['git', 'rev-parse', 'HEAD'], 'tested-commit.txt')
@@ -117,15 +141,37 @@ def native_checks(mode):
     # Exercise peer rejection and queued continuation with the real stats-linked core.
     run([sys.executable, 'Tests/udp_peer_regression.py', CORE / 'bin/hev-socks5-server',
          '--output', OUT / (mode + '-peer.json')], mode + '-peer.log', timeout=45)
+    run([sys.executable, 'Tests/udp_header_regression.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / (mode + '-header.json')], mode + '-header.log', timeout=120)
+    run([sys.executable, 'Tests/udp_buffer_network.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / (mode + '-dynamic-network.json')],
+        mode + '-dynamic-network.log', timeout=120)
     for repeat in (1, 2):
         run([sys.executable, '-u', 'Tests/traffic_stats_regression.py', host],
             mode + '-network-' + str(repeat) + '.log', timeout=120)
     run([*common, '-I' + str(CORE / 'src'), 'Tests/Statistics/counter_probe.c',
          *libs, '-o', OUT / 'counter'], mode + '-counter-build.log')
     run([OUT / 'counter'], mode + '-counter.log')
+    run([sys.executable, 'Tests/Statistics/client_network.py', host],
+        mode + '-client-network.log', timeout=120)
+    run([sys.executable, 'Tests/Statistics/udp_integration.py', host],
+        mode + '-udp-integration.log', timeout=120)
+    run([sys.executable, 'Tests/Statistics/payload_boundaries.py', host, CORE],
+        mode + '-payload-boundaries.log', timeout=120)
+    client_includes = ['-I' + str(CORE / 'src'),
+                       '-I' + str(CORE / 'src/core/src'),
+                       '-I' + str(task / 'include')]
+    run([*common, *client_includes, 'Tests/Statistics/client_probe.c', *libs,
+         '-o', OUT / 'client-probe'], mode + '-client-build.log')
+    run([OUT / 'client-probe'], mode + '-client.log')
+    run([sys.executable, 'Tests/Statistics/registry_contract.py', CORE, OUT, mode],
+        mode + '-registry-contract.log', timeout=300)
     sanitize = ['-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
                 '-fno-omit-frame-pointer']
     env = dict(os.environ, ASAN_OPTIONS='detect_leaks=0', UBSAN_OPTIONS='halt_on_error=1')
+    run([*common, *sanitize, *client_includes, 'Tests/Statistics/client_probe.c',
+         *libs, '-o', OUT / 'client-asan'], mode + '-client-asan-build.log')
+    run([OUT / 'client-asan'], mode + '-client-asan.log', env=env)
     for kind in ('tcp', 'udp'):
         includes = (['-I' + str(task / 'src'), '-I' + str(task / 'include')]
                     if kind == 'tcp' else ['-I' + str(CORE / 'src/core/src'), '-I' + str(task / 'include')])
@@ -135,6 +181,32 @@ def native_checks(mode):
              *(libs if kind == 'udp' else [libs[-1]]), '-o', OUT / kind],
             mode + '-' + kind + '-build.log')
         run([OUT / kind], mode + '-' + kind + '.log', env=env)
+    # Complete TCP relay/callback ordering, including cancellation after partial I/O.
+    for label, extra in [('asan', sanitize), ('optimized', ['-O3', '-fstrict-aliasing'])]:
+        executable = OUT / ('tcp-accounting-matrix-' + label)
+        run([*common, *extra, '-Wno-unused-function',
+             *(['-DENABLE_IO_SPLICE_SYSCALL'] if splice else []),
+             '-I' + str(task / 'src'), *client_includes,
+             'Tests/Statistics/tcp_accounting_matrix.c', *libs, '-o', executable],
+            mode + '-' + executable.name + '-build.log')
+        run([executable], mode + '-' + executable.name + '.log', env=env)
+        executable.unlink()
+    # Same owner source fixtures now execute against the statistics-composed core.
+    for source in ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
+                   'udp_buffer_send.c', 'Statistics/udp_accounting_probe.c'):
+        for label, extra in [('asan', sanitize), ('optimized', ['-O3', '-fstrict-aliasing'])]:
+            executable = OUT / ('composed-' + Path(source).stem + '-' + label)
+            run([*common, *extra, '-Wno-unused-function', *client_includes,
+                 ROOT / 'Tests' / source, *libs, '-o', executable],
+                mode + '-' + executable.name + '-build.log')
+            run([executable], mode + '-' + executable.name + '.log', env=env)
+            executable.unlink()
+    if not splice:
+        executable = OUT / 'statistics-live-retention'
+        run([*common, *client_includes, 'Tests/Statistics/udp_lifecycle.c',
+             *libs, '-o', executable], 'statistics-live-retention-build.log')
+        run([executable], 'statistics-live-retention.log', timeout=490)
+        executable.unlink()
     if sys.platform == 'darwin':
         # Instrument the real counter implementation, not merely an external mock.
         run([*common, '-O1', '-g', '-fsanitize=thread', '-I' + str(CORE / 'src'),
@@ -142,6 +214,11 @@ def native_checks(mode):
              CORE / 'src/core/src/hev-socks5-misc.c', *libs, '-o', OUT / 'counter-tsan'],
             'counter-tsan-build.log')
         run([OUT / 'counter-tsan'], 'counter-tsan.log',
+            env=dict(os.environ, TSAN_OPTIONS='halt_on_error=1'))
+        run([*common, '-O1', '-g', '-fsanitize=thread', *client_includes,
+             'Tests/Statistics/client_probe.c', *libs, '-o', OUT / 'client-tsan'],
+            'client-tsan-build.log')
+        run([OUT / 'client-tsan'], 'client-tsan.log',
             env=dict(os.environ, TSAN_OPTIONS='halt_on_error=1'))
 
 
@@ -189,6 +266,10 @@ def main():
     run(['git', 'checkout', '--detach', CONFIG['sources']['.']], 'checkout.log', CORE)
     run(['git', 'submodule', 'update', '--init', '--recursive'], 'submodules.log', CORE)
     run([sys.executable, 'Build/check.py', 'apply', CORE], 'apply.log')
+    # Preserve the actual patched native sources for offline inspection; no build
+    # product, credentials or .git metadata is included in this source-only archive.
+    run(['tar', '-czf', OUT / 'native-patched-source.tar.gz', '--exclude=.git',
+         '-C', CORE, '.'], 'native-source-archive.log')
     # Only statistics-owned hunks are reviewed; UDP prerequisite contents are frozen.
     changed = []
     for item in CONFIG['patches']:
@@ -199,8 +280,14 @@ def main():
     if not formatter or 'version 18.' not in subprocess.check_output([formatter, '--version'], text=True):
         raise RuntimeError('clang-format 18 is required.')
     hashes = {}
+    formatting_errors = []
     for path in changed:
-        assert subprocess.check_output([formatter, str(path)]) == path.read_bytes(), path
+        formatted = subprocess.check_output([formatter, str(path)])
+        if formatted != path.read_bytes():
+            target = OUT / 'formatting' / path.relative_to(CORE)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(formatted)
+            formatting_errors.append(str(path))
         hashes[str(path.relative_to(CORE))] = hashlib.sha256(path.read_bytes()).hexdigest()
     assert len(hashes) == 9
     (OUT / 'statistics-source-hashes.json').write_text(json.dumps(hashes, indent=2) + '\n')
@@ -209,19 +296,29 @@ def main():
         target = OUT / ('formatted-' + path.name)
         formatted = subprocess.check_output([formatter, '--style=file:' + str(CORE / '.clang-format'), str(path)])
         target.write_bytes(formatted)
-        assert formatted == path.read_bytes(), path
+        if formatted != path.read_bytes():
+            formatting_errors.append(str(path))
+    assert not formatting_errors, formatting_errors
     for mode in (('buffered', 'splice') if sys.platform == 'linux' else ('buffered',)):
         native_checks(mode)
     run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
          'Socks5/Statistics/TrafficStatistics.swift', 'Tests/traffic_statistics_model.swift',
          '-o', OUT / 'model'], 'model-build.log')
     run([OUT / 'model'], 'model.log')
+    for optimization in ([], ['-O']):
+        label = 'client-model-optimized' if optimization else 'client-model-debug'
+        run(['swiftc', '-swift-version', '5', '-warnings-as-errors', *optimization,
+             'Socks5/Statistics/TrafficStatistics.swift', 'Tests/Statistics/client_model.swift',
+             '-o', OUT / 'client-model'], label + '-build.log')
+        run([OUT / 'client-model'], label + '.log')
+    run([sys.executable, 'Tests/Statistics/sampling_contract.py'], 'sampling-contract.log')
     if sys.platform == 'darwin':
         ios_checks(changed)
     for name, expected in hashes.items():
         assert hashlib.sha256((CORE / name).read_bytes()).hexdigest() == expected
     run([sys.executable, 'Build/check.py', 'reverse', CORE], 'reverse.log')
-    for name in ('host', 'counter', 'tcp', 'udp', 'counter-tsan', 'model'):
+    for name in ('host', 'counter', 'tcp', 'udp', 'counter-tsan', 'model',
+                 'client-probe', 'client-asan', 'client-tsan', 'client-model'):
         (OUT / name).unlink(missing_ok=True)
     run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'final-worktree.log')
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'final-index.log')

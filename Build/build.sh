@@ -28,6 +28,9 @@ python3 Build/check.py apply "$CORE" > "$OUT/source-audit.log"
 CF=$(command -v clang-format-18 || command -v clang-format)
 "$CF" --version | grep -E 'version 18\.'
 python3 Build/check.py format "$CORE" "$CF" >> "$OUT/source-audit.log"
+for SOURCE in Tests/udp_stream_boundaries.c Tests/Statistics/tcp_accounting_matrix.c; do
+    "$CF" "$SOURCE" | cmp - "$SOURCE"
+done
 python3 Build/check.py composition >> "$OUT/source-audit.log"
 cp Build/features.json "$OUT/features.json"
 {
@@ -43,6 +46,7 @@ make -C "$CORE" clean > "$OUT/native-clean.log" 2>&1
 if feature background; then
     python3 Tests/Background/run_checks.py > "$OUT/background.log" 2>&1
     python3 Tests/Background/check_async_session.py > "$OUT/background-async.log" 2>&1
+    python3 Tests/Background/check_interruption_policy.py > "$OUT/background-policy.log" 2>&1
     if [ "$(uname -s)" = Darwin ]; then
         python3 Tests/Background/check_subscription.py > "$OUT/background-subscription.log" 2>&1
         python3 Tests/Background/check_live_scheduling.py > "$OUT/background-live-scheduling.log" 2>&1
@@ -80,7 +84,7 @@ if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
         -archivePath "$ROOT/.build/$NAME.xcarchive" \
         CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
         SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
-        MARKETING_VERSION=1.1.0 CURRENT_PROJECT_VERSION=9 \
+        MARKETING_VERSION=1.1.0 CURRENT_PROJECT_VERSION=10 \
         > "$OUT/app-build.log" 2>&1
     APP="$ROOT/.build/$NAME.xcarchive/Products/Applications/Socks5.app"
     xcrun lipo "$APP/Socks5" -verify_arch arm64

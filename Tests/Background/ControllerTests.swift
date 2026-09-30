@@ -44,27 +44,30 @@ import Foundation
         var player = AVAudioPlayer.instances.last!
         check(player.isPlaying && player.numberOfLoops == -1, "Native infinite WAV playback")
         check(audio.category == .playback && audio.categoryOptions == [.mixWithOthers], "Mixing playback category")
-        check(Timer.live.count == 1 && Timer.live[0].interval == 1, "One-second health check")
+        check(Timer.live.count == 1 && Timer.live[0].interval == 0.5, "0.5-second health check")
         let healthyActivations = audio.activations
         for _ in 0..<100 { Timer.live[0].fire(); app.restore() }
         check(audio.activations == healthyActivations && AVAudioPlayer.instances.last === player
-              && Timer.live.count == 1 && Timer.live[0].interval == 1,
-              "100 healthy checks retain one-second monitoring without player reactivation")
+              && Timer.live.count == 1 && Timer.live[0].interval == 0.5,
+              "100 healthy checks retain 0.5-second monitoring without player reactivation")
         for info: [AnyHashable: Any]? in [
             [AVAudioSessionInterruptionTypeKey: UInt(1)],
             [AVAudioSessionInterruptionTypeKey: UInt(0)],
             [AVAudioSessionInterruptionTypeKey: UInt(999)], nil
         ] {
+            Timer.live[0].fire() // A healthy sample begins an independent incident.
             let previous = AVAudioPlayer.instances.last!
             app.audioEvent(Notification(name: AVAudioSession.interruptionNotification, userInfo: info))
-            check(AVAudioPlayer.instances.last !== previous && AVAudioPlayer.instances.last!.isPlaying,
-                  "Interruption is handled even with absent/unknown metadata and stale isPlaying")
+            let ended = info?[AVAudioSessionInterruptionTypeKey] as? UInt == 0
+            check((ended ? AVAudioPlayer.instances.last === previous : AVAudioPlayer.instances.last !== previous)
+                  && AVAudioPlayer.instances.last!.isPlaying,
+                  "End preserves healthy audio; began/unknown metadata invalidates even stale isPlaying")
         }
         audio.rejectActivation = true
         app.audioEvent(Notification(name: AVAudioSession.interruptionNotification))
         for _ in 0..<1000 {
-            check(Timer.live.count == 1 && Timer.live[0].interval == 1 && app.audioEnabled,
-                  "Failure retains one fixed one-second retry")
+            check(Timer.live.count == 1 && Timer.live[0].interval == 0.5 && app.audioEnabled,
+                  "Failure retains one fixed 0.5-second retry")
             Timer.live[0].fire()
         }
         let beforeCategoryEvent = audio.activations
@@ -73,26 +76,31 @@ import Foundation
         check(audio.activations == beforeCategoryEvent && Timer.live.count == 1, "Own category event cannot create a recursive retry loop")
         audio.rejectActivation = false
         Timer.live[0].fire()
-        check(AVAudioPlayer.instances.last!.isPlaying && Timer.live[0].interval == 1, "Recovery retains one-second monitoring")
+        check(AVAudioPlayer.instances.last!.isPlaying && Timer.live[0].interval == 0.5, "Recovery retains 0.5-second monitoring")
+        Timer.live[0].fire() // Mark completed recovery healthy before the next incident.
         player = AVAudioPlayer.instances.last!
         player.isPlaying = false
         Timer.live[0].fire()
         check(player.isPlaying, "Unnotified stop recovered by active monitoring")
-        for event in [AVAudioSession.mediaServicesWereLostNotification, AVAudioSession.mediaServicesWereResetNotification] {
-            let old = AVAudioPlayer.instances.last!
-            app.audioEvent(Notification(name: event))
-            check(old !== AVAudioPlayer.instances.last && AVAudioPlayer.instances.last!.isPlaying, "Media service event recreates player")
-        }
+        let oldServicePlayer = AVAudioPlayer.instances.last!
+        app.audioEvent(Notification(name: AVAudioSession.mediaServicesWereLostNotification))
+        check(!oldServicePlayer.isPlaying && Timer.live.count == 1 && Timer.live[0].interval == 0.5 && app.audioEnabled,
+              "Known loss stops resources and schedules one 0.5-second availability probe")
+        app.audioEvent(Notification(name: AVAudioSession.mediaServicesWereResetNotification))
+        check(oldServicePlayer !== AVAudioPlayer.instances.last && AVAudioPlayer.instances.last!.isPlaying,
+              "Media service reset recreates player immediately")
+        Timer.live[0].fire()
         audio.category = .ambient
         app.audioEvent(Notification(name: AVAudioSession.routeChangeNotification,
                                     userInfo: [AVAudioSessionRouteChangeReasonKey: UInt(3)]))
         check(audio.category == .playback && AVAudioPlayer.instances.last!.isPlaying, "External category change repaired")
+        Timer.live[0].fire()
         player = AVAudioPlayer.instances.last!
         let beforeDecoder = audio.activations
         app.audioPlayerDecodeErrorDidOccur(player, error: nil)
         check(audio.activations == beforeDecoder + 1 && AVAudioPlayer.instances.last !== player
-              && Timer.live.count == 1 && Timer.live[0].interval == 1,
-              "First decoder failure immediately recreates playback and retains one-second monitoring")
+              && Timer.live.count == 1 && Timer.live[0].interval == 0.5,
+              "First decoder failure immediately recreates playback and retains 0.5-second monitoring")
         Timer.live[0].fire()
         let staleTimer = Timer.live[0]
         app.audioEvent(Notification(name: AVAudioSession.interruptionNotification))
@@ -101,12 +109,12 @@ import Foundation
         check(Timer.live.count == 1 && Timer.live[0] === newTimer, "Stale timer cannot cancel or duplicate its replacement")
         AVAudioPlayer.rejectPlay = true
         app.audioEvent(Notification(name: AVAudioSession.interruptionNotification))
-        check(app.audioEnabled && Timer.live[0].interval == 1, "play failure retains intent and retry")
+        check(app.audioEnabled && Timer.live[0].interval == 0.5, "play failure retains intent and retry")
         AVAudioPlayer.rejectPlay = false
         Timer.live[0].fire()
         Bundle.main.resourceAvailable = false
         app.audioEvent(Notification(name: AVAudioSession.interruptionNotification))
-        check(app.audioEnabled && Timer.live[0].interval == 1, "Missing resource cannot silently disable monitoring")
+        check(app.audioEnabled && Timer.live[0].interval == 0.5, "Missing resource cannot silently disable monitoring")
         Bundle.main.resourceAvailable = true
         Timer.live[0].fire()
         player = AVAudioPlayer.instances.last!

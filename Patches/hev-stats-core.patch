@@ -1,44 +1,143 @@
 diff --git a/src/hev-socks5-misc-priv.h b/src/hev-socks5-misc-priv.h
-index 8770a5facf2c7465ea812b12bbf867de89db028c..5ce3468ca755060b1a53db3fcc877f8374499553 100644
+index 8770a5f..916a7fd 100644
 --- a/src/hev-socks5-misc-priv.h
 +++ b/src/hev-socks5-misc-priv.h
-@@ -24,6 +24,8 @@ extern "C" {
+@@ -24,6 +24,10 @@ extern "C" {
  
  int hev_socks5_socket (int type);
  
++void *hev_socks5_transfer_client (int fd);
++
 +void hev_socks5_transfer_add (size_t received, size_t sent, void *data);
 +
  const char *hev_socks5_addr_into_str (const HevSocks5Addr *addr, char *buf,
                                        int len);
  
 diff --git a/src/hev-socks5-misc.c b/src/hev-socks5-misc.c
-index 2b5e12231ac551ac689a9e4d52bad01df02ca281..449ab3542bc30b8b490e7a048c359a4ce28c9bad 100644
+index 2b5e122..aeff920 100644
 --- a/src/hev-socks5-misc.c
 +++ b/src/hev-socks5-misc.c
-@@ -8,6 +8,7 @@
+@@ -8,6 +8,9 @@
   */
  
  #include <stdio.h>
 +#include <stdatomic.h>
++#include <stdlib.h>
++#include <pthread.h>
  #include <string.h>
  #include <unistd.h>
  #include <arpa/inet.h>
-@@ -32,6 +33,27 @@ static int task_stack_size = 8192;
+@@ -32,6 +35,151 @@ static int task_stack_size = 8192;
  static int udp_recv_buffer_size = 512 * 1024;
  static int udp_copy_buffer_nums = 10;
  
++/* Registry entries are process-lived: relay callbacks never take the registry
++ * lock or follow pointers that a closing connection could free. */
++typedef struct _TrafficClient TrafficClient;
++struct _TrafficClient
++{
++    TrafficClient *bucket_next;
++    TrafficClient *next;
++    uint64_t id;
++    unsigned char ip[16];
++    uint32_t scope;
++    int family;
++    char address[64];
++    _Atomic uint64_t received;
++    _Atomic uint64_t sent;
++};
++
 +static _Atomic uint64_t traffic_received;
 +static _Atomic uint64_t traffic_sent;
++static TrafficClient traffic_unknown = { .address = "Unattributed" };
++static pthread_mutex_t traffic_lock = PTHREAD_MUTEX_INITIALIZER;
++static TrafficClient *traffic_buckets[256];
++static TrafficClient *traffic_clients;
++static size_t traffic_client_count;
++
++void *
++hev_socks5_transfer_client (int fd)
++{
++    struct sockaddr_storage peer = { 0 };
++    socklen_t length = sizeof (peer);
++    unsigned char ip[16] = { 0 };
++    char address[INET6_ADDRSTRLEN];
++    uint32_t scope = 0, hash = 2166136261u;
++    TrafficClient *client;
++    int family;
++    size_t i;
++
++    /* This is the SOCKS control peer, never the requested destination. */
++    if (getpeername (fd, (struct sockaddr *)&peer, &length) < 0)
++        return NULL;
++    family = peer.ss_family;
++    if (family == AF_INET && length >= sizeof (struct sockaddr_in)) {
++        memcpy (ip, &((struct sockaddr_in *)&peer)->sin_addr, 4);
++    } else if (family == AF_INET6 && length >= sizeof (struct sockaddr_in6)) {
++        const struct sockaddr_in6 *addr = (const struct sockaddr_in6 *)&peer;
++        if (IN6_IS_ADDR_V4MAPPED (&addr->sin6_addr)) {
++            family = AF_INET;
++            memcpy (ip, &addr->sin6_addr.s6_addr[12], 4);
++        } else {
++            memcpy (ip, &addr->sin6_addr, 16);
++            scope = addr->sin6_scope_id;
++        }
++    } else {
++        return NULL;
++    }
++    if (!inet_ntop (family, ip, address, sizeof (address)))
++        return NULL;
++    for (i = 0; i < sizeof (ip); i++)
++        hash = (hash ^ ip[i]) * 16777619u;
++    hash = (hash ^ scope ^ (uint32_t)family) & 255u;
++
++    pthread_mutex_lock (&traffic_lock);
++    for (client = traffic_buckets[hash]; client; client = client->bucket_next) {
++        if (client->family == family && client->scope == scope &&
++            !memcmp (client->ip, ip, sizeof (ip)))
++            break;
++    }
++    if (!client && traffic_client_count < SIZE_MAX - 1) {
++        /* libc allocation deliberately outlives task-system/server shutdown. */
++        client = calloc (1, sizeof (*client));
++        if (client) {
++            client->id = ++traffic_client_count;
++            client->family = family;
++            client->scope = scope;
++            memcpy (client->ip, ip, sizeof (ip));
++            if (scope)
++                snprintf (client->address, sizeof (client->address), "%s%%%u",
++                          address, scope);
++            else
++                snprintf (client->address, sizeof (client->address), "%s",
++                          address);
++            atomic_init (&client->received, 0);
++            atomic_init (&client->sent, 0);
++            client->next = traffic_clients;
++            client->bucket_next = traffic_buckets[hash];
++            traffic_buckets[hash] = client;
++            traffic_clients = client;
++        }
++    }
++    pthread_mutex_unlock (&traffic_lock);
++    return client;
++}
 +
 +void
 +hev_socks5_transfer_add (size_t received, size_t sent, void *data)
 +{
-+    (void)data;
-+    if (received)
++    TrafficClient *client = data ? data : &traffic_unknown;
++
++    if (received) {
 +        atomic_fetch_add_explicit (&traffic_received, received,
 +                                   memory_order_relaxed);
-+    if (sent)
++        atomic_fetch_add_explicit (&client->received, received,
++                                   memory_order_relaxed);
++    }
++    if (sent) {
 +        atomic_fetch_add_explicit (&traffic_sent, sent, memory_order_relaxed);
++        atomic_fetch_add_explicit (&client->sent, sent, memory_order_relaxed);
++    }
 +}
 +
 +void
@@ -48,34 +147,72 @@ index 2b5e12231ac551ac689a9e4d52bad01df02ca281..449ab3542bc30b8b490e7a048c359a4c
 +    *sent = atomic_load_explicit (&traffic_sent, memory_order_relaxed);
 +}
 +
++size_t
++hev_socks5_transfer_clients (HevSocks5TransferClient callback, void *data)
++{
++    TrafficClient *client;
++    size_t count;
++
++    pthread_mutex_lock (&traffic_lock);
++    client = traffic_clients;
++    count = traffic_client_count + 1;
++    pthread_mutex_unlock (&traffic_lock);
++    if (!callback)
++        return count;
++
++    /* The captured list and strings never change. Do not call user code locked.
++     * Counter pairs/rows are independent reads, not a transactional snapshot. */
++    callback (
++        0, traffic_unknown.address,
++        atomic_load_explicit (&traffic_unknown.received, memory_order_relaxed),
++        atomic_load_explicit (&traffic_unknown.sent, memory_order_relaxed),
++        data);
++    for (; client; client = client->next) {
++        callback (
++            client->id, client->address,
++            atomic_load_explicit (&client->received, memory_order_relaxed),
++            atomic_load_explicit (&client->sent, memory_order_relaxed), data);
++    }
++    return count;
++}
++
  int
  hev_socks5_task_io_yielder (HevTaskYieldType type, void *data)
  {
 diff --git a/src/hev-socks5-misc.h b/src/hev-socks5-misc.h
-index 1c6910466a3568af3f4eafcf5a0d82d65a970b81..b55d9fd60f20c1bca0fda60a748481c98d1226f9 100644
+index 1c69104..c1ba404 100644
 --- a/src/hev-socks5-misc.h
 +++ b/src/hev-socks5-misc.h
-@@ -10,6 +10,7 @@
+@@ -10,6 +10,8 @@
  #ifndef __HEV_SOCKS5_MISC_H__
  #define __HEV_SOCKS5_MISC_H__
  
++#include <stddef.h>
 +#include <stdint.h>
  #include <netinet/in.h>
  
  #include <hev-task.h>
-@@ -22,6 +23,8 @@ extern "C" {
+@@ -22,6 +24,14 @@ extern "C" {
  
  int hev_socks5_task_io_yielder (HevTaskYieldType type, void *data);
  
++typedef void (*HevSocks5TransferClient) (uint64_t id, const char *address,
++                                         uint64_t received, uint64_t sent,
++                                         void *data);
++size_t hev_socks5_transfer_clients (HevSocks5TransferClient callback,
++                                    void *data);
++
 +void hev_socks5_transfer_get (uint64_t *received, uint64_t *sent);
 +
  void hev_socks5_set_connect_timeout (int timeout);
  void hev_socks5_set_tcp_timeout (int timeout);
  void hev_socks5_set_udp_timeout (int timeout);
 diff --git a/src/hev-socks5-tcp.c b/src/hev-socks5-tcp.c
+index a2db80e..0f774d5 100644
 --- a/src/hev-socks5-tcp.c
 +++ b/src/hev-socks5-tcp.c
-@@ -8,5 +8,7 @@
+@@ -7,6 +7,8 @@
+  ============================================================================
   */
  
 +#include <stddef.h>
@@ -83,49 +220,69 @@ diff --git a/src/hev-socks5-tcp.c b/src/hev-socks5-tcp.c
  #include "hev-socks5.h"
  #include "hev-socks5-misc-priv.h"
  #include "hev-socks5-logger-priv.h"
-@@ -32,7 +34,8 @@ hev_socks5_tcp_splicer (HevSocks5TCP *self, int fd)
+@@ -32,7 +34,9 @@ hev_socks5_tcp_splicer (HevSocks5TCP *self, int fd)
      if (res < 0)
          hev_task_mod_fd (task, fd, POLLIN | POLLOUT);
  
 -    hev_task_io_splice (cfd, cfd, fd, fd, 8192, task_io_yielder, self);
 +    hev_task_io_splice_with_stats (cfd, cfd, fd, fd, 8192, task_io_yielder,
-+                                   self, hev_socks5_transfer_add, NULL);
++                                   self, hev_socks5_transfer_add,
++                                   hev_socks5_transfer_client (cfd));
  
      return 0;
  }
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index 5016df65e4a0b66ecdebfef8fbbce46856e042a6..8993cb106369afe76d103d70ae8734af541539a6 100644
+index fb6cfb6..9d56b24 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
-@@ -402,6 +402,12 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
+@@ -55,6 +55,7 @@ struct _UDPBuffers
+     size_t count;
+     uint64_t next_cleanup;
+     uint64_t idle_deadline;
++    void *client;
+ };
  
-         res = hev_task_io_socket_sendmmsg (fd, dvec, res, MSG_WAITALL,
-                                            task_io_yielder, self);
+ static uint64_t
+@@ -812,6 +813,13 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
+         }
+ 
+         res = udp_sendmmsg (self, fd, dvec, res);
 +        if (res > 0) {
 +            size_t sent = 0;
 +            for (i = 0; i < res; i++)
 +                sent += dvec[i].msg_len;
-+            hev_socks5_transfer_add (0, sent, NULL);
++            hev_socks5_transfer_add (0, sent,
++                                     buffers ? buffers[0].owner->client : NULL);
 +        }
      }
      if (res <= 0) {
          if (res == -1 && errno == EAGAIN)
-@@ -427,8 +433,10 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
-     if (res > 0) {
+@@ -839,8 +847,11 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
          HevSocks5UDPMsg dvec[res];
          char saddr[res][19];
+         int count = 0;
 +        size_t received = 0;
  
          for (i = 0; i < res; i++) {
++            /* Count actual destination reads even if their delivery is rejected. */
 +            received += svec[i].msg_len;
-             dvec[i].buf = svec[i].msg_hdr.msg_iov->iov_base;
-             dvec[i].len = svec[i].msg_len;
-             dvec[i].addr = (HevSocks5Addr *)&saddr[i];
-@@ -436,6 +444,7 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
-             hev_socks5_addr_from_sockaddr6 (dvec[i].addr,
+             if (svec[i].msg_hdr.msg_flags & MSG_TRUNC)
+                 continue;
+             dvec[count].buf = svec[i].msg_hdr.msg_iov->iov_base;
+@@ -851,6 +862,8 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
                                              svec[i].msg_hdr.msg_name);
+             count++;
          }
-+        hev_socks5_transfer_add (received, 0, NULL);
-         res = hev_socks5_udp_sendmmsg (self, dvec, res);
++        hev_socks5_transfer_add (received, 0,
++                                 buffers ? buffers[0].owner->client : NULL);
+         if (!count)
+             return 1; /* Consumed rejected data is progress, not an empty queue. */
+         res = hev_socks5_udp_sendmmsg (self, dvec, count);
+@@ -898,6 +911,7 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
+         buffers.slots[i].owner = &buffers;
      }
-     if (res <= 0) {
+ 
++    buffers.client = hev_socks5_transfer_client (HEV_SOCKS5 (self)->fd);
+     fd_a = hev_socks5_udp_get_fd (self);
+     if (hev_task_mod_fd (task, fd_a, POLLIN | POLLOUT) < 0)
+         hev_task_add_fd (task, fd_a, POLLIN | POLLOUT);

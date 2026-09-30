@@ -109,7 +109,9 @@ def composition():
         view = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift').read_text()
         assert 'BackgroundKeepAlive.audioNotifications.map' in view
         source = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift').read_text()
-        assert 'scheduleAudioCheck(after: 2)' not in source and 'scheduleAudioCheck(after: 1)' in source
+        assert 'private static let audioCheckInterval: TimeInterval = 0.5' in source
+        assert 'Timer(timeInterval: Self.audioCheckInterval, repeats: false)' in source
+        assert 'scheduleAudioCheck(after:' not in source
         assert 'retryDelay' not in source and 'UserDefaults' not in source
     if 'server' in FEATURES:
         content = (ROOT / 'Socks5/ContentView.swift').read_text()

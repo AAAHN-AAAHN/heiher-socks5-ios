@@ -5,6 +5,7 @@ import copy
 import hashlib
 import json
 import os
+import plistlib
 from pathlib import Path
 import shutil
 import subprocess
@@ -94,8 +95,8 @@ class AuditBoundaries(unittest.TestCase):
                 for key in ('CFBundleIcons', 'CFBundleIcons~ipad')}
         cases = [('AppIcon60x60.png', False, False, True),
                  ('AppIcon60x60@2x.png', False, False, True),
-                 ('AppIcon60x60@3x~iphone.png', False, False, True),
-                 ('AppIcon60x60@2x~ipad.png', False, False, True),
+                 ('AppIcon60x60@3x~iphone.png', False, False, False),
+                 ('AppIcon60x60@2x~ipad.png', False, False, False),
                  ('AppIcon60x60WRONG.png', False, False, False),
                  ('AppIcon60x60@4x.png', False, False, False),
                  ('AppIcon60x60@2x.png', True, False, False),
@@ -119,7 +120,13 @@ class AuditBoundaries(unittest.TestCase):
                 else:
                     with self.assertRaises(ValueError):
                         current.compiled(folder, value)
-        print('PASS: 8 filename cases; four genuine variants and four exact-old false accepts')
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            (folder / 'Assets.car').write_bytes(b'fixture; not compiled')
+            for name in ('AppIcon60x60@3x~iphone.png', 'AppIcon60x60@2x~ipad.png'):
+                (folder / name).write_bytes(data)
+            self.assertEqual(len(current.compiled(folder, info)), 2)
+        print('PASS: 9 filename cases; generic and correctly paired idioms accepted; cross-idiom rejected')
 
     def test_catalog_rendition_contract(self):
         tree = ast.parse(original(OLD_COMPILED))
@@ -152,6 +159,33 @@ class AuditBoundaries(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         current.catalog_renditions(value)
         print('PASS: 8 CAR metadata cases; six exact-old false accepts rejected')
+
+    def test_installed_resource_identity(self):
+        info = {'CFBundleIdentifier': 'hev.Socks5'}
+        for key, name in (('CFBundleIcons', 'AppIcon60x60'), ('CFBundleIcons~ipad', 'AppIcon76x76')):
+            info[key] = {'CFBundlePrimaryIcon': {'CFBundleIconName': 'AppIcon', 'CFBundleIconFiles': [name]}}
+        data = (ROOT / check_icon.CATALOG / 'AppIcon.png').read_bytes()
+        for fault in ('none', 'identity', 'pad-mapping', 'CAR', 'phone-PNG', 'pad-PNG', 'extra-PNG'):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
+                base = Path(tmp) / 'base'; base.mkdir()
+                (base / 'Info.plist').write_bytes(plistlib.dumps(info))
+                (base / 'Assets.car').write_bytes(b'fixture; not compiled')
+                for name in ('AppIcon60x60@2x.png', 'AppIcon76x76@2x~ipad.png'):
+                    (base / name).write_bytes(data)
+                target = Path(tmp) / 'installed'; shutil.copytree(base, target)
+                value = copy.deepcopy(info); value['CFBundleIdentifier'] = 'hev.Socks5.ICONREVIEW'
+                if fault == 'identity': value['CFBundleIdentifier'] = 'wrong.app'
+                if fault == 'pad-mapping': value['CFBundleIcons~ipad']['CFBundlePrimaryIcon']['CFBundleIconName'] = 'Wrong'
+                (target / 'Info.plist').write_bytes(plistlib.dumps(value))
+                names = {'CAR': 'Assets.car', 'phone-PNG': 'AppIcon60x60@2x.png',
+                         'pad-PNG': 'AppIcon76x76@2x~ipad.png', 'extra-PNG': 'AppIconExtra.png'}
+                if fault in names: (target / names[fault]).write_bytes(b'changed')
+                if fault == 'none':
+                    self.assertEqual(len(current.installed_resources(base, target, 'hev.Socks5.ICONREVIEW')), 3)
+                else:
+                    with self.assertRaises(ValueError):
+                        current.installed_resources(base, target, 'hev.Socks5.ICONREVIEW')
+        print('PASS: 7 installed-resource cases; both mappings, identity, CAR and PNG bytes')
 
     def test_command_working_directory(self):
         for version in ('old', 'current'):

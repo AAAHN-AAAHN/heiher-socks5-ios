@@ -18,7 +18,7 @@ struct BackgroundKeepAliveView: View {
                 } header: {
                     Text("Audio")
                 } footer: {
-                    Text("Checks playback every second. Interruption and stop signals trigger immediate recovery; repeated failures retry every second while On. Mixes with other audio.")
+                    Text("Checks playback and retries every 0.5 seconds, including while audio services are unavailable. Attempts immediate recovery on new interruptions. Mixes with other audio.")
                 }
                 Section {
                     Toggle("Continuous location", isOn: $locationEnabled)

@@ -13,7 +13,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-INPUT = '2bc8e5a8bfbe6a7d2de74644bec9955513f8f8df'
+INPUT = '8577bb1f9b24593de011076aa3a6cafcebd50240'
 
 
 def git(*args):
@@ -64,18 +64,47 @@ def main():
     statistics = json.loads(git('show', refs['feature/traffic-statistics'] + ':Build/features.json'))
     server = json.loads(git('show', refs['feature/server-control'] + ':Build/features.json'))
     assert config['patches'] == statistics['patches'] + server['patches']
-    assert len(config['patches']) == len({p['file'] for p in config['patches']}) == 7
+    assert len(config['patches']) == len({p['file'] for p in config['patches']}) == 8
     for ref in refs.values():
         owner = json.loads(git('show', ref + ':Build/features.json'))
         assert owner['sources'] == config['sources'] and owner['upstream_app'] == config['upstream_app']
         assert owner['base_commit'] == config['base_commit'], 'Owner baseline differs'
         git('merge-base', '--is-ancestor', config['base_commit'], ref)
-    assert refs['feature/udp-compat'].encode() in git('show', refs['feature/traffic-statistics'] + ':Tests/Statistics/audit.py')
+    # The latest UDP review changed tests/docs only after statistics pinned its
+    # dependency. Preserve that real dependency and prove exact runtime equivalence;
+    # release itself must still contain both latest owner tips via ownership checks.
+    stats_audit = git('show', refs['feature/traffic-statistics'] + ':Tests/Statistics/audit.py').decode()
+    dependency = re.search(r"^UDP = '([0-9a-f]{40})'$", stats_audit, re.M).group(1)
+    git('merge-base', '--is-ancestor', dependency, refs['feature/traffic-statistics'])
+    git('merge-base', '--is-ancestor', dependency, refs['feature/udp-compat'])
+    udp = json.loads(git('show', refs['feature/udp-compat'] + ':Build/features.json'))
+    dependency_config = json.loads(git('show', dependency + ':Build/features.json'))
+    assert udp == dependency_config, 'New UDP owner requires a new native composition'
+    assert statistics['patches'][:len(udp['patches'])] == udp['patches']
+    for item in udp['patches']:
+        path = 'Patches/' + item['file']
+        assert git('show', refs['feature/udp-compat'] + ':' + path) == git('show', dependency + ':' + path)
+        assert (ROOT / path).read_bytes() == git('show', refs['feature/traffic-statistics'] + ':' + path)
+
     parent = json.loads(git('show', refs['feature/settings-persistence'] + ':docs/feature-membership.json'))
     assert parent['branches']['feature/server-control'] == refs['feature/server-control']
     assert parent['base_commit'] == config['base_commit']
     git('merge-base', '--is-ancestor', refs['feature/server-control'], refs['feature/settings-persistence'])
-    git('merge-base', '--is-ancestor', refs['feature/udp-compat'], refs['feature/traffic-statistics'])
+    # Release-only fixture repair: early malformed-frame rejection may precede
+    # client half-close. All no-forwarding/EOF assertions and timeouts remain exact.
+    path = 'Tests/udp_buffer_network.py'
+    expected = git('show', refs['feature/udp-compat'] + ':' + path).decode()
+    before = '                tcp.shutdown(socket.SHUT_WR)'
+    after = "\n".join([
+        '                try:', '                    tcp.shutdown(socket.SHUT_WR)',
+        '                except OSError as error:',
+        '                    # Invalid framing may already have caused the peer to close.',
+        '                    if error.errno not in (errno.ENOTCONN, errno.ECONNRESET):',
+        '                        raise'])
+    assert expected.count(before) == 1
+    expected = expected.replace('import concurrent.futures\n',
+                                'import concurrent.futures\nimport errno\n', 1).replace(before, after, 1)
+    assert (ROOT / path).read_text() == expected
     # Check the actual integrated resources, independent of icon-only source gates.
     icon = load('integration_icon', 'Tests/AppIcon/check_icon.py')
     print(json.dumps(icon.catalog(ROOT / icon.CATALOG), indent=2))
@@ -85,7 +114,7 @@ def main():
                            ('Build/check_swift_sdk.sh', ['sdk-success.txt'])]:
         blob = git('rev-parse', '2dcfce074e288c942bd6582b3b77d4763c516a25:' + entry).decode().strip()
         driver.check(entry, markers, blob, 'integrated')
-    print(f'PASS: {len(members["sources"])} exact owner files, seven ordered patches, preserved root/platform and failure-marker controls')
+    print(f'PASS: {len(members["sources"])} exact owner files, eight ordered patches, preserved root/platform and failure-marker controls')
 
 
 if __name__ == '__main__':

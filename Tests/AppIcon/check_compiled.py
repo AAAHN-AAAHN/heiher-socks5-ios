@@ -5,6 +5,7 @@ The simulator app is the unchanged product, using its committed native framework
 Only a second installed test copy's bundle ID is changed. This is not SideStore or
 LiveContainer execution and does not certify SpringBoard tinted/clear appearances.
 """
+import hashlib
 import json
 from pathlib import Path
 import plistlib
@@ -39,14 +40,15 @@ def run(*args, timeout=120):
 
 def compiled(folder, info):
     require((folder / 'Assets.car').is_file(), 'Missing compiled asset catalog')
-    for key in ('CFBundleIcons', 'CFBundleIcons~ipad'):
+    for key, idiom in (('CFBundleIcons', 'iphone'), ('CFBundleIcons~ipad', 'ipad')):
         primary = info[key]['CFBundlePrimaryIcon']
         require(primary['CFBundleIconName'] == 'AppIcon', key)
-        require(primary.get('CFBundleIconFiles'), 'Missing legacy filename fallback')
+        require(isinstance(primary.get('CFBundleIconFiles'), list) and primary['CFBundleIconFiles'],
+                'Missing legacy filename fallback array')
         for name in primary['CFBundleIconFiles']:
             require(isinstance(name, str) and name and Path(name).name == name,
                     'Icon reference must be a nonempty basename')
-            pattern = re.escape(name) + r'(?:@[123]x)?(?:~(?:iphone|ipad))?\.png'
+            pattern = re.escape(name) + rf'(?:@[123]x)?(?:~{idiom})?\.png'
             candidates = [path for path in folder.glob('*.png')
                           if path.is_file() and re.fullmatch(pattern, path.name)]
             require(bool(candidates), 'No generated file for ' + name)
@@ -64,6 +66,22 @@ def catalog_renditions(items):
     require(all(item.get('PixelWidth') == 1024 and item.get('PixelHeight') == 1024
                 and item.get('Opaque') is True for item in icons),
             'CAR AppIcon dimensions/opacity differ from the source contract')
+
+
+def installed_resources(reference, installed, identity):
+    """Check both icon mappings and every icon resource after test-copy signing/install."""
+    source = plistlib.loads((reference / 'Info.plist').read_bytes())
+    target = plistlib.loads((installed / 'Info.plist').read_bytes())
+    require(target['CFBundleIdentifier'] == identity, 'Installed identity differs')
+    for key in ('CFBundleIcons', 'CFBundleIcons~ipad'):
+        require(target[key] == source[key], 'Installed icon mapping differs: ' + key)
+
+    def inventory(folder, info):
+        return {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in [folder / 'Assets.car', *compiled(folder, info)]}
+    expected = inventory(reference, source)
+    require(inventory(installed, target) == expected, 'Installed icon bytes differ')
+    return expected
 
 
 def main():
@@ -111,6 +129,8 @@ def main():
     decoded = run(decoder, ROOT / CATALOG / 'AppIcon.png', *device_images)
     (OUT / 'imageio-decoded.json').write_text(decoded + '\n')
     require(json.loads(decoded)[0]['fileSHA256'] == IMAGE_HASH, 'Decoder used different artwork')
+    boundaries = run('python3', ROOT / 'Tests/AppIcon/test_imageio.py', decoder)
+    (OUT / 'imageio-boundaries.json').write_text(boundaries + '\n')
     # Build only a Simulator .app. No iPhone archive, native rebuild or IPA.
     with (OUT / 'simulator-build.log').open('w') as log:
         subprocess.run(['xcodebuild', 'build', '-project', str(ROOT / 'Socks5.xcodeproj'), '-scheme', 'Socks5',
@@ -123,6 +143,9 @@ def main():
     require(app_info['DTSDKName'].startswith('iphonesimulator27.'), 'Wrong Simulator SDK')
     require(app_info['MinimumOSVersion'] == '17.2' and not app_info.get('UIBackgroundModes'), 'Changed app scope')
     compiled(app, app_info)
+    simassets = run('xcrun', 'assetutil', '--info', app / 'Assets.car')
+    (OUT / 'simulator-assets-info.json').write_text(simassets + '\n')
+    catalog_renditions(json.loads(simassets))
     (OUT / 'simulator-Info.plist').write_bytes((app / 'Info.plist').read_bytes())
     simdecoded = run(decoder, *sorted(app.glob('AppIcon*.png')))
     (OUT / 'simulator-images.json').write_text(simdecoded + '\n')
@@ -150,9 +173,8 @@ def main():
             require(identity in listing, 'Simulator registration missing')
             (OUT / (label + '-registration.plist')).write_bytes(plistlib.dumps(listing[identity]))
             installed = Path(run('xcrun', 'simctl', 'get_app_container', device, identity, 'app'))
-            installed_info = plistlib.loads((installed / 'Info.plist').read_bytes())
-            compiled(installed, installed_info)
-            require(installed_info['CFBundleIcons'] == app_info['CFBundleIcons'], 'Icon mapping changed on install')
+            installed_hashes = installed_resources(app, installed, identity)
+            (OUT / (label + '-installed-icons.json')).write_text(json.dumps(installed_hashes, indent=2) + '\n')
             (OUT / (label + '-launch.txt')).write_text(run('xcrun', 'simctl', 'launch', device, identity) + '\n')
             time.sleep(1)
             run('xcrun', 'simctl', 'terminate', device, identity)

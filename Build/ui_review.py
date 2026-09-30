@@ -49,7 +49,8 @@ def main():
     # The target remains in the temporary project, never the committed app target.
     (app / 'StatisticsUITests.swift').write_bytes(
         (ROOT / 'Tests/Integration/IntegrationUITests.swift').read_bytes() + b'\n' +
-        (ROOT / 'Tests/Background/AsyncAudioUITests.swift').read_bytes())
+        (ROOT / 'Tests/Background/AsyncAudioUITests.swift').read_bytes() + b'\n' +
+        (ROOT / 'Tests/Statistics/StatisticsUITests.swift').read_bytes())
     runtimes = json.loads(output('xcrun', 'simctl', 'list', 'runtimes', '-j'))['runtimes']
     runtime = next(r for r in runtimes if r.get('isAvailable') and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-27'))
     types = json.loads(output('xcrun', 'simctl', 'list', 'devicetypes', '-j'))['devicetypes']
@@ -67,7 +68,7 @@ def main():
              '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
              '-collect-test-diagnostics', 'never',
              'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES',
-             'MARKETING_VERSION=1.1.0', 'CURRENT_PROJECT_VERSION=9'], 'ui-test.log', timeout=900)
+             'MARKETING_VERSION=1.1.0', 'CURRENT_PROJECT_VERSION=10'], 'ui-test.log', timeout=900)
         run(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', OUT / 'UI.xcresult'], 'test-summary.json')
         run(['xcrun', 'xcresulttool', 'get', 'object', '--legacy', '--format', 'json', '--path', OUT / 'UI.xcresult'], 'xcresult.json')
         console = (OUT / 'ui-test.log').read_text()
@@ -76,7 +77,7 @@ def main():
             if 'This method can lead to UI unresponsiveness' in text:
                 raise RuntimeError('Main-thread synchronous audio advisory remains')
         summary = json.loads((OUT / 'test-summary.json').read_text())
-        if summary.get('failedTests', 0) or summary.get('skippedTests', 0) or summary.get('passedTests') != 2:
+        if summary.get('failedTests', 0) or summary.get('skippedTests', 0) or summary.get('passedTests') != 3:
             raise RuntimeError('Incomplete integrated XCTest result')
         (OUT / 'advisory-check.txt').write_text('PASS: targeted synchronous main-thread audio advisory absent from console and xcresult.\n')
         binary = WORK / 'DerivedData/Build/Products/Debug-iphonesimulator/Socks5.app/Socks5'

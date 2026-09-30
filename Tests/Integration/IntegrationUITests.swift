@@ -3,7 +3,7 @@ import XCTest
 import UIKit
 
 /// Integrates durable intent, native execution and four real tabs; Simulator evidence only.
-final class StatisticsUITests: XCTestCase {
+final class IntegrationUITests: XCTestCase {
     @MainActor func testServerControlsAndTabNavigation() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

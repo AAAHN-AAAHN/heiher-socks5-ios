@@ -77,9 +77,9 @@ import Foundation
         app.setAudio(true)
         app.audioEvent(Notification(name: AVAudioSession.mediaServicesWereResetNotification))
         session.completeNext()
-        check(!AVAudioPlayer.instances.last!.isPlaying && Timer.live.count == 1 && Timer.live[0].interval == 1,
-              "Reset during activation rejects stale success and preserves one-second recovery pacing")
-        Timer.live[0].fire()
+        check(!AVAudioPlayer.instances.last!.isPlaying && Timer.live.isEmpty
+              && session.pending.count == 1 && session.pending[0].active,
+              "Reset rejects stale activation, then starts one fresh request without an extra second")
         session.completeNext()
         check(AVAudioPlayer.instances.last!.isPlaying, "Fresh request after invalidation restores playback")
         off()
@@ -153,15 +153,17 @@ import Foundation
         check(!session.isActive && Timer.live.isEmpty, "Retry-disposal Off leaves no system session or retry")
 
         let beforeCanceledConfiguration = session.activations
+        let releasesBeforeCanceledConfiguration = session.deactivations
         session.onCategory = {
             session.onCategory = nil
             app.setAudio(false)
             app.setAudio(true)
         }
         app.setAudio(true)
-        check(session.activations == beforeCanceledConfiguration && session.pending.count == 1 && !session.pending[0].active,
-              "Off-On inside configuration drains release without launching the canceled activation")
-        session.completeNext()
+        check(session.activations == beforeCanceledConfiguration + 1
+              && session.deactivations == releasesBeforeCanceledConfiguration
+              && session.pending.count == 1 && session.pending[0].active,
+              "Off-On inside unowned configuration starts only the latest activation without an unrelated release")
         session.completeNext()
         check(AVAudioPlayer.instances.last!.isPlaying, "The latest On restarts after configuration cancellation cleanup")
         off()

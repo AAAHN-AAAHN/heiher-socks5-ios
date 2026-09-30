@@ -70,6 +70,12 @@ for mode in (('buffered', 'splice') if sys.platform == 'linux' and 'statistics' 
             run(['clang', '-std=gnu11', '-Wall', '-Werror', '-pthread', *flags, *includes,
                  'Tests/udp_sockaddr_unit.c', *libraries, '-o', executable], mode + '-' + label + '-build.log')
             run([executable], mode + '-' + label + '.log', env=dict(os.environ, ASAN_OPTIONS='detect_leaks=0'))
+            stream = CORE / ('udp-stream-' + label)
+            run(['clang', '-std=gnu11', '-Wall', '-Werror', '-pthread', *flags,
+                 '-Wno-unused-function', *includes, 'Tests/udp_stream_boundaries.c',
+                 *libraries, '-o', stream], mode + '-stream-' + label + '-build.log')
+            run([stream], mode + '-stream-' + label + '.log',
+                env=dict(os.environ, ASAN_OPTIONS='detect_leaks=0', UBSAN_OPTIONS='halt_on_error=1'))
     if 'server' in FEATURES:
         executable = CORE / 'lifecycle-host'
         run(['clang', '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread', '-I' + str(CORE / 'src'),
@@ -81,7 +87,7 @@ for mode in (('buffered', 'splice') if sys.platform == 'linux' and 'statistics' 
         run(['clang', '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread', '-I' + str(CORE / 'src'),
              'Tests/ServerControl/configuration_probe.c', *libraries, '-o', CORE / 'config-probe'], 'configuration-probe-build.log')
         run([CORE / 'config-probe', OUT / 'yaml/defaults.yml', OUT / 'yaml/quoted.yml'], mode + '-configuration.log')
-        for script in ('native_controller_check', 'delayed_completion_check', 'active_clients_check'):
+        for script in ('native_controller_check', 'delayed_completion_check', 'active_clients_check', 'final_native_check'):
             run([sys.executable, 'Tests/ServerControl/' + script + '.py', CORE, OUT / (mode + '-' + script)],
                 mode + '-' + script + '.log', timeout=300)
         if 'settings' in FEATURES:
@@ -95,4 +101,11 @@ if 'statistics' in FEATURES:
     run(['swiftc', '-swift-version', '5', '-warnings-as-errors', 'Socks5/Statistics/TrafficStatistics.swift',
          'Tests/traffic_statistics_model.swift', '-o', CORE / 'stats-model'], 'statistics-model-build.log')
     run([CORE / 'stats-model'], 'statistics-model.log')
+    for flags, label in (([], 'debug'), (['-O'], 'optimized')):
+        executable = CORE / ('client-model-' + label)
+        run(['swiftc', '-swift-version', '5', '-warnings-as-errors', *flags,
+             'Socks5/Statistics/TrafficStatistics.swift', 'Tests/Statistics/client_model.swift',
+             '-o', executable], 'client-model-' + label + '-build.log')
+        run([executable], 'client-model-' + label + '.log')
+    run([sys.executable, 'Tests/Statistics/sampling_contract.py'], 'sampling-contract.log', timeout=300)
 print('PASS: declared native tests; fixed-unknown UDP observation failures remain separately recorded.')

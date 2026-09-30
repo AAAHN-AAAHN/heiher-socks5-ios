@@ -129,6 +129,12 @@ final class AVAudioSession {
     static let userIntentToUnmuteOutputNotification = Notification.Name("UnmuteIntent")
     static let didBecomeActiveNotification = Notification.Name("SessionActive")
     static let didBecomeInactiveNotification = Notification.Name("SessionInactive")
+    enum ResumptionRecommendation { case shouldResume, shouldNotResume }
+    final class ResumptionContext {
+        let recommendation: ResumptionRecommendation
+        init(_ recommendation: ResumptionRecommendation) { self.recommendation = recommendation }
+    }
+    static let resumptionContextKey = "ResumptionContext"
     static let resumptionRecommendationNotification = Notification.Name("ResumptionRecommendation")
     static let shared = AVAudioSession()
     static func sharedInstance() -> AVAudioSession { shared }
