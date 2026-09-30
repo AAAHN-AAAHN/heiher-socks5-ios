@@ -42,7 +42,11 @@ def main():
             elif case == 'changed-plist': packaged['Info.plist'] = plistlib.dumps({'CFBundleIdentifier': 'other'})
             ipa = root / 'fixture.zip'
             with zipfile.ZipFile(ipa, 'w') as archive:
-                for name, data in packaged.items(): archive.writestr('Payload/Socks5.app/' + name, data)
+                for name, data in packaged.items():
+                    entry = zipfile.ZipInfo('Payload/Socks5.app/' + name)
+                    entry.create_system = 3
+                    entry.external_attr = ((app / name).stat().st_mode if name in files else 0o100644) << 16
+                    archive.writestr(entry, data)
             for label in ('old', 'current'):
                 accepted = True
                 try:

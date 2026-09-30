@@ -7,6 +7,7 @@ to rewrite both artifacts and attestations. They never alter production source.
 import hashlib
 import json
 from pathlib import Path
+import stat
 import subprocess
 import sys
 import zipfile
@@ -71,15 +72,45 @@ def check_product():
 
 
 def check_ipa_files(ipa, app):
-    expected = {'Payload/Socks5.app/' + p.relative_to(app).as_posix(): p
-                for p in app.rglob('*') if p.is_file()}
+    if app.is_symlink() or not app.is_dir():
+        raise RuntimeError('Missing or linked archive app: ' + str(app))
+    prefix = 'Payload/Socks5.app/'
+    expected = {}
+    directories = {'Payload/': None, prefix: stat.S_IMODE(app.stat().st_mode)}
+    for path in app.rglob('*'):
+        name = prefix + path.relative_to(app).as_posix()
+        mode = path.lstat().st_mode
+        if stat.S_ISDIR(mode):
+            directories[name + '/'] = stat.S_IMODE(mode)
+        elif stat.S_ISREG(mode):
+            expected[name] = path
+        else:
+            raise RuntimeError('Unexpected archive file type: ' + name)
+    if not expected:
+        raise RuntimeError('Empty archive app')
     with zipfile.ZipFile(ipa) as archive:
         if archive.testzip() is not None or len(archive.namelist()) != len(set(archive.namelist())):
             raise RuntimeError('Corrupt IPA or duplicate ZIP entries')
+        for entry in archive.infolist():
+            # This pipeline creates Unix ZIPs. Bytes alone do not preserve an
+            # executable's permissions or distinguish a regular file from a link.
+            mode = entry.external_attr >> 16
+            if entry.create_system != 3:
+                raise RuntimeError('Missing Unix IPA metadata: ' + entry.filename)
+            if entry.is_dir():
+                if (entry.filename not in directories or not stat.S_ISDIR(mode)
+                        or entry.file_size != 0 or mode & 0o500 != 0o500
+                        or (directories[entry.filename] is not None
+                            and stat.S_IMODE(mode) != directories[entry.filename])):
+                    raise RuntimeError('Unexpected IPA directory: ' + entry.filename)
+            elif not stat.S_ISREG(mode):
+                raise RuntimeError('Unexpected IPA file type: ' + entry.filename)
         actual = {i.filename for i in archive.infolist() if not i.is_dir()}
         if actual != set(expected):
             raise RuntimeError('IPA file inventory differs from the verified archive')
         for name, path in expected.items():
+            if stat.S_IMODE(archive.getinfo(name).external_attr >> 16) != stat.S_IMODE(path.stat().st_mode):
+                raise RuntimeError('IPA permissions differ: ' + name)
             if archive.read(name) != path.read_bytes():
                 raise RuntimeError('IPA resource differs: ' + name)
 

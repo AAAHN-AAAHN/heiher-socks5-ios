@@ -18,6 +18,7 @@ python3 Build/integration_checks.py > "$OUT/integration-source-checks.log" 2>&1
 python3 Build/owner_checks.py > "$OUT/owner-checks.log" 2>&1
 python3 Tests/Integration/input_boundaries.py > "$OUT/input-boundaries.log" 2>&1
 python3 Tests/Integration/package_boundaries.py > "$OUT/package-boundaries.log" 2>&1
+python3 Tests/Integration/package_metadata.py > "$OUT/package-metadata.log" 2>&1
 SERVER_REF=$(python3 -c 'import json; print(json.load(open("Build/upstream.json"))["sources"]["."])')
 if [ ! -d "$CORE/.git" ]; then
     git clone --no-checkout https://github.com/heiher/hev-socks5-server.git "$CORE"
