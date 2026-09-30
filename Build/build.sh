@@ -29,7 +29,7 @@ CF=$(command -v clang-format-18 || command -v clang-format)
 "$CF" --version | grep -E 'version 18\.'
 python3 Build/check.py format "$CORE" "$CF" >> "$OUT/source-audit.log"
 for SOURCE in Tests/udp_stream_boundaries.c Tests/Statistics/tcp_accounting_matrix.c; do
-    "$CF" "$SOURCE" | cmp - "$SOURCE"
+    "$CF" --style="file:$CORE/.clang-format" "$SOURCE" | cmp - "$SOURCE"
 done
 python3 Build/check.py composition >> "$OUT/source-audit.log"
 cp Build/features.json "$OUT/features.json"
