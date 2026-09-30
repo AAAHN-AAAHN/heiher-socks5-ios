@@ -1,6 +1,61 @@
 # Integrated SOCKS5 for iOS — verified six-feature release
 
-## Current final review — 2026-09-30
+## Completed submission recheck — 2026-09-30
+
+The repeated final review is complete for the executed scope. It starts at
+`7eb2c7ec1427291a0f2ed1e6a79219dc7c4de240`; the documentation checkpoint
+`e47f7ec80aaa464a0eec9f56b9f62f41a51d150f`, tree
+`609da546e481ba34c56947ce5fde24a317af5be6` (242 paths), is the actual tested source.
+Fresh combined run **36714842285**, attempt1, completed successfully on Linux and
+Xcode27; terminal metadata was updated at **2026-09-30T12:59:46Z**. Both original
+artifacts, four matching source archives, real IPA/dSYM and saved execution results
+were inspected. Earlier results below retain their own source identities.
+
+No additional production defect was reproduced in this review. All twelve app Swift
+files, eight native patches, tests, build/workflow code, 177 owner mappings, resources,
+defaults and limits are unchanged. Only the review checkpoint and closing documents
+change. The fixed UDP port/multiple unknown-peer behavior and default1080 are
+preserved by explicit user decision; no fallback or client/protocol change is applied.
+
+The complete current outcomes and per-feature review matrix are in
+`docs/reviews/release-submission-20260930.md`. The unchanged combined native/model,
+source/input/metadata gates, actual twelve-file iPhoneOS27 SDK check, ARM64 archive,
+ten seeded Simulator cases and three actual UI tests all passed. UI runtimeWarnings
+and both cleanup arrays are empty. Case times were118.567/130.361/96.169s; the
+recorded session window was412.410s. Original predicates and deadlines were retained.
+Real timed reclamation retained Total/IP In78002/Out0: Linux30500 at300.211670s,
+then1500 at420.325799s; Apple300.020803s/420.042072s. The fixture-only600s timeout
+does not change the application's60s default or certify physical background behavior.
+
+The new unsigned **1.1.0/build10** IPA is285407 bytes, SHA-256:
+
+```text
+97d35e44c1d397ff957597f8d5390b4d24fddac18807ad8f33308acb2e4c58ce
+```
+
+All seven decompressed payload files and Unix modes equal the preceding valid build10;
+only ZIP container metadata changes. Actual ARM64/iPhoneOS27/minimum17.2 and the
+app/dSYM UUID78205DB1-9792-3928-98C1-B40B14ACF29D match. The dSYM contains the actual
+aggregate/client statistics and prepare definitions. Older IPAs are not overwritten.
+
+| Original current artifact | SHA-256 |
+| --- | --- |
+| Linux11096281579 | 6f2effd6ff67efb9ce489521fdadd4c9b72bb8b1a6fe2737f94643f374018dd0 |
+| Apple11097441060 | 8732b0ebcfa46f8137ad66e772eecab45818117db9c6c0b073e8478de16019dc |
+
+Supplemental full-history replays completed17 commands successfully, and83 Python/
+Bash/JSON/plist inputs parsed successfully (71 Python/Bash). All242 tracked paths were
+inventoried by content/mode and classified; inventory is not behavioral coverage.
+The closing commit changes only README, its identical integrated specification and
+the submission review. The other239 paths retain the exact tested bytes/modes.
+This documentation closure is not a second CI or device execution.
+
+The environment, resource costs, reproduction commands and deployment limits below
+remain in force. No physical SideStore/LiveContainer run, actual location/call/provider
+sequence, long locked-device survival or device CPU/RAM/energy/throughput measurement
+is newly claimed. Finite passing checks are not an unconditional zero-defect guarantee.
+
+## Prior package-metadata review — 2026-09-30
 
 The release final review starts at `eff5574a902a8c7efba9675fe49587fdec030e83`.
 The complete preceding integration specification, build10 evidence and earlier
