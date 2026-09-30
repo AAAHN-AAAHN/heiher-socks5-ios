@@ -2,12 +2,12 @@
   "branch": "release/integrated",
   "frozen_source": "b9dcac6da65fb7eed7ba5aad19d5208f45d5abcc",
   "parents": {
-    "feature/app-icon": "87d5cb3c612603653ed04cbd1784c9eb42186011",
-    "feature/background": "28cbf5f4d2acbfdb763bbacb1edc294db8fa0790",
-    "feature/server-control": "61f99521c51d3f6d325e5ce0087b4e97e1c005ec",
-    "feature/settings-persistence": "b222d87d0f3351d94a0d0fa11aa6f57a40cfb76c",
-    "feature/udp-compat": "ad5f33de252fd2f8cbb300340f2fbf394e141f8b",
-    "feature/traffic-statistics": "28fed6719c056a0f445b66eabd65a5e11ac49635"
+    "feature/app-icon": "d2e2430046b2987d37fdc25733565c8d407a7b38",
+    "feature/background": "193dd692040b84f6f0f154e5e405fe4e83769571",
+    "feature/server-control": "d0d0c69b26b5c1b2a209531800fdefabd812f717",
+    "feature/settings-persistence": "ba94bc5bf8f5aaf313f6554cc787d37f01e9f33a",
+    "feature/udp-compat": "2898a2d450f2f767ba41ef4f72b60e4627147b4c",
+    "feature/traffic-statistics": "ce0ec6c79a54ca16e7dcccd4df567cf07864af91"
   },
   "owned_documents": [
     "README.md",

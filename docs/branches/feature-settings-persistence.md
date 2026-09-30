@@ -12,6 +12,10 @@ It inherits server control without making the server depend on storage. Settings
 
 `AppSettings` contains schema identifier 1, the complete ServerSettings value, `serverRunning`, independent continuous-location and silent-audio choices, and the selected tab. Background choices and running intent default to false; the selected tab defaults to statistics. The server model supplies its own unchanged defaults and validation rules.
 
+The JSON keys are `version`, `server`, `serverRunning`, `background` and `selectedTab`. The nested Background keys are `continuousLocation` and `silentAudio`; the tab values are `statistics`, `server`, `background` and `settings`. This common schema is preserved even in a branch that does not link all those features.
+
+The standalone settings branch renders only Server and Settings. Its selection binding shows Settings only for a saved `settings` value and otherwise shows Server; it does not rewrite a saved `statistics` or `background` value merely to display Server. It preserves Background choices in JSON but owns no Background controller and does not execute those services. The integrated release supplies all four tabs and applies the same stored Background choices to its one controller.
+
 The store reads `Application Support/Socks5/settings.json`. Valid persisted drafts can include server text that is not currently runnable; the server's own configuration validation still controls startup. Runtime counters, service errors and diagnostics are not encoded into this file.
 
 JSON encoding is pretty-printed with sorted keys. Encoded and decoded data must not exceed 65,536 bytes and the decoded schema identifier must match the supported format. Reads request at most 65,537 bytes, making oversize detection possible without reading an unbounded provider file. Standard Codable decoding determines field/type validity; the feature does not claim a separate rejection rule for every unknown JSON key.
@@ -24,13 +28,19 @@ The live value still changes when an ordinary save fails. In particular, a stora
 
 Only a genuinely absent settings file permits initialization from the two existing Background preference keys. An inaccessible or corrupt existing file is not treated as an empty first launch and is not silently overwritten. Preference keys are removed only after the first successful JSON write. This is the implementation's present absent-file import behavior, not a separate parallel persistence owner.
 
+Those preference keys are `background.continuousLocation` and `background.silentAudio`. If loading an existing file fails, the store retains its initial default live value, with running and Background intent false, and reports a load error while leaving that file untouched. This preservation describes initialization: a subsequent successful explicit setting write or import can replace the file. It is not a promise that a corrupt file is permanently immutable.
+
 ### Import and export
 
 Import decodes the entire input, verifies the schema and size and validates the complete server configuration before replacing durable or live settings. The new file is written before the live snapshot is published. Failure before that point leaves the prior file and live value in place.
 
+Server configuration validation applies even when the imported `serverRunning` is false. Consequently, a saved local draft may be loadable or exportable while import of that same draft is refused until its server fields are valid. Successful import replaces the whole snapshot, including requested services and selected tab; the root applies only the services linked into that composition.
+
 Every explicit setting action, including an unchanged Stop, advances the import revision. A slow file read may apply only if its captured revision is still current and the caller has not been cancelled. A newer edit, Stop or import therefore wins over an older pending read.
 
 Export serializes a configuration snapshot. Credentials are plaintext fields in the exported JSON; export is not a password vault or a claim of end-to-end encrypted transfer. Import/export presentation and actual external-provider transfer are distinct verification boundaries.
+
+The export snapshot comes from the current live `settings.value`, not by rereading `settings.json`. After an ordinary save failure, it can therefore contain changes that are not durable yet. `SettingsDocument` exposes JSON to the system file exporter with the default filename `Socks5-settings`; successful file-picker presentation alone does not prove that a provider saved that file.
 
 ## Implementation and ownership
 
@@ -42,7 +52,7 @@ Export serializes a configuration snapshot. Credentials are plaintext fields in 
 
 The detached provider call may itself remain blocked; cancelling its consumer or rejecting its late result does not forcibly terminate an operating-system coordination call. This ownership distinction prevents stale application without falsely claiming control over a provider's internal progress.
 
-`SettingsView` owns presentation and transfer UI. The root owns the store and service controllers once. It observes the complete value, applies server intent and updates independent background choices. The server remains unaware of files, AppSettings and SettingsStore; Background remains unaware of JSON and the native server.
+`SettingsView` owns presentation and transfer UI. The standalone root owns the store and server controller once, observes the complete value and applies server intent. The integrated root additionally owns BackgroundKeepAlive and applies the independent Background choices. The server remains unaware of files, AppSettings and SettingsStore; Background remains unaware of JSON and the native server.
 
 ## Design rationale and resource cost
 

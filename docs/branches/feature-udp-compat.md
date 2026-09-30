@@ -24,23 +24,27 @@ UDP-over-TCP uses its own frame-length interpretation. The standard zero-RSV/FRA
 
 ### Adaptive buffer policy
 
-The base payload allocation is 1,500 bytes. Larger required capacities are rounded up in 500-byte steps. A requirement of 48,001 bytes obtains 48,500 bytes; 30,001 obtains 30,500. The required size includes any protocol header stored in the same receive region. Allocation does not impose a separate arbitrary 65,536-byte ceiling, but wire-format, arithmetic, allocator, socket and network-path limits still apply.
+Each managed receive slot starts with a 1,500-byte data region. Larger required capacities are rounded up in 500-byte steps. A requirement of 48,001 bytes obtains 48,500 bytes; 30,001 obtains 30,500. The required size includes any protocol header stored in the same receive region. Allocation does not impose a separate arbitrary 65,536-byte ceiling, but wire-format, arithmetic, allocator, socket and network-path limits still apply.
 
 Each 500-byte demand bucket records one expiry time based on a 300-second holding interval. A demand refreshes its own bucket, not every smaller or larger capacity. Small messages therefore do not keep a large buffer alive indefinitely. Cleanup checks the recent demands at a 60-second cadence and returns unused expanded storage toward the largest still-needed bucket or the 1,500-byte base.
 
 For example, a large demand followed two minutes later by a smaller expanded demand permits the first capacity to expire independently. Cleanup needs no subsequent application packet to run. It never moves storage still referenced by active I/O, and it does not treat maintenance activity as new client traffic that extends the communication timeout.
 
+The constants are `UDP_BUF_SIZE`, `UDP_BUFFER_GROW_STEP`, `UDP_BUFFER_HOLD_SECONDS` and `UDP_BUFFER_CLEANUP_SECONDS`. An expanded slot of capacity C holds `(C - 1500) / 500` expiry entries, each a `uint64_t`, followed by its contiguous replacement data region in the same allocation. Resizing copies the relevant expiry entries, not stale packet content. The original base storage remains available and is reused when expanded storage is released.
+
 ## Implementation and ownership
 
 The feature is expressed by `hev-udp-port-zero.patch`, `hev-udp-sockaddr.patch`, `hev-udp-peer-filter.patch` and `hev-udp-dynamic-buffer.patch`, applied at their manifest roots. The public message representation remains address, contiguous buffer and length. The existing association owns the sockets; its native task owns buffer lifetime and cleanup scheduling.
 
-Receive sizing occurs before consuming a message. Darwin queries the next datagram length through its socket interface; Linux uses a length query that does not copy the whole payload. Actual receive length, flags and capacity are checked again when the message is consumed. Different queued datagrams are sized individually rather than assuming that a batch has the first message's size.
+The port-zero patch applies to the server repository; the address, peer and dynamic-buffer patches apply to `src/core`. `UDPBuffers` owns the relay slots and the cleanup/idle deadlines, while each `UDPBuffer` describes one slot. Automatic growth belongs to this managed forwarder path. The public `hev_socks5_udp_recvmmsg()` entry retains caller-owned storage and does not resize an arbitrary caller buffer; capacity and truncation checks still prevent an undersized caller buffer from becoming a successful complete frame.
+
+Receive sizing occurs before consuming a message. Darwin uses `SO_NREAD` and a one-byte non-consuming probe when a zero result could mean either an empty datagram or an empty queue. Linux uses `MSG_PEEK | MSG_TRUNC | MSG_DONTWAIT` with a zero-length receive buffer. Actual receive length, flags and capacity are checked again when the message is consumed. Different queued datagrams are sized individually rather than assuming that a batch has the first message's size. An expansion failure leaves the queued message unconsumed and ends the association instead of forwarding a truncated prefix or spinning indefinitely on that queue head.
 
 Expansion allocates the required rounded space directly. Bucket metadata records capacity demand rather than a per-packet history. Allocation failures do not leave dangling buffer references. A failed shrink retains usable storage for a subsequent cleanup attempt. Association teardown releases its owned expanded storage independently of the holding interval.
 
 The task's existing timer supports cleanup and communication timeout without a new production thread, Swift timer or global buffer registry. When no expanded capacity remains, unnecessary cleanup wakeups stop. The timeout applies to communication, not to the bookkeeping wakeup itself.
 
-On Darwin, a valid large send rejected with EMSGSIZE may require a larger socket send-buffer allowance. Only that failure path queries and adjusts the affected socket as needed, with at most one retry of unsent work. Completed messages are not retransmitted. This socket-level allowance is distinct from the user-space payload retention policy and may persist for the socket's lifetime.
+On Darwin, a valid large send rejected with EMSGSIZE may require a larger socket send-buffer allowance. Only that failure path queries `SO_SNDBUF` and requests a larger allowance when it is actually too small. The same unsent message index receives at most one adjustment-and-retry opportunity; after successful progress, a different unsent message in that batch can receive its own opportunity. Completed messages are never resubmitted by this retry path. Socket allowance is distinct from user-space payload retention and may persist for the socket's lifetime.
 
 ## Design rationale and resource cost
 

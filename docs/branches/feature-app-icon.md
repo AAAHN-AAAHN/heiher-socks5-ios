@@ -10,13 +10,15 @@ The approved source artwork is preserved byte-for-byte. The feature extends the 
 
 The project selects the AppIcon asset set through the ordinary Xcode app-icon configuration. The source is a 1,024 by 1,024 PNG with an indexed palette and fully opaque pixels. The operating system and asset compiler produce and display the appropriate device representations.
 
-The application supports the declared phone and tablet device families. The compiled icon metadata must associate each family with an appropriate icon image or common fallback. A phone-specific image alone is not proof of a valid tablet mapping, or vice versa. Original and remapped application identifiers must retain the same intended icon resources after installation.
+The Xcode target declares both phone and tablet device families; that declaration is not evidence of an executed iPad runtime test. The compiled icon metadata must associate each family with an appropriate icon image or common fallback. A phone-specific image alone is not proof of a valid tablet mapping, or vice versa. Original and remapped application identifiers must retain the same intended icon resources after installation.
 
 The feature has no independent user setting and does not change its icon in response to server, statistics, location or audio state. System light/dark UI presentation is not the same thing as a custom Dark, Tinted or clear icon variant.
 
 ## Implementation and ownership
 
 The source files are `Socks5/Assets.xcassets/AppIcon.appiconset/AppIcon.png` and its `Contents.json`. The Xcode project references the AppIcon set, and the source image is compiled into the application asset catalog and generated fallback PNGs. Source identity is checked independently from compiler-produced compressed bytes.
+
+The authored catalog supplies one universal iOS 1024 slot. The approved PNG is 3,841 bytes, uses a 2-bit indexed palette with four RGB entries and has no transparency chunk; all 1,048,576 pixels are opaque. These properties identify the approved resource rather than restrict PNG images in general. No separate authored Dark or Tinted artwork is supplied. Source-file and decoded-pixel fingerprints are enforced by the source checker, while compiler outputs are decoded and compared under their own size/family contract.
 
 The source-image checker validates PNG signature, chunk boundaries, declared lengths and CRCs, complete decompression, exact dimensions and opacity. The source pixel content and file fingerprint bind the approved artwork. Recompression, resizing or a visually similar replacement is not silently accepted as the same source.
 

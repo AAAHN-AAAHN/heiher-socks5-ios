@@ -14,7 +14,7 @@ Each child contains its parent's complete document set without rewriting the par
 
 The machine-readable `docs/documentation.json` maps current document parents and owned guide paths. Functional ownership and native source inputs remain in their separate build and membership manifests. `docs/top-level-principles.md` contains the exact governing instructions.
 
-The feature guides are `udp-compatibility.md`, `traffic-statistics.md`, `server-control.md`, `settings-persistence.md`, `background.md` and `app-icon.md`, present where that feature is inherited. `integrated.md` describes the release composition. The absence of a sibling's guide from an independent feature does not imply that sibling code is linked into that branch.
+The feature guides are `udp-compatibility.md`, `traffic-statistics.md`, `server-control.md`, `settings-persistence.md`, `background.md` and `app-icon.md`, present where that feature is inherited. `integrated.md` describes the release composition. An inherited guide is a reference to its owner's composition, not proof that every feature it describes is enabled in the current branch. `Build/features.json` determines the current executable composition; the branch's root guide explains how the inherited modules are actually connected.
 
 ## Design rationale and resource cost
 

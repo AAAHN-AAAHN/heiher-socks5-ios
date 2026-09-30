@@ -14,6 +14,8 @@ The tabs are Statistics, Server, Background and Settings. One SettingsStore owns
 
 Server Start records running intent and requests an explicit validated start; Stop records stopped intent and applies live shutdown. The root observes the settings snapshot and supplies configuration and requested state to the server. It separately applies the two Background choices. A save failure remains visible and must not block live Stop or Off, although durable intent can remain different until writing succeeds.
 
+The root compares each Background intent with its controller value before applying it, so changing a tab or server field does not manufacture a new audio recovery request. A successful import can change running intent, Background choices and selected tab together; the server controller validates and serializes any replacement, while audio and location keep their own independent gates. Server controls remain disabled during the owned invocation even though an import can request a replacement through the root.
+
 Statistics observes actual destination-side payload I/O through the native counters. Stop/Start preserves process totals. Visible active sampling updates Total and normalized control-peer IP tables without becoming the owner of server lifetime or durable configuration. Background audio/location can remain enabled while the server is stopped; server requests do not implicitly change those choices.
 
 ### Native and resource behavior
@@ -29,6 +31,8 @@ The fixed UDP port default and multiple-unknown-peer limitation are deliberately
 `Build/features.json` declares native inputs and patch order. `docs/feature-membership.json` preserves the functional file mappings and exact composition exceptions. `docs/documentation.json` owns current-parent document copies and the permitted documentation-validation changes. Each feature tip and the shared main remain in actual Git ancestry; content maps do not substitute for that relationship.
 
 The native order is `hev-udp-port-zero.patch`, `hev-udp-sockaddr.patch`, `hev-udp-peer-filter.patch`, `hev-udp-dynamic-buffer.patch`, `hev-stats-task-io.patch`, `hev-stats-core.patch`, `hev-stats-server.patch` and `hev-server-startup-stop.patch`. The shared unpatched XCFramework remains a source-controlled baseline. Product builds link the freshly generated feature framework in a disposable product-source copy instead of modifying the tracked baseline in place.
+
+The port-zero, public statistics wrapper and startup/stop patches target the server repository; address/peer/buffer and core statistics patches target `src/core`; the I/O hook targets `third-part/hev-task-system`. Core statistics owns the aggregate and IP registry, while the server wrapper exposes its rows to Swift. Repository-root ownership and list order are separate requirements: a correct filename at the wrong patch root is not a valid composition.
 
 The release-only network fixture accounts for a peer that has already closed a malformed stream: the client's half-close can return ENOTCONN or ECONNRESET, but the test still requires no forwarded payload and actual EOF/reset. That narrow test boundary does not excuse arbitrary socket failures or alter runtime protocol behavior.
 
@@ -57,6 +61,8 @@ The seeded Simulator cases cover original/remapped identity, tabs and durable St
 ## Operation and limitations
 
 Use a full-history clean checkout. The release commands are `bash Build/build.sh`, then on an Apple host `bash Build/check_swift_sdk.sh`, `python3 Build/verify_release.py`, `python3 Build/simulator_review.py`, `python3 Build/ui_review.py` and `python3 Build/record_evidence.py`. The workflow selects the applicable platform stages; an Apple-only skip on Linux is not an executed check.
+
+For a manual device-product build, the Apple path defaults `BUILD_IPA` to `1`; it can be set explicitly as in the release workflow. Setting `BUILD_IPA=0` skips archive generation. The following product/Simulator checks require that generated product and their source/native prerequisites; they do not build a missing archive implicitly. The delivered product is unsigned input for a signing or import process, not a device installation. Documentation edits neither alter that product nor replace its separately recorded source and hash.
 
 Documentation verification uses `python3 Build/check_documentation.py` and the document-specific regression fixture. It preserves the frozen application, test oracles, build/workflow configuration, defaults and resources. A document-only commit is not a new runtime test or product build. Existing unsigned IPA bytes and their separately recorded source identity remain unchanged by this work.
 
