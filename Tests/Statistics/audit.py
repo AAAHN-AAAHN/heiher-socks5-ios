@@ -181,6 +181,16 @@ def native_checks(mode):
              *(libs if kind == 'udp' else [libs[-1]]), '-o', OUT / kind],
             mode + '-' + kind + '-build.log')
         run([OUT / kind], mode + '-' + kind + '.log', env=env)
+    # Complete TCP relay/callback ordering, including cancellation after partial I/O.
+    for label, extra in [('asan', sanitize), ('optimized', ['-O3', '-fstrict-aliasing'])]:
+        executable = OUT / ('tcp-accounting-matrix-' + label)
+        run([*common, *extra, '-Wno-unused-function',
+             *(['-DENABLE_IO_SPLICE_SYSCALL'] if splice else []),
+             '-I' + str(task / 'src'), *client_includes,
+             'Tests/Statistics/tcp_accounting_matrix.c', *libs, '-o', executable],
+            mode + '-' + executable.name + '-build.log')
+        run([executable], mode + '-' + executable.name + '.log', env=env)
+        executable.unlink()
     # Same owner source fixtures now execute against the statistics-composed core.
     for source in ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
                    'udp_buffer_send.c', 'Statistics/udp_accounting_probe.c'):
