@@ -38,6 +38,16 @@ with tempfile.TemporaryDirectory() as directory:
             print(result.stdout, end='', flush=True)
             if label == 'current':
                 assert result.returncode == 0 and '0 failed;' in result.stdout, result.stderr
+                # Two signals inside each platform-call hook, not only between returns.
+                subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
+                                *(['-O'] if optimized else []),
+                                str(ROOT / 'Tests/Background/PlatformMocks.swift'),
+                                str(folder / 'Controller.swift'),
+                                str(ROOT / 'Tests/Background/ReentryClosureTests.swift'),
+                                '-o', str(executable)], check=True, timeout=90)
+                reentry = subprocess.run([str(executable)], capture_output=True, text=True, timeout=30)
+                print(reentry.stdout, end='', flush=True)
+                assert reentry.returncode == 0 and 'PASS: 12096 platform-reentry histories;' in reentry.stdout, reentry.stderr
             else:
                 assert result.returncode == 1 and 'Off after failed setup preserves unowned shared session' in result.stdout, result.stderr
                 print('EXPECTED PRIOR FAILURE: unowned release; not a current-source failure', flush=True)
