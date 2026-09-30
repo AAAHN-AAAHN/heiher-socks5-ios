@@ -14,7 +14,11 @@ The configuration exposes workers, TCP listen address/port, UDP listen address/p
 
 Defaults are four workers, TCP address `::` and port `1080`, an empty UDP listen address and UDP port `1080`, outgoing bind addresses `0.0.0.0` and `::`, empty bind interface and credentials, and IPv6-only disabled. The UDP default is intentionally retained; unknown-peer requests are not automatically assigned a different configured policy.
 
-Validation accepts one through 64 workers, TCP ports one through 65,535 and UDP ports zero through 65,535. Text fields must be single-line, contain no control characters and fit within 255 UTF-8 bytes. Authentication requires both fields or neither. YAML strings are single-quoted with embedded apostrophes doubled. Equality compares UTF-8 byte sequences so canonically equivalent but byte-distinct credentials and drafts are not silently treated as identical native input.
+Validation accepts one through 64 workers, TCP ports one through 65,535 and UDP ports zero through 65,535. The seven address, interface and authentication strings must be single-line, contain no control characters and fit within 255 UTF-8 bytes. Worker and port strings instead pass integer conversion and their numeric ranges. Authentication requires both fields or neither. YAML strings are single-quoted with embedded apostrophes doubled. Equality compares UTF-8 byte sequences so canonically equivalent but byte-distinct credentials and drafts are not silently treated as identical native input.
+
+The editor has ten text fields and one IPv6-only toggle. All eleven controls and Start are disabled while `server.isRunning` is true; Stop is enabled by the root while an invocation or requested-running intent remains. Configuration replacement during an active invocation is a controller capability used by programmatic updates and, in a settings-enabled composition, import; the editor itself is not editable during that invocation.
+
+The Swift validation is not an address resolver or a bind/readiness probe. Address syntax, local interface availability, socket permissions and port occupation can still cause native setup to fail after the value passes Swift validation. The blank authentication defaults mean the generated configuration does not request username/password authentication; a masked password field is display protection, not a new transport-encryption layer.
 
 ### Start, replacement and Stop
 
@@ -29,6 +33,8 @@ Stop clears the desired running configuration, overrides a pending replacement a
 `ServerSettings` is a Codable, Equatable value model that owns validation and YAML generation but no file, settings-store or background dependency. The editor binds to this value and receives explicit start/stop actions. This keeps presentation, durable settings and native lifecycle independently testable.
 
 `ServerController` is MainActor-owned. `current` identifies the running invocation, `desired` the latest requested configuration, `stopping` prevents duplicate shutdown requests and `attempted` prevents repeated automatic execution of the same failed intent. A null desired configuration is the Stop state.
+
+`apply(_:running:retry:)` coalesces intent, `startDesired()` validates and starts idle work, and `finished(_:)` releases ownership before considering a requested replacement. An invalid replacement first stops the owned invocation; after it returns, validation can leave the controller idle with the new error rather than continuing to run the obsolete configuration. Clearing running intent also clears the attempted value so a later explicit Start is a fresh decision.
 
 The controller validates before invoking the engine. At the idle boundary, after any previous native call has returned, it calls `hev_socks5_server_prepare()`, records the current configuration and starts the blocking native function on the existing utility queue. The completion is delivered back to MainActor. Restart is allowed only when shutdown was requested and a desired configuration still exists. The owned invocation keeps its controller alive until completion rather than leaving a callback targeting a deallocated owner.
 
