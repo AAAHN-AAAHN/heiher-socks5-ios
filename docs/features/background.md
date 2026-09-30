@@ -1,6 +1,90 @@
 # Background services — continuous audio and location
 
-## Completed final review — 2026-09-30
+## Final submission recheck — 2026-09-30
+
+This additional review starts at published `9d60b7ba6094547112d09182bf39dd01f542eb81`.
+No further production defect was reproduced. All five production Swift files, the
+existing ownership/deferred-On repair, location logic, root/subscriptions, 50ms WAV,
+0.5-second timer, project/plist, framework, pins, workflow and original UI checks
+remain byte/mode-identical. The preceding ownership audit below is historical;
+its source and results are not relabeled as this new execution.
+
+The only pre-validation changes are `Tests/Background/ReentryClosureTests.swift`
+(137 new lines) and ten added lines in `check_session_ownership.py`. No old test,
+assertion, deadline or warning gate was removed. They add no application instructions,
+objects, I/O, timers or wakeups; the existing audio/location and OS resource costs
+remain. Avoiding a needless production rewrite is not a claim of measured minimum
+CPU/RAM/energy or a guarantee about physical background execution.
+
+### Additional boundary coverage and negative controls
+
+The new fixture runs 12,096 ordered two-input reentries: seven one-shot platform-call
+hooks (category, preference, activation, preparation, play, stop, deactivation),
+immediate/deferred completion, six failure settings, and twelve inputs squared.
+Each hook must actually execute once. An independent oracle tracks the last explicit
+On/Off intent. Assertions require exclusive pending work, at most one playing object,
+one 0.5-second deadline when healthy, no implicit preparation, and no local output
+or timer while Off. Once failures cease, only already queued completions and timers
+may restore On; a new user On is not injected to force recovery. Final owned Off must
+drain. These are finite scripted histories, not physical calls or host-arbitration
+trials; a failure flag is a setting, not proof that every branch invokes that API.
+
+Each compiler mode reports 457,411 assertions. Existing 135 ownership assertions and
+the exact-old 13-of-30 expected failures are retained. Three disposable mutations
+that lose Off intent, suppress scheduling or retain an Off timer each fail the new
+fixture. They are supplemental local negative controls, never production inputs.
+The existing 69,984 ordered triples and 65,536-event/1,024-checkpoint tests, historical
+negative cases and explicit one-second interval mutation remain unchanged.
+
+### New exact-source results
+
+Tested commit: `e1bb5b3c38f0619e84088ee9ddc363d02318a56c`, tree
+`65bc946d7e502cfc4ab6db48d0ed21d5f0ac9d11`, 79 tracked files.
+Run `36661305737`, attempt 1, completed successfully; metadata updated at
+2026-09-30T02:57:44Z. Linux recovery, Apple audio/SDK and the separate Simulator job
+all passed without a rerun. The generic native/archive/IPA job was intentionally
+skipped by the existing checks-only workflow, not counted as a native build or IPA.
+
+| Layer | New execution result |
+| --- | --- |
+| Reentry/ownership | 12,096 histories/457,411 assertions and the existing 135 assertions pass in debug and optimized modes on both Linux and Apple hosts. Exact-old ownership failures remain expected failures. |
+| Existing recovery | Both modes pass the 35 policies, 98 reentry combinations, 1,352 mixed pairs, 69,984 triples/3,536,977 assertions and 65,536 events/1,024 liveness checkpoints/313,217 assertions. |
+| Lifetime/delivery | Existing controller/location/delegate/lifetime tests, 38 async-session and 22 preparation assertions with 3,000 transitions each, 34 actual Foundation/Combine deliveries and RunLoop pacing checks pass. Audio/location responses in host scheduling tests remain doubles. |
+| Source/SDK/asset | 46 baseline, 37 audit-entry and three marker controls pass. Five production Swift files typecheck for ARM64/iOS17.2 against iPhoneOS27 with warnings-as-errors and empty SDK diagnostics. Apple AVAudioFile validates all 400 silent mono8kHz PCM samples. |
+| Actual Simulator | Original iPhone16/iOS27.0 build24A434 XCTest passes one case, zero failures/skips, in 139.892 seconds. Original On/Off, Playing, tab and saved-On/final-Off relaunch assertions and deadlines remain. |
+| Runtime/cleanup | Two original Playing/Off images inspected; runtimeWarnings=[], cleanup=[]. The targeted main-thread audio advisory is absent in completed console/result evidence. Raw AppIntents metadata warnings and debugger-version lookup notices remain; no universally warning-free claim. |
+
+The recorded Simulator app executable SHA-256 is
+`f28d40a9655e11b982ec68c7a5a661100120497721578994ad4e4b64fa9969d2`, the same as
+in the preceding ownership audit. This does not turn either Simulator product into
+an IPA. Actual toolchain records remain Xcode27.0 27A266a, iPhoneOS27.0, Apple Swift6.4
+and macOS27.0 26A428. Local supplemental replay used Linux Swift6.2.1.
+
+| Original artifact | SHA-256 |
+| --- | --- |
+| Linux 11074093195 | 9c7017e632d0c79c1ec342106c6d614741febe1f1900d8362c5e1dbceac6fc75 |
+| Apple SDK 11075045125 | 65a3dc2e94fbc7bb372bb527fd48baf1fd189cbf07c3bc0177a497a5c97ebdff |
+| Simulator 11074727316 | cc12b0063a3be97ea2a3d7e4fafe0dc064ea1a7c031b1ed5b1a19d2d66fc5035 |
+
+All three original ZIP digests/CRCs, source comments, 79 file bytes/Git modes and
+complete manifests agree with the independently reconstructed tested tree. The
+controller remains blob `08a73be1e9da8caa36a24d874956f74f916c6e47`. Supplemental
+local work recompiles ten fixtures in both modes, runs the existing long histories,
+checks three mutations and validates the updated driver with the authenticated old
+blob, without fabricating commit ancestry. The preceding evidence package's 146
+file digests also pass. Offline integrity/replay is not a new Apple or physical run.
+
+The closing commit changes only this README and its identical feature specification;
+77 other paths retain their tested bytes/modes. Its parent and Git tree identify
+publication separately from the execution above. Other seven branches and release
+remain unchanged. No reproduced production regression or current required-test
+failure remains in this recheck. Physical SideStore/LiveContainer, actual permissions,
+location/call/route/service events, locked-device survival, device resource/energy
+measurements and final IPA/release integration remain unperformed and separately
+required for claims about those layers. No finite suite proves every possible input,
+resource failure, OS event or scheduler interleaving free of defects.
+
+## Preceding ownership review — 2026-09-30
 
 Reviewed owner: `9d87d7cf3c5be3a96e1b36b5a14b944cf80a35c1`. The complete prior
 specification, source/run identities and retained failure history remain at that
@@ -176,7 +260,7 @@ energy and maximum throughput remain unperformed until actual evidence exists.
 Location mocks and Simulator audio do not certify these paths. No finite suite proves
 all possible OS, scheduler, input and resource-failure histories defect-free.
 
-## Final exact-source evidence — 2026-09-30
+## Preceding ownership execution evidence — 2026-09-30
 
 Run `36646138081`, attempt 1, completed successfully; terminal metadata updated at
 2026-09-29T23:46:13Z. The executed commit is
