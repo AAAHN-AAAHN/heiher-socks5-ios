@@ -113,18 +113,7 @@ def main():
     # Shared fixture boundary: early malformed-frame rejection may precede
     # client half-close. All no-forwarding/EOF assertions and timeouts remain exact.
     path = 'Tests/udp_buffer_network.py'
-    expected = git('show', refs['feature/udp-compat'] + ':' + path).decode()
-    before = '                tcp.shutdown(socket.SHUT_WR)'
-    after = "\n".join([
-        '                try:', '                    tcp.shutdown(socket.SHUT_WR)',
-        '                except OSError as error:',
-        '                    # Invalid framing may already have caused the peer to close.',
-        '                    if error.errno not in (errno.ENOTCONN, errno.ECONNRESET):',
-        '                        raise'])
-    assert expected.count(before) == 1
-    expected = expected.replace('import concurrent.futures\n',
-                                'import concurrent.futures\nimport errno\n', 1).replace(before, after, 1)
-    assert (ROOT / path).read_text() == expected
+    assert (ROOT / path).read_bytes() == git('show', refs['feature/udp-compat'] + ':' + path)
     # Check the actual integrated resources, independent of icon-only source gates.
     icon = load('integration_icon', 'Tests/AppIcon/check_icon.py')
     print(json.dumps(icon.catalog(ROOT / icon.CATALOG), indent=2))

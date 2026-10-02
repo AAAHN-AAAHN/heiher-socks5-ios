@@ -14,7 +14,7 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 CLIENT_BASE = 'bb07d1795f010d624b1924cc06203af9aeb3c6a2'
-UDP = '93e6bd8f09e169aaf62fff3ad67949b454327096'
+UDP = '95f99182e32da0384a0ba29379a7e613cc57095a'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
                         'udp_buffer_send.c', 'udp_stream_boundaries.c',
@@ -78,8 +78,6 @@ def check_udp_inheritance():
         if target.endswith('.md'):
             continue  # The independent document contract checks exact current prose.
         mode, kind, blob = entries[source]
-        if target == 'Tests/udp_buffer_network.py':
-            blob = '2c99bfd8ed9d84e622a7c9ef6a59c8d8e976bb6c'
         path = ROOT / target
         assert kind == 'blob' and not path.is_symlink() and path.is_file(), target
         data = path.read_bytes()
