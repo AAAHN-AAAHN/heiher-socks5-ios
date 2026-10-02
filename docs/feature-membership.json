@@ -2,7 +2,7 @@
   "base_commit": "75335d201cb1e541bb153e9899badbc11ccf1973",
   "branches": {
     "feature/udp-compat": "93e6bd8f09e169aaf62fff3ad67949b454327096",
-    "feature/traffic-statistics": "130312b68cb2ac79469958c9a552b57148a1728a",
+    "feature/traffic-statistics": "c36bebb905419988252eb2eaaa039e48156631c7",
     "feature/server-control": "368aa4cf89436651414a8885a2a171f5cff9abd5",
     "feature/settings-persistence": "a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7",
     "feature/background": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
@@ -398,8 +398,8 @@
       "sha256": "b98a9fa6d2b9c5688d49d4ee7b73ed84bb9fd76c89de52bed78081da0712fd07"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "130312b68cb2ac79469958c9a552b57148a1728a",
-      "sha256": "35f74d8cee5872f7d355f936b22b80f9e5ca67b94da13dd3ea3a9143f2916037"
+      "commit": "c36bebb905419988252eb2eaaa039e48156631c7",
+      "sha256": "36f2e636787c29e0686c427cd1d67342edba380d8d55e5ed3d68af541394b925"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",

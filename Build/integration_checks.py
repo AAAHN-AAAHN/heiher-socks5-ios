@@ -97,8 +97,6 @@ def main():
         source = source.decode()
         if not source.startswith(('Tests/', '.github/workflows/')):
             continue
-        if source == 'Tests/udp_buffer_network.py':
-            continue  # The exact release-only half-close adaptation is checked below.
         target = ('Build/inherited-workflows/traffic-statistics-' + Path(source).name
                   if source.startswith('.github/workflows/') else source)
         mode, kind, blob = meta.decode().split()
@@ -112,7 +110,7 @@ def main():
     assert parent['branches']['feature/server-control'] == refs['feature/server-control']
     assert parent['base_commit'] == config['base_commit']
     git('merge-base', '--is-ancestor', refs['feature/server-control'], refs['feature/settings-persistence'])
-    # Release-only fixture repair: early malformed-frame rejection may precede
+    # Shared fixture boundary: early malformed-frame rejection may precede
     # client half-close. All no-forwarding/EOF assertions and timeouts remain exact.
     path = 'Tests/udp_buffer_network.py'
     expected = git('show', refs['feature/udp-compat'] + ':' + path).decode()

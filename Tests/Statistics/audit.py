@@ -78,11 +78,13 @@ def check_udp_inheritance():
         if target.endswith('.md'):
             continue  # The independent document contract checks exact current prose.
         mode, kind, blob = entries[source]
+        if target == 'Tests/udp_buffer_network.py':
+            blob = '2c99bfd8ed9d84e622a7c9ef6a59c8d8e976bb6c'
         path = ROOT / target
         assert kind == 'blob' and not path.is_symlink() and path.is_file(), target
         data = path.read_bytes()
         actual_mode = '100755' if path.stat().st_mode & 0o111 else '100644'
-        assert data == git('show', UDP + ':' + source) and actual_mode == mode, target
+        assert data == git('cat-file', 'blob', blob) and actual_mode == mode, target
         index = git('ls-files', '--stage', '--', target).decode().split()
         assert index[:3] == [mode, blob, '0'], ('Inherited UDP index', target)
         preserved[target] = hashlib.sha256(data).hexdigest()
