@@ -25,7 +25,7 @@ FROZEN = {
     'feature/settings-persistence': 'a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7',
     'feature/traffic-statistics': '0ed4c4a3d4ec910f02cd519fd6df8c52ddce412f',
     'feature/udp-compat': '84d47e88de993a8f4b4cc084f9240f29565c78ed',
-    'release/integrated': '2e102ffea9ec68c7edf763cce0f87087b1c9f470',
+    'release/integrated': 'bca33285376d6775947c220ae86eea9a6c0baf57',
 }
 PARENTS = {name: ['main'] for name in FROZEN if name != 'main'}
 PARENTS.update({'main': ['upstream'],
