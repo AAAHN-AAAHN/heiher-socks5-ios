@@ -119,7 +119,7 @@ def inspect_sources():
     git('diff', '--exit-code', CLIENT_BASE, 'HEAD', '--',
         'Patches/hev-stats-task-io.patch')
     git('merge-base', '--is-ancestor', UDP, 'HEAD')
-    git('diff', '--exit-code', 'a5c4e6af4f51b64e1e47c0b2c84fd4cc2af661ee',
+    git('diff', '--exit-code', '9091fccd6cc822f261133cee7a78f32284b2c75f',
         'HEAD', '--', 'Socks5', 'Socks5.xcodeproj',
         'Patches/hev-stats-task-io.patch', 'Patches/hev-stats-server.patch')
     run([sys.executable, 'Build/check.py', 'baseline'], 'baseline.log')

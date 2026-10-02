@@ -18,6 +18,7 @@ struct TrafficStatisticsView: View {
                     summary(statistics, id: "total")
                 } header: {
                     Text("Total")
+                        .font(.body)
                         .textCase(nil)
                         .accessibilityIdentifier("total-title")
                 }
@@ -26,6 +27,7 @@ struct TrafficStatisticsView: View {
                         summary(client.traffic, id: "client-\(client.id)")
                     } header: {
                         Text(client.address)
+                            .font(.body)
                             .textCase(nil)
                             .accessibilityIdentifier("client-\(client.id)")
                     }
@@ -100,7 +102,7 @@ struct TrafficStatisticsView: View {
                     Double(statistics.received) + Double(statistics.sent)), id: "\(id)-usage-sum")
             }
         }
-        .font(.caption)
+        .font(.callout)
         .foregroundStyle(.black)
         .background(.white)
         .listRowBackground(Color.white)

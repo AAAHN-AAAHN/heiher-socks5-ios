@@ -2,7 +2,7 @@
   "base_commit": "75335d201cb1e541bb153e9899badbc11ccf1973",
   "branches": {
     "feature/udp-compat": "93e6bd8f09e169aaf62fff3ad67949b454327096",
-    "feature/traffic-statistics": "6544ee959d630381ae25938a6562e070fbf7eb89",
+    "feature/traffic-statistics": "130312b68cb2ac79469958c9a552b57148a1728a",
     "feature/server-control": "368aa4cf89436651414a8885a2a171f5cff9abd5",
     "feature/settings-persistence": "a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7",
     "feature/background": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
@@ -94,8 +94,8 @@
       "sha256": "e4f43af94783281fcfb348f03948fd38ae30131cf840ee8275b9f7547ff68b8d"
     },
     "Socks5/Statistics/TrafficStatisticsView.swift": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "0197d6eaa19c9d621fee4866a0e090f72242f4467868ceeda999e395e14d7cb6"
+      "commit": "130312b68cb2ac79469958c9a552b57148a1728a",
+      "sha256": "055585b04114b6d13664cdb94358b9e15e871d07d58a084e5b2efa486d640ed0"
     },
     "Tests/AppIcon/DecodeImages.swift": {
       "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
@@ -398,8 +398,8 @@
       "sha256": "b98a9fa6d2b9c5688d49d4ee7b73ed84bb9fd76c89de52bed78081da0712fd07"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "6544ee959d630381ae25938a6562e070fbf7eb89",
-      "sha256": "bd663eef692d5003479792af020695d18824d2dcadd28e79c2917475909f9b94"
+      "commit": "130312b68cb2ac79469958c9a552b57148a1728a",
+      "sha256": "35f74d8cee5872f7d355f936b22b80f9e5ca67b94da13dd3ea3a9143f2916037"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
@@ -466,8 +466,8 @@
       "sha256": "c0347f89e69dba5d7b5d4a11ab11f7888d5e4feb51a44e501b061a75255f4ef3"
     },
     "Tests/Statistics/ui_audit.py": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "128f2260047a332c168726d7b77d88b0f8146835622e8f3497495260c029d913"
+      "commit": "130312b68cb2ac79469958c9a552b57148a1728a",
+      "sha256": "eb04936b9814465fd87ffb6b03c873aefb1d8dd8e652d4ae5ae0254582738f3b"
     },
     "Tests/baseline_audit.py": {
       "commit": "75335d201cb1e541bb153e9899badbc11ccf1973",

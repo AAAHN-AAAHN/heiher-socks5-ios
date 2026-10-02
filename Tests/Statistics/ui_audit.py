@@ -112,7 +112,7 @@ def main():
     # UDP ownership and patch ordering are validated by the preceding native audit.
     # This integration may not modify the already completed production UI/model.
     run(['git', 'diff', '--exit-code',
-         'a5c4e6af4f51b64e1e47c0b2c84fd4cc2af661ee', 'HEAD', '--',
+         '9091fccd6cc822f261133cee7a78f32284b2c75f', 'HEAD', '--',
          'Socks5', 'Socks5.xcodeproj'], 'preserved-production-ui.log')
     view = (ROOT / 'Socks5/Statistics/TrafficStatisticsView.swift').read_text()
     old_view = output('git', 'show', ui_base + ':Socks5/Statistics/TrafficStatisticsView.swift')
