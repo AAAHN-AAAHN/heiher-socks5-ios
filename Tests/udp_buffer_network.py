@@ -2,6 +2,7 @@
 """Real loopback dynamic-buffer regression; no production counter or payload mocks."""
 import argparse
 import concurrent.futures
+import errno
 import json
 from pathlib import Path
 import socket
@@ -117,7 +118,12 @@ def malformed_frames(port):
             with socket.create_connection(('127.0.0.1', port), timeout=2) as tcp:
                 handshake(tcp, 5, ('0.0.0.0', 0))
                 tcp.sendall(frame)
-                tcp.shutdown(socket.SHUT_WR)
+                try:
+                    tcp.shutdown(socket.SHUT_WR)
+                except OSError as error:
+                    # Invalid framing may already have caused the peer to close.
+                    if error.errno not in (errno.ENOTCONN, errno.ECONNRESET):
+                        raise
                 destination.settimeout(.08)
                 try:
                     data, _ = destination.recvfrom(70000)
