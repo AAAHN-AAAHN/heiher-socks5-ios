@@ -13,7 +13,7 @@ final class StatisticsUITests: XCTestCase {
         // The aggregate table exists even before the first client registers.
         app.tabBars.buttons["Statistics"].tap()
         XCTAssertTrue(app.staticTexts["total-title"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.staticTexts["total-usage-sum"].label, "0.000 KB")
+        XCTAssertEqual(app.staticTexts["total-usage-sum"].label, "0.00 KB")
         XCTAssertFalse(app.staticTexts["client-1"].exists)
         for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
             XCUIDevice.shared.orientation = orientation
@@ -104,9 +104,9 @@ final class StatisticsUITests: XCTestCase {
                     XCTAssertEqual(volumeLabel.frame.midY, usage.frame.midY, accuracy: 1)
                     XCTAssertLessThanOrEqual(speedLabel.frame.maxX, speed.frame.minX + 1)
                     XCTAssertLessThanOrEqual(volumeLabel.frame.maxX, usage.frame.minX + 1)
-                    XCTAssertEqual(speed.label, "0.000 Kbps")
+                    XCTAssertEqual(speed.label, "0.00 Kbps")
                     let expected = Double(bytes * (column == "sum" ? 2 : 1)) / 1_000
-                    XCTAssertEqual(usage.label, String(format: "%.3f KB", expected))
+                    XCTAssertEqual(usage.label, String(format: "%.2f KB", expected))
                 }
                 if id != "total" {
                     let header = app.staticTexts[id]

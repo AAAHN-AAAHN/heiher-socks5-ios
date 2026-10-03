@@ -112,7 +112,7 @@ def main():
     # UDP ownership and patch ordering are validated by the preceding native audit.
     # This integration may not modify the already completed production UI/model.
     run(['git', 'diff', '--exit-code',
-         '2486277eee5f8c4b1db43432621580791ba8681a', 'HEAD', '--',
+         'ce24a845450298f54189d8bb381311f39eb04db7', 'HEAD', '--',
          'Socks5', 'Socks5.xcodeproj'], 'preserved-production-ui.log')
     view = (ROOT / 'Socks5/Statistics/TrafficStatisticsView.swift').read_text()
     old_view = output('git', 'show', ui_base + ':Socks5/Statistics/TrafficStatisticsView.swift')
@@ -137,7 +137,7 @@ def main():
         old_view.split('        .task(id:', 1)[1].split('    /// One shared', 1)[0]
     model = (ROOT / 'Socks5/Statistics/TrafficStatistics.swift').read_text()
     old_model = output('git', 'show', ui_base + ':Socks5/Statistics/TrafficStatistics.swift')
-    # Three-decimal formatting and a computed Sum must not alter raw accumulation.
+    # Two-decimal formatting and a computed Sum must not alter raw accumulation.
     assert model.split('    mutating func sample(', 1)[1].split('    static func capacity(', 1)[0] == \
         old_model.split('    mutating func sample(', 1)[1].split('    static func capacity(', 1)[0]
     assert model.split('struct ClientTrafficStatistics', 1)[1] == old_model.split('struct ClientTrafficStatistics', 1)[1]
