@@ -20,7 +20,7 @@ CONTROLS = {'Build/check.py', 'Build/check_ownership.py',
 FROZEN = {
     'main': '75335d201cb1e541bb153e9899badbc11ccf1973',
     'feature/app-icon': 'a17e33b283025377601aef1bcfd32dfa6b79a426',
-    'feature/background': '5480cbf9859b8d58c20f9001b0c9fda8e23fd6df',
+    'feature/background': '25c4b2f9bc82b8079212dd5bbcff06034b67959c',
     'feature/server-control': '368aa4cf89436651414a8885a2a171f5cff9abd5',
     'feature/settings-persistence': 'a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7',
     'feature/traffic-statistics': 'dc6feaadb9061eb320bbce5d66c56a7c814c93d3',
