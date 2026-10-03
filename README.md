@@ -22,7 +22,7 @@ Total combines all counted clients. Every association retains the reference for 
 
 `TrafficStatistics` derives rate from cumulative-counter differences divided by the actual elapsed monotonic sample time. The first sample, a non-increasing time or decreasing counters establishes a new baseline with zero rate rather than a negative or invalid interval result. Raw counters and rates are retained independently of display rounding.
 
-The tables show In, Out and Sum for speed and volume. Sum is formed before display rounding. Volume uses SI KB/MB/GB/TB/PB and speed uses SI Kbps/Mbps/Gbps/Tbps/Pbps after conversion from bytes per second to bits per second. Values are rounded to exactly two decimal places using a fixed formatting locale. They describe observed traffic, not link capacity.
+The tables show In, Out and In + Out for speed and volume. In + Out is formed before display rounding. Volume uses SI KB/MB/GB/TB/PB and speed uses SI Kbps/Mbps/Gbps/Tbps/Pbps after conversion from bytes per second to bits per second. Values are rounded to exactly two decimal places using a fixed formatting locale. They describe observed traffic, not link capacity.
 
 The native counters continue as traffic is processed. The view samples only while its tab is visible and the scene is active. Re-entering the view establishes a fresh rate baseline without resetting native cumulative volume. IP rows use stable registration IDs; Unattributed appears first when nonzero. Registration-order display is not lexical IP sorting.
 

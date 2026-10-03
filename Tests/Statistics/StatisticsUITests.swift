@@ -87,7 +87,7 @@ final class StatisticsUITests: XCTestCase {
                                   "Abbreviations must leave more room for the value columns")
                 let bytes = ((64 + 2048 + 48001) * (orientation == .portrait ? 1 : 2)) * (id == "total" ? 2 : 1)
                 var previousColumnX: CGFloat = -.infinity
-                for (column, title) in [("in", "In"), ("out", "Out"), ("sum", "Sum")] {
+                for (column, title) in [("in", "In"), ("out", "Out"), ("sum", "In + Out")] {
                     let heading = app.staticTexts[id + "-column-" + column]
                     let speed = app.staticTexts[id + "-speed-" + column]
                     let usage = app.staticTexts[id + "-usage-" + column]
