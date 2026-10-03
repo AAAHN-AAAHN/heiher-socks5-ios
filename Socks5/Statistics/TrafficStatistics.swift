@@ -41,9 +41,9 @@ struct TrafficStatistics {
             divisor *= 1_000
         }
         // Round the numeric value in the selected SI unit, then display exactly
-        // three decimals. Keep raw counters/rates intact for subsequent samples.
-        let rounded = (amount / (divisor / 1_000)).rounded(.toNearestOrAwayFromZero) / 1_000
-        return String(format: "%.3f %@", locale: Locale(identifier: "en_US_POSIX"), rounded, units[index])
+        // two decimals. Keep raw counters/rates intact for subsequent samples.
+        let rounded = (amount / (divisor / 100)).rounded(.toNearestOrAwayFromZero) / 100
+        return String(format: "%.2f %@", locale: Locale(identifier: "en_US_POSIX"), rounded, units[index])
     }
 }
 

@@ -51,7 +51,7 @@ struct TrafficStatisticsView: View {
                         .accessibilityIdentifier("measurement-volume")
                     Text("In: payload read from destination sockets into this app. Out: payload successfully written by this app to destination sockets. Sum: In + Out before display rounding. SOCKS and transport headers, retransmissions and system-resolver traffic are excluded; these are not VPN, radio or billed data totals.")
                     Text("Total combines all clients. Each IP table contains traffic attributed to that observed SOCKS control-peer IP, not a device identity. IPs follow registration order; Unattributed appears first when needed. Independent live reads can briefly differ from the aggregate.")
-                    Text("Values use three decimal places. KB/MB/GB/TB/PB are 1,000-based bytes; Kbps/Mbps/Gbps/Tbps/Pbps are bits per second. Visible sampling pauses while this tab is hidden or the app is inactive; native totals continue as traffic is processed.")
+                    Text("Values use two decimal places. KB/MB/GB/TB/PB are 1,000-based bytes; Kbps/Mbps/Gbps/Tbps/Pbps are bits per second. Visible sampling pauses while this tab is hidden or the app is inactive; native totals continue as traffic is processed.")
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
