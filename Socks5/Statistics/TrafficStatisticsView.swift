@@ -49,7 +49,7 @@ struct TrafficStatisticsView: View {
                         .accessibilityIdentifier("measurement-speed")
                     Text("Vol. (volume): cumulative TCP/UDP payload bytes read from or successfully written to destination-side sockets since this app process started. Server Stop/Start does not reset it; a new app process does.")
                         .accessibilityIdentifier("measurement-volume")
-                    Text("In: payload read from destination sockets into this app. Out: payload successfully written by this app to destination sockets. Sum: In + Out before display rounding. SOCKS and transport headers, retransmissions and system-resolver traffic are excluded; these are not VPN, radio or billed data totals.")
+                    Text("In: payload read from destination sockets into this app. Out: payload successfully written by this app to destination sockets. In + Out: the sum of both directions before display rounding. SOCKS and transport headers, retransmissions and system-resolver traffic are excluded; these are not VPN, radio or billed data totals.")
                     Text("Total combines all clients. Each IP table contains traffic attributed to that observed SOCKS control-peer IP, not a device identity. IPs follow registration order; Unattributed appears first when needed. Independent live reads can briefly differ from the aggregate.")
                     Text("Values use two decimal places. KB/MB/GB/TB/PB are 1,000-based bytes; Kbps/Mbps/Gbps/Tbps/Pbps are bits per second. Visible sampling pauses while this tab is hidden or the app is inactive; native totals continue as traffic is processed.")
                 }
@@ -80,7 +80,7 @@ struct TrafficStatisticsView: View {
                 rowLabel(" ").accessibilityHidden(true)
                 tableCell("In", id: "\(id)-column-in", bold: true)
                 tableCell("Out", id: "\(id)-column-out", bold: true)
-                tableCell("Sum", id: "\(id)-column-sum", bold: true)
+                tableCell("In + Out", id: "\(id)-column-sum", bold: true)
             }
             Color(white: 0.82)
                 .frame(height: 1)

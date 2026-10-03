@@ -31,7 +31,7 @@ struct BackgroundKeepAliveView: View {
                     Text(keepAlive.locationState)
                     LabeledContent("Reads", value: String(keepAlive.readCount))
                     if let date = keepAlive.lastRead {
-                        LabeledContent("Last read") { Text(date, style: .time) }
+                        LabeledContent("Last read") { Text(date, format: .dateTime.hour().minute().second()) }
                     }
                     Text("Allow location access in Settings. Precise Location is not required.")
                         .font(.footnote)

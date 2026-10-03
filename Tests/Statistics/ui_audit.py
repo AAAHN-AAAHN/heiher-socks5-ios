@@ -112,7 +112,7 @@ def main():
     # UDP ownership and patch ordering are validated by the preceding native audit.
     # This integration may not modify the already completed production UI/model.
     run(['git', 'diff', '--exit-code',
-         'ce24a845450298f54189d8bb381311f39eb04db7', 'HEAD', '--',
+         '2bdfbaf34b24fd3486bb613d65629ba7372aafba', 'HEAD', '--',
          'Socks5', 'Socks5.xcodeproj'], 'preserved-production-ui.log')
     view = (ROOT / 'Socks5/Statistics/TrafficStatisticsView.swift').read_text()
     old_view = output('git', 'show', ui_base + ':Socks5/Statistics/TrafficStatisticsView.swift')
@@ -141,7 +141,7 @@ def main():
     assert model.split('    mutating func sample(', 1)[1].split('    static func capacity(', 1)[0] == \
         old_model.split('    mutating func sample(', 1)[1].split('    static func capacity(', 1)[0]
     assert model.split('struct ClientTrafficStatistics', 1)[1] == old_model.split('struct ClientTrafficStatistics', 1)[1]
-    assert 'tableCell("Sum"' in view and 'tableCell("Total"' not in view
+    assert 'tableCell("In + Out"' in view and 'tableCell("Total"' not in view
     assert 'Grid(alignment:' in view and '.foregroundStyle(.black)' in view
     assert '.fontWeight(bold ? .bold : .regular)' in view and 'Color(white: 0.82)' in view
     # Unit/scale extension must not add another renderer or sampling path.
