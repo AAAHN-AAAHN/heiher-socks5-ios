@@ -1,6 +1,6 @@
 {
   "branch": "release/integrated",
-  "frozen_source": "9498c97622895924d98a1b5d854968b5e34eb14d",
+  "frozen_source": "144ea7d2ec2d6a835d8ae1d1765167ef37d3339c",
   "parents": {
     "feature/app-icon": "d2e2430046b2987d37fdc25733565c8d407a7b38",
     "feature/background": "182e6396c4895348ab22980b76ed9250fd02cd93",
@@ -16,7 +16,7 @@
   "readme_mirror": "docs/features/integrated.md",
   "validation_files": {
     "Build/check.py": "c952262492f5623ddcae1aae38216c3906de7e59",
-    "Build/check_documentation.py": "74711f0e7f695e17df3302d004240aa952754b79",
+    "Build/check_documentation.py": "20f5a3782a10771d4f44a1fbde112326c776359c",
     "Build/check_ownership.py": "32e5764411831c9db0755e8fc9f76c475bb03813",
     "Tests/AppIcon/check_icon.py": "4a3124da0696858401bee966ac015da368ade44b",
     "Tests/Background/check_scope.py": "fbacaed3e63162aa3527d0ea224237397ad8210b",
