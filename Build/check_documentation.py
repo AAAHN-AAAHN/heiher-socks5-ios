@@ -17,21 +17,20 @@ SUPPORT = {'Build/check_documentation.py', 'Tests/documentation_contract.py'}
 CONTROLS = {'Build/check.py', 'Build/check_ownership.py',
             'Tests/AppIcon/check_icon.py', 'Tests/Background/check_scope.py',
             'Tests/Statistics/audit.py'}
-FROZEN = {
-    'main': '75335d201cb1e541bb153e9899badbc11ccf1973',
-    'feature/app-icon': 'a17e33b283025377601aef1bcfd32dfa6b79a426',
-    'feature/background': '5480cbf9859b8d58c20f9001b0c9fda8e23fd6df',
-    'feature/server-control': '368aa4cf89436651414a8885a2a171f5cff9abd5',
-    'feature/settings-persistence': 'a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7',
-    'feature/traffic-statistics': 'dc6feaadb9061eb320bbce5d66c56a7c814c93d3',
-    'feature/udp-compat': '8965cf064511b4c571ba8961d34901031a6fd411',
-    'release/integrated': 'b9dcac6da65fb7eed7ba5aad19d5208f45d5abcc',
+APPROVAL = 'Build/documentation-baseline.json'
+PRINCIPLES_SOURCE = '75335d201cb1e541bb153e9899badbc11ccf1973'
+PARENTS = {
+    'main': ['upstream'],
+    'feature/app-icon': ['main'],
+    'feature/background': ['main'],
+    'feature/server-control': ['main'],
+    'feature/settings-persistence': ['feature/server-control'],
+    'feature/traffic-statistics': ['feature/udp-compat'],
+    'feature/udp-compat': ['main'],
+    'release/integrated': ['feature/app-icon', 'feature/background',
+                           'feature/server-control', 'feature/settings-persistence',
+                           'feature/traffic-statistics', 'feature/udp-compat'],
 }
-PARENTS = {name: ['main'] for name in FROZEN if name != 'main'}
-PARENTS.update({'main': ['upstream'],
-                'feature/traffic-statistics': ['feature/udp-compat'],
-                'feature/settings-persistence': ['feature/server-control'],
-                'release/integrated': [name for name in FROZEN if name.startswith('feature/')]})
 HEADINGS = ['Purpose and scope', 'Functional behavior', 'Implementation and ownership',
             'Design rationale and resource cost', 'Verification contract',
             'Operation and limitations', 'Related documents']
@@ -81,8 +80,20 @@ def configuration(root):
     path = Path(root) / MANIFEST
     require(path.is_file() and not path.is_symlink(), 'Missing regular documentation contract')
     value = json.loads(path.read_bytes())
-    require(value['branch'] in FROZEN, 'Unknown documentation branch')
-    require(value['frozen_source'] == FROZEN[value['branch']], 'Frozen source identity changed')
+    require(value['branch'] in PARENTS, 'Unknown documentation branch')
+    # The branch-specific approval is read from HEAD, never trusted from an edit
+    # to the manifest being checked. The shared checker contains no branch pins.
+    approved = tree(root, 'HEAD').get(APPROVAL)
+    require(approved is not None and approved[:2] == ('100644', 'blob'),
+            'Missing regular committed documentation baseline')
+    require(stamp(Path(root) / APPROVAL) == approved and index_tree(root).get(APPROVAL) == approved,
+            'Documentation baseline differs from committed approval')
+    baseline = json.loads(show(root, 'HEAD', APPROVAL))
+    require(set(baseline) == {'branch', 'frozen_source'} and baseline['branch'] == value['branch'],
+            'Documentation baseline branch differs')
+    require(isinstance(baseline['frozen_source'], str) and
+            re.fullmatch(r'[0-9a-f]{40}', baseline['frozen_source']), 'Invalid immutable baseline identity')
+    require(value['frozen_source'] == baseline['frozen_source'], 'Frozen source identity changed')
     require(set(value['validation_files']) <= CONTROLS | SUPPORT, 'Unexpected documentation-code exception')
     require(SUPPORT <= set(value['validation_files']), 'Missing documentation validation support')
     return value
@@ -90,12 +101,12 @@ def configuration(root):
 
 def documentation_input(root, path):
     value = configuration(root)
-    return document(path) or path in value['validation_files'] or path in (MANIFEST, 'docs/feature-membership.json')
+    return document(path) or path in value['validation_files'] or path in (MANIFEST, APPROVAL, 'docs/feature-membership.json')
 
 
 def code_paths(root, paths):
     value = configuration(root)
-    excluded = set(value['validation_files']) | {MANIFEST, 'docs/feature-membership.json'}
+    excluded = set(value['validation_files']) | {MANIFEST, APPROVAL, 'docs/feature-membership.json'}
     return [p for p in paths if not document(p) and p not in excluded]
 
 
@@ -119,6 +130,7 @@ def check_membership(root, baseline, value):
     original = json.loads(show(root, value['frozen_source'], path))
     current = json.loads((root / path).read_bytes())
     require(set(current) == set(original), 'Membership structure changed')
+    require(current.get('branches', {}) == value['parents'], 'Membership document parents differ')
     for key in set(original) - {'sources', 'files'}:
         require(current[key] == original[key], 'Functional membership changed: ' + key)
     expected_files = {p: h for p, h in original.get('files', {}).items() if not document(p)}
@@ -197,7 +209,7 @@ def check(root=ROOT, live=False):
     staged = index_tree(root)
     git(root, 'merge-base', '--is-ancestor', value['frozen_source'], 'HEAD')
     names = set(git(root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z').decode().split('\0')) - {''}
-    special = set(value['validation_files']) | {MANIFEST, 'docs/feature-membership.json'}
+    special = set(value['validation_files']) | {MANIFEST, APPROVAL, 'docs/feature-membership.json'}
     for name in (set(baseline) | names) - special:
         if document(name):
             continue
@@ -241,6 +253,11 @@ def check(root=ROOT, live=False):
             require(target not in inherited_entries or inherited_entries[target] == entry,
                     'Conflicting inherited mode: ' + target)
             inherited_entries[target] = entry
+    for parent, ref in refs.items():
+        if parent != 'upstream':
+            for name in SUPPORT:
+                require(show(root, ref, name) == (root / name).read_bytes(),
+                        'Shared documentation validator differs: ' + parent + ':' + name)
     owned = set(value['owned_documents'])
     require(len(owned) == len(value['owned_documents']) and all(document(p) for p in owned),
             'Invalid owned document inventory')
@@ -255,7 +272,7 @@ def check(root=ROOT, live=False):
     mirror = value['readme_mirror']
     require(mirror in owned and (root / 'README.md').read_bytes() == (root / mirror).read_bytes(), 'README mirror differs')
     require((root / 'docs/top-level-principles.md').read_bytes() ==
-            show(root, FROZEN['main'], 'docs/top-level-principles.md'), 'Governing principles changed')
+            show(root, PRINCIPLES_SOURCE, 'docs/top-level-principles.md'), 'Governing principles changed')
     upstream = json.loads((root / 'Build/upstream.json').read_bytes())['upstream_app']
     require((root / 'docs/upstream/README.md').read_bytes() == show(root, upstream, 'README.md'), 'Upstream README changed')
     require((root / 'LICENSE').read_bytes() == show(root, upstream, 'LICENSE'), 'Upstream license changed')
