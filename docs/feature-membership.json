@@ -1,7 +1,7 @@
 {
   "base_commit": "bf23e26538cffb7c79f1cf401792a74cbd9848e9",
   "branches": {
-    "feature/server-control": "013cf1bcad49dc99fd52af354e559c355957793b"
+    "feature/server-control": "e20a70aa25f410f965f38fbdcd965e50e98ee685"
   },
   "sources": {
     "Socks5/Server/ServerSettings.swift": {
@@ -109,8 +109,8 @@
       "sha256": "6bff598fee7dd0fa7bf099fe68cfe38c3e8515bf103b553e723964e68bf8ea48"
     },
     "Tests/ServerControl/final_native_check.py": {
-      "commit": "013cf1bcad49dc99fd52af354e559c355957793b",
-      "sha256": "0d3867324bd7be59be2b26badb5d7c528562cebbda9e95b818624a35beb4dce8"
+      "commit": "e20a70aa25f410f965f38fbdcd965e50e98ee685",
+      "sha256": "510d43f92a70808c882224d165656ae0249a6c45c5f4977a1599eb183606ecb3"
     },
     "Tests/ServerControl/ui_audit.py": {
       "commit": "013cf1bcad49dc99fd52af354e559c355957793b",
