@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-static uint64_t now_ns;
+static uint64_t now_ns, suspended_ns, sleep_jump_ns;
 static unsigned int clock_calls, alloc_calls, fail_next, wait_calls;
 static unsigned int io_remaining;
 static size_t live_bytes, peak_bytes;
@@ -41,10 +41,23 @@ unsigned int audit_sleep (unsigned int milliseconds);
 int
 audit_clock (clockid_t clock, struct timespec *ts)
 {
-    (void)clock;
+    uint64_t value = now_ns;
+#if defined(__APPLE__) && defined(CLOCK_UPTIME_RAW)
+    if (clock == CLOCK_UPTIME_RAW)
+        value -= suspended_ns;
+    else
+        assert (clock == CLOCK_MONOTONIC);
+#else
+    if (clock == CLOCK_MONOTONIC)
+        value -= suspended_ns;
+#if defined(CLOCK_BOOTTIME)
+    else
+        assert (clock == CLOCK_BOOTTIME);
+#endif
+#endif
     clock_calls++;
-    ts->tv_sec = now_ns / UDP_NSEC_PER_SEC;
-    ts->tv_nsec = now_ns % UDP_NSEC_PER_SEC;
+    ts->tv_sec = value / UDP_NSEC_PER_SEC;
+    ts->tv_nsec = value % UDP_NSEC_PER_SEC;
     return 0;
 }
 
@@ -52,7 +65,7 @@ audit_clock (clockid_t clock, struct timespec *ts)
 uint64_t
 audit_clock_ns (clockid_t clock)
 {
-    (void)clock;
+    assert (clock == CLOCK_MONOTONIC_RAW);
     clock_calls++;
     return now_ns;
 }
@@ -101,6 +114,9 @@ audit_sleep (unsigned int milliseconds)
     assert (wait_calls < 32 && milliseconds >= io_remaining);
     delays[wait_calls++] = milliseconds;
     now_ns += (uint64_t)(milliseconds - io_remaining) * 1000000;
+    now_ns += sleep_jump_ns;
+    suspended_ns += sleep_jump_ns;
+    sleep_jump_ns = 0;
     return io_remaining;
 }
 
@@ -300,6 +316,46 @@ independent_wait (void)
         "PASS: independent maintenance wakes preserve 130s timeout; I/O wake and Stop; no cleanup sleep without extensions");
 }
 
+static void
+sleep_clock_domains (void)
+{
+    unsigned char base[UDP_BUF_SIZE];
+    UDPBuffers owner;
+    UDPBuffer b;
+    HevSocks5 self = { .type = HEV_SOCKS5_TYPE_UDP_IN_TCP, .timeout = 60000 };
+    init (&b, &owner, base);
+    now_ns = 1000 * UDP_NSEC_PER_SEC;
+    suspended_ns = 400 * UDP_NSEC_PER_SEC;
+    assert (udp_timeout_now () == 600 * UDP_NSEC_PER_SEC);
+    use (&b, 48001);
+    assert (b.history[93] == 1300 * UDP_NSEC_PER_SEC);
+    wait_calls = 0;
+    io_remaining = 50000;
+    sleep_jump_ns = 120 * UDP_NSEC_PER_SEC;
+    assert (udp_buffers_yield (HEV_TASK_WAITIO, &self, &owner) == 0);
+    assert (wait_calls == 1 && delays[0] == 60000 && !owner.idle_deadline);
+    assert (udp_timeout_now () == 610 * UDP_NSEC_PER_SEC);
+    assert (udp_buffer_now () == 1130 * UDP_NSEC_PER_SEC);
+    udp_buffers_cleanup (&owner, now_ns);
+    assert (b.capacity == 48500);
+
+    /* Maintenance consumes awake time, while retention ages across sleep. */
+    self.timeout = 130000;
+    io_remaining = 0;
+    sleep_jump_ns = 360 * UDP_NSEC_PER_SEC;
+    wait_calls = 0;
+    assert (udp_buffers_yield (HEV_TASK_WAITIO, &self, &owner) == 0);
+    assert (wait_calls == 1 && delays[0] == 60000);
+    assert (owner.idle_deadline == 740 * UDP_NSEC_PER_SEC);
+    udp_buffers_cleanup (&owner, now_ns);
+    assert (b.capacity == 1500 && !owner.next_cleanup && !live_bytes);
+    assert (udp_buffers_yield (HEV_TASK_WAITIO, &self, &owner) == -1);
+    assert (wait_calls == 2 && delays[1] == 70000);
+    suspended_ns = 0;
+    puts (
+        "PASS: distinct sleep/awake clocks preserve I/O and idle deadlines without extending buffer retention");
+}
+
 int
 main (void)
 {
@@ -307,6 +363,7 @@ main (void)
     timeline_and_failures ();
     reference_histories ();
     independent_wait ();
+    sleep_clock_domains ();
     assert (live_bytes == 0);
     printf (
         "PASS: all policy allocation ownership released; test peak=%zu bytes\n",
