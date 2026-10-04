@@ -50,7 +50,8 @@ def main():
     assert extra.startswith(b'diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c\n')
     assert re.findall(rb'^diff --git a/(\S+) b/', extra, re.M) == [
         b'src/hev-socks5-worker.c', b'src/hev-socks5-proxy.c',
-        b'src/hev-socks5-proxy.h', b'src/hev-main.c', b'src/hev-main.h']
+        b'src/hev-socks5-proxy.h', b'src/hev-main.c', b'src/hev-main.h',
+        b'src/hev-socks5-proxy.c']
     # The native probe also reconstructs the exact upstream worker blob and checks
     # that this adds only the pre-yield Stop guard before compiling both versions.
     root = content('Socks5/AppRoot.swift')

@@ -12,7 +12,7 @@
   "validation_files": {
     "Build/check.py": "1c042a36950e9dc62c976ebd33dfa1e951323935",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
-    "Build/check_ownership.py": "b586c0ec265d861678c9f7b8b2ad050e83007fc7",
+    "Build/check_ownership.py": "e6ee5fd524cb7f8527a7bafd040f8505dfe7214f",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }
