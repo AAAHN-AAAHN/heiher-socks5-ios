@@ -1,7 +1,7 @@
 {
   "base_commit": "bf23e26538cffb7c79f1cf401792a74cbd9848e9",
   "branches": {
-    "feature/server-control": "e20a70aa25f410f965f38fbdcd965e50e98ee685"
+    "feature/server-control": "789d5817d6834211e4531e21f725f39c8bfb7806"
   },
   "sources": {
     "Socks5/Server/ServerSettings.swift": {
@@ -17,8 +17,8 @@
       "sha256": "0684c8be1fae897e045ca22471e33c26e1a5ed950c45c107ad04009742ea7208"
     },
     "Patches/hev-server-startup-stop.patch": {
-      "commit": "013cf1bcad49dc99fd52af354e559c355957793b",
-      "sha256": "fe1f9409c39d426aefb1271b7b34336ef52252a03bcc59374c9295d97e9b1b1b"
+      "commit": "789d5817d6834211e4531e21f725f39c8bfb7806",
+      "sha256": "e95eaa89cf4abf3e06f1e7a4753daecd856f8def8f698ef9aac249cde5ac2205"
     },
     "Tests/server_lifecycle_host.c": {
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
@@ -109,16 +109,16 @@
       "sha256": "6bff598fee7dd0fa7bf099fe68cfe38c3e8515bf103b553e723964e68bf8ea48"
     },
     "Tests/ServerControl/final_native_check.py": {
-      "commit": "e20a70aa25f410f965f38fbdcd965e50e98ee685",
-      "sha256": "510d43f92a70808c882224d165656ae0249a6c45c5f4977a1599eb183606ecb3"
+      "commit": "789d5817d6834211e4531e21f725f39c8bfb7806",
+      "sha256": "3163980805168e45fa5fde2372273dafcede700364b0b663a5e7c5f08413d477"
     },
     "Tests/ServerControl/ui_audit.py": {
-      "commit": "013cf1bcad49dc99fd52af354e559c355957793b",
-      "sha256": "f27fc622d2cc240333cf363d86c1da990b49eed59ca149aea09ff841b6810220"
+      "commit": "789d5817d6834211e4531e21f725f39c8bfb7806",
+      "sha256": "fec7dc103edddef021b78631d2ff16a998d0b89f30df48c39511750f17a517f6"
     },
     "Tests/ServerControl/auth_startup_probe.c": {
-      "commit": "013cf1bcad49dc99fd52af354e559c355957793b",
-      "sha256": "f760a036082ccbb2d1d2baea6c1e59da30570d6bc82f820ed80c62c54f51a294"
+      "commit": "789d5817d6834211e4531e21f725f39c8bfb7806",
+      "sha256": "c0024e473f63fc8942b8ad7899e438e2064cddb9da256b30685dad801fba7403"
     }
   },
   "files": {

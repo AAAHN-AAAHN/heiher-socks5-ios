@@ -1,6 +1,7 @@
-/* Real native initialization; only the two allocation results are injectable. */
+/* Real initialization; only allocation and credential-read outcomes are injectable. */
 #include <assert.h>
 #include <arpa/inet.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +11,7 @@
 #include "hev-main.h"
 #include "hev-socks5-user-mark.h"
 
-static int fail_auth, fail_user, auth_calls, user_calls;
+static int fail_auth, fail_user, fail_read, auth_calls, user_calls;
 
 static HevSocks5Authenticator *
 new_auth (void)
@@ -28,9 +29,21 @@ new_user (const char *name, unsigned int nlen, const char *pass,
                        hev_socks5_user_mark_new (name, nlen, pass, plen, mark);
 }
 
+static ssize_t
+read_line (char **line, size_t *length, FILE *file)
+{
+    if (fail_read) {
+        errno = ENOMEM;
+        return -1;
+    }
+    return getline (line, length, file);
+}
+
 #define hev_socks5_authenticator_new new_auth
 #define hev_socks5_user_mark_new new_user
+#define getline read_line
 #include "hev-socks5-proxy.c"
+#undef getline
 #undef hev_socks5_authenticator_new
 #undef hev_socks5_user_mark_new
 
@@ -43,8 +56,9 @@ main (int argc, char **argv)
                            "auth:\n  username: ''\n  password: 'pass'\n",
                            "auth:\n  username: 'user'\n  password: ''\n",
                            "auth:\n  file: '/dev/null/missing-auth-file'\n",
+                           "auth:\n  file: '/dev/null'\n",
                            "auth:\n  username: 'user'\n  password: 'pass'\n" };
-    const int expected[] = { 0, -1, -1, -1, -1, -1, 0 };
+    const int expected[] = { 0, -1, -1, -1, -1, -1, -1, 0 };
     struct sockaddr_in address = { .sin_family = AF_INET };
     char config[512];
     int workers, port, i;
@@ -54,10 +68,11 @@ main (int argc, char **argv)
     port = atoi (argv[2]);
     address.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
     address.sin_port = htons (port);
-    for (i = 0; i < 7; i++) {
+    for (i = 0; i < 8; i++) {
         int result, fd;
         fail_auth = i <= 1;
         fail_user = i == 2;
+        fail_read = i == 6;
         auth_calls = user_calls = 0;
         snprintf (config, sizeof (config),
                   "main:\n  workers: %d\n  listen-address: '127.0.0.1'\n"
@@ -85,6 +100,6 @@ main (int argc, char **argv)
         close (fd);
     }
     puts (
-        "PASS: seven authentication startup cases; failure closes the listener and releases workers");
+        "PASS: eight authentication startup cases; failure closes the listener and releases workers");
     return 0;
 }
