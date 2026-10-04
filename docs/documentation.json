@@ -2,12 +2,12 @@
   "branch": "release/integrated",
   "frozen_source": "df0b59cbf81443b0f755a1d7d1fb0c004ebdb3e4",
   "parents": {
-    "feature/app-icon": "50b8b5ac35064f44b4796f44197c463e360e6c6a",
-    "feature/background": "aef83b39118d26ec844df9d12009be8f2afad8ba",
-    "feature/server-control": "b0fcebef900bb63fdb93fdbd5dc12bd92ec240cd",
-    "feature/settings-persistence": "2f5d16328a1c2848665e62de5a4bfb9a78629547",
-    "feature/udp-compat": "31b72406adc88ae2d57bb4c54383a5646d3ad772",
-    "feature/traffic-statistics": "9d53bbd255dbd7d4bbe5e61aca175ea71619a6de"
+    "feature/app-icon": "fcf9e6a7d56b0f4e3732070c6f1d803d2d28cc9b",
+    "feature/background": "f16ba6eafdf3ff7685be1a9e2fc9c7cc2da1075a",
+    "feature/server-control": "765614f67add7448a6ffdf67bbe739008375cab9",
+    "feature/settings-persistence": "19b96acf4bc6b40f116630fee9985130c44e38ca",
+    "feature/udp-compat": "ba594ea1baec2604bddf3f3faa942a812fcfe53d",
+    "feature/traffic-statistics": "d21790da8d877ed2b578e225e5a0d9edd64bd4b3"
   },
   "owned_documents": [
     "README.md",
@@ -18,9 +18,9 @@
     "Build/check.py": "c952262492f5623ddcae1aae38216c3906de7e59",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
     "Build/check_ownership.py": "32e5764411831c9db0755e8fc9f76c475bb03813",
-    "Tests/AppIcon/check_icon.py": "626ba6be821d9b1bcfd3f867f786ad89e638ccf4",
-    "Tests/Background/check_scope.py": "9945fea3133d6911b4475748f3077e0c48b95a5f",
-    "Tests/Statistics/audit.py": "c628058a7ce84d841cd0fb6b679b1a4072d8b940",
+    "Tests/AppIcon/check_icon.py": "e0037d96e64b917808483c5cf5384e62786270e4",
+    "Tests/Background/check_scope.py": "73bc11a34305a24909f81ed5bab17fe576456fe7",
+    "Tests/Statistics/audit.py": "572a8167addeda6ff48f3bc995974844436069d6",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }

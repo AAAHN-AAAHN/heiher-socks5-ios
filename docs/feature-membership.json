@@ -1,12 +1,12 @@
 {
-  "base_commit": "75335d201cb1e541bb153e9899badbc11ccf1973",
+  "base_commit": "c40a4add7ed1674f0ee95096dd274a01ee1752a5",
   "branches": {
-    "feature/app-icon": "50b8b5ac35064f44b4796f44197c463e360e6c6a",
-    "feature/background": "aef83b39118d26ec844df9d12009be8f2afad8ba",
-    "feature/server-control": "b0fcebef900bb63fdb93fdbd5dc12bd92ec240cd",
-    "feature/settings-persistence": "2f5d16328a1c2848665e62de5a4bfb9a78629547",
-    "feature/udp-compat": "31b72406adc88ae2d57bb4c54383a5646d3ad772",
-    "feature/traffic-statistics": "9d53bbd255dbd7d4bbe5e61aca175ea71619a6de"
+    "feature/app-icon": "fcf9e6a7d56b0f4e3732070c6f1d803d2d28cc9b",
+    "feature/background": "f16ba6eafdf3ff7685be1a9e2fc9c7cc2da1075a",
+    "feature/server-control": "765614f67add7448a6ffdf67bbe739008375cab9",
+    "feature/settings-persistence": "19b96acf4bc6b40f116630fee9985130c44e38ca",
+    "feature/udp-compat": "ba594ea1baec2604bddf3f3faa942a812fcfe53d",
+    "feature/traffic-statistics": "d21790da8d877ed2b578e225e5a0d9edd64bd4b3"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -30,8 +30,8 @@
       "sha256": "8e04be1633e4382e741ad803c68212ec0282e99873c874cb6101adcfa0c88edc"
     },
     "Patches/hev-udp-dynamic-buffer.patch": {
-      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
-      "sha256": "93b447da99de5c766f4d142203214748d98f4ffc4ddf3a26f7bc1f7894a07754"
+      "commit": "d21790da8d877ed2b578e225e5a0d9edd64bd4b3",
+      "sha256": "ebce7b15ad455c723fface338001a9629412cf09ebaa4434253a66f97e34fb8f"
     },
     "Patches/hev-udp-peer-filter.patch": {
       "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
@@ -110,12 +110,12 @@
       "sha256": "f32cebe2d501b259b6c28bcf63c1e2f7d96fb311d8c93efe1b610e194a4eea67"
     },
     "Tests/AppIcon/check_icon.py": {
-      "commit": "50b8b5ac35064f44b4796f44197c463e360e6c6a",
-      "sha256": "08986f98d0ba4e9156c46d1eeeec2efffffb5ba174d70198ff6ff04589a58283"
+      "commit": "fcf9e6a7d56b0f4e3732070c6f1d803d2d28cc9b",
+      "sha256": "a9d982c8e0fa44aced00504dbdcf67e0fcc357877f68ca989a69414f52b4623c"
     },
     "Tests/AppIcon/run_checks.sh": {
-      "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
-      "sha256": "20288c5e6eeb8ce4e5b5ab53af8d351db4c0ce7787cfed4b063303b96a18643b"
+      "commit": "fcf9e6a7d56b0f4e3732070c6f1d803d2d28cc9b",
+      "sha256": "2b4aaaeeca29f692cc63e5f2c6501d61d7f365caba75439f4ea8587c6eaf8769"
     },
     "Tests/AppIcon/test_audit_boundaries.py": {
       "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
@@ -226,8 +226,8 @@
       "sha256": "b17c5233214664de6dba3f0b0adb97e00892e0dbd189a26db850ca00ce3c18ea"
     },
     "Tests/Background/check_scope.py": {
-      "commit": "aef83b39118d26ec844df9d12009be8f2afad8ba",
-      "sha256": "e50ce6417e969aadf3d077e7d1c9ca97833ffa39589deb3a59dabcb085fc884b"
+      "commit": "f16ba6eafdf3ff7685be1a9e2fc9c7cc2da1075a",
+      "sha256": "6d55789915085f52a7c2b60246586189585f558fd7adc63078c46524f3c79394"
     },
     "Tests/Background/check_session_ownership.py": {
       "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
@@ -398,8 +398,8 @@
       "sha256": "c4bcbab59660eb649c990ef1971a19d7b03b4e0f58c832928d84876543845c3a"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "9d53bbd255dbd7d4bbe5e61aca175ea71619a6de",
-      "sha256": "7d3eef028986a2b2b5c6e89cfde1468623f2aa0bd4452970b011cf3f7c80e204"
+      "commit": "d21790da8d877ed2b578e225e5a0d9edd64bd4b3",
+      "sha256": "ea0bae5e9aef23ee38b25f6c15f0447d6b34c65625a128f9740efc70033602b8"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
@@ -518,8 +518,8 @@
       "sha256": "df028fa922043f68c38503be262de2a7173e743aaa92e6ccf91e120db8d8a83b"
     },
     "Tests/udp_buffer_unit.c": {
-      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
-      "sha256": "81d735c2f86c3d80a954d84adab6f603e7ecf7472e138f633c14f1e9d5f8b725"
+      "commit": "d21790da8d877ed2b578e225e5a0d9edd64bd4b3",
+      "sha256": "b7f1d294673a7b26132253c2e3b103dc1b5de44a3749ce3a165097243f05917f"
     },
     "Tests/udp_compat_audit.py": {
       "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
@@ -554,8 +554,8 @@
       "sha256": "c41980fccc66dacb9bddff470050fb0e24a1c658d1537568c8ed23a0cfe076d2"
     },
     "Build/inherited-workflows/traffic-statistics-verify-build.yml": {
-      "commit": "9d53bbd255dbd7d4bbe5e61aca175ea71619a6de",
-      "sha256": "9a99e765fe4c0e8e05d63b714aa7f9eed217b30bedc7c5110de074f7dda892c1",
+      "commit": "d21790da8d877ed2b578e225e5a0d9edd64bd4b3",
+      "sha256": "d1dc56c2ae056bde404c7b0f56e8ed96eb71ca5c602f3389a420937c0f7e8063",
       "path": ".github/workflows/verify-build.yml"
     },
     "Build/inherited-workflows/traffic-statistics-udp-compat-audit.yml": {

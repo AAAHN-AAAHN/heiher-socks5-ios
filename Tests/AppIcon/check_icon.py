@@ -9,7 +9,7 @@ import subprocess
 import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE = '75335d201cb1e541bb153e9899badbc11ccf1973'
+BASE = 'c40a4add7ed1674f0ee95096dd274a01ee1752a5'
 INPUT = 'f88e8c8946b095c4d5551d413dee3b4a60943714'
 CATALOG = 'Socks5/Assets.xcassets/AppIcon.appiconset'
 IMAGE_HASH = '4a2f2a9384e8b6db351a9284232db56e719377e60f17123e4a6992cee1799cc2'
@@ -115,14 +115,19 @@ def main():
     paths = documents['code_paths'](ROOT, git('ls-files').decode().splitlines())
     originals = documents['code_paths'](ROOT, git('ls-tree', '-r', '--name-only', INPUT).decode().splitlines())
     allowed = {'.github/workflows/verify-build.yml', 'README.md', 'docs/features/app-icon.md'}
-    shared = {'Build/build.sh', 'Build/check.py', 'docs/main-baseline.md'}
+    shared = {'Build/build.sh', 'Build/check.py', 'docs/main-baseline.md',
+              'Build/upstream.json', 'Build/baseline-framework.json'}
+    shared.update(p for p in git('ls-tree', '-r', '--name-only', BASE).decode().splitlines()
+                  if p.startswith('HevSocks5Server.xcframework/'))
     inherited = {'Tests/baseline_audit.py', 'docs/top-level-principles.md'}
     for path in documents['code_paths'](ROOT, shared | inherited):
         require((ROOT / path).read_bytes() == git('show', BASE + ':' + path),
                 'Current main source: ' + path)
     old_config = json.loads(git('show', INPUT + ':Build/features.json'))
+    baseline_config = json.loads(git('show', BASE + ':Build/features.json'))
     require(json.loads((ROOT / 'Build/features.json').read_bytes()) ==
-            dict(old_config, base_commit=BASE), 'Only the exact main reference changes')
+            dict(old_config, base_commit=BASE, sources=baseline_config['sources'],
+                 upstream_app=baseline_config['upstream_app']), 'Only shared baseline inputs change')
     preserved = []
     require(set(originals) <= set(paths), 'Original file removed')
     for path in originals:
@@ -132,7 +137,6 @@ def main():
     require(all(p.startswith('Tests/AppIcon/') or p in inherited
                 for p in set(paths) - set(originals)),
             'Unexpected feature addition')
-    baseline_config = json.loads(git('show', BASE + ':Build/features.json'))
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
     require(config['features'] == ['icon'] and not config['patches'], 'Icon-only composition')
     for key in ('sources', 'upstream_app'):

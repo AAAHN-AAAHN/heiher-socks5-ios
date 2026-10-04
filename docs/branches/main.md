@@ -42,7 +42,7 @@ The normal source checks are `python3 Build/check.py baseline` and `python3 Buil
 
 Use a clean full-history checkout and the commands selected by the checkout's feature manifest and workflow. Main is a baseline, not the integrated six-feature deliverable. Do not link a feature app against the committed unpatched framework when its public native interface requires a generated feature framework.
 
-The committed baseline framework's inventory records Xcode 16.4 and iPhoneOS SDK 18.5 as its build environment. This identifies that checked-in artifact; it is not evidence of runtime execution on the target phone. Feature and release product checks use their own recorded SDK and generated framework rather than treating the baseline build environment as the device's environment.
+The committed baseline framework's inventory records Xcode 27.0 and iPhoneOS SDK 27.0 as its build environment. This identifies that checked-in artifact; it is not evidence of runtime execution on the target phone. Feature and release product checks use their own recorded SDK and generated framework rather than treating the baseline build environment as the device's environment.
 
 The configured minimum iOS version is 17.2. The primary intended deployment is a physical iOS 27 device through SideStore standalone installation or LiveContainer guest execution. Those environments have different signing, containers, permissions and shared-session boundaries. Host and Simulator results do not certify either physical installation route, background survival or device power consumption.
 

@@ -44,7 +44,7 @@ UDP-over-TCP has a different consumption boundary: the receiver first reads the 
 
 Expansion allocates the required rounded space directly. Bucket metadata records capacity demand rather than a per-packet history. Allocation failures do not leave dangling buffer references. A failed shrink retains usable storage for a subsequent cleanup attempt. Association teardown releases its owned expanded storage independently of the holding interval.
 
-The task's existing timer supports cleanup and communication timeout without a new production thread, Swift timer or global buffer registry. When no expanded capacity remains, unnecessary cleanup wakeups stop. The timeout applies to communication, not to the bookkeeping wakeup itself.
+The task's existing timer supports cleanup and communication timeout without a new production thread, Swift timer or global buffer registry. When no expanded capacity remains, unnecessary cleanup wakeups stop. Communication timeout follows the task timer's clock, excluding system sleep where supported; buffer retention uses its separate elapsed-time clock, and the next wait compares remaining durations rather than unlike absolute clock readings.
 
 On Darwin, a valid large send rejected with EMSGSIZE may require a larger socket send-buffer allowance. Only that failure path queries `SO_SNDBUF` and requests a larger allowance when it is actually too small. The same unsent message index receives at most one adjustment-and-retry opportunity; after successful progress, a different unsent message in that batch can receive its own opportunity. Completed messages are never resubmitted by this retry path. Socket allowance is distinct from user-space payload retention and may persist for the socket's lifetime.
 
