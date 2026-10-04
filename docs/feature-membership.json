@@ -1,7 +1,7 @@
 {
   "base_commit": "75335d201cb1e541bb153e9899badbc11ccf1973",
   "branches": {
-    "main": "75335d201cb1e541bb153e9899badbc11ccf1973"
+    "main": "3e3377553b8498002c623da2c3ac264fe3bad5ed"
   },
   "sources": {
     "Tests/server_lifecycle_host.c": {
