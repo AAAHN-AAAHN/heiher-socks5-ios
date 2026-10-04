@@ -2,12 +2,12 @@
   "branch": "release/integrated",
   "frozen_source": "144ea7d2ec2d6a835d8ae1d1765167ef37d3339c",
   "parents": {
-    "feature/app-icon": "d2e2430046b2987d37fdc25733565c8d407a7b38",
-    "feature/background": "182e6396c4895348ab22980b76ed9250fd02cd93",
-    "feature/server-control": "d0d0c69b26b5c1b2a209531800fdefabd812f717",
-    "feature/settings-persistence": "ba94bc5bf8f5aaf313f6554cc787d37f01e9f33a",
-    "feature/udp-compat": "95f99182e32da0384a0ba29379a7e613cc57095a",
-    "feature/traffic-statistics": "a8efd57271207787f9626abdbd8737ba2b1f7b45"
+    "feature/app-icon": "50b8b5ac35064f44b4796f44197c463e360e6c6a",
+    "feature/background": "aef83b39118d26ec844df9d12009be8f2afad8ba",
+    "feature/server-control": "b0fcebef900bb63fdb93fdbd5dc12bd92ec240cd",
+    "feature/settings-persistence": "2f5d16328a1c2848665e62de5a4bfb9a78629547",
+    "feature/udp-compat": "31b72406adc88ae2d57bb4c54383a5646d3ad772",
+    "feature/traffic-statistics": "9d53bbd255dbd7d4bbe5e61aca175ea71619a6de"
   },
   "owned_documents": [
     "README.md",
@@ -16,11 +16,11 @@
   "readme_mirror": "docs/features/integrated.md",
   "validation_files": {
     "Build/check.py": "c952262492f5623ddcae1aae38216c3906de7e59",
-    "Build/check_documentation.py": "20f5a3782a10771d4f44a1fbde112326c776359c",
+    "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
     "Build/check_ownership.py": "32e5764411831c9db0755e8fc9f76c475bb03813",
-    "Tests/AppIcon/check_icon.py": "4a3124da0696858401bee966ac015da368ade44b",
-    "Tests/Background/check_scope.py": "fbacaed3e63162aa3527d0ea224237397ad8210b",
-    "Tests/Statistics/audit.py": "ffe98f7d1cf62dde1b6522e45a0b55d5f9a2939e",
-    "Tests/documentation_contract.py": "3f93f6e1d5913b8cc2af0da6390e532252df8c41"
+    "Tests/AppIcon/check_icon.py": "626ba6be821d9b1bcfd3f867f786ad89e638ccf4",
+    "Tests/Background/check_scope.py": "9945fea3133d6911b4475748f3077e0c48b95a5f",
+    "Tests/Statistics/audit.py": "c628058a7ce84d841cd0fb6b679b1a4072d8b940",
+    "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }

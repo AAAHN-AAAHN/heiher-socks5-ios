@@ -116,8 +116,7 @@ def main():
     originals = documents['code_paths'](ROOT, git('ls-tree', '-r', '--name-only', INPUT).decode().splitlines())
     allowed = {'.github/workflows/verify-build.yml', 'README.md', 'docs/features/app-icon.md'}
     shared = {'Build/build.sh', 'Build/check.py', 'docs/main-baseline.md'}
-    inherited = {'Tests/baseline_audit.py', 'docs/top-level-principles.md',
-                 'docs/history/main-before-project-audit-20260926.md'}
+    inherited = {'Tests/baseline_audit.py', 'docs/top-level-principles.md'}
     for path in documents['code_paths'](ROOT, shared | inherited):
         require((ROOT / path).read_bytes() == git('show', BASE + ':' + path),
                 'Current main source: ' + path)
