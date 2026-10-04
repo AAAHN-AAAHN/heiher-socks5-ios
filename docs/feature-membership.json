@@ -6,7 +6,7 @@
     "feature/server-control": "765614f67add7448a6ffdf67bbe739008375cab9",
     "feature/settings-persistence": "19b96acf4bc6b40f116630fee9985130c44e38ca",
     "feature/udp-compat": "ba594ea1baec2604bddf3f3faa942a812fcfe53d",
-    "feature/traffic-statistics": "d21790da8d877ed2b578e225e5a0d9edd64bd4b3"
+    "feature/traffic-statistics": "c94e5e430ae364bb3026f4f0803bd7f6376589b1"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -18,8 +18,8 @@
       "sha256": "26b64eec6e08806436b7241c04f5851490bfcbc384afee15762d5d6c719a207c"
     },
     "Patches/hev-stats-core.patch": {
-      "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
-      "sha256": "233634b63d4359a45798785a4768ed8de25f5e124e9061ce064c6398ffc4a501"
+      "commit": "c94e5e430ae364bb3026f4f0803bd7f6376589b1",
+      "sha256": "ee83dbed65ac0b98886dba2f056d3fe91949846f5823d0018fd66ee3c14c91e1"
     },
     "Patches/hev-stats-server.patch": {
       "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",
