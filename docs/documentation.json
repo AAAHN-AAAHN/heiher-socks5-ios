@@ -2,7 +2,7 @@
   "branch": "feature/background",
   "frozen_source": "ace419b43b0a1b38dd73e1a5127198e6fe8607c5",
   "parents": {
-    "main": "b4dbce2235e016f4155e4b7d753a05bf8d7e4843"
+    "main": "dafb19cda8cf80998b687b419b73f9181e47bd1e"
   },
   "owned_documents": [
     "README.md",
@@ -10,9 +10,9 @@
   ],
   "readme_mirror": "docs/features/background.md",
   "validation_files": {
-    "Build/check.py": "ebffe177ab6359f4892b5eec8312da6bbdc71723",
+    "Build/check.py": "6fa7884405a0cffd73ac949233114f635acaee81",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
-    "Tests/Background/check_scope.py": "f93023162fe3b785d59dd78d3d137b84f0e39782",
+    "Tests/Background/check_scope.py": "47d7f4aaa7c0c6e00a39daf5fab407bf8618de62",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }
