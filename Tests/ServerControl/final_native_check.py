@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Additional final-review controls with the unchanged Swift controller and Hev.
+"""Exercise the actual Swift controller and patched native engine.
 
 Allocation-failure probes supplement real bind failure, retry suppression,
-quoted UTF-8 authentication, listener release and current-owner lifetime are used.
+quoted UTF-8 authentication, listener release and current-owner lifetime checks.
 """
 import json
 import os
