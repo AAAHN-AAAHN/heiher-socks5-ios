@@ -3,8 +3,8 @@
   "branches": {
     "feature/app-icon": "fcf9e6a7d56b0f4e3732070c6f1d803d2d28cc9b",
     "feature/background": "f16ba6eafdf3ff7685be1a9e2fc9c7cc2da1075a",
-    "feature/server-control": "765614f67add7448a6ffdf67bbe739008375cab9",
-    "feature/settings-persistence": "19b96acf4bc6b40f116630fee9985130c44e38ca",
+    "feature/server-control": "b0c2b7855d5928ff2e43543bedaf09fe17ca7aa1",
+    "feature/settings-persistence": "bad9c26317dc6f108cc0a7ae0611513be29dd54b",
     "feature/udp-compat": "ba594ea1baec2604bddf3f3faa942a812fcfe53d",
     "feature/traffic-statistics": "c94e5e430ae364bb3026f4f0803bd7f6376589b1"
   },
@@ -322,8 +322,8 @@
       "sha256": "c0b5b155afa1b84c947177769184a3474533d831bace868f680d090122ec636c"
     },
     "Tests/ServerControl/ui_audit.py": {
-      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
-      "sha256": "ddc564e546da945ea5c9433b263474cb85d9cd50347db3567e925db358866b91"
+      "commit": "b0c2b7855d5928ff2e43543bedaf09fe17ca7aa1",
+      "sha256": "d7d274d1d152a91bc046857b792180fc750125301c77d0bfd04d4cc61ece88ac"
     },
     "Tests/ServerControl/worker_stop_probe.c": {
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
@@ -386,8 +386,8 @@
       "sha256": "b46d14ccad3ca681b48cd91881c9cf2ec68729105ee5c4d4e30dee3d4e322473"
     },
     "Tests/Settings/ui_audit.py": {
-      "commit": "a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7",
-      "sha256": "b02c09f9073111112a3b82583a2ff89c49938b05e8816dcbd45cbdc880b64b62"
+      "commit": "bad9c26317dc6f108cc0a7ae0611513be29dd54b",
+      "sha256": "400e881621cd05e69128e8d63059e805b8b24e499bdc7f3320115192778c004a"
     },
     "Tests/Statistics/SamplingContractTests.swift": {
       "commit": "dc6feaadb9061eb320bbce5d66c56a7c814c93d3",

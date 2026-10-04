@@ -4,8 +4,8 @@
   "parents": {
     "feature/app-icon": "fcf9e6a7d56b0f4e3732070c6f1d803d2d28cc9b",
     "feature/background": "f16ba6eafdf3ff7685be1a9e2fc9c7cc2da1075a",
-    "feature/server-control": "765614f67add7448a6ffdf67bbe739008375cab9",
-    "feature/settings-persistence": "19b96acf4bc6b40f116630fee9985130c44e38ca",
+    "feature/server-control": "b0c2b7855d5928ff2e43543bedaf09fe17ca7aa1",
+    "feature/settings-persistence": "bad9c26317dc6f108cc0a7ae0611513be29dd54b",
     "feature/udp-compat": "ba594ea1baec2604bddf3f3faa942a812fcfe53d",
     "feature/traffic-statistics": "c94e5e430ae364bb3026f4f0803bd7f6376589b1"
   },
