@@ -14,7 +14,7 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 CLIENT_BASE = 'bb07d1795f010d624b1924cc06203af9aeb3c6a2'
-UDP = 'ba594ea1baec2604bddf3f3faa942a812fcfe53d'
+UDP = '105e12d6f21fbb2a93577e3e5e9b9728008ca472'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
                         'udp_buffer_send.c', 'udp_stream_boundaries.c',
