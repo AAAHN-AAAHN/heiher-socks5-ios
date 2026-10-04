@@ -2,12 +2,12 @@
   "branch": "release/integrated",
   "frozen_source": "a4fd225bbf36a5d418c506a87d9003e4a3249170",
   "parents": {
-    "feature/app-icon": "fcf9e6a7d56b0f4e3732070c6f1d803d2d28cc9b",
-    "feature/background": "f16ba6eafdf3ff7685be1a9e2fc9c7cc2da1075a",
-    "feature/server-control": "b0c2b7855d5928ff2e43543bedaf09fe17ca7aa1",
-    "feature/settings-persistence": "bad9c26317dc6f108cc0a7ae0611513be29dd54b",
-    "feature/udp-compat": "ba594ea1baec2604bddf3f3faa942a812fcfe53d",
-    "feature/traffic-statistics": "c94e5e430ae364bb3026f4f0803bd7f6376589b1"
+    "feature/app-icon": "154106e7a94f78440ce0aa7c54cb7b08c136971f",
+    "feature/background": "f6d1a2d5cc2c9fa38765259599dde5cdde789a87",
+    "feature/server-control": "eff0c62824b2c036c5762ab4e201f3fbff97f994",
+    "feature/settings-persistence": "591e5b4dc2ecf87d036b080689abbc82b616d59e",
+    "feature/udp-compat": "105e12d6f21fbb2a93577e3e5e9b9728008ca472",
+    "feature/traffic-statistics": "6f8f9f311c2fcf1d745cfc1333c71b46337191bc"
   },
   "owned_documents": [
     "README.md",
@@ -15,12 +15,12 @@
   ],
   "readme_mirror": "docs/features/integrated.md",
   "validation_files": {
-    "Build/check.py": "c952262492f5623ddcae1aae38216c3906de7e59",
+    "Build/check.py": "a5e605f7526f84c72f631b3699e4171f07919ea0",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
-    "Build/check_ownership.py": "32e5764411831c9db0755e8fc9f76c475bb03813",
-    "Tests/AppIcon/check_icon.py": "e0037d96e64b917808483c5cf5384e62786270e4",
-    "Tests/Background/check_scope.py": "73bc11a34305a24909f81ed5bab17fe576456fe7",
-    "Tests/Statistics/audit.py": "572a8167addeda6ff48f3bc995974844436069d6",
+    "Build/check_ownership.py": "103db04ed769b9e61521ff5423ca67bfe39b3aac",
+    "Tests/AppIcon/check_icon.py": "96c7bc4f9035ad4366a1f0eb19d6ca9ad0e8e514",
+    "Tests/Background/check_scope.py": "f93023162fe3b785d59dd78d3d137b84f0e39782",
+    "Tests/Statistics/audit.py": "8237edc7954ae6c744f27540f7dba7eb2c6b8c00",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }

@@ -12,7 +12,7 @@ git rev-parse HEAD > "$OUT/tested-commit.txt"
 git rev-parse 'HEAD^{tree}' > "$OUT/tested-tree.txt"
 git archive --format=zip HEAD -o "$OUT/tested-source.zip"
 git archive --format=zip f88e8c8946b095c4d5551d413dee3b4a60943714 -o "$OUT/input-source.zip"
-git archive --format=zip c40a4add7ed1674f0ee95096dd274a01ee1752a5 -o "$OUT/main-source.zip"
+git archive --format=zip 427a3c5a49642fb1927e29690469809963879f4e -o "$OUT/main-source.zip"
 git diff --check f88e8c8946b095c4d5551d413dee3b4a60943714 HEAD > "$OUT/whitespace.log"
 python3 Build/check.py baseline > "$OUT/baseline.log"
 python3 Tests/baseline_audit.py > "$OUT/baseline-driver.log" 2>&1

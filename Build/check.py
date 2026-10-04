@@ -57,6 +57,8 @@ def apply(core):
         # Build scripts and the index are source inputs too, not only C/H files.
         git(repo, 'diff', '--exit-code', 'HEAD', '--')
         git(repo, 'diff', '--cached', '--exit-code', 'HEAD', '--')
+        assert not (git(repo, 'ls-files', '--others', '--exclude-standard') or
+                    git(repo, 'ls-files', '--others', '--', 'src', 'include')), 'Untracked native input: ' + relative
     for relative, patch in patches():
         git(core / relative, 'apply', '--check', '--whitespace=error-all', str(patch))
         git(core / relative, 'apply', '--whitespace=error-all', str(patch))
@@ -80,6 +82,8 @@ def reverse(core):
     for relative in CONFIG['sources']:
         git(core / relative, 'diff', '--exit-code', 'HEAD', '--')
         git(core / relative, 'diff', '--cached', '--exit-code', 'HEAD', '--')
+        assert not (git(core / relative, 'ls-files', '--others', '--exclude-standard') or
+                    git(core / relative, 'ls-files', '--others', '--', 'src', 'include')), 'Untracked native input: ' + relative
     git(core, 'submodule', 'foreach', '--recursive',
         'git diff --exit-code HEAD -- && git diff --cached --exit-code HEAD --')
     print('PASS: reverse patches restore exact upstream source')

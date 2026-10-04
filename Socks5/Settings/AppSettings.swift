@@ -18,12 +18,12 @@ struct AppSettings: Codable, Equatable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(self)
-        guard data.count <= 65_536 else { throw SettingsError.invalid("Settings file exceeds 64 KB.") }
+        guard data.count <= 65_536 else { throw SettingsError.invalid("Settings file exceeds 65,536 bytes.") }
         return data
     }
 
     static func decoded(_ data: Data) throws -> Self {
-        guard data.count <= 65_536 else { throw SettingsError.invalid("Settings file exceeds 64 KB.") }
+        guard data.count <= 65_536 else { throw SettingsError.invalid("Settings file exceeds 65,536 bytes.") }
         let value = try JSONDecoder().decode(Self.self, from: data)
         guard value.version == 1 else { throw SettingsError.invalid("Unsupported settings version.") }
         return value
