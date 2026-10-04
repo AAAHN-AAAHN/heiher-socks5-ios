@@ -2,7 +2,7 @@
   "branch": "feature/app-icon",
   "frozen_source": "65bb2a5e7215c57e93d6396ba096da5bef0b946d",
   "parents": {
-    "main": "b4dbce2235e016f4155e4b7d753a05bf8d7e4843"
+    "main": "dafb19cda8cf80998b687b419b73f9181e47bd1e"
   },
   "owned_documents": [
     "README.md",
@@ -10,9 +10,9 @@
   ],
   "readme_mirror": "docs/features/app-icon.md",
   "validation_files": {
-    "Build/check.py": "a2f40dad9686d99406a333c151d8721b1883db84",
+    "Build/check.py": "3aaecfd06726c8e0916f9167b01e8cfa5c1a7ddd",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
-    "Tests/AppIcon/check_icon.py": "96c7bc4f9035ad4366a1f0eb19d6ca9ad0e8e514",
+    "Tests/AppIcon/check_icon.py": "e38c2eb702e38130118e84fc2baa8ac427a79586",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }
