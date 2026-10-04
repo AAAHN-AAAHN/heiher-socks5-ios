@@ -30,6 +30,7 @@ def initialize(root):
     (root / 'src/probe.c').write_text('int probe;\n')
     (root / 'Makefile').write_text('all:\n\t@true\n')
     (root / 'build-apple.sh').write_text('#!/bin/sh\nexit 0\n')
+    (root / '.gitignore').write_text('build/\n')
     git(root, 'init', '-q')
     git(root, 'add', '.')
     git(root, '-c', 'user.name=Input fixture', '-c', 'user.email=audit@localhost', 'commit', '-qm', 'original')
@@ -38,6 +39,13 @@ def initialize(root):
 
 def alter(root, case):
     if case == 'clean':
+        return
+    extra = {'untracked-c': 'src/extra.c', 'untracked-config': '.rev-id',
+             'ignored-c': 'src/build/extra.c', 'ignored-output': 'build/extra.o'}
+    if case in extra:
+        path = root / extra[case]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('untracked input\n')
         return
     path = root / ('src/probe.c' if case.endswith('c') else 'Makefile')
     before = path.read_bytes()
@@ -53,7 +61,8 @@ def alter(root, case):
 
 def native_boundaries(old, current):
     cases = ['clean', 'modified-c', 'modified-make', 'deleted-script',
-             'staged-c', 'staged-make', 'index-c', 'index-make']
+             'staged-c', 'staged-make', 'index-c', 'index-make',
+             'untracked-c', 'untracked-config', 'ignored-c', 'ignored-output']
     count = 0
     for label, source in [('old', old), ('current', current)]:
         tree = ast.parse(source)
@@ -73,9 +82,11 @@ def native_boundaries(old, current):
                         namespace[operation](root)
                     except (AssertionError, subprocess.CalledProcessError):
                         accepted = False
-                    expected = case == 'clean'
+                    expected = case in ('clean', 'ignored-output')
                     if label == 'old':
                         expected = case not in ('modified-c', 'staged-c') if operation == 'apply' else case.startswith(('clean', 'staged-'))
+                        if case in ('untracked-c', 'untracked-config', 'ignored-c', 'ignored-output'):
+                            expected = True
                     if accepted != expected:
                         raise RuntimeError((label, operation, case, accepted, expected))
                     print('PASS native:', label, operation, case, 'accepted=', accepted, flush=True)

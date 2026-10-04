@@ -60,6 +60,8 @@ def main():
         assert 'Socks5/Settings/SettingsStore.swift' in manifest.get('files', {}), 'Store changes must be explicitly hash-locked'
         assert (ROOT / 'Socks5/Settings/SettingsView.swift').read_bytes() == show(INPUT, 'Socks5/Settings/SettingsView.swift')
         model_without_server = original[:original.index('struct ServerSettings:')] + original[original.index('enum SettingsError:'):]
+        model_without_server = model_without_server.replace('Settings file exceeds 64 KB.',
+                                                            'Settings file exceeds 65,536 bytes.')
         assert content('Socks5/Settings/AppSettings.swift') == model_without_server
         assert 'server.apply(value.server, running: value.serverRunning)' in root
         assert 'settings.binding(\\.server)' in root
