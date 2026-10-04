@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the actual Swift controller and patched native engine.
 
-Allocation-failure probes supplement real bind failure, retry suppression,
+Allocation/read-failure probes supplement real bind failure, retry suppression,
 quoted UTF-8 authentication, listener release and current-owner lifetime checks.
 """
 import json
@@ -35,7 +35,7 @@ def refused(port):
 
 
 def authentication_startup(core, output, folder):
-    """Exercise real initialization/cleanup with only allocation outcomes injected."""
+    """Exercise real initialization/cleanup with only allocation/read outcomes injected."""
     libraries = [core / 'bin/libhev-socks5-server.a', core / 'third-part/yaml/bin/libyaml.a',
                  core / 'third-part/hev-task-system/bin/libhev-task-system.a']
     includes = [core / 'src', core / 'src/misc', core / 'src/core/include',
@@ -58,7 +58,7 @@ def authentication_startup(core, output, folder):
                                              UBSAN_OPTIONS='halt_on_error=1'))
             (output / f'{label}-auth-workers{workers}.log').write_text(result.stdout + result.stderr)
             result.check_returncode()
-    print('PASS: 42 authentication startup checks, sanitized/optimized workers1/4/64; allocation faults are injected.')
+    print('PASS: 48 authentication startup checks, sanitized/optimized workers1/4/64; allocation/read faults are injected.')
 
 
 def main():

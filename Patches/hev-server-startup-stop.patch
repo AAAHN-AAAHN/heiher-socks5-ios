@@ -124,7 +124,7 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
          }
      }
  
-+    res = ferror (fp) ? -1 : 0;
++    res = !feof (fp) || ferror (fp) ? -1 : 0;
      free (line);
      fclose (fp);
 -}
