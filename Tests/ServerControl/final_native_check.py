@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Additional final-review controls with the unchanged Swift controller and Hev.
 
-Only command/peer transport is test code. Real bind failure, retry suppression,
+Allocation-failure probes supplement real bind failure, retry suppression,
 quoted UTF-8 authentication, listener release and current-owner lifetime are used.
 """
 import json
+import os
+import subprocess
 from pathlib import Path
 import socket
 import sys
@@ -32,6 +34,33 @@ def refused(port):
         return True
 
 
+def authentication_startup(core, output, folder):
+    """Exercise real initialization/cleanup with only allocation outcomes injected."""
+    libraries = [core / 'bin/libhev-socks5-server.a', core / 'third-part/yaml/bin/libyaml.a',
+                 core / 'third-part/hev-task-system/bin/libhev-task-system.a']
+    includes = [core / 'src', core / 'src/misc', core / 'src/core/include',
+                core / 'third-part/hev-task-system/include']
+    for label, flags in [('sanitized', ['-O1', '-g', '-fsanitize=address,undefined',
+                                       '-fno-sanitize-recover=all']), ('optimized', ['-O3'])]:
+        executable = folder / ('auth-startup-' + label)
+        with (output / (label + '-auth-build.log')).open('wb') as log:
+            subprocess.run(['clang', '-std=gnu11', '-Wall', '-Werror', '-pthread', *flags,
+                            *['-I' + str(p) for p in includes],
+                            str(Path(__file__).with_name('auth_startup_probe.c')),
+                            *map(str, libraries), '-o', str(executable)],
+                           stdout=log, stderr=subprocess.STDOUT, check=True, timeout=90)
+        for workers in (1, 4, 64):
+            with socket.socket() as reserve:
+                reserve.bind(('127.0.0.1', 0)); port = reserve.getsockname()[1]
+            result = subprocess.run([str(executable), str(workers), str(port)],
+                                    capture_output=True, text=True, timeout=15,
+                                    env=dict(os.environ, ASAN_OPTIONS='detect_leaks=0',
+                                             UBSAN_OPTIONS='halt_on_error=1'))
+            (output / f'{label}-auth-workers{workers}.log').write_text(result.stdout + result.stderr)
+            result.check_returncode()
+    print('PASS: 42 authentication startup checks, sanitized/optimized workers1/4/64; allocation faults are injected.')
+
+
 def main():
     if not __debug__:
         raise SystemExit('Assertions required')
@@ -42,6 +71,7 @@ def main():
     rows = []
     with tempfile.TemporaryDirectory() as temporary:
         folder = Path(temporary)
+        authentication_startup(core, output, folder)
         with (output / 'build.log').open('wb') as log:
             executable = compile_host(core, folder, False, log)
         for workers in (1, 4, 64):
