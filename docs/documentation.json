@@ -2,7 +2,7 @@
   "branch": "feature/traffic-statistics",
   "frozen_source": "6811bf75b0d9fa1e59385c219ce48f1773723ee6",
   "parents": {
-    "feature/udp-compat": "105e12d6f21fbb2a93577e3e5e9b9728008ca472"
+    "feature/udp-compat": "0fb2f2fb879a974d1f4f01bb70f90141eeabe5aa"
   },
   "owned_documents": [
     "README.md",
@@ -10,9 +10,9 @@
   ],
   "readme_mirror": "docs/features/traffic-statistics.md",
   "validation_files": {
-    "Build/check.py": "a2f40dad9686d99406a333c151d8721b1883db84",
+    "Build/check.py": "3aaecfd06726c8e0916f9167b01e8cfa5c1a7ddd",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
-    "Tests/Statistics/audit.py": "8237edc7954ae6c744f27540f7dba7eb2c6b8c00",
+    "Tests/Statistics/audit.py": "039aaef4b258df3f6009d35b0adc6e5963f1ab61",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }
