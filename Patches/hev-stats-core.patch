@@ -232,7 +232,7 @@ index a2db80e..0f774d5 100644
      return 0;
  }
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index fb6cfb6..9d56b24 100644
+index f1704a0..a38a063 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -55,6 +55,7 @@ struct _UDPBuffers
@@ -243,7 +243,7 @@ index fb6cfb6..9d56b24 100644
  };
  
  static uint64_t
-@@ -812,6 +813,13 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
+@@ -830,6 +831,13 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
          }
  
          res = udp_sendmmsg (self, fd, dvec, res);
@@ -257,7 +257,7 @@ index fb6cfb6..9d56b24 100644
      }
      if (res <= 0) {
          if (res == -1 && errno == EAGAIN)
-@@ -839,8 +847,11 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
+@@ -857,8 +865,11 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
          HevSocks5UDPMsg dvec[res];
          char saddr[res][19];
          int count = 0;
@@ -269,7 +269,7 @@ index fb6cfb6..9d56b24 100644
              if (svec[i].msg_hdr.msg_flags & MSG_TRUNC)
                  continue;
              dvec[count].buf = svec[i].msg_hdr.msg_iov->iov_base;
-@@ -851,6 +862,8 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
+@@ -869,6 +880,8 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
                                              svec[i].msg_hdr.msg_name);
              count++;
          }
@@ -278,7 +278,7 @@ index fb6cfb6..9d56b24 100644
          if (!count)
              return 1; /* Consumed rejected data is progress, not an empty queue. */
          res = hev_socks5_udp_sendmmsg (self, dvec, count);
-@@ -898,6 +911,7 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
+@@ -916,6 +929,7 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
          buffers.slots[i].owner = &buffers;
      }
  
