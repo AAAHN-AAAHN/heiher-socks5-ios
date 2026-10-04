@@ -2,7 +2,7 @@
   "branch": "feature/settings-persistence",
   "frozen_source": "813125503093ce65c8384c2609c3e8381ed193a7",
   "parents": {
-    "feature/server-control": "b0fcebef900bb63fdb93fdbd5dc12bd92ec240cd"
+    "feature/server-control": "765614f67add7448a6ffdf67bbe739008375cab9"
   },
   "owned_documents": [
     "README.md",
