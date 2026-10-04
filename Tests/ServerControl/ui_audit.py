@@ -111,7 +111,7 @@ def main():
     if (native / 'compiled-headers/source-commit.txt').read_text().strip() != head:
         raise RuntimeError('Stale native headers')
     run(['git', 'diff', '--exit-code',
-         '1196413c2198e0b0f751979959961ef63da5afdd', 'HEAD', '--',
+         '7cfa5662378cd7a68a40eaa64bfa70cc7f001c11', 'HEAD', '--',
          'Socks5', 'Socks5.xcodeproj', 'Patches', 'Build/features.json', 'Build/upstream.json',
          'HevSocks5Server.xcframework'], 'preserved-production.log')
     snapshot = {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest()

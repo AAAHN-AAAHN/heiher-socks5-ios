@@ -92,3 +92,101 @@ diff --git a/src/hev-main.h b/src/hev-main.h
   * hev_socks5_server_quit:
   *
   * Stop the socks5 server.
+
+diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
+--- a/src/hev-socks5-proxy.c
++++ b/src/hev-socks5-proxy.c
+@@ -50,19 +50,18 @@
+ static atomic_int tsync;
+ static HevSocks5WorkerData *worker_list;
+ 
+-static void
++static int
+ hev_socks5_proxy_load_file (HevSocks5Authenticator *auth, const char *file)
+ {
+     char *line = NULL;
+     size_t len = 0;
+     ssize_t nread;
+     FILE *fp;
++    int res;
+ 
+     fp = fopen (file, "r");
+-    if (!fp) {
+-        hev_object_unref (HEV_OBJECT (auth));
+-        return;
+-    }
++    if (!fp)
++        return -1;
+ 
+     while ((nread = getline (&line, &len, fp)) != -1) {
+         HevSocks5UserMark *user;
+@@ -93,11 +92,13 @@
+         }
+     }
+ 
++    res = ferror (fp) ? -1 : 0;
+     free (line);
+     fclose (fp);
+-}
+-
+-static void
++    return res;
++}
++
++static int
+ hev_socks5_proxy_load (void)
+ {
+     HevSocks5Authenticator *auth;
+@@ -112,21 +113,25 @@
+     pass = hev_config_get_auth_password ();
+ 
+     if (!file && !name && !pass)
+-        return;
++        return 0;
++    if (!file && (!name || !pass))
++        return -1;
+ 
+     auth = hev_socks5_authenticator_new ();
+     if (!auth)
+-        return;
++        return -1;
+ 
+     if (file) {
+-        hev_socks5_proxy_load_file (auth, file);
++        if (hev_socks5_proxy_load_file (auth, file) < 0)
++            goto exit;
+     } else {
+         HevSocks5UserMark *user;
+ 
+         user = hev_socks5_user_mark_new (name, strlen (name), pass,
+                                          strlen (pass), 0);
+-        if (user)
+-            hev_socks5_authenticator_add (auth, HEV_SOCKS5_USER (user));
++        if (!user)
++            goto exit;
++        hev_socks5_authenticator_add (auth, HEV_SOCKS5_USER (user));
+     }
+ 
+     workers = hev_config_get_workers ();
+@@ -137,6 +142,11 @@
+     }
+ 
+     hev_object_unref (HEV_OBJECT (auth));
++    return 0;
++
++exit:
++    hev_object_unref (HEV_OBJECT (auth));
++    return -1;
+ }
+ 
+ static void
+@@ -250,7 +260,8 @@
+     hev_socket_factory_destroy (factory);
+     factory = NULL;
+ 
+-    hev_socks5_proxy_load ();
++    if (hev_socks5_proxy_load () < 0)
++        goto exit;
+     signal (SIGPIPE, SIG_IGN);
+     signal (SIGUSR1, sigint_handler);
+     atomic_fetch_or (&tsync, SYNC_SEND);
