@@ -1,7 +1,7 @@
 {
   "base_commit": "75335d201cb1e541bb153e9899badbc11ccf1973",
   "branches": {
-    "feature/server-control": "368aa4cf89436651414a8885a2a171f5cff9abd5"
+    "feature/server-control": "b0fcebef900bb63fdb93fdbd5dc12bd92ec240cd"
   },
   "sources": {
     "Socks5/Server/ServerSettings.swift": {
@@ -120,5 +120,5 @@
   "files": {
     "Socks5/Settings/SettingsStore.swift": "e13d64e5dda6923f105d93b2145733e94286339a370419699a48f3c432b0a7ef"
   },
-  "responsibility": "Persistence owns durable options and file handling; all 32 server-owned inputs are inherited byte-identically from the pinned latest server-control ancestor."
+  "responsibility": "Persistence owns durable options and file handling; the listed server-owned inputs are inherited byte-identically from the pinned latest server-control ancestor."
 }
