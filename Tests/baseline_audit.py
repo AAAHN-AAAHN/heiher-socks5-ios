@@ -41,8 +41,11 @@ def alter(root, case):
     if case == 'clean':
         return
     extra = {'untracked-c': 'src/extra.c', 'untracked-config': '.rev-id',
-             'ignored-c': 'src/build/extra.c', 'ignored-output': 'build/extra.o'}
+             'ignored-c': 'src/build/extra.c', 'ignored-output': 'build/extra.o',
+             'ignored-config': '.rev-id'}
     if case in extra:
+        if case == 'ignored-config':
+            (root / '.git/info/exclude').write_text('.rev-id\n')
         path = root / extra[case]
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text('untracked input\n')
@@ -62,7 +65,7 @@ def alter(root, case):
 def native_boundaries(old, current):
     cases = ['clean', 'modified-c', 'modified-make', 'deleted-script',
              'staged-c', 'staged-make', 'index-c', 'index-make',
-             'untracked-c', 'untracked-config', 'ignored-c', 'ignored-output']
+             'untracked-c', 'untracked-config', 'ignored-c', 'ignored-output', 'ignored-config']
     count = 0
     for label, source in [('old', old), ('current', current)]:
         tree = ast.parse(source)
@@ -85,7 +88,7 @@ def native_boundaries(old, current):
                     expected = case in ('clean', 'ignored-output')
                     if label == 'old':
                         expected = case not in ('modified-c', 'staged-c') if operation == 'apply' else case.startswith(('clean', 'staged-'))
-                        if case in ('untracked-c', 'untracked-config', 'ignored-c', 'ignored-output'):
+                        if case in ('untracked-c', 'untracked-config', 'ignored-c', 'ignored-output', 'ignored-config'):
                             expected = True
                     if accepted != expected:
                         raise RuntimeError((label, operation, case, accepted, expected))
@@ -133,7 +136,8 @@ def shell_boundaries(old, current):
                 # Stop at the next validator, before any build/network/SDK work.
                 (root / 'Build/check.py').write_text(
                     'from pathlib import Path\nPath("reached-validator").touch()\nraise SystemExit(19)\n')
-                git(root, 'add', '.')
+                # The native build/ ignore must not hide this Build/ harness.
+                git(root, '-c', 'core.ignorecase=true', 'add', '-f', 'Build')
                 git(root, '-c', 'user.name=Input fixture', '-c', 'user.email=audit@localhost', 'commit', '-qm', 'entry')
                 if case != 'optimized':
                     alter(root, case)
