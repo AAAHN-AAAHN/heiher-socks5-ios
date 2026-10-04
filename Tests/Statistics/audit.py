@@ -14,7 +14,7 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 CLIENT_BASE = 'bb07d1795f010d624b1924cc06203af9aeb3c6a2'
-UDP = '31b72406adc88ae2d57bb4c54383a5646d3ad772'
+UDP = 'ba594ea1baec2604bddf3f3faa942a812fcfe53d'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
                         'udp_buffer_send.c', 'udp_stream_boundaries.c',
@@ -99,6 +99,7 @@ def inspect_sources():
     original = json.loads(git('show', START + ':Build/features.json'))
     statistics_patches = [p for p in original['patches'] if p['file'].startswith('hev-stats-')]
     assert CONFIG == dict(original, base_commit=udp_config['base_commit'],
+                          sources=udp_config['sources'], upstream_app=udp_config['upstream_app'],
                           patches=udp_config['patches'] + statistics_patches)
     runtime_changes = set(git('diff', '--name-only', CLIENT_BASE, 'HEAD', '--',
                               'Socks5', 'Socks5.xcodeproj', 'Patches').decode().splitlines())
