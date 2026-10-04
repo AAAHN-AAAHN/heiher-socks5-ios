@@ -102,6 +102,29 @@ def change(root, case):
     elif case == 'validator':
         path = root / 'Build/check.py'
         path.write_bytes(path.read_bytes() + b'\n# Unapproved validator change.\n')
+    elif case in ('approval-content', 'approval-index', 'approval-link',
+                  'approval-mode', 'approval-and-manifest', 'existing-frozen-reference'):
+        target = root / 'Build/documentation-baseline.json'
+        data = target.read_bytes()
+        if case == 'approval-link':
+            target.unlink()
+            target.symlink_to(manifest)
+        elif case == 'approval-mode':
+            target.chmod(0o755)
+        elif case == 'existing-frozen-reference':
+            value['frozen_source'] = git('rev-parse', 'HEAD').decode().strip()
+            manifest.write_text(json.dumps(value))
+        elif case == 'approval-and-manifest':
+            value['frozen_source'] = git('rev-parse', 'HEAD').decode().strip()
+            manifest.write_text(json.dumps(value))
+            target.write_text(json.dumps({'branch': value['branch'],
+                                          'frozen_source': value['frozen_source']}))
+            subprocess.run(['git', '-C', str(root), 'add', str(target)], check=True, env=ENV)
+        else:
+            target.write_bytes(data + b'\n')
+            if case == 'approval-index':
+                subprocess.run(['git', '-C', str(root), 'add', str(target)], check=True, env=ENV)
+                target.write_bytes(data)
     elif case == 'frozen-reference':
         value['frozen_source'] = '0' * 40
         manifest.write_text(json.dumps(value))
@@ -130,7 +153,8 @@ def main():
              'parent-mode', 'code-index', 'validator-index', 'parent-index', 'license',
              'test-input', 'workflow', 'source-pin', 'empty-section', 'title-count', 'crlf',
              'trailing', 'fence', 'escaping-link', 'repository-link', 'invalid-link-scheme',
-             'owned-inventory']
+             'owned-inventory', 'approval-content', 'approval-index', 'approval-link',
+             'approval-mode', 'approval-and-manifest', 'existing-frozen-reference']
     rows = []
     with tempfile.TemporaryDirectory(prefix='documentation-contract-') as directory:
         for number, case in enumerate(cases):

@@ -14,24 +14,20 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 CLIENT_BASE = 'bb07d1795f010d624b1924cc06203af9aeb3c6a2'
-UDP = '95f99182e32da0384a0ba29379a7e613cc57095a'
+UDP = '31b72406adc88ae2d57bb4c54383a5646d3ad772'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
                         'udp_buffer_send.c', 'udp_stream_boundaries.c',
                         'Statistics/udp_accounting_probe.c')
 UDP_FILES = {
     '.github/workflows/udp-compat-audit.yml': '.github/workflows/verify-build.yml',
-    'docs/branches/feature-udp-compat.md': 'README.md',
     **{p: p for p in ('Patches/hev-udp-port-zero.patch', 'Patches/hev-udp-sockaddr.patch',
                      'Patches/hev-udp-peer-filter.patch', 'Patches/hev-udp-dynamic-buffer.patch',
                      'Tests/udp_peer_regression.py',
                      'Tests/udp_queue_observation.py',
                      'Tests/udp_compat_audit.py', 'Tests/udp_sockaddr_regression.py',
                      'Tests/udp_sockaddr_unit.c', 'Tests/udp_audit_driver_regression.py',
-                     'docs/reviews/udp-compat-20260923.md', 'docs/features/udp-compatibility.md',
-                     'docs/reviews/udp-compat-20260922.md', 'Socks5/Info.plist',
-                     'docs/history/udp-before-final-audit-20260926.md',
-                     'docs/history/udp-before-project-alignment-20260926.md',
+                     'Socks5/Info.plist',
                      'Tests/udp_buffer_benchmark.py',
                      'Tests/udp_buffer_io.c',
                      'Tests/udp_buffer_live_hold.c',
@@ -39,10 +35,7 @@ UDP_FILES = {
                      'Tests/udp_buffer_send.c',
                      'Tests/udp_buffer_timer.c',
                      'Tests/udp_buffer_unit.c',
-                     'Tests/udp_header_regression.py',
-                     'docs/history/udp-before-dynamic-buffer-20260929.md',
-                     'docs/reviews/udp-dynamic-resume-20260929.md',
-                     'docs/reviews/udp-header-validation-20260929.md')}
+                     'Tests/udp_header_regression.py')}
 }
 
 
@@ -75,8 +68,6 @@ def check_udp_inheritance():
     paths.update({p: p for p in entries if p.startswith('Tests/')})
     preserved = {}
     for target, source in paths.items():
-        if target.endswith('.md'):
-            continue  # The independent document contract checks exact current prose.
         mode, kind, blob = entries[source]
         path = ROOT / target
         assert kind == 'blob' and not path.is_symlink() and path.is_file(), target
@@ -138,7 +129,7 @@ def inspect_sources():
     (OUT / 'inventory.json').write_text(json.dumps({
         'base': CONFIG['base_commit'], 'start': START, 'udp': UDP,
         'files_vs_main': inventory, 'excluded_udp_files': preserved,
-        'statistics_owned_paths': [p for p in inventory if p not in UDP_FILES and p not in preserved],
+        'statistics_owned_paths': [p for p in documents['code_paths'](ROOT, inventory) if p not in UDP_FILES and p not in preserved],
         'statistics_production_unchanged': False,
         'client_ip_base': CLIENT_BASE, 'allowed_runtime_changes': sorted(runtime_changes), 'udp_dependency_updated': True}, indent=2) + '\n')
     run(['git', 'diff', CONFIG['base_commit'], 'HEAD'], 'main-to-feature.diff')
