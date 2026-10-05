@@ -73,10 +73,10 @@ import Foundation
                 value[keyPath: path] += "x"
                 do { _ = try value.configuration(); check(false, "Reject overlong executable field") }
                 catch { check(true, "Reject overlong executable field") }
-                for separator in ["\0", "\n", "\r", "\u{0085}", "\u{2028}", "\u{2029}"] {
+                for separator in ["\0", "\n", "\r", "\u{0085}", "\u{2028}", "\u{2029}", "\u{FFFE}", "\u{FFFF}"] {
                     value[keyPath: path] = "a" + separator + "b"
-                    do { _ = try value.configuration(); check(false, "Reject YAML text separator") }
-                    catch { check(true, "Reject YAML text separator") }
+                    do { _ = try value.configuration(); check(false, "Reject non-printable or multiline YAML text") }
+                    catch { check(true, "Reject non-printable or multiline YAML text") }
                 }
             }
             a = ServerSettings()

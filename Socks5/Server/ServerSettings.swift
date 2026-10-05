@@ -28,6 +28,10 @@ struct ServerSettings: Codable, Equatable {
               authUsername.isEmpty == authPassword.isEmpty else {
             throw ServerConfigurationError.invalid("Text fields must be single-line and at most 255 UTF-8 bytes. Set both authentication fields or leave both empty.")
         }
+        let yamlExcluded = CharacterSet(charactersIn: "\u{FFFE}\u{FFFF}")
+        guard fields.allSatisfy({ $0.rangeOfCharacter(from: yamlExcluded) == nil }) else {
+            throw ServerConfigurationError.invalid("Text fields must not contain U+FFFE or U+FFFF.")
+        }
         func quote(_ text: String) -> String { "'" + text.replacingOccurrences(of: "'", with: "''") + "'" }
         return """
         main:
