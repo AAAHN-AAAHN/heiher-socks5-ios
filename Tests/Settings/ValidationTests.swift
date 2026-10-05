@@ -40,11 +40,11 @@ import Foundation
             \.bindInterface, \.authUsername, \.authPassword
         ]
         for path in texts {
-            for separator in ["\0", "\t", "\n", "\r", "\u{0085}", "\u{2028}", "\u{2029}"] {
+            for separator in ["\0", "\t", "\n", "\r", "\u{0085}", "\u{2028}", "\u{2029}", "\u{FFFE}", "\u{FFFF}"] {
                 var server = defaults.server
                 server.authUsername = "user"; server.authPassword = "password"
                 server[keyPath: path] = "a" + separator + "b"
-                rejects({ _ = try server.configuration() }, "Every YAML text field rejects control/line separators")
+                rejects({ _ = try server.configuration() }, "Every YAML text field rejects non-printable or multiline input")
             }
         }
         var auth = defaults.server
@@ -103,6 +103,19 @@ import Foundation
         store.set(\.serverRunning, false)
         check(try FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as? Date == stamp,
               "Identical setter leaves file timestamp unchanged, not merely equal JSON bytes")
+        let initialBytes = try Data(contentsOf: file)
+        for path in texts {
+            for scalar in ["\u{FFFE}", "\u{FFFF}"] {
+                var invalid = defaults
+                invalid.server.authUsername = "user"; invalid.server.authPassword = "password"
+                invalid.server[keyPath: path] = "a" + scalar + "b"
+                invalid.serverRunning = true
+                rejects({ try store.importData(invalid.encoded()) }, "Non-printable YAML import rejected")
+                let disk = try Data(contentsOf: file)
+                check(store.value == defaults && disk == initialBytes,
+                      "Invalid YAML import preserves live and stored settings")
+            }
+        }
         var incoming = defaults; incoming.serverRunning = true; incoming.server.listenPort = "20000"
         let previous = try Data(contentsOf: file)
         let parked = root.appendingPathComponent("previous.json")
