@@ -48,8 +48,6 @@ class Host:
                 if not chunk:
                     raise RuntimeError('Native controller stdout closed')
                 self.buffer += chunk
-            elif self.process.poll() is not None:
-                raise RuntimeError('Native controller host exited: ' + str(self.process.returncode))
         raise TimeoutError('Native controller command exceeded six seconds')
 
     def close(self):
@@ -142,21 +140,36 @@ def compile_host(core, folder, old, log):
 
 
 def exit_transport_check(executable, output):
-    """An exited host can still have its complete acknowledgement in the pipe."""
+    """Drain acknowledgements for exit before a read and just after an empty select."""
     with output.open('wb') as log:
-        host = Host(executable, log)
-        flush = host.process.stdin.flush
+        for after_timeout in (False, True):
+            host = Host(executable, log)
+            flush = host.process.stdin.flush
+            original_select = select.select
 
-        def flush_after_exit():
-            flush()
-            host.process.wait(timeout=6)
+            def flush_after_exit():
+                flush()
+                host.process.wait(timeout=6)
 
-        host.process.stdin.flush = flush_after_exit
-        try:
-            assert host.request('exit')['running'] is False
-        finally:
-            host.close()
-    print('PASS: complete exit acknowledgement drained after real host termination')
+            def select_before_exit(*args):
+                ready = original_select(*args)
+                if not ready[0]:
+                    flush_after_exit()
+                return ready
+
+            try:
+                if after_timeout:
+                    host.process.stdin.flush = lambda: None
+                    select.select = select_before_exit
+                else:
+                    host.process.stdin.flush = flush_after_exit
+                assert host.request('exit')['running'] is False
+                assert host.process.returncode == 0
+            finally:
+                select.select = original_select
+                host.process.stdin.flush = flush
+                host.close()
+    print('PASS: complete exit acknowledgements drained before a read and after a select timeout')
 
 
 def worker_stop_check(core, output, folder):
