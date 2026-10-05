@@ -43,13 +43,13 @@ class Host:
                     if result['id'] != self.sequence:
                         raise RuntimeError('Out-of-order test command result')
                     return result
-            if self.process.poll() is not None:
-                raise RuntimeError('Native controller host exited: ' + str(self.process.returncode))
             if select.select([self.process.stdout], [], [], .05)[0]:
                 chunk = os.read(self.process.stdout.fileno(), 65536)
                 if not chunk:
                     raise RuntimeError('Native controller stdout closed')
                 self.buffer += chunk
+            elif self.process.poll() is not None:
+                raise RuntimeError('Native controller host exited: ' + str(self.process.returncode))
         raise TimeoutError('Native controller command exceeded six seconds')
 
     def close(self):
@@ -141,6 +141,24 @@ def compile_host(core, folder, old, log):
     return executable
 
 
+def exit_transport_check(executable, output):
+    """An exited host can still have its complete acknowledgement in the pipe."""
+    with output.open('wb') as log:
+        host = Host(executable, log)
+        flush = host.process.stdin.flush
+
+        def flush_after_exit():
+            flush()
+            host.process.wait(timeout=6)
+
+        host.process.stdin.flush = flush_after_exit
+        try:
+            assert host.request('exit')['running'] is False
+        finally:
+            host.close()
+    print('PASS: complete exit acknowledgement drained after real host termination')
+
+
 def worker_stop_check(core, output, folder):
     """Exercise the actual old/new worker helper with only yield scheduling replaced."""
     patched = (core / 'src/hev-socks5-worker.c').read_bytes()
@@ -185,6 +203,7 @@ def main():
             folder = Path(temp) / label; folder.mkdir()
             with (output / (label + '-build.log')).open('wb') as build_log:
                 executable = compile_host(core, folder, old, build_log)
+            exit_transport_check(executable, output / (label + '-exit-transport.log'))
             for workers in (1, 4):
                 with socket.socket() as sock:
                     sock.bind(('127.0.0.1', 0)); port = sock.getsockname()[1]
