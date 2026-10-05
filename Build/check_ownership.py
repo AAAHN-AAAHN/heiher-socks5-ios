@@ -34,7 +34,9 @@ def main():
     original = show(INPUT, 'Socks5/Settings/AppSettings.swift').decode()
     before = original[original.index('struct ServerSettings:'):original.index('\nenum SettingsError:')]
     after = model[model.index('struct ServerSettings:'):model.index('\nenum ServerConfigurationError:')]
-    assert after.replace('ServerConfigurationError', 'SettingsError') == before
+    yaml_guard = '        let yamlExcluded = CharacterSet(charactersIn: "\\u{FFFE}\\u{FFFF}")\n        guard fields.allSatisfy({ $0.rangeOfCharacter(from: yamlExcluded) == nil }) else {\n            throw ServerConfigurationError.invalid("Text fields must not contain U+FFFE or U+FFFF.")\n        }\n'
+    assert after.count(yaml_guard) == 1, 'Missing or changed YAML scalar guard'
+    assert after.replace(yaml_guard, '', 1).replace('ServerConfigurationError', 'SettingsError') == before
     original_controller = show(INPUT, 'Socks5/Server/ServerController.swift').decode()
     expected = original_controller.replace('func apply(_ settings: AppSettings, retry: Bool = false)',
         'func apply(_ settings: ServerSettings, running: Bool, retry: Bool = false)').replace(
