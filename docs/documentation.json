@@ -2,7 +2,7 @@
   "branch": "feature/settings-persistence",
   "frozen_source": "18915a7f85a869300969b69c5316263899bc7b9c",
   "parents": {
-    "feature/server-control": "8ce44ced1c7c21e3f8f2c5fe59ec42142c110d9f"
+    "feature/server-control": "167c9785f38c148eae65c809cc72e41e48d21c81"
   },
   "owned_documents": [
     "README.md",
@@ -12,7 +12,7 @@
   "validation_files": {
     "Build/check.py": "1c042a36950e9dc62c976ebd33dfa1e951323935",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
-    "Build/check_ownership.py": "7f16ffd80b2871f76b8fd0ad5363188bdfc4227f",
+    "Build/check_ownership.py": "3f11ee85e1248ad3d891fd8867f21ef1e9f2a4c0",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }
