@@ -190,3 +190,25 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
      signal (SIGPIPE, SIG_IGN);
      signal (SIGUSR1, sigint_handler);
      atomic_fetch_or (&tsync, SYNC_SEND);
+
+diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
+--- a/src/hev-socks5-proxy.c
++++ b/src/hev-socks5-proxy.c
+@@ -23,6 +23,7 @@
+ #include "hev-config.h"
+ #include "hev-logger.h"
+ #include "hev-socks5-worker.h"
++#include "hev-socks5-session.h"
+ #include "hev-socket-factory.h"
+ #include "hev-socks5-user-mark.h"
+
+@@ -199,6 +200,9 @@
+
+     LOG_D ("socks5 proxy init");
+
++    /* Shared class tables must be complete before any worker can use them. */
++    hev_socks5_session_class ();
++
+     listen_addr = hev_config_get_listen_address ();
+     listen_port = hev_config_get_listen_port ();
+     ipv6_only = hev_config_get_listen_ipv6_only ();

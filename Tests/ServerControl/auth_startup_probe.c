@@ -1,7 +1,8 @@
-/* Real initialization; only allocation and credential-read outcomes are injectable. */
+/* Real startup; observe class publication and inject allocation/read failures. */
 #include <assert.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,8 +11,9 @@
 #include <hev-socks5-authenticator.h>
 #include "hev-main.h"
 #include "hev-socks5-user-mark.h"
+#include "hev-socks5-session.h"
 
-static int fail_auth, fail_user, fail_read, auth_calls, user_calls;
+static int fail_auth, fail_user, fail_read, auth_calls, user_calls, classes_ready;
 
 static HevSocks5Authenticator *
 new_auth (void)
@@ -39,10 +41,35 @@ read_line (char **line, size_t *length, FILE *file)
     return getline (line, length, file);
 }
 
+/* Neither wrapper initializes classes on a worker's behalf. */
+HevObjectClass *
+checked_session_class (void)
+{
+    HevSocks5ServerClass *klass = (void *)hev_socks5_session_class ();
+    assert (!strcmp (klass->base.base.name, "HevSocks5Session"));
+    assert (klass->base.base.ref && klass->base.base.destruct &&
+            klass->base.base.iface && klass->base.binder && klass->binder &&
+            klass->tcp.splicer && klass->udp.get_fd);
+    classes_ready++;
+    return HEV_OBJECT_CLASS (klass);
+}
+
+int
+checked_thread_create (pthread_t *thread, const pthread_attr_t *attr,
+                        void *(*entry) (void *), void *data)
+{
+    assert (classes_ready == 1);
+    return pthread_create (thread, attr, entry, data);
+}
+
+#define hev_socks5_session_class checked_session_class
+#define pthread_create checked_thread_create
 #define hev_socks5_authenticator_new new_auth
 #define hev_socks5_user_mark_new new_user
 #define getline read_line
 #include "hev-socks5-proxy.c"
+#undef pthread_create
+#undef hev_socks5_session_class
 #undef getline
 #undef hev_socks5_authenticator_new
 #undef hev_socks5_user_mark_new
@@ -73,7 +100,7 @@ main (int argc, char **argv)
         fail_auth = i <= 1;
         fail_user = i == 2;
         fail_read = i == 6;
-        auth_calls = user_calls = 0;
+        auth_calls = user_calls = classes_ready = 0;
         snprintf (config, sizeof (config),
                   "main:\n  workers: %d\n  listen-address: '127.0.0.1'\n"
                   "  port: %d\n  udp-port: 0\n%s",
@@ -83,6 +110,7 @@ main (int argc, char **argv)
         hev_socks5_server_quit ();
         result = hev_socks5_server_main_from_str ((const unsigned char *)config,
                                                   strlen (config));
+        assert (classes_ready == 1);
         if (result != expected[i]) {
             fprintf (stderr, "case %d: result %d, expected %d\n", i, result,
                      expected[i]);
@@ -100,6 +128,6 @@ main (int argc, char **argv)
         close (fd);
     }
     puts (
-        "PASS: eight authentication startup cases; failure closes the listener and releases workers");
+        "PASS: eight startup cases; shared classes precede workers and failures release the listener");
     return 0;
 }
