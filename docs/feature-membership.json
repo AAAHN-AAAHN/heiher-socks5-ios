@@ -1,7 +1,7 @@
 {
   "base_commit": "bf23e26538cffb7c79f1cf401792a74cbd9848e9",
   "branches": {
-    "feature/server-control": "def5163e1565ae631f634436773a9a64b2ca5cd8"
+    "feature/server-control": "8ce44ced1c7c21e3f8f2c5fe59ec42142c110d9f"
   },
   "sources": {
     "Socks5/Server/ServerSettings.swift": {
@@ -17,8 +17,8 @@
       "sha256": "0684c8be1fae897e045ca22471e33c26e1a5ed950c45c107ad04009742ea7208"
     },
     "Patches/hev-server-startup-stop.patch": {
-      "commit": "789d5817d6834211e4531e21f725f39c8bfb7806",
-      "sha256": "e95eaa89cf4abf3e06f1e7a4753daecd856f8def8f698ef9aac249cde5ac2205"
+      "commit": "8ce44ced1c7c21e3f8f2c5fe59ec42142c110d9f",
+      "sha256": "c9862bb9f074354297b969822b2cbba22b18563a248c705ec113d8eceaec9c7b"
     },
     "Tests/server_lifecycle_host.c": {
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
@@ -113,12 +113,12 @@
       "sha256": "3163980805168e45fa5fde2372273dafcede700364b0b663a5e7c5f08413d477"
     },
     "Tests/ServerControl/ui_audit.py": {
-      "commit": "83a0d6ef516b5d9b4330a099305b9f4f86804ae3",
-      "sha256": "4a5635a330a981d1ce65de8b3dc572b1fc70b09a43fcb21a4e85d60d77cabfef"
+      "commit": "8ce44ced1c7c21e3f8f2c5fe59ec42142c110d9f",
+      "sha256": "84b919cb6a24eca6eb5f9bd0330e53b238371fcce841153f940c9d1da8f9e0c8"
     },
     "Tests/ServerControl/auth_startup_probe.c": {
-      "commit": "789d5817d6834211e4531e21f725f39c8bfb7806",
-      "sha256": "c0024e473f63fc8942b8ad7899e438e2064cddb9da256b30685dad801fba7403"
+      "commit": "8ce44ced1c7c21e3f8f2c5fe59ec42142c110d9f",
+      "sha256": "4b2d84bff9a576c0aff13ab9f31eb354fec1c2a4ae64baab5b478218716eb6ad"
     }
   },
   "files": {
