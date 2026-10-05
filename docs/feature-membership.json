@@ -3,8 +3,8 @@
   "branches": {
     "feature/app-icon": "a7b57385f90500e7a5abd5e379d2a85cbc6c833f",
     "feature/background": "6669e8c4ca0ecf9ec99d9142877af58ea01c074b",
-    "feature/server-control": "167c9785f38c148eae65c809cc72e41e48d21c81",
-    "feature/settings-persistence": "ae12f6c61fccca06000064febb2f366141853339",
+    "feature/server-control": "5a4d1edc0eeda4ae725fb3be60870fbc1d95a3c7",
+    "feature/settings-persistence": "1486f6ee40081d4d8d370321e336205c2988af63",
     "feature/udp-compat": "0fb2f2fb879a974d1f4f01bb70f90141eeabe5aa",
     "feature/traffic-statistics": "e7e5af2b3876a951e9fc16143dde2b04ff0bbb02"
   },
@@ -314,8 +314,8 @@
       "sha256": "a8fff4b29de1f90de8b1a7134d6e7de834e5cd40ba1b0046c88f031c82695c28"
     },
     "Tests/ServerControl/native_controller_check.py": {
-      "commit": "def5163e1565ae631f634436773a9a64b2ca5cd8",
-      "sha256": "480e95139a3932e5360dcb67344890daca3186511a1a295e6a9d4f41c8baef1c"
+      "commit": "5a4d1edc0eeda4ae725fb3be60870fbc1d95a3c7",
+      "sha256": "b5e27a7fb9f978382af60e7e25fb20d2205ab8369c16216184d83109f999314d"
     },
     "Tests/ServerControl/run_checks.py": {
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
