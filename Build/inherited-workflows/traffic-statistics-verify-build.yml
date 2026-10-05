@@ -14,7 +14,7 @@ jobs:
   udp-prerequisite:
     uses: ./.github/workflows/udp-compat-audit.yml
     with:
-      ref: 0fb2f2fb879a974d1f4f01bb70f90141eeabe5aa
+      ref: a7ef3d11ef3bdca3b19c40ba4ddffded8d6b2a2e
   verify:
     needs: udp-prerequisite
     strategy:

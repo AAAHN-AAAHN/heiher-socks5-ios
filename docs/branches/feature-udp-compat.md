@@ -70,6 +70,8 @@ The feature's SDK checks compile the actual patched C/session and applicable Swi
 
 Use a clean full-history checkout and `python3 Tests/udp_compat_audit.py` for the standalone audit. Feature manifests identify the source roots and patch order. The application's server configuration accepts UDP port zero, but its default and configured fixed-port behavior are not automatically migrated. A client must use the relay endpoint returned by its association response.
 
+Each association binds its destination-side UDP socket once, using its first destination's family. Family-specific binding may prevent later traffic to the other family; Linux IPv4-first with `0.0.0.0` is one such case. Mixed-family audit profiles leave both outgoing bind addresses empty. Default bindings and larger buffers do not guarantee mixed-family forwarding within one association.
+
 Correct independent shutdown of multiple unknown-peer associations on a single fixed UDP endpoint is an explicit limitation. Peer checks are not cryptographic authentication, and a valid first sender sharing the expected IP can still compete to establish an unknown source port. NAT, firewall and socket/path limits are not overridden by a larger buffer.
 
 The configured minimum is iOS 17.2 and the primary target is physical iOS 27 through SideStore standalone or LiveContainer guest execution. Actual installer, host, VPN/hotspot, suspension, long-background and device-resource behavior require separate evidence. Timer intervals are scheduling policies, not deadlines that override blocked I/O or process suspension.
