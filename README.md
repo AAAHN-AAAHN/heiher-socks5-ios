@@ -27,7 +27,7 @@ The actual socket peer determines attribution. IPv4-mapped addresses normalize t
 
 `TrafficStatistics` computes rates from cumulative-counter differences divided by actual elapsed monotonic time. The first sample, non-increasing time or decreasing counters establishes a zero-rate baseline. Raw counters and rates remain separate from display rounding.
 
-The existing tables show **In**, **Out** and **In + Out**, with **Spd.** and **Vol.** rows. The sum is formed before rounding. Volume uses SI KB/MB/GB/TB/PB; speed converts bytes per second to SI Kbps/Mbps/Gbps/Tbps/Pbps. Both use exactly two decimal places and a fixed formatting locale. Title and table fonts, grid styling, monospaced digits and accessibility identifiers are preserved.
+The existing tables show **In**, **Out** and **In + Out**, with **Spd.** and **Vol.** rows. The sum is formed before rounding. Volume uses SI KB/MB/GB/TB/PB; speed converts bytes per second to SI Kbps/Mbps/Gbps/Tbps/Pbps. Both use exactly two decimal places and a fixed formatting locale.
 
 A single visibility/scene-keyed task samples immediately, then approximately once per second while the tab is visible and the scene active. Cancellation stops the loop. Returning establishes a fresh rate baseline without resetting native volume. `EndpointTrafficStatistics` caches entries by stable ID and sorts those IDs; IDs may have gaps and do not index the native row array. Nonzero Unattributed appears first.
 
