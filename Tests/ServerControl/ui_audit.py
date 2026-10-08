@@ -33,12 +33,17 @@ def output(*args):
 
 def verify_production():
     baseline = 'b67733e7e13ae61401425e13a274f4fc7459bdb2'
+    source_base = '1a2130c1d0658e0483b421bfa808572bd16df82e'
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
     expected = json.loads(output('git', 'show', baseline + ':Build/features.json'))
     parent = json.loads((ROOT / 'docs/documentation.json').read_bytes())['parents']['main']
-    expected['base_commit'] = parent
+    expected['base_commit'] = source_base
     if config != expected:
-        raise RuntimeError('Server-control configuration differs beyond the current main base')
+        raise RuntimeError('Server-control configuration differs beyond the immutable main source base')
+    run(['git', 'merge-base', '--is-ancestor', source_base, parent], 'preserved-main-ancestry.log')
+    run(['git', 'diff', '--exit-code', source_base, parent, '--', '.',
+         ':(exclude)README.md', ':(exclude)docs'], 'preserved-main-source.log')
+    run([sys.executable, ROOT / 'Build/check_documentation.py'], 'preserved-documents.log')
     run(['git', 'diff', '--exit-code', baseline, 'HEAD', '--',
          'Socks5', 'Socks5.xcodeproj', 'Patches', 'Build/upstream.json',
          'HevSocks5Server.xcframework'], 'preserved-production.log')
