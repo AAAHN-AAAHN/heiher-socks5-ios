@@ -3,6 +3,23 @@
 import argparse,json,os,select,socket,struct,subprocess,tempfile,threading,time
 from pathlib import Path
 
+def udp_socket(family,label):
+ # Match the inherited UDP fixture's capacity; keep every large-packet oracle.
+ s=socket.socket(family,socket.SOCK_DGRAM)
+ try:
+  actual={}
+  for name,option,size in [('send',socket.SO_SNDBUF,256*1024),('receive',socket.SO_RCVBUF,512*1024)]:
+   try:s.setsockopt(socket.SOL_SOCKET,option,size)
+   except OSError as error:
+    raise RuntimeError(f'UDP fixture {label}: cannot set {name} buffer to {size}; host socket limits must allow the unchanged large-packet matrix') from error
+   actual[name]=s.getsockopt(socket.SOL_SOCKET,option)
+   if actual[name]<65536:
+    raise RuntimeError(f'UDP fixture {label}: {name} buffer is {actual[name]} after requesting {size}; host socket limits must permit at least 65536 bytes for the unchanged 64000-byte payload matrix')
+  print('UDP fixture buffers:',json.dumps(dict(peer=label,family=int(family),**actual)),flush=True)
+  return s
+ except BaseException:
+  s.close();raise
+
 def exact(s,n):
  b=b''
  while len(b)<n:
@@ -75,7 +92,8 @@ class Host:
 
 class Echo:
  def __init__(self,ip,udp=False):
-  self.ip=ip;self.udp=udp;self.s=socket.socket(socket.AF_INET6 if ':' in ip else socket.AF_INET,socket.SOCK_DGRAM if udp else socket.SOCK_STREAM)
+  self.ip=ip;self.udp=udp;family=socket.AF_INET6 if ':' in ip else socket.AF_INET
+  self.s=udp_socket(family,'echo '+ip) if udp else socket.socket(family,socket.SOCK_STREAM)
   self.s.bind((ip,0));self.port=self.s.getsockname()[1];self.running=True;self.error=None
   if not udp:self.s.listen()
   self.s.settimeout(.1);self.children=[];self.t=threading.Thread(target=self.loop);self.t.start()
@@ -113,7 +131,7 @@ def suite(binary,out,workers,auth):
     h.add(source,size+3,size+4);h.add(dest,size+4,size+3);h.check(f'tcp-{source}-{dest}-{size}')
    u=Echo(dest,True);servers.append(u)
    ctrl,relay=h.connect(source,'::' if ':' in source else '0.0.0.0',0,cmd=3)
-   client=socket.socket(socket.AF_INET6 if ':' in source else socket.AF_INET,socket.SOCK_DGRAM);client.bind((source,0));client.settimeout(2)
+   client=udp_socket(socket.AF_INET6 if ':' in source else socket.AF_INET,'client '+source);client.bind((source,0));client.settimeout(2)
    rip=relay[0]
    for size in [0,1,64,1499,1500,1501,2000,48001,64000]:
     data=bytes((i*17+3)&255 for i in range(size));header=b'\x00\x00\x00'+addr(dest,u.port)
