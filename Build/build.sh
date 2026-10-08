@@ -48,12 +48,7 @@ for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
             --output "$OUT/$mode-protocol.json" > "$OUT/$mode-protocol.log" 2>&1
     fi
     if feature statistics; then
-        cc -std=gnu11 -O2 -Wall -Werror -pthread -I"$CORE/src" Tests/traffic_stats_host.c \
-            "$CORE/bin/libhev-socks5-server.a" "$CORE/third-part/yaml/bin/libyaml.a" \
-            "$CORE/third-part/hev-task-system/bin/libhev-task-system.a" -o "$OUT/stats-host"
-        python3 Tests/traffic_stats_regression.py "$OUT/stats-host" \
-            > "$OUT/$mode-statistics.log" 2>&1
-        rm "$OUT/stats-host"
+        python3 Tests/SocketIO/run.py "$CORE" --mode "$mode" > "$OUT/$mode-statistics.log" 2>&1
     fi
     if feature settings; then
         cc -std=gnu11 -O2 -Wall -Werror -pthread -I"$CORE/src" Tests/server_lifecycle_host.c \
@@ -91,7 +86,7 @@ if [ "$(uname -s)" = Darwin ]; then
         -sdk iphoneos -destination 'generic/platform=iOS' \
         -archivePath "$ROOT/.build/$NAME.xcarchive" \
         CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
-        MARKETING_VERSION=2.0.0 CURRENT_PROJECT_VERSION=1 \
+        MARKETING_VERSION=3.0.0 CURRENT_PROJECT_VERSION=1 \
         > "$OUT/app-build.log" 2>&1
     APP="$ROOT/.build/$NAME.xcarchive/Products/Applications/Socks5.app"
     xcrun lipo "$APP/Socks5" -verify_arch arm64
