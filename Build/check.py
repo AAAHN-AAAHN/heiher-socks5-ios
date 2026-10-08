@@ -69,7 +69,9 @@ def apply(core):
 def formatting(core, formatter):
     for relative in CONFIG['sources']:
         repo = core / relative
-        for name in git(repo, 'diff', '--name-only', '--', '*.c', '*.h').decode().splitlines():
+        changed = git(repo, 'diff', '--name-only', '--', '*.c', '*.h').decode().splitlines()
+        added = git(repo, 'ls-files', '--others', '--exclude-standard', '--', '*.c', '*.h').decode().splitlines()
+        for name in sorted(set(changed + added)):
             path = repo / name
             formatted = subprocess.check_output([formatter, str(path)])
             assert formatted == path.read_bytes(), f'Upstream formatting: {relative}/{name}'
@@ -138,6 +140,7 @@ def composition():
 
 def package(app):
     info = plistlib.loads((app / 'Info.plist').read_bytes())
+    assert info['CFBundleShortVersionString'] == '3.0.0' and info['CFBundleVersion'] == '1', 'Unexpected package version'
     if CONFIG['name'] != 'baseline':
         assert info['UIApplicationSceneManifest']['UIApplicationSupportsMultipleScenes'] is False
         assert info.get('NSLocalNetworkUsageDescription')
