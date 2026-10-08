@@ -1,7 +1,7 @@
 {
   "base_commit": "1a2130c1d0658e0483b421bfa808572bd16df82e",
   "branches": {
-    "feature/server-control": "b367d730be77835151317b6123adc0ea59e51042"
+    "feature/server-control": "51e4c8ae7e03ddd4be3d1a76e922e03bca97f2c5"
   },
   "sources": {
     "Socks5/Server/ServerSettings.swift": {
@@ -113,8 +113,8 @@
       "sha256": "e9066f4766602f545108855a4c8b17ac107149591849fe16aed145a9e6f8f865"
     },
     "Tests/ServerControl/ui_audit.py": {
-      "commit": "531332d62c8e0b6e92ac44824d2b6b82743bea83",
-      "sha256": "3b2df803da106da3fdd066d701a0b7017be8b49518f030eb711c676a2cdbe534"
+      "commit": "51e4c8ae7e03ddd4be3d1a76e922e03bca97f2c5",
+      "sha256": "4e171681c46868f060eedd9a3af0c37cc4a1dae11400ec435e639160c1bc916e"
     },
     "Tests/ServerControl/auth_startup_probe.c": {
       "commit": "8ce44ced1c7c21e3f8f2c5fe59ec42142c110d9f",
