@@ -1,0 +1,70 @@
+name: Diagnose Simulator boot and verify exact ServerControl
+on:
+  push:
+    branches: [work/simulator-diagnostics]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: simulator-environment-diagnostic
+  cancel-in-progress: false
+jobs:
+  diagnose-and-verify:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+    steps:
+      - name: Check out diagnostic tools only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: diagnostic
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Observe unchanged 120-second Simulator boot boundary
+        id: boot
+        run: python3 diagnostic/Diagnostics/CoreSimulator/diagnose.py --output artifacts/core-simulator-diagnostic
+      - name: Check out the exact existing ServerControl source
+        id: source
+        if: success() && steps.boot.outcome == 'success'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: bbb4ff8bd8bc54d848ed90009c15226eada3ec23
+          path: server-control
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install the formatter without replacing the compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install llvm@18
+          mkdir -p "$RUNNER_TEMP/format-only"
+          ln -s "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
+          echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
+      - name: Unchanged native and lifecycle checks at the exact source
+        working-directory: server-control
+        run: BUILD_IPA=0 bash Build/build.sh
+      - name: Unchanged iOS 27 API type checks
+        working-directory: server-control
+        run: bash Build/check_swift_sdk.sh
+      - name: Unchanged ServerControl Simulator UI and native listener gate
+        id: server_ui
+        working-directory: server-control
+        run: python3 Tests/ServerControl/ui_audit.py
+      - name: Preserve host evidence if the existing UI gate fails
+        if: failure() && steps.server_ui.outcome == 'failure'
+        run: python3 diagnostic/Diagnostics/CoreSimulator/diagnose.py --capture-only --output artifacts/core-simulator-diagnostic/after-server-ui
+      - name: Record the exact ServerControl evidence
+        if: always() && steps.source.outcome == 'success'
+        working-directory: server-control
+        run: python3 Build/record_evidence.py
+      - name: Retain diagnostic and original gate results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: CoreSimulator-diagnostic-and-ServerControl-${{ github.run_attempt }}
+          path: |
+            artifacts/core-simulator-diagnostic/
+            server-control/artifacts/
+          retention-days: 30
