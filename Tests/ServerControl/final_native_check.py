@@ -6,6 +6,8 @@ quoted UTF-8 authentication, listener release and current-owner lifetime checks.
 """
 import json
 import os
+from contextlib import contextmanager
+import shutil
 import subprocess
 from pathlib import Path
 import socket
@@ -14,6 +16,67 @@ import tempfile
 import time
 
 from native_controller_check import Host, authenticate, compile_host, receive, stop, wait_auth
+
+
+def matching_crash_report(path, pid, executable):
+    """Apple .ips files may contain a metadata object followed by a report."""
+    content = path.read_text()
+    decoder = json.JSONDecoder()
+    offset = 0
+    while offset < len(content):
+        offset += len(content[offset:]) - len(content[offset:].lstrip())
+        if offset == len(content):
+            break
+        report, offset = decoder.raw_decode(content, offset)
+        if (isinstance(report, dict) and report.get('pid') == pid
+                and report.get('procName') == executable.name
+                and isinstance(report.get('procPath'), str)
+                and Path(report['procPath']).resolve() == executable.resolve()):
+            return True
+    return False
+
+
+@contextmanager
+def temporary_with_failure_evidence(output, context):
+    with tempfile.TemporaryDirectory() as temporary:
+        try:
+            yield temporary
+        except BaseException as failure:
+            # Preserve evidence before TemporaryDirectory removes the exact host.
+            # Observation errors must never replace the original test failure.
+            evidence = dict(error=repr(failure), inputs=temporary, reports=[],
+                            observation_errors=[])
+            host = context.get('host')
+            if host is not None:
+                executable = Path(host.process.args[0])
+                evidence.update(workers=context['workers'], pid=host.process.pid,
+                                executable=str(executable),
+                                returncode=host.process.poll())
+            try:
+                shutil.copytree(temporary, output / 'failure-host')
+                evidence['inputs_preserved'] = True
+                if sys.platform == 'darwin' and host is not None:
+                    directories = [Path.home() / 'Library/Logs/DiagnosticReports',
+                                   Path('/Library/Logs/DiagnosticReports')]
+                    for directory in directories:
+                        for report in sorted(directory.glob(executable.name + '*.ips')):
+                            try:
+                                if matching_crash_report(report, host.process.pid, executable):
+                                    target = output / 'failure-host' / ('crash-' + report.name)
+                                    shutil.copyfile(report, target)
+                                    evidence['reports'].append(str(report))
+                            except (OSError, ValueError) as error:
+                                evidence['observation_errors'].append(repr(error))
+                evidence['crash_report_scope'] = (
+                    'Only reports already present for this exact PID/name/path; '
+                    'no waiting, retry, or change to the original test deadline.')
+            except Exception as error:
+                evidence['observation_errors'].append(repr(error))
+            try:
+                (output / 'failure-evidence.json').write_text(json.dumps(evidence, indent=2) + '\n')
+            except OSError as error:
+                print('Unable to record failure evidence: ' + repr(error), file=sys.stderr)
+            raise
 
 
 def settled(host, predicate):
@@ -69,7 +132,8 @@ def main():
     core, output = (Path(p).resolve() for p in sys.argv[1:])
     output.mkdir(parents=True, exist_ok=True)
     rows = []
-    with tempfile.TemporaryDirectory() as temporary:
+    failure_context = {}
+    with temporary_with_failure_evidence(output, failure_context) as temporary:
         folder = Path(temporary)
         authentication_startup(core, output, folder)
         with (output / 'build.log').open('wb') as log:
@@ -82,7 +146,9 @@ def main():
                     udpListenAddress='', udpListenPort='0', bindIPv4Address='0.0.0.0',
                     bindIPv6Address='::', bindInterface='', authUsername="u' :#[]{}/\\\u00e9",
                     authPassword="p' :#[]{}/\\\uac00", listenIPv6Only=False)
+                failure_context.clear()
                 host = Host(executable, log)
+                failure_context.update(host=host, workers=workers)
                 try:
                     host.request('apply', settings=options, running=True)
                     state = settled(host, lambda s: not s['running'] and s['status'].startswith('Server exited ('))
