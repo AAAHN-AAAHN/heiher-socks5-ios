@@ -51,6 +51,7 @@ final class ServerControlUITests: XCTestCase {
             reveal(start, in: app, upward: true)
             XCTAssertTrue(start.isHittable && stop.isHittable)
             XCTAssertTrue(start.isEnabled && !stop.isEnabled)
+            print("ServerControlUI Start orientation=\(orientation.rawValue)")
             start.tap()
             XCTAssertTrue(waitUntil { !start.isEnabled && stop.isEnabled })
             XCTAssertTrue(waitUntil { Self.handshake() }, "Running label is not the native-readiness oracle")
@@ -59,6 +60,7 @@ final class ServerControlUITests: XCTestCase {
             XCTAssertFalse(app.secureTextFields.firstMatch.isEnabled)
             XCTAssertFalse(ipv6Only.isEnabled)
             capture("running-\(orientation.rawValue)")
+            print("ServerControlUI Stop orientation=\(orientation.rawValue)")
             stop.tap()
             XCTAssertTrue(waitUntil { start.isEnabled && !stop.isEnabled })
             XCTAssertTrue(waitUntil { !Self.handshake() && !Self.handshake(ipv6: true) }, "Stop must release both listener paths")
@@ -111,25 +113,42 @@ final class ServerControlUITests: XCTestCase {
         add(image)
     }
 
-    private static func handshake(ipv6: Bool = false) -> Bool {
+    private static func handshake(ipv6: Bool = false, line: UInt = #line) -> Bool {
+        let started = ProcessInfo.processInfo.systemUptime
+        func failed(_ stage: String, _ result: Int, _ capturedErrno: Int32, response: [UInt8] = []) -> Bool {
+            let elapsed = ProcessInfo.processInfo.systemUptime - started
+            let family = ipv6 ? "IPv6" : "IPv4"
+            print("ServerControlUI handshake failed family=\(family) line=\(line) stage=\(stage) result=\(result) errno=\(capturedErrno) errnoValid=\(result < 0) response=\(response) started=\(started) elapsed=\(elapsed)")
+            return false
+        }
         let fd = Darwin.socket(ipv6 ? AF_INET6 : AF_INET, SOCK_STREAM, 0)
-        guard fd >= 0 else { return false }
+        let socketErrno = errno
+        guard fd >= 0 else { return failed("socket", Int(fd), socketErrno) }
         defer { Darwin.close(fd) }
         var noSignal: Int32 = 1
         var timeout = timeval(tv_sec: 0, tv_usec: 250_000)
-        guard setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout.size(ofValue: noSignal))) == 0,
-              setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout))) == 0,
-              setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout))) == 0 else { return false }
-        let connected: Bool
+        let noSignalResult = setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout.size(ofValue: noSignal)))
+        let noSignalErrno = errno
+        guard noSignalResult == 0 else { return failed("setsockopt SO_NOSIGPIPE", Int(noSignalResult), noSignalErrno) }
+        let receiveTimeoutResult = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))
+        let receiveTimeoutErrno = errno
+        guard receiveTimeoutResult == 0 else { return failed("setsockopt SO_RCVTIMEO", Int(receiveTimeoutResult), receiveTimeoutErrno) }
+        let sendTimeoutResult = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))
+        let sendTimeoutErrno = errno
+        guard sendTimeoutResult == 0 else { return failed("setsockopt SO_SNDTIMEO", Int(sendTimeoutResult), sendTimeoutErrno) }
+        let connected: (result: Int32, error: Int32)
         if ipv6 {
             var address = sockaddr_in6()
             address.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)
             address.sin6_family = sa_family_t(AF_INET6)
             address.sin6_port = UInt16(1080).bigEndian
-            guard inet_pton(AF_INET6, "::1", &address.sin6_addr) == 1 else { return false }
+            let addressResult = inet_pton(AF_INET6, "::1", &address.sin6_addr)
+            let addressErrno = errno
+            guard addressResult == 1 else { return failed("inet_pton", Int(addressResult), addressErrno) }
             connected = withUnsafePointer(to: &address) {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                    Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in6>.size)) == 0
+                    let result = Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in6>.size))
+                    return (result, errno)
                 }
             }
         } else {
@@ -137,17 +156,31 @@ final class ServerControlUITests: XCTestCase {
             address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
             address.sin_family = sa_family_t(AF_INET)
             address.sin_port = UInt16(1080).bigEndian
-            guard inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) == 1 else { return false }
+            let addressResult = inet_pton(AF_INET, "127.0.0.1", &address.sin_addr)
+            let addressErrno = errno
+            guard addressResult == 1 else { return failed("inet_pton", Int(addressResult), addressErrno) }
             connected = withUnsafePointer(to: &address) {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                    Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
+                    let result = Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+                    return (result, errno)
                 }
             }
         }
-        guard connected else { return false }
+        guard connected.result == 0 else { return failed("connect", Int(connected.result), connected.error) }
         let request: [UInt8] = [5, 1, 0]
-        guard request.withUnsafeBytes({ Darwin.send(fd, $0.baseAddress, $0.count, 0) }) == request.count else { return false }
+        let sent = request.withUnsafeBytes {
+            let result = Darwin.send(fd, $0.baseAddress, $0.count, 0)
+            return (result: result, error: errno)
+        }
+        guard sent.result == request.count else { return failed("send", sent.result, sent.error) }
         var reply: [UInt8] = [0, 0]
-        return reply.withUnsafeMutableBytes { Darwin.recv(fd, $0.baseAddress, $0.count, MSG_WAITALL) } == 2 && reply == [5, 0]
+        let received = reply.withUnsafeMutableBytes {
+            let result = Darwin.recv(fd, $0.baseAddress, $0.count, MSG_WAITALL)
+            return (result: result, error: errno)
+        }
+        guard received.result == 2 && reply == [5, 0] else {
+            return failed("recv/reply", received.result, received.error, response: Array(reply.prefix(max(0, received.result))))
+        }
+        return true
     }
 }
