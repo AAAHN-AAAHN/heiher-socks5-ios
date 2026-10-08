@@ -36,6 +36,7 @@ def module(name, path):
 
 
 for mode in (('buffered', 'splice') if sys.platform == 'linux' and 'statistics' in FEATURES else ('buffered',)):
+    udp_fixture_flags = []
     if 'statistics' in FEATURES:
         audit = module('composition_statistics', 'Tests/Statistics/audit.py')
         audit.CORE = CORE
@@ -43,6 +44,7 @@ for mode in (('buffered', 'splice') if sys.platform == 'linux' and 'statistics' 
         audit.OUT.mkdir(exist_ok=True)
         # Execute the existing real native cases, not the standalone-branch identity gate.
         audit.native_checks(mode)
+        udp_fixture_flags = audit.UDP_FIXTURE_FLAGS
     else:
         run(['make', 'clean'], mode + '-clean.log', cwd=CORE)
         run(['make', '-j3', 'ENABLE_IO_SPLICE_SYSCALL=0', 'static', 'exec'],
@@ -67,11 +69,11 @@ for mode in (('buffered', 'splice') if sys.platform == 'linux' and 'statistics' 
         for label, flags in [('sanitized', ['-O2', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all']),
                              ('optimized', ['-O3', '-fstrict-aliasing'])]:
             executable = OUT / ('udp-' + label)
-            run(['clang', '-std=gnu11', '-Wall', '-Werror', '-pthread', *flags, *includes,
+            run(['clang', '-std=gnu11', '-Wall', '-Werror', '-pthread', *flags, *udp_fixture_flags, *includes,
                  'Tests/udp_sockaddr_unit.c', *libraries, '-o', executable], mode + '-' + label + '-build.log')
             run([executable], mode + '-' + label + '.log', env=dict(os.environ, ASAN_OPTIONS='detect_leaks=0'))
             stream = OUT / ('udp-stream-' + label)
-            run(['clang', '-std=gnu11', '-Wall', '-Werror', '-pthread', *flags,
+            run(['clang', '-std=gnu11', '-Wall', '-Werror', '-pthread', *flags, *udp_fixture_flags,
                  '-Wno-unused-function', *includes, 'Tests/udp_stream_boundaries.c',
                  *libraries, '-o', stream], mode + '-stream-' + label + '-build.log')
             run([stream], mode + '-stream-' + label + '.log',
@@ -96,16 +98,8 @@ for mode in (('buffered', 'splice') if sys.platform == 'linux' and 'statistics' 
                     mode + '-' + script + '.log', timeout=300)
 
 if 'statistics' in FEATURES:
-    for script in ('audit_driver_probe.py', 'host_probe.py'):
-        run([sys.executable, 'Tests/Statistics/' + script], script + '.log')
-    run(['swiftc', '-swift-version', '5', '-warnings-as-errors', 'Socks5/Statistics/TrafficStatistics.swift',
-         'Tests/traffic_statistics_model.swift', '-o', OUT / 'stats-model'], 'statistics-model-build.log')
-    run([OUT / 'stats-model'], 'statistics-model.log')
-    for flags, label in (([], 'debug'), (['-O'], 'optimized')):
-        executable = OUT / ('client-model-' + label)
-        run(['swiftc', '-swift-version', '5', '-warnings-as-errors', *flags,
-             'Socks5/Statistics/TrafficStatistics.swift', 'Tests/Statistics/client_model.swift',
-             '-o', executable], 'client-model-' + label + '-build.log')
-        run([executable], 'client-model-' + label + '.log')
-    run([sys.executable, 'Tests/Statistics/sampling_contract.py'], 'sampling-contract.log', timeout=300)
+    run([sys.executable, 'Tests/Statistics/audit_driver_probe.py'], 'audit-driver-probe.log')
+    statistics = module('composition_statistics_models', 'Tests/Statistics/audit.py')
+    statistics.OUT = OUT / 'statistics'
+    statistics.model_checks()
 print('PASS: declared native tests; fixed-unknown UDP observation failures remain separately recorded.')

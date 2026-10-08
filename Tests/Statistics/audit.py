@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Statistics-only review: native tests and iOS type checking, never an IPA build."""
+"""Statistics-owned socket I/O audit and iOS type checks; no IPA packaging."""
 import hashlib
 import json
 import os
@@ -13,12 +13,19 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
-CLIENT_BASE = 'bb07d1795f010d624b1924cc06203af9aeb3c6a2'
-UDP = 'a7ef3d11ef3bdca3b19c40ba4ddffded8d6b2a2e'
+SOCKET_BASE = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
+UDP = '581790d7ace4bdb7a6c66832d5cc696cbc7d709d'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
+SOCKET_PATCHES = [
+    {'file': 'hev-socket-meter-task.patch', 'repository': 'third-part/hev-task-system'},
+    {'file': 'hev-socket-meter-core.patch', 'repository': 'src/core'},
+    {'file': 'hev-socket-meter-server.patch', 'repository': '.'},
+]
 UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
-                        'udp_buffer_send.c', 'udp_stream_boundaries.c',
-                        'Statistics/udp_accounting_probe.c')
+                        'udp_buffer_send.c', 'udp_stream_boundaries.c')
+# Keep inherited fixtures' substituted I/O boundaries; real meter tests use no aliases.
+UDP_FIXTURE_FLAGS = ['-Dhev_meter_' + op + '=hev_task_io_socket_' + op
+                     for op in ('recv', 'send', 'recvmsg', 'sendmsg', 'recvmmsg', 'sendmmsg')]
 UDP_FILES = {
     '.github/workflows/udp-compat-audit.yml': '.github/workflows/verify-build.yml',
     **{p: p for p in ('Patches/hev-udp-port-zero.patch', 'Patches/hev-udp-sockaddr.patch',
@@ -92,28 +99,29 @@ def inspect_sources():
         assert CONFIG[key] == udp_config[key], key
     assert CONFIG['patches'][:len(udp_config['patches'])] == udp_config['patches']
     preserved = check_udp_inheritance()
-    # UDP and shared build logic stay frozen; only the explicit statistics-owned
-    # runtime paths below may differ from the completed aggregate-only baseline.
-    # Exact prefix ownership above and the original suffix below reject missing,
-    # reordered, extra or silently edited patches without freezing an obsolete parent.
+    # The UDP prefix remains exact; all metric changes belong to Statistics.
     original = json.loads(git('show', START + ':Build/features.json'))
-    statistics_patches = [p for p in original['patches'] if p['file'].startswith('hev-stats-')]
     assert CONFIG == dict(original, base_commit=udp_config['base_commit'],
                           sources=udp_config['sources'], upstream_app=udp_config['upstream_app'],
-                          patches=udp_config['patches'] + statistics_patches)
-    runtime_changes = set(git('diff', '--name-only', CLIENT_BASE, 'HEAD', '--',
+                          patches=udp_config['patches'] + SOCKET_PATCHES)
+    runtime_changes = set(git('diff', '--name-only', SOCKET_BASE, 'HEAD', '--',
                               'Socks5', 'Socks5.xcodeproj', 'Patches').decode().splitlines())
     allowed = {'Socks5/Statistics/TrafficStatistics.swift',
                'Socks5/Statistics/TrafficStatisticsView.swift',
-               'Patches/hev-stats-core.patch', 'Patches/hev-stats-server.patch',
-               'Patches/hev-udp-dynamic-buffer.patch'}
+               'Patches/hev-stats-task-io.patch', 'Patches/hev-stats-core.patch',
+               'Patches/hev-stats-server.patch',
+               *('Patches/' + p['file'] for p in SOCKET_PATCHES),
+               *('Patches/' + p['file'] for p in udp_config['patches'])}
     assert runtime_changes <= allowed, runtime_changes - allowed
-    git('diff', '--exit-code', CLIENT_BASE, 'HEAD', '--',
-        'Patches/hev-stats-task-io.patch')
+    git('merge-base', '--is-ancestor', SOCKET_BASE, 'HEAD')
     git('merge-base', '--is-ancestor', UDP, 'HEAD')
-    git('diff', '--exit-code', '2bdfbaf34b24fd3486bb613d65629ba7372aafba',
-        'HEAD', '--', 'Socks5', 'Socks5.xcodeproj',
-        'Patches/hev-stats-task-io.patch', 'Patches/hev-stats-server.patch')
+    git('diff', '--exit-code', SOCKET_BASE, 'HEAD', '--', 'Socks5', 'Socks5.xcodeproj',
+        ':(exclude)Socks5/Statistics/TrafficStatistics.swift',
+        ':(exclude)Socks5/Statistics/TrafficStatisticsView.swift')
+    for name in ('hev-stats-task-io.patch', 'hev-stats-core.patch', 'hev-stats-server.patch'):
+        assert not (ROOT / 'Patches' / name).exists(), 'Obsolete payload collector: ' + name
+    from ui_audit import verify_presentation
+    verify_presentation()
     run([sys.executable, 'Build/check.py', 'baseline'], 'baseline.log')
     run([sys.executable, 'Tests/baseline_audit.py'], 'baseline-driver.log')
     run([sys.executable, 'Build/check.py', 'composition'], 'composition.log')
@@ -132,7 +140,7 @@ def inspect_sources():
         'files_vs_main': inventory, 'excluded_udp_files': preserved,
         'statistics_owned_paths': [p for p in documents['code_paths'](ROOT, inventory) if p not in UDP_FILES and p not in preserved],
         'statistics_production_unchanged': False,
-        'client_ip_base': CLIENT_BASE, 'allowed_runtime_changes': sorted(runtime_changes), 'udp_dependency_updated': True}, indent=2) + '\n')
+        'socket_accounting_base': SOCKET_BASE, 'allowed_runtime_changes': sorted(runtime_changes), 'udp_dependency_updated': True}, indent=2) + '\n')
     run(['git', 'diff', CONFIG['base_commit'], 'HEAD'], 'main-to-feature.diff')
     run(['git', 'diff', UDP, 'HEAD'], 'udp-to-statistics.diff')
     run(['git', 'rev-parse', 'HEAD'], 'tested-commit.txt')
@@ -144,6 +152,8 @@ def inspect_sources():
 
 
 def native_checks(mode):
+    """Build one composition and reuse the same Statistics-owned metric tests."""
+    assert mode in ('buffered', 'splice')
     splice = mode == 'splice'
     run(['make', 'clean'], mode + '-clean.log', CORE)
     # CFLAGS alone cannot disable a default-enabled Makefile option.
@@ -153,95 +163,89 @@ def native_checks(mode):
     symbols = subprocess.check_output(['nm', '-u', task / 'build/lib/io/basic/hev-task-io.o'], text=True)
     (OUT / (mode + '-io-symbols.txt')).write_text(symbols)
     assert bool(re.search(r'\b_?splice\s*$', symbols, re.M)) == splice
-    # Generic readv/writev wrappers are always part of this object.
     assert bool(re.search(r'\b_?hev_circular_buffer_new\s*$', symbols, re.M)) != splice
     libs = [CORE / 'bin/libhev-socks5-server.a', CORE / 'third-part/yaml/bin/libyaml.a',
             task / 'bin/libhev-task-system.a']
     common = ['clang', '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread']
-    host = OUT / 'host'
-    run([*common, '-I' + str(CORE / 'src'), 'Tests/traffic_stats_host.c', *libs,
-         '-o', host], mode + '-host-build.log')
-    # Exercise peer rejection and queued continuation with the real stats-linked core.
-    run([sys.executable, 'Tests/udp_peer_regression.py', CORE / 'bin/hev-socks5-server',
-         '--output', OUT / (mode + '-peer.json')], mode + '-peer.log', timeout=45)
-    run([sys.executable, 'Tests/udp_header_regression.py', CORE / 'bin/hev-socks5-server',
-         '--output', OUT / (mode + '-header.json')], mode + '-header.log', timeout=120)
-    run([sys.executable, 'Tests/udp_buffer_network.py', CORE / 'bin/hev-socks5-server',
-         '--output', OUT / (mode + '-dynamic-network.json')],
-        mode + '-dynamic-network.log', timeout=120)
-    for repeat in (1, 2):
-        run([sys.executable, '-u', 'Tests/traffic_stats_regression.py', host],
-            mode + '-network-' + str(repeat) + '.log', timeout=120)
-    run([*common, '-I' + str(CORE / 'src'), 'Tests/Statistics/counter_probe.c',
-         *libs, '-o', OUT / 'counter'], mode + '-counter-build.log')
-    run([OUT / 'counter'], mode + '-counter.log')
-    run([sys.executable, 'Tests/Statistics/client_network.py', host],
-        mode + '-client-network.log', timeout=120)
-    run([sys.executable, 'Tests/Statistics/udp_integration.py', host],
-        mode + '-udp-integration.log', timeout=120)
-    run([sys.executable, 'Tests/Statistics/payload_boundaries.py', host, CORE],
-        mode + '-payload-boundaries.log', timeout=120)
-    client_includes = ['-I' + str(CORE / 'src'),
-                       '-I' + str(CORE / 'src/core/src'),
-                       '-I' + str(task / 'include')]
-    run([*common, *client_includes, 'Tests/Statistics/client_probe.c', *libs,
-         '-o', OUT / 'client-probe'], mode + '-client-build.log')
-    run([OUT / 'client-probe'], mode + '-client.log')
-    run([sys.executable, 'Tests/Statistics/registry_contract.py', CORE, OUT, mode],
-        mode + '-registry-contract.log', timeout=300)
+    includes = ['-I' + str(CORE / 'src'), '-I' + str(CORE / 'src/core/src'),
+                '-I' + str(task / 'src'), '-I' + str(task / 'include')]
+    run([sys.executable, 'Tests/SocketIO/run.py', CORE, '--mode', mode,
+         '--output', OUT / ('socket-' + mode)], mode + '-socket-io.log', timeout=600)
+    # Preserve the UDP parent's protocol and buffer checks on the composed core.
+    for script, label, timeout in [('udp_peer_regression.py', 'peer', 45),
+                                    ('udp_header_regression.py', 'header', 120),
+                                    ('udp_buffer_network.py', 'dynamic-network', 120)]:
+        run([sys.executable, 'Tests/' + script, CORE / 'bin/hev-socks5-server',
+             '--output', OUT / (mode + '-' + label + '.json')],
+            mode + '-' + label + '.log', timeout=timeout)
     sanitize = ['-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
                 '-fno-omit-frame-pointer']
     env = dict(os.environ, ASAN_OPTIONS='detect_leaks=0', UBSAN_OPTIONS='halt_on_error=1')
-    run([*common, *sanitize, *client_includes, 'Tests/Statistics/client_probe.c',
-         *libs, '-o', OUT / 'client-asan'], mode + '-client-asan-build.log')
-    run([OUT / 'client-asan'], mode + '-client-asan.log', env=env)
-    for kind in ('tcp', 'udp'):
-        includes = (['-I' + str(task / 'src'), '-I' + str(task / 'include')]
-                    if kind == 'tcp' else ['-I' + str(CORE / 'src/core/src'), '-I' + str(task / 'include')])
-        flags = ['-DENABLE_IO_SPLICE_SYSCALL'] if splice and kind == 'tcp' else []
-        run([*common, '-Wno-unused-function', '-Wno-unused-variable', *sanitize,
-             *flags, *includes, 'Tests/Statistics/' + kind + '_probe.c',
-             *(libs if kind == 'udp' else [libs[-1]]), '-o', OUT / kind],
-            mode + '-' + kind + '-build.log')
-        run([OUT / kind], mode + '-' + kind + '.log', env=env)
-    # Complete TCP relay/callback ordering, including cancellation after partial I/O.
+    helpers = [('socket_observer', []), ('socket_observer', ['-DFORCE_FALLBACK']),
+               ('stream_matrix', ['-DENABLE_IO_SPLICE_SYSCALL'] if splice else []),
+               ('registry', []), ('worker_boundaries', [])]
     for label, extra in [('asan', sanitize), ('optimized', ['-O3', '-fstrict-aliasing'])]:
-        executable = OUT / ('tcp-accounting-matrix-' + label)
-        run([*common, *extra, '-Wno-unused-function',
-             *(['-DENABLE_IO_SPLICE_SYSCALL'] if splice else []),
-             '-I' + str(task / 'src'), *client_includes,
-             'Tests/Statistics/tcp_accounting_matrix.c', *libs, '-o', executable],
-            mode + '-' + executable.name + '-build.log')
-        run([executable], mode + '-' + executable.name + '.log', env=env)
-        executable.unlink()
-    # Same owner source fixtures now execute against the statistics-composed core.
-    for source in UDP_COMPOSED_SOURCES:
-        for label, extra in [('asan', sanitize), ('optimized', ['-O3', '-fstrict-aliasing'])]:
+        # Fixtures include the actual socket helpers/worker registry; only syscall
+        # outcomes and allocation failures are substituted at controlled boundaries.
+        for name, defines in helpers:
+            suffix = '-fallback' if '-DFORCE_FALLBACK' in defines else ''
+            executable = OUT / ('socket-' + name + suffix + '-' + label)
+            run([*common, *extra, '-Wno-unused-function', *defines, *includes,
+                 'Tests/SocketIO/' + name + '.c', libs[-1], '-o', executable],
+                mode + '-' + executable.name + '-build.log')
+            run([executable], mode + '-' + executable.name + '.log', env=env)
+            executable.unlink()
+        for source in UDP_COMPOSED_SOURCES:
             executable = OUT / ('composed-' + Path(source).stem + '-' + label)
-            run([*common, *extra, '-Wno-unused-function', *client_includes,
+            run([*common, *extra, '-Wno-unused-function', *UDP_FIXTURE_FLAGS, *includes,
                  ROOT / 'Tests' / source, *libs, '-o', executable],
                 mode + '-' + executable.name + '-build.log')
             run([executable], mode + '-' + executable.name + '.log', env=env)
             executable.unlink()
     if not splice:
-        executable = OUT / 'statistics-live-retention'
-        run([*common, *client_includes, 'Tests/Statistics/udp_lifecycle.c',
-             *libs, '-o', executable], 'statistics-live-retention-build.log')
-        run([executable], 'statistics-live-retention.log', timeout=490)
+        executable = OUT / 'udp-live-retention'
+        run([*common, *includes, 'Tests/udp_buffer_live_hold.c', *libs, '-o', executable],
+            'udp-live-retention-build.log')
+        run([executable], 'udp-live-retention.log', timeout=490)
         executable.unlink()
     if sys.platform == 'darwin':
-        # Instrument the real counter implementation, not merely an external mock.
-        run([*common, '-O1', '-g', '-fsanitize=thread', '-I' + str(CORE / 'src'),
-             '-I' + str(task / 'include'), 'Tests/Statistics/counter_probe.c',
-             CORE / 'src/core/src/hev-socks5-misc.c', *libs, '-o', OUT / 'counter-tsan'],
-            'counter-tsan-build.log')
-        run([OUT / 'counter-tsan'], 'counter-tsan.log',
-            env=dict(os.environ, TSAN_OPTIONS='halt_on_error=1'))
-        run([*common, '-O1', '-g', '-fsanitize=thread', *client_includes,
-             'Tests/Statistics/client_probe.c', *libs, '-o', OUT / 'client-tsan'],
-            'client-tsan-build.log')
-        run([OUT / 'client-tsan'], 'client-tsan.log',
-            env=dict(os.environ, TSAN_OPTIONS='halt_on_error=1'))
+        for name in ('registry', 'worker_boundaries'):
+            executable = OUT / ('socket-' + name + '-tsan')
+            run([*common, '-O1', '-g', '-fsanitize=thread', *includes,
+                 'Tests/SocketIO/' + name + '.c', libs[-1], '-o', executable],
+                mode + '-' + executable.name + '-build.log')
+            run([executable], mode + '-' + executable.name + '.log',
+                env=dict(os.environ, TSAN_OPTIONS='halt_on_error=1'))
+            executable.unlink()
+    module = OUT / 'bridge-module'
+    module.mkdir(exist_ok=True)
+    shutil.copyfile(CORE / 'src/hev-main.h', module / 'hev-main.h')
+    (module / 'module.modulemap').write_text('module HevSocks5Server { header "hev-main.h" export * }\n')
+    executable = OUT / 'socket-abi-bridge'
+    run(['swiftc', '-swift-version', '5', '-warnings-as-errors', '-I', module,
+         'Tests/SocketIO/BridgeTests.swift', *libs, '-Xlinker', '-lpthread', '-o', executable],
+        mode + '-socket-abi-build.log')
+    run([executable], mode + '-socket-abi.log')
+    executable.unlink()
+
+
+def model_checks():
+    """Pure formatting/model checks and the current sampling lifecycle contract."""
+    for source, label in [('Tests/traffic_statistics_model.swift', 'model'),
+                          ('Tests/SocketIO/FormattingTests.swift', 'socket-formatting')]:
+        run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
+             'Socks5/Statistics/TrafficStatistics.swift', source,
+             '-o', OUT / label], label + '-build.log')
+        run([OUT / label], label + '.log')
+        (OUT / label).unlink()
+    for optimization in ([], ['-O']):
+        label = 'client-model-optimized' if optimization else 'client-model-debug'
+        run(['swiftc', '-swift-version', '5', '-warnings-as-errors', *optimization,
+             'Socks5/Statistics/TrafficStatistics.swift', 'Tests/Statistics/client_model.swift',
+             '-o', OUT / 'client-model'], label + '-build.log')
+        run([OUT / 'client-model'], label + '.log')
+    (OUT / 'client-model').unlink()
+    run([sys.executable, 'Tests/Statistics/sampling_contract.py'], 'sampling-contract.log', timeout=300)
 
 
 def ios_checks(changed):
@@ -284,7 +288,6 @@ def main():
     run([sys.executable, 'Tests/Statistics/audit_driver_probe.py'], 'audit-driver.log')
     run([sys.executable, 'Tests/Statistics/udp_inheritance_regression.py'], 'udp-inheritance.log')
     run([sys.executable, 'Tests/Statistics/input_probe.py'], 'input-probe.log')
-    run([sys.executable, 'Tests/Statistics/host_probe.py'], 'host-reader.log')
     run(['git', 'clone', '--no-checkout', 'https://github.com/heiher/hev-socks5-server.git', CORE], 'clone.log')
     run(['git', 'checkout', '--detach', CONFIG['sources']['.']], 'checkout.log', CORE)
     run(['git', 'submodule', 'update', '--init', '--recursive'], 'submodules.log', CORE)
@@ -296,7 +299,7 @@ def main():
     # Only statistics-owned hunks are reviewed; UDP prerequisite contents are frozen.
     changed = []
     for item in CONFIG['patches']:
-        if item['file'].startswith('hev-stats-'):
+        if item['file'].startswith('hev-socket-meter-'):
             text = (ROOT / 'Patches' / item['file']).read_text()
             changed += [CORE / item['repository'] / p for p in re.findall(r'^\+\+\+ b/(.+)$', text, re.M)]
     formatter = shutil.which('clang-format-18') or shutil.which('clang-format')
@@ -312,10 +315,10 @@ def main():
             target.write_bytes(formatted)
             formatting_errors.append(str(path))
         hashes[str(path.relative_to(CORE))] = hashlib.sha256(path.read_bytes()).hexdigest()
-    assert len(hashes) == 9
+    assert len(hashes) == 17
     (OUT / 'statistics-source-hashes.json').write_text(json.dumps(hashes, indent=2) + '\n')
     # Test-only C follows the same formatter; never silently rewrite reviewed files.
-    for path in [*(ROOT / 'Tests/Statistics').glob('*.c'), ROOT / 'Tests/udp_stream_boundaries.c']:
+    for path in [*(ROOT / 'Tests/SocketIO').glob('*.c'), ROOT / 'Tests/udp_stream_boundaries.c']:
         target = OUT / ('formatted-' + path.name)
         formatted = subprocess.check_output([formatter, '--style=file:' + str(CORE / '.clang-format'), str(path)])
         target.write_bytes(formatted)
@@ -324,28 +327,15 @@ def main():
     assert not formatting_errors, formatting_errors
     for mode in (('buffered', 'splice') if sys.platform == 'linux' else ('buffered',)):
         native_checks(mode)
-    run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
-         'Socks5/Statistics/TrafficStatistics.swift', 'Tests/traffic_statistics_model.swift',
-         '-o', OUT / 'model'], 'model-build.log')
-    run([OUT / 'model'], 'model.log')
-    for optimization in ([], ['-O']):
-        label = 'client-model-optimized' if optimization else 'client-model-debug'
-        run(['swiftc', '-swift-version', '5', '-warnings-as-errors', *optimization,
-             'Socks5/Statistics/TrafficStatistics.swift', 'Tests/Statistics/client_model.swift',
-             '-o', OUT / 'client-model'], label + '-build.log')
-        run([OUT / 'client-model'], label + '.log')
-    run([sys.executable, 'Tests/Statistics/sampling_contract.py'], 'sampling-contract.log')
+    model_checks()
     if sys.platform == 'darwin':
         ios_checks(changed)
     for name, expected in hashes.items():
         assert hashlib.sha256((CORE / name).read_bytes()).hexdigest() == expected
     run([sys.executable, 'Build/check.py', 'reverse', CORE], 'reverse.log')
-    for name in ('host', 'counter', 'tcp', 'udp', 'counter-tsan', 'model',
-                 'client-probe', 'client-asan', 'client-tsan', 'client-model'):
-        (OUT / name).unlink(missing_ok=True)
     run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'final-worktree.log')
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'final-index.log')
-    (OUT / 'SUCCESS.txt').write_text('PASS: statistics-scoped native audit and applicable type checks.\n'
+    (OUT / 'SUCCESS.txt').write_text('PASS: peer socket I/O native audit and applicable type checks.\n'
                                     'UDP contents preserved. No IPA or XCFramework build.\n')
 
 

@@ -1,5 +1,5 @@
 {
-  "base_commit": "bf23e26538cffb7c79f1cf401792a74cbd9848e9",
+  "base_commit": "1a2130c1d0658e0483b421bfa808572bd16df82e",
   "features": [
     "udp",
     "statistics",
@@ -27,15 +27,15 @@
       "repository": "src/core"
     },
     {
-      "file": "hev-stats-task-io.patch",
+      "file": "hev-socket-meter-task.patch",
       "repository": "third-part/hev-task-system"
     },
     {
-      "file": "hev-stats-core.patch",
+      "file": "hev-socket-meter-core.patch",
       "repository": "src/core"
     },
     {
-      "file": "hev-stats-server.patch",
+      "file": "hev-socket-meter-server.patch",
       "repository": "."
     },
     {

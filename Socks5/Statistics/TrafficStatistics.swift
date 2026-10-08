@@ -1,6 +1,6 @@
 import Foundation
 
-/// External-side payload totals. Sampling never changes the native counters.
+/// Peer socket-I/O totals. Sampling never changes the native counters.
 struct TrafficStatistics {
     private(set) var received: UInt64 = 0
     private(set) var sent: UInt64 = 0
@@ -48,8 +48,8 @@ struct TrafficStatistics {
 }
 
 /// The native registry owns attribution and lifetime; this is only a visible-tab
-/// sampler. Stable IDs combine all connections for the same normalized peer IP.
-struct ClientTrafficStatistics {
+/// sampler. Stable IDs combine both roles for the same normalized peer IP.
+struct EndpointTrafficStatistics {
     struct Entry: Identifiable {
         let id: UInt64
         let address: String

@@ -88,14 +88,15 @@ def main():
         assert git('show', refs['feature/udp-compat'] + ':' + path) == git('show', dependency + ':' + path)
         assert (ROOT / path).read_bytes() == git('show', refs['feature/traffic-statistics'] + ':' + path)
 
-    # Preserve the complete statistics test tree. Its workflows are inert source
-    # copies: the integrated workflow already executes the eight-patch engine.
+    # Statistics owns its implementation and complete test tree. The release
+    # inherits these exact bytes; its workflow only runs the combined engine.
     for record in git('ls-tree', '-rz', refs['feature/traffic-statistics']).split(b'\0'):
         if not record:
             continue
         meta, source = record.split(b'\t', 1)
         source = source.decode()
-        if not source.startswith(('Tests/', '.github/workflows/')):
+        if not source.startswith(('Socks5/Statistics/', 'Patches/hev-socket-meter-',
+                                  'Tests/', '.github/workflows/')):
             continue
         target = ('Build/inherited-workflows/traffic-statistics-' + Path(source).name
                   if source.startswith('.github/workflows/') else source)

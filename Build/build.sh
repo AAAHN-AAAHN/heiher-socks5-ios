@@ -29,7 +29,7 @@ python3 Build/check.py apply "$CORE" > "$OUT/source-audit.log"
 CF=$(command -v clang-format-18 || command -v clang-format)
 "$CF" --version | grep -E 'version 18\.'
 python3 Build/check.py format "$CORE" "$CF" >> "$OUT/source-audit.log"
-for SOURCE in Tests/udp_stream_boundaries.c Tests/Statistics/tcp_accounting_matrix.c; do
+for SOURCE in Tests/udp_stream_boundaries.c Tests/SocketIO/*.c; do
     "$CF" --style="file:$CORE/.clang-format" "$SOURCE" | cmp - "$SOURCE"
 done
 python3 Build/check.py composition >> "$OUT/source-audit.log"
@@ -85,7 +85,7 @@ if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
         -archivePath "$ROOT/.build/$NAME.xcarchive" \
         CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
         SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
-        MARKETING_VERSION=2.0.0 CURRENT_PROJECT_VERSION=1 \
+        MARKETING_VERSION=3.0.0 CURRENT_PROJECT_VERSION=1 \
         > "$OUT/app-build.log" 2>&1
     APP="$ROOT/.build/$NAME.xcarchive/Products/Applications/Socks5.app"
     xcrun lipo "$APP/Socks5" -verify_arch arm64

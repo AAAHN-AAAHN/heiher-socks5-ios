@@ -2,7 +2,7 @@ import Foundation
 
 @main struct ClientModelTests {
     static func main() {
-        var model = ClientTrafficStatistics()
+        var model = EndpointTrafficStatistics()
         model.sample(id: 0, address: "Unattributed", received: 0, sent: 0, at: 1)
         precondition(model.rows.isEmpty)
         model.sample(id: 2, address: "::1", received: 50, sent: 20, at: 1)
@@ -28,7 +28,7 @@ import Foundation
         model.sample(id: 3, address: "fe80::1%3", received: UInt64.max, sent: UInt64.max, at: 6)
         precondition(model.rows.last!.traffic.sendRate == 0)
         // Hidden-tab resumption resets only sampling, not native cumulative totals.
-        model = ClientTrafficStatistics()
+        model = EndpointTrafficStatistics()
         model.sample(id: 1, address: "127.0.0.1", received: 10000, sent: 9000, at: 50)
         precondition(model.rows[0].traffic.receiveRate == 0 && model.rows[0].traffic.received == 10000)
         checkTableRounding()
@@ -77,7 +77,7 @@ import Foundation
         }
         let large = Double(UInt64.max) + Double(UInt64.max)
         precondition(large.isFinite && TrafficStatistics.capacity(large).hasSuffix(" PB"))
-        var clients = ClientTrafficStatistics()
+        var clients = EndpointTrafficStatistics()
         clients.sample(id: 2, address: "::1", received: 0, sent: 0, at: 0)
         clients.sample(id: 1, address: "127.0.0.1", received: 0, sent: 0, at: 0)
         clients.sample(id: 1, address: "127.0.0.1", received: 1, sent: 1, at: 2)

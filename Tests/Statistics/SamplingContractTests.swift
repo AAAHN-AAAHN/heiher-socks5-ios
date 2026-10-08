@@ -17,7 +17,7 @@ import Foundation
 }
 
 // Same 64-byte caller-owned address storage as the native public struct.
-struct HevSocks5ClientStats {
+struct HevSocks5EndpointStats {
     var id: UInt64 = 0
     var received: UInt64 = 0
     var sent: UInt64 = 0
@@ -38,22 +38,22 @@ struct HevSocks5ClientStats {
     final class Clock { var systemUptime = 100.0 }
 }
 @MainActor enum NativeSnapshot {
-    static var rows = [HevSocks5ClientStats(id: 0, received: 0, sent: 0)]
+    static var rows = [HevSocks5EndpointStats(id: 0, received: 0, sent: 0)]
     static var registerDuringCopy = 0
     static var queries = 0
     static var copies = 0
 }
-@MainActor func hev_socks5_server_stats(_ received: inout UInt64, _ sent: inout UInt64) {
+@MainActor func hev_socks5_server_endpoint_stats(_ received: inout UInt64, _ sent: inout UInt64) {
     received = NativeSnapshot.rows.reduce(0) { $0 &+ $1.received }
     sent = NativeSnapshot.rows.reduce(0) { $0 &+ $1.sent }
 }
-@MainActor func hev_socks5_server_client_stats(_ rows: UnsafeMutablePointer<HevSocks5ClientStats>?,
+@MainActor func hev_socks5_server_endpoint_rows(_ rows: UnsafeMutablePointer<HevSocks5EndpointStats>?,
                                              _ capacity: Int) -> Int {
     guard let rows else { NativeSnapshot.queries += 1; return NativeSnapshot.rows.count }
     NativeSnapshot.copies += 1
     for _ in 0..<NativeSnapshot.registerDuringCopy {
         let id = UInt64(NativeSnapshot.rows.count)
-        NativeSnapshot.rows.append(HevSocks5ClientStats(id: id, received: id * 17, sent: id * 31))
+        NativeSnapshot.rows.append(HevSocks5EndpointStats(id: id, received: id * 17, sent: id * 31))
     }
     NativeSnapshot.registerDuringCopy = 0
     for index in 0..<min(capacity, NativeSnapshot.rows.count) { rows[index] = NativeSnapshot.rows[index] }
@@ -62,7 +62,7 @@ struct HevSocks5ClientStats {
 
 @MainActor struct SamplingHarness {
     @Recorded var statistics = TrafficStatistics()
-    @Recorded var clients = ClientTrafficStatistics()
+    @Recorded var clients = EndpointTrafficStatistics()
     @Recorded var clientsIncomplete = false
     // INSERT_EXACT_SAMPLE_METHOD
     func run() { sample() }
@@ -132,6 +132,23 @@ struct HevSocks5ClientStats {
         sample(returned)
         check(returned.clients.rows.allSatisfy { $0.traffic.sumRate == 0 }, "returning tab starts fresh rates")
         check(returned.statistics.received == view.statistics.received, "view lifetime does not reset native totals")
-        print("PASS:", checks, "exact sample-body checks; 512 clients/64 intervals and snapshot growth; no SwiftUI render-count claim")
+        // Native snapshots are packed in hash order. Stable IDs are identifiers,
+        // not array indices, and concurrent registration may leave gaps.
+        NativeSnapshot.rows = [
+            HevSocks5EndpointStats(id: 901, received: 90, sent: 91),
+            HevSocks5EndpointStats(id: 0, received: 0, sent: 0),
+            HevSocks5EndpointStats(id: 7, received: 70, sent: 71),
+        ]
+        let packed = SamplingHarness()
+        sample(packed)
+        check(packed.clients.rows.map(\.id) == [7, 901], "packed rows sort by stable, noncontiguous IDs")
+        check(packed.clients.entries[901]?.traffic.received == 90, "high ID remains inside the bounded snapshot")
+        ProcessInfo.processInfo.systemUptime += 1
+        NativeSnapshot.rows.reverse()
+        NativeSnapshot.rows[0].sent += 3
+        sample(packed)
+        check(packed.clients.entries[7]?.traffic.sendRate == 3, "reordered packed rows keep the same per-IP baseline")
+        check(packed.statistics.received == 160 && packed.statistics.sent == 165, "packed Total sums endpoint directions")
+        print("PASS:", checks, "exact sample-body checks; 512 peers/64 intervals, snapshot growth and packed IDs; no SwiftUI render-count claim")
     }
 }

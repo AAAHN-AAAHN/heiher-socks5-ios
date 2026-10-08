@@ -2,7 +2,7 @@
 """Actual statistics UI interaction on a temporary Simulator product; never an IPA.
 
 The committed app/project and baseline XCFramework are not edited. A source copy
-gets a test target and a Simulator-only library rebuilt from the seven declared patches.
+gets a test target and a Simulator-only library rebuilt from the declared patches.
 XCTest drives actual scrolling, taps, tab switches and a native SOCKS greeting.
 """
 import hashlib
@@ -89,6 +89,64 @@ def add_test_target(app):
     shutil.copyfile(path, OUT / 'generated-test-project.pbxproj')
 
 
+def verify_presentation():
+    """Keep the frozen table/sampler behavior while changing only the metric API."""
+    ui_base = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
+    changed = set(output('git', 'diff', '--name-only', ui_base, 'HEAD', '--',
+                         'Socks5', 'Socks5.xcodeproj').splitlines())
+    assert changed <= {'Socks5/Statistics/TrafficStatisticsView.swift',
+                       'Socks5/Statistics/TrafficStatistics.swift'}, changed
+    view = (ROOT / 'Socks5/Statistics/TrafficStatisticsView.swift').read_text()
+    old_view = output('git', 'show', ui_base + ':Socks5/Statistics/TrafficStatisticsView.swift')
+    model = (ROOT / 'Socks5/Statistics/TrafficStatistics.swift').read_text()
+    old_model = output('git', 'show', ui_base + ':Socks5/Statistics/TrafficStatistics.swift')
+
+    def endpoint_names(text):
+        return text.replace('ClientTrafficStatistics', 'EndpointTrafficStatistics')\
+            .replace('HevSocks5ClientStats', 'HevSocks5EndpointStats')\
+            .replace('hev_socks5_server_client_stats', 'hev_socks5_server_endpoint_rows')\
+            .replace('hev_socks5_server_stats', 'hev_socks5_server_endpoint_stats')
+
+    def without_comments(text):
+        return '\n'.join(line for line in text.splitlines() if not line.lstrip().startswith('//'))
+
+    # The complete model, renderer and sampling method retain their behavior.
+    # Only endpoint names and explanatory comments differ from the frozen UI.
+    assert without_comments(model) == endpoint_names(without_comments(old_model))
+    renderer = '    /// One shared'
+    sampler = '    private func sample()'
+    assert view.split(renderer, 1)[1].split(sampler, 1)[0] == \
+        old_view.split(renderer, 1)[1].split(sampler, 1)[0]
+    assert without_comments(view.split(sampler, 1)[1]) == \
+        endpoint_names(without_comments(old_view.split(sampler, 1)[1]))
+    assert view.split('        .task(id:', 1)[1].split(renderer, 1)[0] == \
+        endpoint_names(old_view.split('        .task(id:', 1)[1].split(renderer, 1)[0])
+
+    # All Form structure, title fonts and accessibility labels before the footer
+    # are unchanged apart from the two peer-specific empty/growth messages.
+    prefix = '                Section {\n                    Text("Spd.'
+    old_prefix = endpoint_names(old_view.split(prefix, 1)[0])\
+        .replace('No client payload recorded yet.', 'No peer socket I/O recorded yet.')\
+        .replace('New clients will be included in the next sample.',
+                 'New peers will be included in the next sample.')
+    assert view.split(prefix, 1)[0] == old_prefix
+    assert 'DisclosureGroup' not in view
+    assert view.count('summary(statistics, id: "total")') == 1
+    assert view.count('summary(client.traffic, id: "client-\\(client.id)")') == 1
+    assert view.count('        clients = sampledClients\n') == 1
+    assert 'tableCell("In + Out"' in view and 'tableCell("Total"' not in view
+    assert '.font(.body.weight(.bold))' in view and '.font(.callout)' in view
+    assert 'Grid(alignment:' in view and '.foregroundStyle(.black)' in view
+    assert '.fontWeight(bold ? .bold : .regular)' in view and 'Color(white: 0.82)' in view
+    assert view.count('.minimumScaleFactor(0.5)') == 1
+    assert '.minimumScaleFactor(0.7)' not in view
+    assert '["KB", "MB", "GB", "TB", "PB"]' in model
+    assert '["Kbps", "Mbps", "Gbps", "Tbps", "Pbps"]' in model
+    assert 'In is bytes the OS accepted toward that IP' in view
+    assert 'Out is bytes this server consumed from that IP' in view
+    assert 'Total sums peer endpoints' in view
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for name in ('SUCCESS.txt', 'simulator-app-sha256.txt', 'simulator-library-sha256.txt'):
@@ -101,54 +159,7 @@ def main():
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'input-index.log')
     if not output('xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version').strip().startswith('27.'):
         raise SystemExit('An iOS 27 Simulator SDK is required')
-    # Preserve the completed table presentation while integrating declared native changes.
-    ui_base = '803a1ef26209c23af7338c1effa4fe7d90ead857'
-    changed = set(output('git', 'diff', '--name-only', ui_base, 'HEAD', '--',
-                         'Socks5', 'Socks5.xcodeproj', 'Patches').splitlines())
-    assert changed <= {'Socks5/Statistics/TrafficStatisticsView.swift',
-                       'Socks5/Statistics/TrafficStatistics.swift',
-                       'Patches/hev-udp-dynamic-buffer.patch',
-                       'Patches/hev-stats-core.patch'}, changed
-    # UDP ownership and patch ordering are validated by the preceding native audit.
-    # This integration may not modify the already completed production UI/model.
-    run(['git', 'diff', '--exit-code',
-         '2bdfbaf34b24fd3486bb613d65629ba7372aafba', 'HEAD', '--',
-         'Socks5', 'Socks5.xcodeproj'], 'preserved-production-ui.log')
-    view = (ROOT / 'Socks5/Statistics/TrafficStatisticsView.swift').read_text()
-    old_view = output('git', 'show', ui_base + ':Socks5/Statistics/TrafficStatisticsView.swift')
-    assert 'DisclosureGroup' not in view
-    assert view.count('summary(statistics, id: "total")') == 1
-    assert view.count('summary(client.traffic, id: "client-\\(client.id)")') == 1
-    # Reverse only the batched publication; preserve every native call, copy bound,
-    # timestamp and per-IP delta from the already validated sample body.
-    sample_body = view.split('    private func sample()', 1)[1]
-    restored = sample_body.replace(
-        '        // Build one value snapshot before publishing; per-row State writes can\n'
-        '        // repeatedly copy the dictionary and invalidate the same view state.\n'
-        '        var sampledClients = clients\n', '', 1).replace(
-        '            sampledClients.sample(', '            clients.sample(', 1).replace(
-        '                                 sent: row.sent, at: time)',
-        '                           sent: row.sent, at: time)', 1).replace(
-        '        clients = sampledClients\n', '', 1)
-    assert restored == old_view.split('    private func sample()', 1)[1]
-    assert sample_body.count('        clients = sampledClients\n') == 1
-    # Only a shared renderer was inserted between the existing task and sample.
-    assert view.split('        .task(id:', 1)[1].split('    /// One shared', 1)[0] == \
-        old_view.split('        .task(id:', 1)[1].split('    /// One shared', 1)[0]
-    model = (ROOT / 'Socks5/Statistics/TrafficStatistics.swift').read_text()
-    old_model = output('git', 'show', ui_base + ':Socks5/Statistics/TrafficStatistics.swift')
-    # Two-decimal formatting and a computed Sum must not alter raw accumulation.
-    assert model.split('    mutating func sample(', 1)[1].split('    static func capacity(', 1)[0] == \
-        old_model.split('    mutating func sample(', 1)[1].split('    static func capacity(', 1)[0]
-    assert model.split('struct ClientTrafficStatistics', 1)[1] == old_model.split('struct ClientTrafficStatistics', 1)[1]
-    assert 'tableCell("In + Out"' in view and 'tableCell("Total"' not in view
-    assert 'Grid(alignment:' in view and '.foregroundStyle(.black)' in view
-    assert '.fontWeight(bold ? .bold : .regular)' in view and 'Color(white: 0.82)' in view
-    # Unit/scale extension must not add another renderer or sampling path.
-    assert view.count('.minimumScaleFactor(0.5)') == 1
-    assert '.minimumScaleFactor(0.7)' not in view
-    assert '["KB", "MB", "GB", "TB", "PB"]' in model
-    assert '["Kbps", "Mbps", "Gbps", "Tbps", "Pbps"]' in model
+    verify_presentation()
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
     if config['features'] != ['udp', 'statistics']:
         raise RuntimeError('Statistics-only composition required')

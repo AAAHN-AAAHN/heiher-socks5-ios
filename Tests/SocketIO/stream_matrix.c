@@ -1,5 +1,5 @@
 /* Include the actual relay. Script only syscall outcomes and cancellation;
- * callback delivery and the process-lived Total/IP registry remain production. */
+ * callback delivery and buffering remain production; registry is tested separately. */
 #define _GNU_SOURCE
 #include <assert.h>
 #include <errno.h>
@@ -27,8 +27,6 @@ static ssize_t scripted_splice (int, loff_t *, int, loff_t *, size_t,
 #undef shutdown
 #undef splice
 #include <hev-task-system.h>
-#include "hev-main.h"
-#include "hev-socks5-misc-priv.h"
 
 /* Descriptors are labels in the I/O substitutes, not real client sockets. */
 enum
@@ -49,7 +47,7 @@ static struct
 {
     int action[4], tick, cancel_at, measured;
     size_t pending[2];
-    uint64_t incoming, outgoing, reported_in, reported_out;
+    size_t actual[4], reported[4];
     TraceItem events[64];
     size_t event_count;
     unsigned int callbacks, syscalls;
@@ -94,14 +92,12 @@ io_result (int operation, size_t capacity)
     }
     if (!(operation & 1)) {
         state.pending[direction] += value;
-        if (operation == 2)
-            state.incoming += value;
+
     } else {
         assert ((size_t)value <= state.pending[direction]);
         state.pending[direction] -= value;
-        if (operation == 1)
-            state.outgoing += value;
     }
+    state.actual[(int[]){ 0, 3, 2, 1 }[operation]] += value;
     return value;
 }
 
@@ -178,15 +174,14 @@ scripted_splice (int in, loff_t *off_in, int out, loff_t *off_out,
 #endif
 
 static void
-record (size_t received, size_t sent, void *token)
+record (const size_t bytes[4], void *token)
 {
-    assert (state.measured && token == state.token && (received || sent));
-    assert (received == state.incoming - state.reported_in);
-    assert (sent == state.outgoing - state.reported_out);
-    state.reported_in += received;
-    state.reported_out += sent;
+    assert (state.measured && token == state.token);
+    for (int i = 0; i < 4; i++) {
+        assert (bytes[i] == state.actual[i] - state.reported[i]);
+        state.reported[i] += bytes[i];
+    }
     state.callbacks++;
-    hev_socks5_transfer_add (received, sent, token);
 }
 
 static int
@@ -195,95 +190,32 @@ on_yield (HevTaskYieldType type, void *data)
     assert (data == &state);
     assert (type == HEV_TASK_YIELD || type == HEV_TASK_WAITIO);
     if (state.measured) {
-        assert (state.incoming == state.reported_in);
-        assert (state.outgoing == state.reported_out);
+        for (int i = 0; i < 4; i++)
+            assert (state.actual[i] == state.reported[i]);
     }
     trace (5, type);
     return state.tick++ >= state.cancel_at;
 }
 
-static void *
-register_peer (int family)
-{
-    struct sockaddr_storage address = { 0 };
-    socklen_t length;
-    int listener = socket (family, SOCK_STREAM, 0);
-    int client = socket (family, SOCK_STREAM, 0), accepted;
-    void *token;
-    assert (listener >= 0 && client >= 0);
-    if (family == AF_INET) {
-        struct sockaddr_in *a = (struct sockaddr_in *)&address;
-        a->sin_family = family;
-        a->sin_addr.s_addr = htonl (INADDR_LOOPBACK);
-        length = sizeof (*a);
-#if defined(__APPLE__)
-        a->sin_len = length;
-#endif
-    } else {
-        struct sockaddr_in6 *a = (struct sockaddr_in6 *)&address;
-        a->sin6_family = family;
-        a->sin6_addr = in6addr_loopback;
-        length = sizeof (*a);
-#if defined(__APPLE__)
-        a->sin6_len = length;
-#endif
-    }
-    assert (bind (listener, (struct sockaddr *)&address, length) == 0);
-    assert (listen (listener, 1) == 0);
-    assert (getsockname (listener, (struct sockaddr *)&address, &length) == 0);
-    assert (connect (client, (struct sockaddr *)&address, length) == 0);
-    accepted = accept (listener, NULL, NULL);
-    assert (accepted >= 0);
-    token = hev_socks5_transfer_client (accepted);
-    assert (token);
-    close (accepted);
-    close (client);
-    close (listener);
-    return token;
-}
-
 static void
 run_case (const int *actions, int cancel, void *token, size_t id, int mode)
 {
-    HevSocks5ClientStats before[3] = { 0 }, after[3] = { 0 };
-    uint64_t in_before, out_before, in_after, out_after, sum_in = 0,
-                                                         sum_out = 0;
     memset (&state, 0, sizeof (state));
     memcpy (state.action, actions, sizeof (state.action));
     state.cancel_at = cancel;
     state.measured = mode == 0;
     state.token = token;
-    hev_socks5_server_stats (&in_before, &out_before);
-    assert (hev_socks5_server_client_stats (before, 3) == 3);
     if (mode == 2)
         hev_task_io_splice (client_read, client_write, server_read,
                             server_write, 64, on_yield, &state);
     else
-        hev_task_io_splice_with_stats (client_read, client_write, server_read,
-                                       server_write, 64, on_yield, &state,
-                                       state.measured ? record : NULL, token);
+        hev_task_io_splice_observed (client_read, client_write, server_read,
+                                     server_write, 64, on_yield, &state,
+                                     state.measured ? record : NULL, token);
     assert (state.syscalls && state.tick <= 5);
-    if (state.measured) {
-        assert (state.callbacks && state.reported_in == state.incoming);
-        assert (state.reported_out == state.outgoing);
-    } else {
-        assert (!state.callbacks && !state.reported_in && !state.reported_out);
-    }
-    hev_socks5_server_stats (&in_after, &out_after);
-    assert (in_after - in_before == state.reported_in);
-    assert (out_after - out_before == state.reported_out);
-    assert (hev_socks5_server_client_stats (after, 3) == 3);
-    for (size_t i = 0; i < 3; i++) {
-        assert (before[i].id == i && after[i].id == i);
-        assert (!strcmp (before[i].address, after[i].address));
-        assert (after[i].received - before[i].received ==
-                (i == id ? state.reported_in : 0));
-        assert (after[i].sent - before[i].sent ==
-                (i == id ? state.reported_out : 0));
-        sum_in += after[i].received;
-        sum_out += after[i].sent;
-    }
-    assert (in_after == sum_in && out_after == sum_out);
+    for (int i = 0; i < 4; i++)
+        assert (state.reported[i] == (state.measured ? state.actual[i] : 0));
+    assert (state.measured ? state.callbacks > 0 : state.callbacks == 0);
     if (!mode) {
         reference_count = state.event_count;
         memcpy (reference, state.events, reference_count * sizeof (*reference));
@@ -304,15 +236,14 @@ run_matrix (void *unused)
     static const int writes[] = { 0, -EAGAIN, -EPIPE, 1, 7, 63 };
     void *tokens[3] = { NULL };
     unsigned int cases = 0;
-    tokens[1] = register_peer (AF_INET);
-    tokens[2] = register_peer (AF_INET6);
+
     for (unsigned int combination = 0; combination < 1296; combination++) {
         int actions[4];
         unsigned int digits = combination;
         for (int i = 0; i < 4; i++, digits /= 6)
             actions[i] = i & 1 ? writes[digits % 6] : reads[digits % 6];
         for (int cancel = 0; cancel < 4; cancel++) {
-            for (size_t id = 0; id < 3; id++) {
+            for (size_t id = 0; id < 1; id++) {
                 for (int mode = 0; mode < 3; mode++)
                     run_case (actions, cancel, tokens[id], id, mode);
                 cases++;
@@ -321,11 +252,11 @@ run_matrix (void *unused)
     }
     printf (
         "PASS: %u TCP I/O/cancellation/attribution cases x 3 callback modes; "
-        "actual Total/IP/Unattributed conservation, exact successful I/O, "
+        "four exact stream boundaries, "
         "unchanged disabled/legacy I/O traces; scripted syscalls, not "
         "physical transfers\n",
         cases);
-    assert (cases == 15552);
+    assert (cases == 5184);
     completed_cases = cases;
 }
 
@@ -339,6 +270,6 @@ main (void)
     hev_task_system_run ();
     hev_task_unref (task);
     hev_task_system_fini ();
-    assert (completed_cases == 15552);
+    assert (completed_cases == 5184);
     return 0;
 }

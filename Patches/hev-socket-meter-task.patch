@@ -1,0 +1,303 @@
+diff --git a/src/lib/io/basic/hev-task-io.c b/src/lib/io/basic/hev-task-io.c
+index af36b19..a9b57bc 100644
+--- a/src/lib/io/basic/hev-task-io.c
++++ b/src/lib/io/basic/hev-task-io.c
+@@ -251,5 +251,6 @@ task_io_splicer_fini (HevTaskIOSplicer *self)
+
+ static int
+-task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out)
++task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out,
++                size_t *read_bytes, size_t *written_bytes)
+ {
+     int res;
+@@ -266,4 +267,6 @@ task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out)
+         res = 1;
+         self->wlen += s;
++        if (read_bytes)
++            *read_bytes += s;
+     }
+
+@@ -279,4 +282,6 @@ task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out)
+             res = 1;
+             self->wlen -= s;
++            if (written_bytes)
++                *written_bytes += s;
+         }
+     } else if (res < 0) {
+@@ -307,5 +312,6 @@ task_io_splicer_fini (HevTaskIOSplicer *self)
+
+ static int
+-task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out)
++task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out,
++                size_t *read_bytes, size_t *written_bytes)
+ {
+     struct iovec iov[2];
+@@ -322,4 +328,6 @@ task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out)
+         } else {
+             hev_circular_buffer_write_finish (self->buf, s);
++            if (read_bytes)
++                *read_bytes += s;
+         }
+     }
+@@ -336,4 +344,6 @@ task_io_splice (HevTaskIOSplicer *self, int fd_in, int fd_out)
+             res = 1;
+             hev_circular_buffer_read_finish (self->buf, s);
++            if (written_bytes)
++                *written_bytes += s;
+         }
+     } else if (res < 0) {
+@@ -350,4 +360,14 @@ hev_task_io_splice (int fd_a_i, int fd_a_o, int fd_b_i, int fd_b_o,
+                     size_t buf_size, HevTaskIOYielder yielder,
+                     void *yielder_data)
++{
++    hev_task_io_splice_observed (fd_a_i, fd_a_o, fd_b_i, fd_b_o, buf_size,
++                                 yielder, yielder_data, NULL, NULL);
++}
++
++EXPORT_SYMBOL void
++hev_task_io_splice_observed (int fd_a_i, int fd_a_o, int fd_b_i, int fd_b_o,
++                             size_t buf_size, HevTaskIOYielder yielder,
++                             void *yielder_data, HevTaskIOObserver observer,
++                             void *context)
+ {
+     HevTaskIOSplicer splicer_f;
+@@ -364,8 +384,15 @@ hev_task_io_splice (int fd_a_i, int fd_a_o, int fd_b_i, int fd_b_o,
+         HevTaskYieldType type;
+
++        size_t bytes[4] = { 0 }; /* read A, write A, read B, write B */
+         if (res_f >= 0)
+-            res_f = task_io_splice (&splicer_f, fd_a_i, fd_b_o);
++            res_f = task_io_splice (&splicer_f, fd_a_i, fd_b_o,
++                                    observer ? &bytes[0] : NULL,
++                                    observer ? &bytes[3] : NULL);
+         if (res_b >= 0)
+-            res_b = task_io_splice (&splicer_b, fd_b_i, fd_a_o);
++            res_b = task_io_splice (&splicer_b, fd_b_i, fd_a_o,
++                                    observer ? &bytes[2] : NULL,
++                                    observer ? &bytes[1] : NULL);
++        if (observer && (bytes[0] || bytes[1] || bytes[2] || bytes[3]))
++            observer (bytes, context);
+
+         if (res_f > 0 || res_b > 0)
+diff --git a/src/lib/io/basic/hev-task-io.h b/src/lib/io/basic/hev-task-io.h
+index f2a142f..fcde509 100644
+--- a/src/lib/io/basic/hev-task-io.h
++++ b/src/lib/io/basic/hev-task-io.h
+@@ -189,4 +189,11 @@ void hev_task_io_splice (int fd_a_i, int fd_a_o, int fd_b_i, int fd_b_o,
+                          void *yielder_data);
+
++/* Successful socket-side I/O only; never infer IP packet boundaries. */
++typedef void (*HevTaskIOObserver) (const size_t bytes[4], void *context);
++void hev_task_io_splice_observed (int fd_a_i, int fd_a_o, int fd_b_i,
++                                  int fd_b_o, size_t buf_size,
++                                  HevTaskIOYielder yielder, void *yielder_data,
++                                  HevTaskIOObserver observer, void *context);
++
+ #ifdef __cplusplus
+ }
+diff --git a/src/lib/io/socket/hev-task-io-socket.c b/src/lib/io/socket/hev-task-io-socket.c
+index f6897cc..4e1042b 100644
+--- a/src/lib/io/socket/hev-task-io-socket.c
++++ b/src/lib/io/socket/hev-task-io-socket.c
+@@ -20,4 +20,23 @@
+ #include "hev-task-io-socket.h"
+
++static void
++socket_observed (HevTaskSocketObserver observer, int fd,
++                 const struct msghdr *msg, ssize_t count, int writing,
++                 int flags, void *context)
++{
++    size_t bytes = count, capacity = 0;
++    int error = errno;
++    if (!observer || count <= 0 || (!writing && (flags & MSG_PEEK)))
++        return;
++    if (!writing && msg) {
++        for (size_t i = 0; i < msg->msg_iovlen; i++)
++            capacity += msg->msg_iov[i].iov_len;
++        if (bytes > capacity)
++            bytes = capacity;
++    }
++    observer (fd, msg, bytes, writing, context);
++    errno = error;
++}
++
+ EXPORT_SYMBOL int
+ hev_task_io_socket_socket (int domain, int type, int protocol)
+@@ -143,4 +162,13 @@ EXPORT_SYMBOL ssize_t
+ hev_task_io_socket_recv (int fd, void *buf, size_t len, int flags,
+                          HevTaskIOYielder yielder, void *yielder_data)
++{
++    return hev_task_io_socket_recv_observed (fd, buf, len, flags, yielder,
++                                             yielder_data, NULL, NULL);
++}
++
++EXPORT_SYMBOL ssize_t
++hev_task_io_socket_recv_observed (int fd, void *buf, size_t len, int flags,
++                                  HevTaskIOYielder yielder, void *yielder_data,
++                                  HevTaskSocketObserver observer, void *context)
+ {
+     size_t size = 0;
+@@ -149,4 +177,8 @@ hev_task_io_socket_recv (int fd, void *buf, size_t len, int flags,
+ retry:
+     s = recv (fd, buf + size, len - size, flags & ~MSG_WAITALL);
++    socket_observed (observer, fd, NULL,
++                     s > 0 && (size_t)s > len - size ? (ssize_t)(len - size) :
++                                                       s,
++                     0, flags, context);
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+@@ -175,4 +207,14 @@ EXPORT_SYMBOL ssize_t
+ hev_task_io_socket_send (int fd, const void *buf, size_t len, int flags,
+                          HevTaskIOYielder yielder, void *yielder_data)
++{
++    return hev_task_io_socket_send_observed (fd, buf, len, flags, yielder,
++                                             yielder_data, NULL, NULL);
++}
++
++EXPORT_SYMBOL ssize_t
++hev_task_io_socket_send_observed (int fd, const void *buf, size_t len,
++                                  int flags, HevTaskIOYielder yielder,
++                                  void *yielder_data,
++                                  HevTaskSocketObserver observer, void *context)
+ {
+     size_t size = 0;
+@@ -181,4 +223,5 @@ hev_task_io_socket_send (int fd, const void *buf, size_t len, int flags,
+ retry:
+     s = send (fd, buf + size, len - size, flags & ~MSG_WAITALL);
++    socket_observed (observer, fd, NULL, s, 1, flags, context);
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+@@ -275,4 +318,15 @@ EXPORT_SYMBOL ssize_t
+ hev_task_io_socket_recvmsg (int fd, struct msghdr *msg, int flags,
+                             HevTaskIOYielder yielder, void *yielder_data)
++{
++    return hev_task_io_socket_recvmsg_observed (fd, msg, flags, yielder,
++                                                yielder_data, NULL, NULL);
++}
++
++EXPORT_SYMBOL ssize_t
++hev_task_io_socket_recvmsg_observed (int fd, struct msghdr *msg, int flags,
++                                     HevTaskIOYielder yielder,
++                                     void *yielder_data,
++                                     HevTaskSocketObserver observer,
++                                     void *context)
+ {
+     struct iovec iov[msg->msg_iovlen];
+@@ -296,4 +350,5 @@ hev_task_io_socket_recvmsg (int fd, struct msghdr *msg, int flags,
+ retry:
+     s = recvmsg (fd, &mh, flags & ~MSG_WAITALL);
++    socket_observed (observer, fd, &mh, s, 0, flags, context);
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+@@ -336,4 +391,15 @@ EXPORT_SYMBOL ssize_t
+ hev_task_io_socket_sendmsg (int fd, const struct msghdr *msg, int flags,
+                             HevTaskIOYielder yielder, void *yielder_data)
++{
++    return hev_task_io_socket_sendmsg_observed (fd, msg, flags, yielder,
++                                                yielder_data, NULL, NULL);
++}
++
++EXPORT_SYMBOL ssize_t
++hev_task_io_socket_sendmsg_observed (int fd, const struct msghdr *msg,
++                                     int flags, HevTaskIOYielder yielder,
++                                     void *yielder_data,
++                                     HevTaskSocketObserver observer,
++                                     void *context)
+ {
+     struct iovec iov[msg->msg_iovlen];
+@@ -357,4 +423,5 @@ hev_task_io_socket_sendmsg (int fd, const struct msghdr *msg, int flags,
+ retry:
+     s = sendmsg (fd, &mh, flags & ~MSG_WAITALL);
++    socket_observed (observer, fd, &mh, s, 1, flags, context);
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+@@ -397,4 +464,15 @@ EXPORT_SYMBOL int
+ hev_task_io_socket_recvmmsg (int fd, void *_msgv, unsigned int n, int flags,
+                              HevTaskIOYielder yielder, void *yielder_data)
++{
++    return hev_task_io_socket_recvmmsg_observed (fd, _msgv, n, flags, yielder,
++                                                 yielder_data, NULL, NULL);
++}
++
++EXPORT_SYMBOL int
++hev_task_io_socket_recvmmsg_observed (int fd, void *_msgv, unsigned int n,
++                                      int flags, HevTaskIOYielder yielder,
++                                      void *yielder_data,
++                                      HevTaskSocketObserver observer,
++                                      void *context)
+ {
+     struct mmsghdr *msgv = _msgv;
+@@ -411,4 +489,7 @@ retry:
+     }
+ #endif
++    for (int i = 0; i < r; i++)
++        socket_observed (observer, fd, &msgv[c + i].msg_hdr,
++                         msgv[c + i].msg_len, 0, flags, context);
+     if (r < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+@@ -437,4 +518,15 @@ EXPORT_SYMBOL int
+ hev_task_io_socket_sendmmsg (int fd, void *_msgv, unsigned int n, int flags,
+                              HevTaskIOYielder yielder, void *yielder_data)
++{
++    return hev_task_io_socket_sendmmsg_observed (fd, _msgv, n, flags, yielder,
++                                                 yielder_data, NULL, NULL);
++}
++
++EXPORT_SYMBOL int
++hev_task_io_socket_sendmmsg_observed (int fd, void *_msgv, unsigned int n,
++                                      int flags, HevTaskIOYielder yielder,
++                                      void *yielder_data,
++                                      HevTaskSocketObserver observer,
++                                      void *context)
+ {
+     struct mmsghdr *msgv = _msgv;
+@@ -451,4 +543,7 @@ retry:
+     }
+ #endif
++    for (int i = 0; i < r; i++)
++        socket_observed (observer, fd, &msgv[c + i].msg_hdr,
++                         msgv[c + i].msg_len, 1, flags, context);
+     if (r < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+diff --git a/src/lib/io/socket/hev-task-io-socket.h b/src/lib/io/socket/hev-task-io-socket.h
+index 9d2ab91..eb6b28c 100644
+--- a/src/lib/io/socket/hev-task-io-socket.h
++++ b/src/lib/io/socket/hev-task-io-socket.h
+@@ -275,4 +275,37 @@ int hev_task_io_socket_sendmmsg (int fd, void *msgv, unsigned int n, int flags,
+                                  HevTaskIOYielder yielder, void *yielder_data);
+
++/* Invoked for every successful consuming syscall, before retries or yields.
++ * msg is the actual syscall msghdr (or NULL for connected byte I/O).
++ * Callback must not yield; its lifetime ends when the call returns. */
++typedef void (*HevTaskSocketObserver) (int fd, const struct msghdr *msg,
++                                       size_t bytes, int writing,
++                                       void *context);
++ssize_t hev_task_io_socket_recv_observed (int fd, void *buf, size_t len,
++                                          int flags, HevTaskIOYielder yielder,
++                                          void *yielder_data,
++                                          HevTaskSocketObserver observer,
++                                          void *context);
++ssize_t hev_task_io_socket_send_observed (int fd, const void *buf, size_t len,
++                                          int flags, HevTaskIOYielder yielder,
++                                          void *yielder_data,
++                                          HevTaskSocketObserver observer,
++                                          void *context);
++ssize_t hev_task_io_socket_recvmsg_observed (
++    int fd, struct msghdr *msg, int flags, HevTaskIOYielder yielder,
++    void *yielder_data, HevTaskSocketObserver observer, void *context);
++ssize_t hev_task_io_socket_sendmsg_observed (
++    int fd, const struct msghdr *msg, int flags, HevTaskIOYielder yielder,
++    void *yielder_data, HevTaskSocketObserver observer, void *context);
++int hev_task_io_socket_recvmmsg_observed (int fd, void *_msgv, unsigned int n,
++                                          int flags, HevTaskIOYielder yielder,
++                                          void *yielder_data,
++                                          HevTaskSocketObserver observer,
++                                          void *context);
++int hev_task_io_socket_sendmmsg_observed (int fd, void *_msgv, unsigned int n,
++                                          int flags, HevTaskIOYielder yielder,
++                                          void *yielder_data,
++                                          HevTaskSocketObserver observer,
++                                          void *context);
++
+ #ifdef __cplusplus
+ }
