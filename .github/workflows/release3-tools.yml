@@ -1,0 +1,23 @@
+name: Temporary release 3 verification tools
+on:
+  push:
+    branches: [work/release-3-verification]
+permissions:
+  contents: read
+jobs:
+  tools:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Obtain exact formatter for offline verification
+        run: |
+          set -euo pipefail
+          mkdir artifacts
+          python3 -m pip download --no-deps --only-binary=:all: --platform manylinux2014_x86_64 clang-format==18.1.8 --dest artifacts
+          cd artifacts
+          echo '2de122b8aa78ba49e326f974131caab2c79f4ae877c227cd4e3e5d82a98d21e5  clang_format-18.1.8-py2.py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl' | sha256sum -c -
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release3-offline-formatter
+          path: artifacts/
+          retention-days: 2
