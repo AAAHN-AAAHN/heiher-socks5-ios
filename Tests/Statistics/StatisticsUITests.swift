@@ -42,10 +42,14 @@ final class StatisticsUITests: XCTestCase {
             add(capture)
             start.tap()
             XCTAssertTrue(waitUntil { stop.isEnabled && !start.isEnabled })
-            // Readiness opens a connection without application bytes. A separate
-            // complete greeting below has one exact, independently known count.
-            XCTAssertTrue(waitUntil { Self.listenerAcceptsConnection() }, "Start must reach the real native listener")
-            try record(Self.handshake())
+            // Reuse the successful readiness connection for the measured greeting.
+            // Closing it without a greeting can itself produce a two-byte rejection.
+            var readySocket: Int32?
+            XCTAssertTrue(waitUntil {
+                readySocket = Self.listenerConnection()
+                return readySocket != nil
+            }, "Start must reach the real native listener")
+            try record(Self.handshake(connectedSocket: try XCTUnwrap(readySocket)))
             try record(Self.handshake(recordPayload: true))
             try record(Self.handshake(recordPayload: true, ipv6: true))
             // Retain both original small relays and larger payloads. Expectations
@@ -187,19 +191,28 @@ final class StatisticsUITests: XCTestCase {
         var outgoing = 0
     }
 
-    private static func listenerAcceptsConnection() -> Bool {
+    private static func listenerConnection() -> Int32? {
         let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
-        guard fd >= 0 else { return false }
+        guard fd >= 0 else { return nil }
+        guard connectLoopback(fd, ipv6: false, port: 1080) else {
+            Darwin.close(fd)
+            return nil
+        }
+        return fd
+    }
+
+    private static func listenerAcceptsConnection() -> Bool {
+        guard let fd = listenerConnection() else { return false }
         defer { Darwin.close(fd) }
-        return connectLoopback(fd, ipv6: false, port: 1080)
+        return true
     }
 
     /// Expected directions come from the independent client's wire buffers and
     /// destination echo, without reading or reproducing the native collector.
     private static func handshake(recordPayload: Bool = false, ipv6: Bool = false,
-                                  payloadSize: Int = 64) -> [String: PeerBytes]? {
+                                  payloadSize: Int = 64, connectedSocket: Int32? = nil) -> [String: PeerBytes]? {
         let family = ipv6 ? AF_INET6 : AF_INET
-        let fd = Darwin.socket(family, SOCK_STREAM, 0)
+        let fd = connectedSocket ?? Darwin.socket(family, SOCK_STREAM, 0)
         guard fd >= 0 else { return nil }
         defer { Darwin.close(fd) }
         var noSignal: Int32 = 1
@@ -212,7 +225,9 @@ final class StatisticsUITests: XCTestCase {
         address.sin_family = sa_family_t(AF_INET)
         address.sin_port = UInt16(1080).bigEndian
         guard inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) == 1 else { return nil }
-        guard connectLoopback(fd, ipv6: ipv6, port: 1080) else { return nil }
+        if connectedSocket == nil {
+            guard connectLoopback(fd, ipv6: ipv6, port: 1080) else { return nil }
+        }
         let greeting: [UInt8] = [5, 1, 0]
         guard greeting.withUnsafeBytes({ Darwin.send(fd, $0.baseAddress, $0.count, 0) }) == greeting.count else { return nil }
         var reply = [UInt8](repeating: 0, count: 2)
