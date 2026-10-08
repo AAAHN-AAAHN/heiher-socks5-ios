@@ -56,7 +56,7 @@ The controller suites use the actual controller body with controlled engine retu
 
 Real native tests cover occupied ports, authentication, workers one/four/64, repeated identical requests, explicit retry, invalid replacement settings, active clients during Stop and reconfiguration, and early cancellation. Tests verify that a failed bind does not become an automatic retry loop when the port later becomes available. The worker Stop probe requires the exact upstream worker plus its single guard; a composition may instead supply its feature owner’s reviewed pre-guard digest, with all other edits still rejected.
 
-`Build/check_ownership.py` preserves the functional separation and exact native patch/source boundaries. The document contract separately verifies current parent prose and the frozen non-document tree. The actual SDK test compiles the production interfaces, while Simulator tests exercise the settings controls, Start/Stop, orientation, actual IPv4/IPv6 SOCKS replies and listener release. Source review, model execution and actual socket readiness remain distinct evidence.
+`Build/check_ownership.py` preserves the functional separation and exact native patch/source boundaries. The document contract separately verifies current parent prose and the frozen non-document tree. The actual SDK test compiles the production interfaces, while Simulator tests exercise the settings controls, Start/Stop, orientation, actual IPv4/IPv6 SOCKS replies and listener release. Source review, model execution and actual socket readiness remain distinct evidence. The UI source gate retains the immutable main source baseline and separately verifies that the current documentation parent descends from it with identical non-document inputs.
 
 ## Operation and limitations
 

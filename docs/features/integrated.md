@@ -58,6 +58,8 @@ The package checks require exact generated-framework/source identity, successful
 
 The seeded Simulator cases cover original/remapped identity, tabs and durable Start/Stop with actual TCP responses. The three UI cases verify independent audio, server/setting behavior and known large IPv4/IPv6 volumes in the actual Total/IP tables across Stop/Start and orientation. Runtime-warning and cleanup checks remain required. Scrolling and hittability establish access, not simultaneous unoccluded display of every row.
 
+On Simulator installation or subsequent failure, the release harness preserves the actual app bundle, Unix modes and signature diagnostics; partial timeout output remains in the original log.
+
 ## Operation and limitations
 
 Use a full-history clean checkout. The release commands are `bash Build/build.sh`, then on an Apple host `bash Build/check_swift_sdk.sh`, `python3 Build/verify_release.py`, `python3 Build/simulator_review.py`, `python3 Build/ui_review.py` and `python3 Build/record_evidence.py`. The workflow selects the applicable platform stages; an Apple-only skip on Linux is not an executed check.

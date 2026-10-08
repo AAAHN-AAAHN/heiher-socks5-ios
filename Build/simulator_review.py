@@ -9,6 +9,8 @@ from pathlib import Path
 import plistlib
 import socket
 import subprocess
+import sys
+import tarfile
 import threading
 import time
 from release_source import PRODUCT, check_product, check_source
@@ -18,10 +20,55 @@ OUT = ROOT / 'artifacts/integrated/simulator'
 
 
 def run(*args, timeout=120):
-    result = subprocess.run([str(x) for x in args], capture_output=True, text=True, timeout=timeout, cwd=ROOT)
+    try:
+        result = subprocess.run([str(x) for x in args], capture_output=True, text=True, timeout=timeout, cwd=ROOT)
+    except subprocess.TimeoutExpired as error:
+        # communicate() retains partial bytes even with text=True. Keep them in
+        # the original redirected log without replacing the original timeout.
+        for stream, data in ((sys.stdout, error.stdout), (sys.stderr, error.stderr)):
+            if data:
+                try:
+                    if isinstance(data, bytes):
+                        stream.buffer.write(data)
+                        stream.buffer.flush()
+                    else:
+                        stream.write(data)
+                        stream.flush()
+                except Exception:
+                    pass  # A failed diagnostic write must not hide the timeout.
+        raise
     if result.returncode:
         raise RuntimeError(f'{args}: exit {result.returncode}\n{result.stdout}\n{result.stderr}')
     return result.stdout.strip()
+
+
+def preserve_failed_app(app):
+    """Observe only after failure; never replace it or mutate the built app."""
+    try:
+        evidence = OUT / 'failure-app'
+        evidence.mkdir(parents=True, exist_ok=True)
+        result = {'app': str(app), 'archive': 'Socks5.app.tar.gz', 'errors': []}
+        try:
+            # Tar preserves Unix modes, symlinks and all bytes, including the
+            # final Info.plist and code-signature resources. Do not follow links.
+            with tarfile.open(evidence / result['archive'], 'w:gz', dereference=False) as archive:
+                archive.add(app, arcname=app.name)
+        except Exception as error:
+            result['errors'].append('archive: ' + repr(error))
+        command = ['codesign', '--verify', '--deep', '--strict', '--verbose=4', str(app)]
+        result['signature_check'] = {'command': command, 'timeout_seconds': 15}
+        try:
+            with (evidence / 'codesign-verify.log').open('wb') as log:
+                checked = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, timeout=15)
+            result['signature_check']['exit'] = checked.returncode
+        except Exception as error:
+            result['signature_check']['error'] = repr(error)
+        (evidence / 'capture.json').write_text(json.dumps(result, indent=2) + '\n')
+    except Exception as error:
+        try:
+            print('Failed to preserve Simulator failure evidence: ' + repr(error), file=sys.stderr, flush=True)
+        except Exception:
+            pass
 
 
 def free_port():
@@ -107,6 +154,7 @@ def main():
     def record(result):
         outcomes.append(result)
         (OUT / 'results.json').write_text(json.dumps(outcomes, indent=2) + '\n')
+    installation_started = False
     try:
         run('xcrun', 'simctl', 'boot', device)
         (OUT / 'boot.log').write_text(run('xcrun', 'simctl', 'bootstatus', device, '-b', timeout=240))
@@ -116,6 +164,7 @@ def main():
             info['CFBundleIdentifier'] = bundle
             (app / 'Info.plist').write_bytes(plistlib.dumps(info))
             run('codesign', '--force', '--sign', '-', app)
+            installation_started = True
             run('xcrun', 'simctl', 'install', device, app)
             container = Path(run('xcrun', 'simctl', 'get_app_container', device, bundle, 'data'))
             settings_file = container / 'Library/Application Support/Socks5/settings.json'
@@ -172,6 +221,10 @@ def main():
             record({'identity': label, 'case': 'saved-stop', 'passed': True})
             run('xcrun', 'simctl', 'uninstall', device, bundle)
         success_text = ('PASS: saved tabs, Start/relaunch/TCP and Stop in original/remapped Simulator installs. Not a physical SideStore/LiveContainer or background audio test.\n')
+    except Exception:
+        if installation_started:
+            preserve_failed_app(app)
+        raise
     finally:
         cleanup = []
         for action in ('shutdown', 'delete'):
@@ -183,8 +236,13 @@ def main():
                 cleanup.append({'action': action, 'error': 'timeout'})
         (OUT / 'cleanup.json').write_text(json.dumps(cleanup, indent=2))
     if cleanup:
+        preserve_failed_app(app)
         raise RuntimeError('Simulator cleanup failed: ' + repr(cleanup))
-    check_product()
+    try:
+        check_product()
+    except Exception:
+        preserve_failed_app(app)
+        raise
     (OUT / 'SUCCESS.txt').write_text(success_text)
 
 
