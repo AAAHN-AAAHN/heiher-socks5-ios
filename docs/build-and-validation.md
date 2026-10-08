@@ -52,7 +52,7 @@ Verification is organized by the invariant under test: input identity before pat
 
 ## Operation and limitations
 
-Archive and Simulator build commands use version `3.0.0`, build `1`. The upstream Xcode project remains unchanged; explicit build settings supply the release version.
+Product archives and integrated Simulator build commands use version `3.0.0`, build `1`. Standalone feature XCTest fixtures retain the upstream project version unless their runner explicitly overrides it. The upstream Xcode project remains unchanged; explicit build settings supply the release version.
 
 Use a full-history checkout and a clean workspace. For the baseline, start with `python3 Build/check.py baseline`, `python3 Build/check.py composition` and `bash Build/build.sh`. Feature READMEs specify their dedicated audit entry points. The integrated path uses `bash Build/build.sh`, `bash Build/check_swift_sdk.sh`, `python3 Build/verify_release.py`, `python3 Build/simulator_review.py`, `python3 Build/ui_review.py` and `python3 Build/record_evidence.py` on the applicable platform.
 
