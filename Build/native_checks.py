@@ -37,6 +37,7 @@ def module(name, path):
 
 for mode in (('buffered', 'splice') if sys.platform == 'linux' and 'statistics' in FEATURES else ('buffered',)):
     udp_fixture_flags = []
+    worker_baseline = None
     if 'statistics' in FEATURES:
         audit = module('composition_statistics', 'Tests/Statistics/audit.py')
         audit.CORE = CORE
@@ -45,6 +46,7 @@ for mode in (('buffered', 'splice') if sys.platform == 'linux' and 'statistics' 
         # Execute the existing real native cases, not the standalone-branch identity gate.
         audit.native_checks(mode)
         udp_fixture_flags = audit.UDP_FIXTURE_FLAGS
+        worker_baseline = audit.worker_baseline_sha256()
     else:
         run(['make', 'clean'], mode + '-clean.log', cwd=CORE)
         run(['make', '-j3', 'ENABLE_IO_SPLICE_SYSCALL=0', 'static', 'exec'],
@@ -90,7 +92,9 @@ for mode in (('buffered', 'splice') if sys.platform == 'linux' and 'statistics' 
              'Tests/ServerControl/configuration_probe.c', *libraries, '-o', OUT / 'config-probe'], 'configuration-probe-build.log')
         run([OUT / 'config-probe', OUT / 'yaml/defaults.yml', OUT / 'yaml/quoted.yml'], mode + '-configuration.log')
         for script in ('native_controller_check', 'delayed_completion_check', 'active_clients_check', 'final_native_check'):
-            run([sys.executable, 'Tests/ServerControl/' + script + '.py', CORE, OUT / (mode + '-' + script)],
+            baseline = (['--worker-baseline-sha256', worker_baseline]
+                        if script == 'native_controller_check' and worker_baseline else [])
+            run([sys.executable, 'Tests/ServerControl/' + script + '.py', CORE, OUT / (mode + '-' + script), *baseline],
                 mode + '-' + script + '.log', timeout=300)
         if 'settings' in FEATURES:
             for script in ('native_persistence_check', 'delayed_persistence_check'):

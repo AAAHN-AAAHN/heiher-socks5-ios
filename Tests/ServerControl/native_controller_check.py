@@ -4,6 +4,7 @@
 No sockets or engine functions are mocked. The command transport and clients are
 CI-only. This is native-host execution, not an iPhone/SideStore/LiveContainer test.
 """
+import argparse
 import json
 import hashlib
 import os
@@ -172,17 +173,25 @@ def exit_transport_check(executable, output):
     print('PASS: complete exit acknowledgements drained before a read and after a select timeout')
 
 
-def worker_stop_check(core, output, folder):
-    """Exercise the actual old/new worker helper with only yield scheduling replaced."""
+def worker_stop_check(core, output, folder, baseline_sha256=None):
+    """Exercise the actual worker against the upstream or declared owner baseline."""
     patched = (core / 'src/hev-socks5-worker.c').read_bytes()
     guard = (b'    /* A pending Stop can run before this task reaches its first wait. */\n'
              b'    if (!READ_ONCE (self->run))\n        return -1;\n\n')
     if patched.count(guard) != 1:
         raise AssertionError('Missing/duplicated worker Stop guard')
     original = patched.replace(guard, b'', 1)
-    identity = hashlib.sha1(b'blob ' + str(len(original)).encode() + b'\0' + original).hexdigest()
-    if identity != '683a773999569784b2a42d1bab136ef1c44a8101':
-        raise AssertionError('Worker changed beyond the reviewed four-line Stop guard')
+    if baseline_sha256 is None:
+        identity = hashlib.sha1(b'blob ' + str(len(original)).encode() + b'\0' + original).hexdigest()
+        if identity != '683a773999569784b2a42d1bab136ef1c44a8101':
+            raise AssertionError('Worker changed beyond the reviewed four-line Stop guard')
+    else:
+        # A composition supplies its owner's exact pre-guard identity. This
+        # changes no worker bytes and permits no change beyond the same guard.
+        if len(baseline_sha256) != 64 or any(c not in '0123456789abcdef' for c in baseline_sha256):
+            raise AssertionError('Worker baseline must be a lowercase SHA256 digest')
+        if hashlib.sha256(original).hexdigest() != baseline_sha256:
+            raise AssertionError('Worker differs from the supplied baseline beyond the Stop guard')
     old = folder / 'upstream-worker'; old.mkdir()
     (old / 'hev-socks5-worker.c').write_bytes(original)
     libraries = [core / 'bin/libhev-socks5-server.a', core / 'third-part/yaml/bin/libyaml.a',
@@ -202,15 +211,22 @@ def worker_stop_check(core, output, folder):
         expected = 1 if name == 'original' else 0
         if result.returncode != expected or f'three worker-yield postconditions; {expected} failed' not in result.stdout:
             raise AssertionError('Worker Stop boundary did not match the old/new contract')
-    print('PASS: exact upstream worker attempts a wait after Stop; corrected worker does not. Normal and resumed waits preserved.')
+    label = 'upstream' if baseline_sha256 is None else 'declared composition'
+    print(f'PASS: exact {label} worker attempts a wait after Stop; corrected worker does not. Normal and resumed waits preserved.')
 
 
 def main():
-    core = Path(sys.argv[1]).resolve()
-    output = Path(sys.argv[2]).resolve(); output.mkdir(parents=True, exist_ok=True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('core', type=Path)
+    parser.add_argument('output', type=Path)
+    parser.add_argument('--worker-baseline-sha256',
+                        help='Exact pre-Stop-guard worker digest supplied by the composition owner; defaults to the fixed upstream blob')
+    args = parser.parse_args()
+    core = args.core.resolve()
+    output = args.output.resolve(); output.mkdir(parents=True, exist_ok=True)
     results = []
     with tempfile.TemporaryDirectory() as temp:
-        worker_stop_check(core, output, Path(temp))
+        worker_stop_check(core, output, Path(temp), args.worker_baseline_sha256)
         for old in (True, False):
             label = 'original' if old else 'current'
             folder = Path(temp) / label; folder.mkdir()
