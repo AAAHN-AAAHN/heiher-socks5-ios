@@ -1,7 +1,7 @@
 {
   "base_commit": "1a2130c1d0658e0483b421bfa808572bd16df82e",
   "branches": {
-    "feature/server-control": "531332d62c8e0b6e92ac44824d2b6b82743bea83"
+    "feature/server-control": "bbb4ff8bd8bc54d848ed90009c15226eada3ec23"
   },
   "sources": {
     "Socks5/Server/ServerSettings.swift": {
@@ -61,8 +61,8 @@
       "sha256": "d5ebb6dcc9e000bf433d1f28a1a5d50085d4e52a10b18cc38469d26af5d72f48"
     },
     "Tests/ServerControl/native_controller_check.py": {
-      "commit": "5a4d1edc0eeda4ae725fb3be60870fbc1d95a3c7",
-      "sha256": "b5e27a7fb9f978382af60e7e25fb20d2205ab8369c16216184d83109f999314d"
+      "commit": "bbb4ff8bd8bc54d848ed90009c15226eada3ec23",
+      "sha256": "4a753830d941684d4067b82796a40980a9c89415efa03bbf5b4ac9bc4ffd272d"
     },
     "Tests/ServerControl/worker_stop_probe.c": {
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
