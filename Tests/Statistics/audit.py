@@ -56,6 +56,14 @@ def run(args, log, cwd=ROOT, timeout=180, env=None):
                        stderr=subprocess.STDOUT, check=True, timeout=timeout, env=env)
 
 
+def worker_baseline_sha256():
+    """Supply this owner's reviewed worker input to composed lifecycle checks."""
+    manifest = json.loads((ROOT / 'Tests/SocketIO/worker-native.json').read_text())
+    digest = manifest['compositions']['statistics']['src/hev-socks5-worker.c']
+    assert re.fullmatch(r'[0-9a-f]{64}', digest), 'Invalid Statistics worker digest'
+    return digest
+
+
 def check_udp_inheritance():
     """Keep the executable UDP prerequisite, inherited tests and prose on one parent."""
     parent = json.loads((ROOT / 'docs/documentation.json').read_bytes())['parents']['feature/udp-compat']

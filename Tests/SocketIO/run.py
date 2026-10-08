@@ -4,15 +4,17 @@ Controlled syscall fixtures and real-network checks are separate evidence.
 """
 import argparse,json,subprocess,sys
 from pathlib import Path
+from loopback import prepared_loopback
 HERE=Path(__file__).resolve().parent
 p=argparse.ArgumentParser();p.add_argument('native',type=Path);p.add_argument('--cc',default='cc');p.add_argument('--mode',choices=['buffered','splice'],default='buffered')
 p.add_argument('--output',type=Path,help='Keep executables and results outside the native source inputs')
 features=json.loads((HERE.parents[1]/'Build/features.json').read_text())['features']
 p.add_argument('--composition',choices=['statistics','integrated'],default='integrated' if 'server' in features else 'statistics');a=p.parse_args()
 n=a.native.resolve();out=a.output.resolve() if a.output else n/'build/socket-io-tests';out.mkdir(parents=True,exist_ok=True);host=out/'meter-host'
-def run(args):
- print('+',' '.join(map(str,args)),flush=True);subprocess.run(list(map(str,args)),check=True)
+def run(args,timeout=None):
+ print('+',' '.join(map(str,args)),flush=True);subprocess.run(list(map(str,args)),check=True,timeout=timeout)
 task=n/'third-part/hev-task-system'
+run([sys.executable,HERE/'loopback_check.py'])
 run([sys.executable,HERE/'contract.py',n,'--composition',a.composition])
 run([a.cc,'-O2','-pthread','-I'+str(n/'src'),HERE/'meter_host.c',
      n/'bin/libhev-socks5-server.a',n/'third-part/yaml/bin/libyaml.a',
@@ -25,8 +27,10 @@ run([a.cc,'-O2','-pthread','-I'+str(n/'src'),'-I'+str(n/'src/core/src'),
      HERE/'snapshot_rows.c',n/'bin/libhev-socks5-server.a',
      n/'third-part/yaml/bin/libyaml.a',task/'bin/libhev-task-system.a','-o',exe])
 run([exe])
-run([sys.executable,HERE/'integration.py','--host',host,'--output',out/'network'])
-run([sys.executable,HERE/'pair_example.py','--host',host,'--output',out/'pair'])
+with prepared_loopback():
+ run([sys.executable,HERE/'integration.py','--host',host,'--output',out/'network'],timeout=120)
+ run([sys.executable,HERE/'pair_example.py','--host',host,'--output',out/'pair'],timeout=120)
+ run([sys.executable,HERE/'restart.py','--host',host,'--output',out/'restart'],timeout=120)
 
 if sys.platform == 'linux':
  exe=out/'accept-reset'
@@ -36,4 +40,3 @@ if sys.platform == 'linux':
       task/'bin/libhev-task-system.a','-Wl,--wrap=hev_socks5_session_new','-o',exe])
  for workers in (1,4,8):
   for family in (4,6): run([exe,str(workers),str(family)])
-run([sys.executable,HERE/'restart.py','--host',host,'--output',out/'restart'])
