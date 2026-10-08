@@ -48,7 +48,8 @@ for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
             --output "$OUT/$mode-protocol.json" > "$OUT/$mode-protocol.log" 2>&1
     fi
     if feature statistics; then
-        python3 Tests/SocketIO/run.py "$CORE" --mode "$mode" > "$OUT/$mode-statistics.log" 2>&1
+        python3 Tests/SocketIO/run.py "$CORE" --mode "$mode" --output "$OUT/$mode-socket-io" \
+            > "$OUT/$mode-statistics.log" 2>&1
     fi
     if feature settings; then
         cc -std=gnu11 -O2 -Wall -Werror -pthread -I"$CORE/src" Tests/server_lifecycle_host.c \
