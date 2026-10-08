@@ -10,11 +10,18 @@ final class StatisticsUITests: XCTestCase {
         app.launch()
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         XCTAssertTrue(app.tabBars.buttons["Server"].waitForExistence(timeout: 10))
-        // The aggregate table exists even before the first client registers.
+        // The aggregate table exists even before the first peer registers.
         app.tabBars.buttons["Statistics"].tap()
         XCTAssertTrue(app.staticTexts["total-title"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["total-usage-sum"].label, "0.00 KB")
         XCTAssertFalse(app.staticTexts["client-1"].exists)
+        var expectedPeers: [String: PeerBytes] = [:]
+        func record(_ exchange: [String: PeerBytes]?) throws {
+            for (address, bytes) in try XCTUnwrap(exchange, "Actual SOCKS/UDP exchange must finish") {
+                expectedPeers[address, default: PeerBytes()].incoming += bytes.incoming
+                expectedPeers[address, default: PeerBytes()].outgoing += bytes.outgoing
+            }
+        }
         for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
             XCUIDevice.shared.orientation = orientation
             app.tabBars.buttons["Server"].tap()
@@ -35,18 +42,21 @@ final class StatisticsUITests: XCTestCase {
             add(capture)
             start.tap()
             XCTAssertTrue(waitUntil { stop.isEnabled && !start.isEnabled })
-            XCTAssertTrue(waitUntil { Self.handshake() }, "Start must reach the real native listener")
-            XCTAssertTrue(Self.handshake(recordPayload: true), "First IP row must come from real IPv4 UDP relay")
-            XCTAssertTrue(Self.handshake(recordPayload: true, ipv6: true), "Second IP row must come from real IPv6 control-peer relay")
-            // Retain both original small relays, then verify newly supported sizes
-            // reach the same actual Total and control-peer IP rows.
+            // Readiness opens a connection without application bytes. A separate
+            // complete greeting below has one exact, independently known count.
+            XCTAssertTrue(waitUntil { Self.listenerAcceptsConnection() }, "Start must reach the real native listener")
+            try record(Self.handshake())
+            try record(Self.handshake(recordPayload: true))
+            try record(Self.handshake(recordPayload: true, ipv6: true))
+            // Retain both original small relays and larger payloads. Expectations
+            // include client framing, destination I/O and the greeting above.
             for size in [2048, 48001] {
-                XCTAssertTrue(Self.handshake(recordPayload: true, payloadSize: size))
-                XCTAssertTrue(Self.handshake(recordPayload: true, ipv6: true, payloadSize: size))
+                try record(Self.handshake(recordPayload: true, payloadSize: size))
+                try record(Self.handshake(recordPayload: true, ipv6: true, payloadSize: size))
             }
             stop.tap()
             XCTAssertTrue(waitUntil { start.isEnabled && !stop.isEnabled })
-            XCTAssertTrue(waitUntil { !Self.handshake() }, "Stop must release the real native listener")
+            XCTAssertTrue(waitUntil { !Self.listenerAcceptsConnection() }, "Stop must release the real native listener")
             app.tabBars.buttons["Statistics"].tap()
             XCTAssertTrue(app.navigationBars["Statistics"].waitForExistence(timeout: 5))
             let form = app.collectionViews.firstMatch
@@ -58,7 +68,26 @@ final class StatisticsUITests: XCTestCase {
             }
             XCTAssertTrue(top.exists && top.isHittable)
             var previousHeaderY = top.frame.minY
-            for id in ["total", "client-1", "client-2"] {
+            for address in ["", "127.0.0.1", "::1"] {
+                let id: String
+                let bytes: PeerBytes
+                if address.isEmpty {
+                    id = "total"
+                    bytes = expectedPeers.values.reduce(PeerBytes()) {
+                        PeerBytes(incoming: $0.incoming + $1.incoming,
+                                  outgoing: $0.outgoing + $1.outgoing)
+                    }
+                } else {
+                    let peerHeader = app.staticTexts.matching(NSPredicate(format: "label == %@", address)).firstMatch
+                    for _ in 0..<6 {
+                        if peerHeader.exists { break }
+                        form.swipeUp()
+                    }
+                    XCTAssertTrue(peerHeader.exists, "Each observed IP has its own table")
+                    id = peerHeader.identifier
+                    XCTAssertTrue(id.hasPrefix("client-"), "Stable identifiers preserve the existing UI contract")
+                    bytes = try XCTUnwrap(expectedPeers[address])
+                }
                 let first = app.staticTexts[id + "-column-in"]
                 let last = app.staticTexts[id + "-usage-sum"]
                 for _ in 0..<6 {
@@ -85,7 +114,6 @@ final class StatisticsUITests: XCTestCase {
                 let columnWidth = nextColumn.frame.midX - first.frame.midX
                 XCTAssertLessThan(speedLabel.frame.width, columnWidth,
                                   "Abbreviations must leave more room for the value columns")
-                let bytes = ((64 + 2048 + 48001) * (orientation == .portrait ? 1 : 2)) * (id == "total" ? 2 : 1)
                 var previousColumnX: CGFloat = -.infinity
                 for (column, title) in [("in", "In"), ("out", "Out"), ("sum", "In + Out")] {
                     let heading = app.staticTexts[id + "-column-" + column]
@@ -105,15 +133,21 @@ final class StatisticsUITests: XCTestCase {
                     XCTAssertLessThanOrEqual(speedLabel.frame.maxX, speed.frame.minX + 1)
                     XCTAssertLessThanOrEqual(volumeLabel.frame.maxX, usage.frame.minX + 1)
                     XCTAssertEqual(speed.label, "0.00 Kbps")
-                    let expected = Double(bytes * (column == "sum" ? 2 : 1)) / 1_000
-                    XCTAssertEqual(usage.label, String(format: "%.2f KB", expected))
+                    let count = column == "sum" ? bytes.incoming + bytes.outgoing :
+                        (column == "in" ? bytes.incoming : bytes.outgoing)
+                    var amount = Decimal(count) / 1_000
+                    var rounded = Decimal()
+                    NSDecimalRound(&rounded, &amount, 2, .plain)
+                    let expected = String(format: "%.2f KB", locale: Locale(identifier: "en_US_POSIX"),
+                                          NSDecimalNumber(decimal: rounded).doubleValue)
+                    XCTAssertEqual(usage.label, expected)
                 }
                 if id != "total" {
                     let header = app.staticTexts[id]
                     XCTAssertTrue(header.exists)
-                    XCTAssertEqual(header.label, id == "client-1" ? "127.0.0.1" : "::1")
+                    XCTAssertEqual(header.label, address)
                     if orientation == .portrait {
-                        XCTAssertGreaterThan(header.frame.minY, previousHeaderY, "Total then client registration order")
+                        XCTAssertGreaterThan(header.frame.minY, previousHeaderY, "Total then peer registration order")
                         previousHeaderY = header.frame.minY
                     }
                 }
@@ -148,75 +182,92 @@ final class StatisticsUITests: XCTestCase {
         return false
     }
 
-    private static func handshake(recordPayload: Bool = false, ipv6: Bool = false, payloadSize: Int = 64) -> Bool {
-        let family = ipv6 ? AF_INET6 : AF_INET
-        let fd = Darwin.socket(family, SOCK_STREAM, 0)
+    private struct PeerBytes {
+        var incoming = 0
+        var outgoing = 0
+    }
+
+    private static func listenerAcceptsConnection() -> Bool {
+        let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
         guard fd >= 0 else { return false }
         defer { Darwin.close(fd) }
+        return connectLoopback(fd, ipv6: false, port: 1080)
+    }
+
+    /// Expected directions come from the independent client's wire buffers and
+    /// destination echo, without reading or reproducing the native collector.
+    private static func handshake(recordPayload: Bool = false, ipv6: Bool = false,
+                                  payloadSize: Int = 64) -> [String: PeerBytes]? {
+        let family = ipv6 ? AF_INET6 : AF_INET
+        let fd = Darwin.socket(family, SOCK_STREAM, 0)
+        guard fd >= 0 else { return nil }
+        defer { Darwin.close(fd) }
         var noSignal: Int32 = 1
-        guard setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout.size(ofValue: noSignal))) == 0 else { return false }
+        guard setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout.size(ofValue: noSignal))) == 0 else { return nil }
         var timeout = timeval(tv_sec: 1, tv_usec: 0)
         guard setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout))) == 0,
-              setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout))) == 0 else { return false }
+              setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout))) == 0 else { return nil }
         var address = sockaddr_in()
         address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         address.sin_family = sa_family_t(AF_INET)
         address.sin_port = UInt16(1080).bigEndian
-        guard inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) == 1 else { return false }
-        guard connectLoopback(fd, ipv6: ipv6, port: 1080) else { return false }
+        guard inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) == 1 else { return nil }
+        guard connectLoopback(fd, ipv6: ipv6, port: 1080) else { return nil }
         let greeting: [UInt8] = [5, 1, 0]
-        guard greeting.withUnsafeBytes({ Darwin.send(fd, $0.baseAddress, $0.count, 0) }) == greeting.count else { return false }
+        guard greeting.withUnsafeBytes({ Darwin.send(fd, $0.baseAddress, $0.count, 0) }) == greeting.count else { return nil }
         var reply = [UInt8](repeating: 0, count: 2)
         let received = reply.withUnsafeMutableBytes { Darwin.recv(fd, $0.baseAddress, $0.count, MSG_WAITALL) }
-        guard received == 2 && reply == [5, 0] else { return false }
-        guard recordPayload else { return true }
+        guard received == 2 && reply == [5, 0] else { return nil }
+        let clientIP = ipv6 ? "::1" : "127.0.0.1"
+        var expected = [clientIP: PeerBytes(incoming: reply.count, outgoing: greeting.count)]
+        guard recordPayload else { return expected }
         let destination = Darwin.socket(AF_INET, SOCK_DGRAM, 0)
         let udp = Darwin.socket(family, SOCK_DGRAM, 0)
         guard destination >= 0, udp >= 0 else {
             if destination >= 0 { Darwin.close(destination) }
             if udp >= 0 { Darwin.close(udp) }
-            return false
+            return nil
         }
         defer { Darwin.close(destination); Darwin.close(udp) }
         guard setsockopt(destination, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                         socklen_t(MemoryLayout.size(ofValue: timeout))) == 0 else { return false }
+                         socklen_t(MemoryLayout.size(ofValue: timeout))) == 0 else { return nil }
         address.sin_port = 0
         let bound = withUnsafePointer(to: &address) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                 Darwin.bind(destination, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
             }
         }
-        guard bound == 0 else { return false }
+        guard bound == 0 else { return nil }
         var length = socklen_t(MemoryLayout<sockaddr_in>.size)
         guard withUnsafeMutablePointer(to: &address, {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                 getsockname(destination, $0, &length)
             }
-        }) == 0 else { return false }
+        }) == 0 else { return nil }
         let destinationPort = UInt16(bigEndian: address.sin_port)
         let request: [UInt8] = [5, 3, 0, 1, 0, 0, 0, 0, 0, 0]
-        guard request.withUnsafeBytes({ Darwin.send(fd, $0.baseAddress, $0.count, 0) }) == request.count else { return false }
+        guard request.withUnsafeBytes({ Darwin.send(fd, $0.baseAddress, $0.count, 0) }) == request.count else { return nil }
         var header = [UInt8](repeating: 0, count: 4)
         guard header.withUnsafeMutableBytes({ Darwin.recv(fd, $0.baseAddress, $0.count, MSG_WAITALL) }) == 4,
-              header[0] == 5, header[1] == 0, header[3] == 1 || header[3] == 4 else { return false }
+              header[0] == 5, header[1] == 0, header[3] == 1 || header[3] == 4 else { return nil }
         var endpoint = [UInt8](repeating: 0, count: header[3] == 1 ? 6 : 18)
-        guard endpoint.withUnsafeMutableBytes({ Darwin.recv(fd, $0.baseAddress, $0.count, MSG_WAITALL) }) == endpoint.count else { return false }
+        guard endpoint.withUnsafeMutableBytes({ Darwin.recv(fd, $0.baseAddress, $0.count, MSG_WAITALL) }) == endpoint.count else { return nil }
         let relayPort = UInt16(endpoint[endpoint.count - 2]) << 8 | UInt16(endpoint.last!)
         guard connectLoopback(udp, ipv6: ipv6, port: relayPort),
               setsockopt(udp, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                         socklen_t(MemoryLayout.size(ofValue: timeout))) == 0 else { return false }
+                         socklen_t(MemoryLayout.size(ofValue: timeout))) == 0 else { return nil }
         var sendCapacity: Int32 = 256 * 1024
         var receiveCapacity: Int32 = 512 * 1024
         for socket in [destination, udp] {
             guard setsockopt(socket, SOL_SOCKET, SO_SNDBUF, &sendCapacity,
                              socklen_t(MemoryLayout.size(ofValue: sendCapacity))) == 0,
                   setsockopt(socket, SOL_SOCKET, SO_RCVBUF, &receiveCapacity,
-                             socklen_t(MemoryLayout.size(ofValue: receiveCapacity))) == 0 else { return false }
+                             socklen_t(MemoryLayout.size(ofValue: receiveCapacity))) == 0 else { return nil }
         }
         let payload = (0..<payloadSize).map { UInt8($0 % 251) }
         let packet: [UInt8] = [0, 0, 0, 1, 127, 0, 0, 1,
                                UInt8(destinationPort >> 8), UInt8(destinationPort & 255)] + payload
-        guard packet.withUnsafeBytes({ Darwin.send(udp, $0.baseAddress, $0.count, 0) }) == packet.count else { return false }
+        guard packet.withUnsafeBytes({ Darwin.send(udp, $0.baseAddress, $0.count, 0) }) == packet.count else { return nil }
         var external = [UInt8](repeating: 0, count: payloadSize)
         var peer = sockaddr_storage()
         var peerLength = socklen_t(MemoryLayout<sockaddr_storage>.size)
@@ -227,7 +278,7 @@ final class StatisticsUITests: XCTestCase {
                 }
             }
         }
-        guard count == payload.count && external == payload else { return false }
+        guard count == payload.count && external == payload else { return nil }
         let echoed = withUnsafePointer(to: &peer) { pointer in
             pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { source in
                 external.withUnsafeBytes {
@@ -235,15 +286,22 @@ final class StatisticsUITests: XCTestCase {
                 }
             }
         }
-        guard echoed == payload.count else { return false }
+        guard echoed == payload.count else { return nil }
         var response = [UInt8](repeating: 0, count: payloadSize + 32)
         let responseCount = response.withUnsafeMutableBytes {
             Darwin.recv(udp, $0.baseAddress, $0.count, 0)
         }
-        guard responseCount >= 4, Array(response.prefix(3)) == [0, 0, 0] else { return false }
+        guard responseCount >= 4, Array(response.prefix(3)) == [0, 0, 0] else { return nil }
         let headerSize = response[3] == 1 ? 10 : (response[3] == 4 ? 22 : 0)
-        return headerSize > 0 && responseCount == headerSize + payload.count &&
-            Array(response.prefix(responseCount).suffix(payload.count)) == payload
+        guard headerSize > 0 && responseCount == headerSize + payload.count &&
+            Array(response.prefix(responseCount).suffix(payload.count)) == payload else { return nil }
+        expected[clientIP, default: PeerBytes()].incoming += header.count + endpoint.count + responseCount
+        expected[clientIP, default: PeerBytes()].outgoing += request.count + packet.count
+        // The IPv4 destination is also the IPv4 client IP in the first relay;
+        // the common peer entry combines both roles, regardless of port.
+        expected["127.0.0.1", default: PeerBytes()].incoming += count
+        expected["127.0.0.1", default: PeerBytes()].outgoing += echoed
+        return expected
     }
 
     private static func connectLoopback(_ fd: Int32, ipv6: Bool, port: UInt16) -> Bool {

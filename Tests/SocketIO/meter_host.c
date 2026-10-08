@@ -1,7 +1,6 @@
 /* Test-only host for querying the server API while native workers run. */
 #include <inttypes.h>
 #include <pthread.h>
-#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,13 +17,12 @@ run_server (void *path)
 int
 main (int argc, char **argv)
 {
-    _Atomic uint64_t probe = 0;
     pthread_t worker;
     char command[32];
 
     if (argc != 2 || pthread_create (&worker, NULL, run_server, argv[1]))
         return 1;
-    printf ("LOCK_FREE %d\n", atomic_is_lock_free (&probe));
+    puts ("READY");
     fflush (stdout);
     while (fgets (command, sizeof (command), stdin)) {
         uint64_t received, sent;
@@ -37,11 +35,11 @@ main (int argc, char **argv)
                 return 2;
         }
         if (!strcmp (command, "clients\n")) {
-            size_t capacity = hev_socks5_server_client_stats (NULL, 0) + 32;
-            HevSocks5ClientStats *rows = calloc (capacity, sizeof (*rows));
+            size_t capacity = hev_socks5_server_endpoint_rows (NULL, 0) + 32;
+            HevSocks5EndpointStats *rows = calloc (capacity, sizeof (*rows));
             if (!rows)
                 return 3;
-            size_t count = hev_socks5_server_client_stats (rows, capacity);
+            size_t count = hev_socks5_server_endpoint_rows (rows, capacity);
             if (count > capacity)
                 count = capacity;
             printf ("CLIENTS %zu\n", count);
@@ -53,7 +51,7 @@ main (int argc, char **argv)
             fflush (stdout);
             continue;
         }
-        hev_socks5_server_stats (&received, &sent);
+        hev_socks5_server_endpoint_stats (&received, &sent);
         printf ("STATS %" PRIu64 " %" PRIu64 "\n", received, sent);
         fflush (stdout);
     }

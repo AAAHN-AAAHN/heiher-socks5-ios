@@ -25,7 +25,13 @@ with tempfile.TemporaryDirectory() as directory:
     for label, text in [('current', VIEW.read_text()), ('prior-per-row-negative', previous.decode())]:
         start = text.index('    private func sample()')
         body = text[start:].rsplit('\n}', 1)[0]
-        # Import the exact unchanged formatter/model, not a rewritten formula.
+        # The historical negative control keeps its per-row publication and
+        # I/O behavior; adapt only renamed API types to the current fixture.
+        if label == 'prior-per-row-negative':
+            body = body.replace('HevSocks5ClientStats', 'HevSocks5EndpointStats')\
+                .replace('hev_socks5_server_client_stats', 'hev_socks5_server_endpoint_rows')\
+                .replace('hev_socks5_server_stats', 'hev_socks5_server_endpoint_stats')
+        # Import the exact current formatter/model, not a rewritten formula.
         generated = fixture.replace('    // INSERT_EXACT_SAMPLE_METHOD', body)
         assert generated != fixture
         source = folder / 'Replay.swift'

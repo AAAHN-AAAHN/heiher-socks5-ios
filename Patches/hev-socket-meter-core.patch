@@ -1,0 +1,749 @@
+diff --git a/src/hev-socks5-meter.c b/src/hev-socks5-meter.c
+new file mode 100644
+index 0000000..05d2277
+--- /dev/null
++++ b/src/hev-socks5-meter.c
+@@ -0,0 +1,158 @@
++/* One process/socket metric. Workers own counter writes; readers only sample. */
++#include <errno.h>
++#include <pthread.h>
++#include "hev-socks5.h"
++#include "hev-socks5-meter.h"
++#include "worker_meter.h"
++
++static pthread_key_t meter_key;
++/* The single engine initializes this before creating any worker threads. */
++static int meter_key_ready;
++static void
++meter_release (void *p)
++{
++    wm_worker_release (p);
++}
++
++int
++hev_meter_prepare (void)
++{
++    if (meter_key_ready)
++        return 0;
++    if (pthread_key_create (&meter_key, meter_release))
++        return -1;
++    meter_key_ready = 1;
++    return 0;
++}
++
++int
++hev_meter_worker_enter (void)
++{
++    WmWorker *worker = pthread_getspecific (meter_key);
++    if (worker)
++        return 0;
++    worker = wm_worker_new ();
++    if (!worker)
++        return -1;
++    if (pthread_setspecific (meter_key, worker)) {
++        wm_worker_release (worker);
++        return -1;
++    }
++    return 0;
++}
++
++void
++hev_meter_worker_leave (void)
++{
++    WmWorker *worker = pthread_getspecific (meter_key);
++    /* If clearing fails, keep ownership until the thread-key destructor. */
++    if (!pthread_setspecific (meter_key, NULL))
++        wm_worker_release (worker);
++}
++
++void *
++hev_meter_peer (const struct sockaddr *address, socklen_t length)
++{
++    int error = errno;
++    void *peer = wm_peer (pthread_getspecific (meter_key), address, length);
++    errno = error;
++    return peer;
++}
++
++void *
++hev_meter_fd (int fd)
++{
++    struct sockaddr_storage address = { 0 };
++    socklen_t length = sizeof (address);
++    int error = errno;
++    void *peer = getpeername (fd, (struct sockaddr *)&address, &length) < 0 ?
++                     NULL :
++                     hev_meter_peer ((struct sockaddr *)&address, length);
++    errno = error;
++    return peer;
++}
++
++void
++hev_meter_add (void *peer, size_t in, size_t out)
++{
++    if (!peer)
++        peer = wm_unknown (pthread_getspecific (meter_key));
++    wm_add (peer, in, out);
++}
++
++void
++hev_meter_totals (uint64_t *in, uint64_t *out)
++{
++    wm_snapshot (NULL, NULL, in, out);
++}
++
++size_t
++hev_meter_rows (HevMeterRow callback, void *context)
++{
++    return wm_snapshot (callback, context, NULL, NULL);
++}
++
++void
++hev_meter_stream (const size_t bytes[4], void *context)
++{
++    void **endpoints = context;
++    hev_meter_add (endpoints[0], bytes[1], bytes[0]);
++    hev_meter_add (endpoints[1], bytes[3], bytes[2]);
++}
++
++static void
++socket_observer (int fd, const struct msghdr *msg, size_t bytes, int writing,
++                 void *context)
++{
++    HevSocks5 *self = context;
++    void *peer = self->io_peer;
++    if (msg && msg->msg_name)
++        peer = hev_meter_peer (msg->msg_name, msg->msg_namelen);
++    /* Only connected control streams/client relay sends have no msg_name.
++     * Unconnected receive always provides the actual sender before filtering. */
++    hev_meter_add (peer, writing ? bytes : 0, writing ? 0 : bytes);
++}
++
++/* Preserve the parent's timeout, short I/O, cancellation and errno behaviour. */
++ssize_t
++hev_meter_recv (int fd, void *buf, size_t len, int flags,
++                HevTaskIOYielder yielder, void *self)
++{
++    return hev_task_io_socket_recv_observed (fd, buf, len, flags, yielder, self,
++                                             socket_observer, self);
++}
++ssize_t
++hev_meter_send (int fd, const void *buf, size_t len, int flags,
++                HevTaskIOYielder yielder, void *self)
++{
++    return hev_task_io_socket_send_observed (fd, buf, len, flags, yielder, self,
++                                             socket_observer, self);
++}
++ssize_t
++hev_meter_recvmsg (int fd, struct msghdr *msg, int flags,
++                   HevTaskIOYielder yielder, void *self)
++{
++    return hev_task_io_socket_recvmsg_observed (fd, msg, flags, yielder, self,
++                                                socket_observer, self);
++}
++ssize_t
++hev_meter_sendmsg (int fd, const struct msghdr *msg, int flags,
++                   HevTaskIOYielder yielder, void *self)
++{
++    return hev_task_io_socket_sendmsg_observed (fd, msg, flags, yielder, self,
++                                                socket_observer, self);
++}
++int
++hev_meter_recvmmsg (int fd, void *messages, unsigned int count, int flags,
++                    HevTaskIOYielder yielder, void *self)
++{
++    return hev_task_io_socket_recvmmsg_observed (
++        fd, messages, count, flags, yielder, self, socket_observer, self);
++}
++int
++hev_meter_sendmmsg (int fd, void *messages, unsigned int count, int flags,
++                    HevTaskIOYielder yielder, void *self)
++{
++    return hev_task_io_socket_sendmmsg_observed (
++        fd, messages, count, flags, yielder, self, socket_observer, self);
++}
+diff --git a/src/hev-socks5-meter.h b/src/hev-socks5-meter.h
+new file mode 100644
+index 0000000..8bf8c33
+--- /dev/null
++++ b/src/hev-socks5-meter.h
+@@ -0,0 +1,37 @@
++/* Program/socket boundary accounting; not IP packet or interface counters. */
++#ifndef HEV_SOCKS5_METER_H
++#define HEV_SOCKS5_METER_H
++#include <stdint.h>
++#include <stddef.h>
++#include <sys/socket.h>
++#include <hev-task.h>
++#include <hev-task-io.h>
++#include <hev-task-io-socket.h>
++
++/* Rows are remote endpoints: In = OS accepted bytes TO peer;
++ * Out = bytes consumed FROM peer. Nodes live until process exit. */
++typedef void (*HevMeterRow) (uint64_t id, const char *address, uint64_t in,
++                             uint64_t out, void *context);
++int hev_meter_prepare (void);
++int hev_meter_worker_enter (void);
++void hev_meter_worker_leave (void);
++void *hev_meter_peer (const struct sockaddr *address, socklen_t length);
++void *hev_meter_fd (int fd);
++void hev_meter_add (void *peer, size_t in, size_t out);
++void hev_meter_totals (uint64_t *in, uint64_t *out);
++size_t hev_meter_rows (HevMeterRow callback, void *context);
++void hev_meter_stream (const size_t bytes[4], void *context);
++
++ssize_t hev_meter_recv (int fd, void *buf, size_t len, int flags,
++                        HevTaskIOYielder yielder, void *self);
++ssize_t hev_meter_send (int fd, const void *buf, size_t len, int flags,
++                        HevTaskIOYielder yielder, void *self);
++ssize_t hev_meter_recvmsg (int fd, struct msghdr *msg, int flags,
++                           HevTaskIOYielder yielder, void *self);
++ssize_t hev_meter_sendmsg (int fd, const struct msghdr *msg, int flags,
++                           HevTaskIOYielder yielder, void *self);
++int hev_meter_recvmmsg (int fd, void *messages, unsigned int count, int flags,
++                        HevTaskIOYielder yielder, void *self);
++int hev_meter_sendmmsg (int fd, void *messages, unsigned int count, int flags,
++                        HevTaskIOYielder yielder, void *self);
++#endif
+diff --git a/src/hev-socks5-server.c b/src/hev-socks5-server.c
+index 9abc372..9a5b9df 100644
+--- a/src/hev-socks5-server.c
++++ b/src/hev-socks5-server.c
+@@ -21,4 +21,5 @@
+
+ #include "hev-socks5-server.h"
++#include "hev-socks5-meter.h"
+
+ #define task_io_yielder hev_socks5_task_io_yielder
+@@ -65,6 +66,6 @@ hev_socks5_server_read_auth_method (HevSocks5Server *self)
+     LOG_D ("%p socks5 server read auth method", self);
+
+-    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, &auth, 2, MSG_WAITALL,
+-                                   task_io_yielder, self);
++    res = hev_meter_recv (HEV_SOCKS5 (self)->fd, &auth, 2, MSG_WAITALL,
++                          task_io_yielder, self);
+     if (res != 2) {
+         LOG_I ("%p socks5 server read auth method", self);
+@@ -77,7 +78,6 @@ hev_socks5_server_read_auth_method (HevSocks5Server *self)
+     }
+
+-    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, &auth.methods,
+-                                   auth.method_len, MSG_WAITALL,
+-                                   task_io_yielder, self);
++    res = hev_meter_recv (HEV_SOCKS5 (self)->fd, &auth.methods, auth.method_len,
++                          MSG_WAITALL, task_io_yielder, self);
+     if (res != auth.method_len) {
+         LOG_I ("%p socks5 server read auth methods", self);
+@@ -112,6 +112,6 @@ hev_socks5_server_write_auth_method (HevSocks5Server *self, int auth_method)
+     auth.method = auth_method;
+
+-    res = hev_task_io_socket_send (HEV_SOCKS5 (self)->fd, &auth, 2, MSG_WAITALL,
+-                                   task_io_yielder, self);
++    res = hev_meter_send (HEV_SOCKS5 (self)->fd, &auth, 2, MSG_WAITALL,
++                          task_io_yielder, self);
+     if (res <= 0) {
+         LOG_I ("%p socks5 server write auth method", self);
+@@ -134,6 +134,6 @@ hev_socks5_server_read_auth_user (HevSocks5Server *self)
+     LOG_D ("%p socks5 server read auth user", self);
+
+-    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, head, 2, MSG_WAITALL,
+-                                   task_io_yielder, self);
++    res = hev_meter_recv (HEV_SOCKS5 (self)->fd, head, 2, MSG_WAITALL,
++                          task_io_yielder, self);
+     if (res != 2) {
+         LOG_I ("%p socks5 server read auth user.ver", self);
+@@ -152,6 +152,6 @@ hev_socks5_server_read_auth_user (HevSocks5Server *self)
+     }
+
+-    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, name, nlen + 1,
+-                                   MSG_WAITALL, task_io_yielder, self);
++    res = hev_meter_recv (HEV_SOCKS5 (self)->fd, name, nlen + 1, MSG_WAITALL,
++                          task_io_yielder, self);
+     if (res != (nlen + 1)) {
+         LOG_I ("%p socks5 server read auth user.name", self);
+@@ -165,6 +165,6 @@ hev_socks5_server_read_auth_user (HevSocks5Server *self)
+     }
+
+-    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, pass, plen,
+-                                   MSG_WAITALL, task_io_yielder, self);
++    res = hev_meter_recv (HEV_SOCKS5 (self)->fd, pass, plen, MSG_WAITALL,
++                          task_io_yielder, self);
+     if (res != plen) {
+         LOG_I ("%p socks5 server read auth user.pass", self);
+@@ -205,6 +205,6 @@ hev_socks5_server_write_auth_user (HevSocks5Server *self, int auth_res)
+     buf[1] = auth_res;
+
+-    res = hev_task_io_socket_send (HEV_SOCKS5 (self)->fd, buf, 2, MSG_WAITALL,
+-                                   task_io_yielder, self);
++    res = hev_meter_send (HEV_SOCKS5 (self)->fd, buf, 2, MSG_WAITALL,
++                          task_io_yielder, self);
+     if (res <= 0) {
+         LOG_I ("%p socks5 server write auth user", self);
+@@ -253,6 +253,6 @@ hev_socks5_server_read_request (HevSocks5Server *self, int *cmd, int *rep,
+     LOG_D ("%p socks5 server read request", self);
+
+-    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, &req, 5, MSG_WAITALL,
+-                                   task_io_yielder, self);
++    res = hev_meter_recv (HEV_SOCKS5 (self)->fd, &req, 5, MSG_WAITALL,
++                          task_io_yielder, self);
+     if (res != 5) {
+         LOG_I ("%p socks5 server read request", self);
+@@ -282,6 +282,6 @@ hev_socks5_server_read_request (HevSocks5Server *self, int *cmd, int *rep,
+     }
+
+-    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, req.addr.domain.addr,
+-                                   addrlen, MSG_WAITALL, task_io_yielder, self);
++    res = hev_meter_recv (HEV_SOCKS5 (self)->fd, req.addr.domain.addr, addrlen,
++                          MSG_WAITALL, task_io_yielder, self);
+     if (res != addrlen) {
+         *rep = HEV_SOCKS5_RES_REP_ADDR;
+@@ -340,6 +340,6 @@ hev_socks5_server_write_response (HevSocks5Server *self, int rep,
+
+     ret = hev_socks5_addr_from_sockaddr6 (&res.addr, addr);
+-    ret = hev_task_io_socket_send (HEV_SOCKS5 (self)->fd, &res, 3 + ret,
+-                                   MSG_WAITALL, task_io_yielder, self);
++    ret = hev_meter_send (HEV_SOCKS5 (self)->fd, &res, 3 + ret, MSG_WAITALL,
++                          task_io_yielder, self);
+     if (ret <= 0) {
+         LOG_I ("%p socks5 server write response", self);
+@@ -391,4 +391,6 @@ hev_socks5_server_connect (HevSocks5Server *self, struct sockaddr_in6 *addr)
+
+     self->fds[0] = fd;
++    HEV_SOCKS5 (self)->io_destination =
++        hev_meter_peer ((struct sockaddr *)addr, sizeof (*addr));
+
+     return 0;
+@@ -614,4 +616,5 @@ hev_socks5_server_construct (HevSocks5Server *self, int fd)
+
+     HEV_SOCKS5 (self)->fd = fd;
++    HEV_SOCKS5 (self)->io_peer = hev_meter_fd (fd);
+
+     self->fds[0] = -1;
+diff --git a/src/hev-socks5-tcp.c b/src/hev-socks5-tcp.c
+index a2db80e..2632ac9 100644
+--- a/src/hev-socks5-tcp.c
++++ b/src/hev-socks5-tcp.c
+@@ -13,4 +13,5 @@
+
+ #include "hev-socks5-tcp.h"
++#include "hev-socks5-meter.h"
+
+ #define task_io_yielder hev_socks5_task_io_yielder
+@@ -33,5 +34,8 @@ hev_socks5_tcp_splicer (HevSocks5TCP *self, int fd)
+         hev_task_mod_fd (task, fd, POLLIN | POLLOUT);
+
+-    hev_task_io_splice (cfd, cfd, fd, fd, 8192, task_io_yielder, self);
++    void *peers[2] = { HEV_SOCKS5 (self)->io_peer,
++                       HEV_SOCKS5 (self)->io_destination };
++    hev_task_io_splice_observed (cfd, cfd, fd, fd, 8192, task_io_yielder, self,
++                                 hev_meter_stream, peers);
+
+     return 0;
+diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
+index f1704a0..000a418 100644
+--- a/src/hev-socks5-udp.c
++++ b/src/hev-socks5-udp.c
+@@ -27,4 +27,5 @@
+
+ #include "hev-socks5-udp.h"
++#include "hev-socks5-meter.h"
+
+ #define UDP_BUF_SIZE 1500
+@@ -271,6 +272,6 @@ udp_buffer_recvmmsg (HevSocks5UDP *self, int fd, struct mmsghdr *messages,
+
+     if (!buffers)
+-        return hev_task_io_socket_recvmmsg (fd, messages, num, flags,
+-                                            task_io_yielder, self);
++        return hev_meter_recvmmsg (fd, messages, num, flags, task_io_yielder,
++                                   self);
+     for (i = 0; i < num; i++) {
+         struct msghdr *msg = &messages[i].msg_hdr;
+@@ -289,6 +290,6 @@ udp_buffer_recvmmsg (HevSocks5UDP *self, int fd, struct mmsghdr *messages,
+         msg->msg_iov[0].iov_len = buffers[i].capacity;
+         msg->msg_flags = 0;
+-        res = hev_task_io_socket_recvmmsg (fd, &messages[i], 1, MSG_DONTWAIT,
+-                                           task_io_yielder, self);
++        res = hev_meter_recvmmsg (fd, &messages[i], 1, MSG_DONTWAIT,
++                                  task_io_yielder, self);
+         if (res <= 0)
+             return i ? (int)i : res;
+@@ -331,4 +332,6 @@ udp_control_check (HevSocks5 *self)
+
+         res = recv (self->fd, &buf, sizeof (buf), 0);
++        if (res > 0)
++            hev_meter_add (self->io_peer, 0, res);
+         if ((res == 0) || ((res < 0) && (errno != EAGAIN))) {
+             hev_socks5_set_timeout (self, 0);
+@@ -419,6 +422,6 @@ udp_sendmmsg (HevSocks5UDP *self, int fd, struct mmsghdr *messages,
+
+     do {
+-        res = hev_task_io_socket_sendmmsg (fd, messages + done, num - done,
+-                                           MSG_WAITALL, task_io_yielder, self);
++        res = hev_meter_sendmmsg (fd, messages + done, num - done, MSG_WAITALL,
++                                  task_io_yielder, self);
+         if (res > 0)
+             done += res;
+@@ -493,6 +496,6 @@ hev_socks5_udp_sendmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+     }
+
+-    res = hev_task_io_socket_sendmsg (hev_socks5_udp_get_fd (self), &mh,
+-                                      MSG_WAITALL, task_io_yielder, self);
++    res = hev_meter_sendmsg (hev_socks5_udp_get_fd (self), &mh, MSG_WAITALL,
++                             task_io_yielder, self);
+     if (res < 0 || (size_t)res != expected) {
+         /* A partial frame cannot be followed by a new frame on this stream. */
+@@ -580,10 +583,8 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+         ssize_t res;
+
+-        res = hev_task_io_socket_recv (fd, &udp, 5, nonblock, task_io_yielder,
+-                                       self);
++        res = hev_meter_recv (fd, &udp, 5, nonblock, task_io_yielder, self);
+         if (res > 0 && res < 5) {
+-            ssize_t tail = hev_task_io_socket_recv (fd, (char *)&udp + res,
+-                                                    5 - res, MSG_WAITALL,
+-                                                    task_io_yielder, self);
++            ssize_t tail = hev_meter_recv (fd, (char *)&udp + res, 5 - res,
++                                           MSG_WAITALL, task_io_yielder, self);
+             if (tail != 5 - res) {
+                 hev_socks5_set_timeout (HEV_SOCKS5 (self), 0);
+@@ -632,6 +633,5 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+         iov[1].iov_len = udp.datlen;
+
+-        res = hev_task_io_socket_recvmsg (fd, &mh, MSG_WAITALL, task_io_yielder,
+-                                          self);
++        res = hev_meter_recvmsg (fd, &mh, MSG_WAITALL, task_io_yielder, self);
+         if (res != (addrlen - 2 + udp.datlen)) {
+             LOG_D ("%p socks5 udp read udp data", self);
+diff --git a/src/hev-socks5.c b/src/hev-socks5.c
+index d06b5d4..0fa3b33 100644
+--- a/src/hev-socks5.c
++++ b/src/hev-socks5.c
+@@ -68,4 +68,6 @@ hev_socks5_construct (HevSocks5 *self, HevSocks5Type type)
+
+     self->fd = -1;
++    self->io_peer = NULL;
++    self->io_destination = NULL;
+     self->timeout = -1;
+     self->type = type;
+diff --git a/src/hev-socks5.h b/src/hev-socks5.h
+index 40ad1cf..d571690 100644
+--- a/src/hev-socks5.h
++++ b/src/hev-socks5.h
+@@ -49,4 +49,6 @@ struct _HevSocks5
+
+     int fd;
++    void *io_peer;
++    void *io_destination;
+     int timeout;
+     unsigned int type : 2;
+diff --git a/src/worker_meter.c b/src/worker_meter.c
+new file mode 100644
+index 0000000..cebdb69
+--- /dev/null
++++ b/src/worker_meter.c
+@@ -0,0 +1,279 @@
++#include "worker_meter.h"
++#include <stdatomic.h>
++#include <stdlib.h>
++#include <string.h>
++#include <stdio.h>
++#include <arpa/inet.h>
++#include <netinet/in.h>
++#include <limits.h>
++
++/* No mutex, compiler TLS, atomic uint64_t, or per-I/O shared RMW. */
++_Static_assert (sizeof (unsigned) >= 4, "32-bit unsigned required");
++typedef struct Identity Identity;
++typedef struct
++{
++    _Atomic unsigned sequence, epoch, in_lo, in_hi, out_lo, out_hi;
++    unsigned version, epoch_value;
++    uint64_t in, out; /* Written exclusively by the owning worker. */
++} Counter;
++struct WmPeer
++{
++    struct WmPeer *bucket_next, *identity_next;
++    Identity *identity;
++    Counter counter;
++};
++struct Identity
++{
++    Identity *next;
++    _Atomic (WmPeer *) parts;
++    uint64_t id;
++    uint32_t scope;
++    int family;
++    unsigned char ip[16];
++    char address[64];
++};
++struct WmWorker
++{
++    struct WmWorker *next;
++    _Atomic unsigned owned;
++    WmPeer *buckets[256];
++    WmPeer unknown;
++};
++static _Atomic (WmWorker *) worker_pool;
++static _Atomic (Identity *) identities[256];
++static _Atomic unsigned serial;
++static Identity unknown = { .address = "Unattributed" };
++
++static void
++counter_init (Counter *c)
++{
++    atomic_init (&c->sequence, 0);
++    atomic_init (&c->epoch, 0);
++    atomic_init (&c->in_lo, 0);
++    atomic_init (&c->in_hi, 0);
++    atomic_init (&c->out_lo, 0);
++    atomic_init (&c->out_hi, 0);
++}
++static void
++publish_part (WmPeer *p, Identity *identity)
++{
++    p->identity = identity;
++    WmPeer *head =
++        atomic_load_explicit (&identity->parts, memory_order_relaxed);
++    do {
++        p->identity_next = head;
++    } while (!atomic_compare_exchange_weak_explicit (&identity->parts, &head, p,
++                                                     memory_order_release,
++                                                     memory_order_relaxed));
++}
++WmWorker *
++wm_worker_new (void)
++{
++    WmWorker *head = atomic_load_explicit (&worker_pool, memory_order_acquire);
++    for (WmWorker *p = head; p; p = p->next) {
++        unsigned vacant = 0;
++        if (atomic_compare_exchange_strong_explicit (&p->owned, &vacant, 1,
++                                                     memory_order_acquire,
++                                                     memory_order_relaxed))
++            return p;
++    }
++    WmWorker *w = calloc (1, sizeof (*w));
++    if (!w)
++        return NULL;
++    atomic_init (&w->owned, 1);
++    counter_init (&w->unknown.counter);
++    publish_part (&w->unknown, &unknown);
++    do {
++        w->next = head;
++    } while (!atomic_compare_exchange_weak_explicit (
++        &worker_pool, &head, w, memory_order_release, memory_order_relaxed));
++    return w;
++}
++void
++wm_worker_release (WmWorker *w)
++{
++    if (w)
++        atomic_store_explicit (&w->owned, 0, memory_order_release);
++}
++WmPeer *
++wm_unknown (WmWorker *w)
++{
++    return w ? &w->unknown : NULL;
++}
++static int
++same (const Identity *id, int family, uint32_t scope,
++      const unsigned char ip[16])
++{
++    return id->family == family && id->scope == scope &&
++           !memcmp (id->ip, ip, 16);
++}
++WmPeer *
++wm_peer (WmWorker *w, const struct sockaddr *addr, socklen_t length)
++{
++    unsigned char ip[16] = { 0 };
++    uint32_t scope = 0, hash = 2166136261u;
++    int family;
++    if (!w)
++        return NULL;
++    if (!addr || length < offsetof (struct sockaddr, sa_family) +
++                              sizeof (addr->sa_family))
++        return &w->unknown;
++    family = addr->sa_family;
++    if (family == AF_INET && length >= sizeof (struct sockaddr_in)) {
++        memcpy (ip, &((const struct sockaddr_in *)addr)->sin_addr, 4);
++    } else if (family == AF_INET6 && length >= sizeof (struct sockaddr_in6)) {
++        const struct sockaddr_in6 *v6 = (const struct sockaddr_in6 *)addr;
++        if (IN6_IS_ADDR_V4MAPPED (&v6->sin6_addr)) {
++            family = AF_INET;
++            memcpy (ip, v6->sin6_addr.s6_addr + 12, 4);
++        } else {
++            memcpy (ip, &v6->sin6_addr, 16);
++            scope = v6->sin6_scope_id;
++        }
++    } else
++        return &w->unknown;
++    for (unsigned i = 0; i < 16; i++)
++        hash = (hash ^ ip[i]) * 16777619u;
++    hash = (hash ^ scope ^ (unsigned)family) & 255u;
++    for (WmPeer *p = w->buckets[hash]; p; p = p->bucket_next)
++        if (same (p->identity, family, scope, ip))
++            return p;
++    Identity *id;
++    for (;;) {
++        Identity *head =
++            atomic_load_explicit (&identities[hash], memory_order_acquire);
++        for (id = head; id; id = id->next)
++            if (same (id, family, scope, ip))
++                break;
++        if (id)
++            break;
++        Identity *fresh = calloc (1, sizeof (*fresh));
++        if (!fresh)
++            return &w->unknown;
++        char text[INET6_ADDRSTRLEN];
++        if (!inet_ntop (family, ip, text, sizeof (text))) {
++            free (fresh);
++            return &w->unknown;
++        }
++        /* IDs may have holes after a lost insertion race; snapshots never index
++         * the caller's array by ID. No ID wrap may silently alias an older IP. */
++        unsigned n = atomic_load_explicit (&serial, memory_order_relaxed);
++        do {
++            if (n == UINT_MAX) {
++                free (fresh);
++                return &w->unknown;
++            }
++        } while (!atomic_compare_exchange_weak_explicit (
++            &serial, &n, n + 1, memory_order_relaxed, memory_order_relaxed));
++        fresh->id = (uint64_t)n + 1;
++        fresh->family = family;
++        fresh->scope = scope;
++        memcpy (fresh->ip, ip, 16);
++        if (scope)
++            snprintf (fresh->address, sizeof (fresh->address), "%s%%%u", text,
++                      scope);
++        else
++            snprintf (fresh->address, sizeof (fresh->address), "%s", text);
++        atomic_init (&fresh->parts, NULL);
++        fresh->next = head;
++        if (atomic_compare_exchange_strong_explicit (
++                &identities[hash], &head, fresh, memory_order_release,
++                memory_order_relaxed)) {
++            id = fresh;
++            break;
++        }
++        free (fresh);
++    }
++    WmPeer *p = calloc (1, sizeof (*p));
++    if (!p)
++        return &w->unknown;
++    counter_init (&p->counter);
++    p->bucket_next = w->buckets[hash];
++    w->buckets[hash] = p;
++    publish_part (p, id);
++    return p;
++}
++void
++wm_add (WmPeer *peer, size_t in, size_t out)
++{
++    if (!peer || (!in && !out))
++        return;
++    Counter *c = &peer->counter;
++    c->in += in;
++    c->out += out;
++    atomic_store_explicit (&c->sequence, ++c->version, memory_order_relaxed);
++    atomic_thread_fence (memory_order_release);
++    atomic_store_explicit (&c->in_lo, (unsigned)(uint32_t)c->in,
++                           memory_order_relaxed);
++    atomic_store_explicit (&c->in_hi, (unsigned)(c->in >> 32),
++                           memory_order_relaxed);
++    atomic_store_explicit (&c->out_lo, (unsigned)(uint32_t)c->out,
++                           memory_order_relaxed);
++    atomic_store_explicit (&c->out_hi, (unsigned)(c->out >> 32),
++                           memory_order_relaxed);
++    if (++c->version == 0)
++        atomic_store_explicit (&c->epoch, ++c->epoch_value,
++                               memory_order_relaxed);
++    atomic_store_explicit (&c->sequence, c->version, memory_order_release);
++}
++static void
++counter_read (const Counter *c, uint64_t *in, uint64_t *out)
++{
++    for (;;) {
++        unsigned generation =
++            atomic_load_explicit (&c->epoch, memory_order_relaxed);
++        unsigned before =
++            atomic_load_explicit (&c->sequence, memory_order_acquire);
++        if (before & 1u)
++            continue;
++        unsigned il = atomic_load_explicit (&c->in_lo, memory_order_relaxed);
++        unsigned ih = atomic_load_explicit (&c->in_hi, memory_order_relaxed);
++        unsigned ol = atomic_load_explicit (&c->out_lo, memory_order_relaxed);
++        unsigned oh = atomic_load_explicit (&c->out_hi, memory_order_relaxed);
++        atomic_thread_fence (memory_order_acquire);
++        if (before !=
++                atomic_load_explicit (&c->sequence, memory_order_relaxed) ||
++            generation !=
++                atomic_load_explicit (&c->epoch, memory_order_relaxed))
++            continue;
++        *in = ((uint64_t)ih << 32) | il;
++        *out = ((uint64_t)oh << 32) | ol;
++        return;
++    }
++}
++static void
++identity_read (Identity *id, WmVisit visit, void *context, uint64_t *in,
++               uint64_t *out)
++{
++    uint64_t a = 0, b = 0;
++    for (WmPeer *p = atomic_load_explicit (&id->parts, memory_order_acquire); p;
++         p = p->identity_next) {
++        uint64_t x, y;
++        counter_read (&p->counter, &x, &y);
++        a += x;
++        b += y;
++    }
++    *in += a;
++    *out += b;
++    if (visit)
++        visit (id->id, id->address, a, b, context);
++}
++size_t
++wm_snapshot (WmVisit visit, void *context, uint64_t *in, uint64_t *out)
++{
++    uint64_t a = 0, b = 0;
++    size_t count = 1;
++    identity_read (&unknown, visit, context, &a, &b);
++    for (unsigned i = 0; i < 256; i++)
++        for (Identity *id =
++                 atomic_load_explicit (&identities[i], memory_order_acquire);
++             id; id = id->next) {
++            identity_read (id, visit, context, &a, &b);
++            ++count;
++        }
++    if (in)
++        *in = a;
++    if (out)
++        *out = b;
++    return count;
++}
+diff --git a/src/worker_meter.h b/src/worker_meter.h
+new file mode 100644
+index 0000000..d340e5a
+--- /dev/null
++++ b/src/worker_meter.h
+@@ -0,0 +1,20 @@
++#ifndef WORKER_METER_H
++#define WORKER_METER_H
++#include <stddef.h>
++#include <stdint.h>
++#include <sys/socket.h>
++
++typedef struct WmWorker WmWorker;
++typedef struct WmPeer WmPeer;
++typedef void (*WmVisit) (uint64_t id, const char *address, uint64_t in,
++                         uint64_t out, void *context);
++/* One writer per worker. Create/register workers before their first socket I/O.
++ * Workers and peer references live for the process lifetime. No callback yields.
++ * Snapshot rows are individually coherent, not a global simultaneous instant. */
++WmWorker *wm_worker_new (void);
++void wm_worker_release (WmWorker *);
++WmPeer *wm_peer (WmWorker *, const struct sockaddr *, socklen_t);
++WmPeer *wm_unknown (WmWorker *);
++void wm_add (WmPeer *, size_t accepted_write, size_t consumed_read);
++size_t wm_snapshot (WmVisit, void *, uint64_t *in, uint64_t *out);
++#endif
