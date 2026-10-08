@@ -30,7 +30,7 @@ jobs:
         if: success() && steps.boot.outcome == 'success'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: bbb4ff8bd8bc54d848ed90009c15226eada3ec23
+          ref: ac80c14793d412de3cfc5466e83abd92c6bc13ba
           path: server-control
           persist-credentials: false
           fetch-depth: 0

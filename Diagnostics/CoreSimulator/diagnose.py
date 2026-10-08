@@ -27,6 +27,9 @@ OUT = ARGS.output.resolve()
 LOCK = threading.Lock()
 RUNTIME = 'com.apple.CoreSimulator.SimRuntime.iOS-27-0'
 DEVICE = 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
+LOG_PREDICATE = ('process == "CoreSimulatorService" OR process == "launchd_sim" '
+                 'OR subsystem BEGINSWITH "com.apple.CoreSimulator" '
+                 'OR process == "SimulatorTrampoline"')
 
 
 def event(value):
@@ -111,23 +114,32 @@ def succeeded(result):
     return result['returncode'] == 0 and not result['timed_out']
 
 
-def snapshot(label, client_pid=None, sample_service=False, stop=None):
+def sample_processes(label, pids, stop=None):
+    for pid in dict.fromkeys(pids):
+        if stop and stop.is_set():
+            return
+        command(['/usr/bin/sample', str(pid), '3', '1', '-file', str(OUT / (label + '-sample-' + str(pid) + '.txt'))],
+                label + '-sample-' + str(pid), timeout=8)
+
+
+def snapshot(label, client_pid=None, service_pid=None, sample_service=False, stop=None):
     if stop and stop.is_set():
         return
+    # Cached own-service and live client PIDs do not depend on ps still working.
+    known = ([service_pid] if service_pid else []) + ([client_pid] if client_pid else [])
+    sample_processes(label, known, stop=stop)
     process_result = command(['/bin/ps', '-axo', 'pid,uid,%cpu,%mem,rss,state,etime,comm'], label + '-processes', timeout=5)
-    if (client_pid or sample_service) and succeeded(process_result):
+    service = None
+    if succeeded(process_result):
         own_uid = os.getuid()
-        selected = [client_pid] if client_pid else []
         for line in (OUT / (label + '-processes.log')).read_text(errors='replace').splitlines()[1:]:
             fields = line.split(None, 7)
             if len(fields) == 8 and fields[1] == str(own_uid) and 'CoreSimulatorService' in fields[7]:
-                selected.append(int(fields[0]))
+                service = dict(pid=int(fields[0]), uid=own_uid, command=fields[7],
+                               observed_in=label + '-processes.log')
                 break
-        for pid in dict.fromkeys(selected):
-            if stop and stop.is_set():
-                return
-            command(['/usr/bin/sample', str(pid), '3', '1', '-file', str(OUT / (label + '-sample-' + str(pid) + '.txt'))],
-                    label + '-sample-' + str(pid), timeout=8)
+        if sample_service and service and service['pid'] not in known:
+            sample_processes(label, [service['pid']], stop=stop)
     for args, suffix in [(['/usr/bin/vm_stat'], 'vm-stat'),
                          (['/usr/bin/memory_pressure', '-Q'], 'memory-pressure'),
                          (['/bin/df', '-h'], 'disk')]:
@@ -138,15 +150,52 @@ def snapshot(label, client_pid=None, sample_service=False, stop=None):
     # still responds while bootstatus waits for the new device.
     if not stop or not stop.is_set():
         command(['xcrun', 'simctl', 'list', 'devices', '-j'], label + '-devices', timeout=10)
+    return service
 
 
-def collect_failure(label):
-    snapshot(label, sample_service=True)
-    predicate = ('process == "CoreSimulatorService" OR process == "launchd_sim" '
-                 'OR subsystem BEGINSWITH "com.apple.CoreSimulator" '
-                 'OR process == "SimulatorTrampoline"')
+def start_log_stream():
+    stream = (OUT / 'live-unified-log.log').open('wb', buffering=0)
+    args = ['/usr/bin/log', 'stream', '--style', 'compact', '--info',
+            '--predicate', LOG_PREDICATE]
+    try:
+        process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=stream,
+                                   stderr=subprocess.STDOUT, start_new_session=True)
+    except Exception as exc:
+        stream.close()
+        event(dict(stage='log-stream-unavailable', error=repr(exc)))
+        return None
+    event(dict(stage='log-stream-started', pid=process.pid, args=args))
+    return process, stream
+
+
+def stop_log_stream(capture):
+    if capture is None:
+        return
+    process, stream = capture
+    forced = False
+    try:
+        if process.poll() is None:
+            # Terminate only our log reader, never the observed service.
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                forced = True
+                process.kill()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+    finally:
+        stream.close()
+        event(dict(stage='log-stream-stopped', pid=process.pid,
+                   returncode=process.returncode, forced=forced))
+
+
+def collect_failure(label, service_pid=None):
+    snapshot(label, service_pid=service_pid, sample_service=True)
     command(['/usr/bin/log', 'show', '--last', '10m', '--style', 'compact', '--info',
-             '--predicate', predicate], label + '-unified-log', timeout=45)
+             '--predicate', LOG_PREDICATE], label + '-unified-log', timeout=45)
     help_result = command(['xcrun', 'simctl', 'help', 'diagnose'], label + '-diagnose-help')
     if succeeded(help_result):
         help_text = (OUT / (label + '-diagnose-help.log')).read_text(errors='replace')
@@ -183,11 +232,15 @@ def main():
                        (['xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version'], 'simulator-sdk'),
                        (['xcrun', 'simctl', 'help', 'bootstatus'], 'bootstatus-help')]:
         command(args, name, timeout=30)
-    snapshot('before-boot')
+    service = snapshot('before-boot', sample_service=True)
+    (OUT / 'preboot-service.json').write_text(json.dumps(service, indent=2) + '\n')
+    service_pid = service['pid'] if service else None
+    event(dict(stage='preboot-service-cached', service=service))
     identifier = None
     boot_result = None
     cleanup = []
     error = None
+    capture = start_log_stream()
     try:
         for kind in ['runtimes', 'devicetypes']:
             result = command(['xcrun', 'simctl', 'list', kind, '-j'], kind, timeout=60)
@@ -217,7 +270,8 @@ def main():
                 for second in [30, 90]:
                     if stop.wait(max(0, second - (time.monotonic() - beginning))):
                         return
-                    snapshot('during-boot-' + str(second), client_pid=pid if second == 90 else None, stop=stop)
+                    snapshot('during-boot-' + str(second), client_pid=pid if second == 90 else None,
+                             service_pid=service_pid if second == 90 else None, stop=stop)
             thread = threading.Thread(target=collect, daemon=True)
             monitors.append(thread)
             thread.start()
@@ -236,11 +290,12 @@ def main():
     except Exception as exc:
         error = str(exc)
         event(dict(stage='environment-failure', reason=error))
-        collect_failure('boot-failure')
+        collect_failure('boot-failure', service_pid=service_pid)
     finally:
         if identifier:
             for action in ['shutdown', 'delete']:
                 cleanup.append(command(['xcrun', 'simctl', action, identifier], 'cleanup-' + action, timeout=30))
+        stop_log_stream(capture)
     success = error is None and boot_result is not None and succeeded(boot_result) and all(map(succeeded, cleanup))
     result = dict(environment_boot_ready=success, error=error, bootstatus=boot_result,
                   cleanup=cleanup, product_ui_gate_result='Recorded separately by the unchanged product audit; not executed by this script.',
