@@ -2,7 +2,7 @@
   "branch": "feature/server-control",
   "frozen_source": "fd2660b9c88ccfec1a6df789376096b8c9d4adf1",
   "parents": {
-    "main": "dafb19cda8cf80998b687b419b73f9181e47bd1e"
+    "main": "1a2130c1d0658e0483b421bfa808572bd16df82e"
   },
   "owned_documents": [
     "README.md",
@@ -10,7 +10,7 @@
   ],
   "readme_mirror": "docs/features/server-control.md",
   "validation_files": {
-    "Build/check.py": "1c042a36950e9dc62c976ebd33dfa1e951323935",
+    "Build/check.py": "ece12b6d49cbb528d0af42e76d3059d047b60eda",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
     "Build/check_ownership.py": "a400f197ba0ab89b2324a7defae2395fe8a3cad8",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
