@@ -35,25 +35,24 @@ cp Build/features.json "$OUT/features.json"
     git -C "$CORE" submodule status --recursive
 } > "$OUT/build-info.txt"
 feature() { python3 -c 'import json,sys; sys.exit(sys.argv[1] not in json.load(open("Build/features.json"))["features"])' "$1"; }
+make -C "$CORE" clean > "$OUT/native-clean.log" 2>&1
 mode=buffered
+splice=0
 for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
     if [ -n "$flags" ]; then
         if [ "$(uname -s)" != Linux ] || ! feature statistics; then break; fi
         mode=splice
+        splice=1
     fi
-    make -C "$CORE" -j3 CFLAGS="$flags" static exec > "$OUT/$mode-build.log" 2>&1
+    make -C "$CORE" -j3 ENABLE_IO_SPLICE_SYSCALL="$splice" CFLAGS="$flags" static exec > "$OUT/$mode-build.log" 2>&1
     python3 Tests/tcp_smoke.py "$CORE/bin/hev-socks5-server" > "$OUT/$mode-tcp.log"
     if feature udp; then
         python3 Tests/udp_sockaddr_regression.py "$CORE/bin/hev-socks5-server" \
             --output "$OUT/$mode-protocol.json" > "$OUT/$mode-protocol.log" 2>&1
     fi
     if feature statistics; then
-        cc -std=gnu11 -O2 -Wall -Werror -pthread -I"$CORE/src" Tests/traffic_stats_host.c \
-            "$CORE/bin/libhev-socks5-server.a" "$CORE/third-part/yaml/bin/libyaml.a" \
-            "$CORE/third-part/hev-task-system/bin/libhev-task-system.a" -o "$OUT/stats-host"
-        python3 Tests/traffic_stats_regression.py "$OUT/stats-host" \
+        python3 Tests/SocketIO/run.py "$CORE" --mode "$mode" --output "$OUT/$mode-socket-io" \
             > "$OUT/$mode-statistics.log" 2>&1
-        rm "$OUT/stats-host"
     fi
     if feature settings; then
         cc -std=gnu11 -O2 -Wall -Werror -pthread -I"$CORE/src" Tests/server_lifecycle_host.c \
@@ -91,7 +90,7 @@ if [ "$(uname -s)" = Darwin ]; then
         -sdk iphoneos -destination 'generic/platform=iOS' \
         -archivePath "$ROOT/.build/$NAME.xcarchive" \
         CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
-        MARKETING_VERSION=2.0.0 CURRENT_PROJECT_VERSION=1 \
+        MARKETING_VERSION=3.0.0 CURRENT_PROJECT_VERSION=1 \
         > "$OUT/app-build.log" 2>&1
     APP="$ROOT/.build/$NAME.xcarchive/Products/Applications/Socks5.app"
     xcrun lipo "$APP/Socks5" -verify_arch arm64
