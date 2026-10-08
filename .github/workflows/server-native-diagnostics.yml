@@ -1,0 +1,80 @@
+name: Diagnose exact ServerControl occupied-port native crash
+on:
+  push:
+    branches: [work/server-native-diagnostics]
+    paths:
+      - .github/workflows/server-native-diagnostics.yml
+      - Diagnostics/server_native_failure.py
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: server-native-crash-diagnostic
+  cancel-in-progress: false
+jobs:
+  occupied-port:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+    steps:
+      - name: Check out diagnostic tools only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: diagnostic
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Check out exact ServerControl with failure input preservation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: b3b770cc59ce9d6746a460e4f89bec424215c7db
+          path: product
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Record compiler identities and build exact buffered native inputs
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ../artifacts/server-native-diagnostic
+          OUT="$GITHUB_WORKSPACE/artifacts/server-native-diagnostic"
+          git rev-parse HEAD > "$OUT/product-head.txt"
+          git diff --exit-code HEAD -- > "$OUT/input-worktree.log"
+          git diff --cached --exit-code HEAD -- > "$OUT/input-index.log"
+          uname -a > "$OUT/os.txt"
+          xcodebuild -version > "$OUT/xcode.txt"
+          swiftc --version > "$OUT/swift.txt"
+          gcc --version > "$OUT/native-compiler.txt"
+          python3 Build/check.py baseline > "$OUT/baseline.log"
+          SERVER_REF=$(python3 -c 'import json; print(json.load(open("Build/upstream.json"))["sources"]["."])')
+          git clone --no-checkout https://github.com/heiher/hev-socks5-server.git .build/core
+          git -C .build/core checkout --detach "$SERVER_REF"
+          git -C .build/core submodule update --init --recursive
+          python3 Build/check.py apply .build/core > "$OUT/native-inputs.log"
+          git -C .build/core submodule status --recursive > "$OUT/native-pins.txt"
+          make -C .build/core clean > "$OUT/native-clean.log" 2>&1
+          make -C .build/core -j3 ENABLE_IO_SPLICE_SYSCALL=0 CFLAGS='' static exec > "$OUT/native-build.log" 2>&1
+      - name: Observe 100 fresh hosts with the unchanged bind-failure contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 diagnostic/Diagnostics/server_native_failure.py product product/.build/core artifacts/server-native-diagnostic/trials > artifacts/server-native-diagnostic/run.log 2>&1
+      - name: Record exact source independently of diagnostic outcome
+        if: always()
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 Build/record_evidence.py
+          git diff --exit-code HEAD -- > ../artifacts/server-native-diagnostic/final-worktree.log
+          git diff --cached --exit-code HEAD -- > ../artifacts/server-native-diagnostic/final-index.log
+      - name: Retain original failure and process-specific diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ServerControl-native-crash-diagnostic-${{ github.run_attempt }}
+          path: |
+            artifacts/server-native-diagnostic/
+            product/artifacts/
+          retention-days: 30
