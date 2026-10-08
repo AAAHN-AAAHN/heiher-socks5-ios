@@ -19,6 +19,19 @@ run([sys.executable,HERE/'contract.py',n,'--composition',a.composition])
 run([a.cc,'-O2','-pthread','-I'+str(n/'src'),HERE/'meter_host.c',
      n/'bin/libhev-socks5-server.a',n/'third-part/yaml/bin/libyaml.a',
      task/'bin/libhev-task-system.a','-o',host])
+# Keep the normal native host unchanged; only the restart fixture observes its first
+# accept wait before exposing READY/STATS to the original three-cycle driver.
+worker=(n/'src/hev-socks5-worker.c').read_text()
+yield_point='    hev_task_yield (type);\n'
+assert worker.count(yield_point)==1
+observed=out/'restart-worker.c'
+observed.write_text('extern void socket_io_worker_wait (const void *, int);\n'+
+                   worker.replace(yield_point,'    socket_io_worker_wait (self, type);\n'+yield_point))
+restart_host=out/'restart-host'
+run([a.cc,'-O2','-pthread',*['-I'+str(n/path) for path in
+     ('src','src/misc','src/core/include','third-part/yaml/src','third-part/hev-task-system/include')],
+     HERE/'restart_host.c',observed,n/'bin/libhev-socks5-server.a',
+     n/'third-part/yaml/bin/libyaml.a',task/'bin/libhev-task-system.a','-o',restart_host])
 for name,defines in [('socket_observer',[]),('socket_observer',['-DFORCE_FALLBACK']),('stream_matrix',['-DENABLE_IO_SPLICE_SYSCALL'] if a.mode=='splice' else []),('registry',[]),('worker_boundaries',[])]:
  exe=out/(name+('-fallback' if '-DFORCE_FALLBACK' in defines else ''))
  run([a.cc,'-O2','-std=gnu11','-Wall','-Werror','-Wno-unused-function',*defines,'-I'+str(n/'src/core/src'),'-I'+str(task/'src'),'-I'+str(task/'include'),HERE/(name+'.c'),task/'bin/libhev-task-system.a','-pthread','-o',exe]);run([exe])
@@ -30,7 +43,7 @@ run([exe])
 with prepared_loopback():
  run([sys.executable,HERE/'integration.py','--host',host,'--output',out/'network'],timeout=120)
  run([sys.executable,HERE/'pair_example.py','--host',host,'--output',out/'pair'],timeout=120)
- run([sys.executable,HERE/'restart.py','--host',host,'--output',out/'restart'],timeout=120)
+ run([sys.executable,HERE/'restart.py','--host',restart_host,'--output',out/'restart'],timeout=120)
 
 if sys.platform == 'linux':
  exe=out/'accept-reset'

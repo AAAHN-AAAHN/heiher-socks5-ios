@@ -55,7 +55,7 @@ Worker-local counters remove shared per-I/O Total updates. Registration, allocat
 
 ## Verification contract
 
-`Tests/SocketIO/` defines the native endpoint-I/O contract: both peer roles and address families, authentication and rejected input, partial frames, cancellation, successful message prefixes, peeks, worker concurrency, packed rows and stream/splice behavior. The Statistics audit composes this contract with the declared UDP prerequisite; inherited UDP fixtures remain part of the composed-engine validation. Statistics-owned compile aliases preserve the unchanged UDP fixtures' original substituted I/O boundaries. Meter helpers and real socket tests execute the observed paths directly. The host fixture provides the same distinct loopback peers on Linux and macOS and restores any addresses it adds. For composed lifecycle checks, Statistics supplies its reviewed worker digest while the lifecycle owner retains the Stop assertions.
+`Tests/SocketIO/` defines the native endpoint-I/O contract: both peer roles and address families, authentication and rejected input, partial frames, cancellation, successful message prefixes, peeks, worker concurrency, packed rows and stream/splice behavior. The Statistics audit composes this contract with the declared UDP prerequisite; inherited UDP fixtures remain part of the composed-engine validation. Statistics-owned compile aliases preserve the unchanged UDP fixtures' original substituted I/O boundaries. Meter helpers and real socket tests execute the observed paths directly. The host fixture provides the same distinct loopback peers on Linux and macOS and restores any addresses it adds. For composed lifecycle checks, Statistics supplies its reviewed worker digest while the lifecycle owner retains the Stop assertions. The restart fixture observes all four workers' first accept wait before its three Stop/Start cycles; only that fixture links the readiness observer.
 
 `FormattingTests.swift` and the retained Statistics model tests cover elapsed-time deltas, resets, large counters, SI thresholds and independent decimal rounding controls. `BridgeTests.swift` imports the actual new C ABI. The sampling replay executes the actual view sampling body with controlled rows and recorded state publication; its historical per-row negative control remains required. It also checks packed rows with noncontiguous IDs. These are model/ABI checks, not SwiftUI render or scheduling measurements.
 
@@ -63,7 +63,7 @@ Worker-local counters remove shared per-I/O Total updates. Registration, allocat
 
 ## Operation and limitations
 
-The inherited UDP fixed-port, multiple-unknown-peer restriction remains. Statistics does not change routing, prove remote delivery or identify a device behind a shared IP.
+The inherited UDP fixed-port, multiple-unknown-peer restriction remains. Statistics does not change routing, prove remote delivery or identify a device behind a shared IP. The Statistics-only branch preserves the upstream lifecycle, including its early-Stop race; the separate ServerControl feature supplies that correction.
 
 Physical iOS 27 SideStore standalone and LiveContainer guest operation, device resource measurements and non-Linux native runtimes require separate execution evidence. A configured minimum iOS version or a successful source build does not establish those results.
 
