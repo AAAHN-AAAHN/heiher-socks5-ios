@@ -31,6 +31,19 @@ def output(*args):
     return subprocess.check_output(list(map(str, args)), text=True, timeout=60, cwd=ROOT)
 
 
+def verify_production():
+    baseline = 'b67733e7e13ae61401425e13a274f4fc7459bdb2'
+    config = json.loads((ROOT / 'Build/features.json').read_bytes())
+    expected = json.loads(output('git', 'show', baseline + ':Build/features.json'))
+    parent = json.loads((ROOT / 'docs/documentation.json').read_bytes())['parents']['main']
+    expected['base_commit'] = parent
+    if config != expected:
+        raise RuntimeError('Server-control configuration differs beyond the current main base')
+    run(['git', 'diff', '--exit-code', baseline, 'HEAD', '--',
+         'Socks5', 'Socks5.xcodeproj', 'Patches', 'Build/upstream.json',
+         'HevSocks5Server.xcframework'], 'preserved-production.log')
+
+
 def add_test_target(app):
     project = app / 'Socks5.xcodeproj'
     path = project / 'project.pbxproj'
@@ -110,10 +123,7 @@ def main():
         raise RuntimeError('Same-source native and SDK success required')
     if (native / 'compiled-headers/source-commit.txt').read_text().strip() != head:
         raise RuntimeError('Stale native headers')
-    run(['git', 'diff', '--exit-code',
-         'b67733e7e13ae61401425e13a274f4fc7459bdb2', 'HEAD', '--',
-         'Socks5', 'Socks5.xcodeproj', 'Patches', 'Build/features.json', 'Build/upstream.json',
-         'HevSocks5Server.xcframework'], 'preserved-production.log')
+    verify_production()
     snapshot = {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest()
                 for p in output('git', 'ls-files').splitlines()}
     (OUT / 'source-sha256.json').write_text(json.dumps(snapshot, indent=2) + '\n')
@@ -162,7 +172,8 @@ def main():
         run(['xcodebuild', 'test', '-project', app / 'Socks5.xcodeproj', '-scheme', 'ServerControlUIAudit',
              '-destination', 'platform=iOS Simulator,id=' + identifier, '-parallel-testing-enabled', 'NO',
              '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
-             'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES'], 'ui-test.log', timeout=900)
+             'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES',
+             'MARKETING_VERSION=3.0.0', 'CURRENT_PROJECT_VERSION=1'], 'ui-test.log', timeout=900)
         run(['xcrun', 'xcresulttool', 'export', 'attachments', '--path', OUT / 'UI.xcresult',
              '--output-path', OUT / 'screenshots'], 'screenshots-export.log')
         run(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', OUT / 'UI.xcresult',
