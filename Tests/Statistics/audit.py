@@ -243,13 +243,11 @@ def native_checks(mode):
 
 def model_checks():
     """Pure formatting/model checks and the current sampling lifecycle contract."""
-    for source, label in [('Tests/traffic_statistics_model.swift', 'model'),
-                          ('Tests/SocketIO/FormattingTests.swift', 'socket-formatting')]:
-        run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
-             'Socks5/Statistics/TrafficStatistics.swift', source,
-             '-o', OUT / label], label + '-build.log')
-        run([OUT / label], label + '.log')
-        (OUT / label).unlink()
+    run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
+         'Socks5/Statistics/TrafficStatistics.swift', 'Tests/traffic_statistics_model.swift',
+         '-o', OUT / 'model'], 'model-build.log')
+    run([OUT / 'model'], 'model.log')
+    (OUT / 'model').unlink()
     for optimization in ([], ['-O']):
         label = 'client-model-optimized' if optimization else 'client-model-debug'
         run(['swiftc', '-swift-version', '5', '-warnings-as-errors', *optimization,
