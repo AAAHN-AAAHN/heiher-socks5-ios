@@ -24,8 +24,10 @@ SOCKET_PATCHES = [
 UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
                         'udp_buffer_send.c', 'udp_stream_boundaries.c')
 # Keep inherited fixtures' substituted I/O boundaries; real meter tests use no aliases.
-UDP_FIXTURE_FLAGS = ['-Dhev_meter_' + op + '=hev_task_io_socket_' + op
-                     for op in ('recv', 'send', 'recvmsg', 'sendmsg', 'recvmmsg', 'sendmmsg')]
+UDP_FIXTURE_INIT = ['-include', str(ROOT / 'Tests/SocketIO/udp_fixture_main.h')]
+UDP_FIXTURE_FLAGS = UDP_FIXTURE_INIT + [
+    '-Dhev_meter_' + op + '=hev_task_io_socket_' + op
+    for op in ('recv', 'send', 'recvmsg', 'sendmsg', 'recvmmsg', 'sendmmsg')]
 UDP_FILES = {
     '.github/workflows/udp-compat-audit.yml': '.github/workflows/verify-build.yml',
     **{p: p for p in ('Patches/hev-udp-port-zero.patch', 'Patches/hev-udp-sockaddr.patch',
@@ -212,7 +214,7 @@ def native_checks(mode):
             executable.unlink()
     if not splice:
         executable = OUT / 'udp-live-retention'
-        run([*common, *includes, 'Tests/udp_buffer_live_hold.c', *libs, '-o', executable],
+        run([*common, *UDP_FIXTURE_INIT, *includes, 'Tests/udp_buffer_live_hold.c', *libs, '-o', executable],
             'udp-live-retention-build.log')
         run([executable], 'udp-live-retention.log', timeout=490)
         executable.unlink()

@@ -6,7 +6,7 @@
     "feature/server-control": "51e4c8ae7e03ddd4be3d1a76e922e03bca97f2c5",
     "feature/settings-persistence": "5a32e32d22f5c39dfc24a8814f3db7288868bce2",
     "feature/udp-compat": "c42a610cd02403b2930c2b8160adcbdad837a77f",
-    "feature/traffic-statistics": "9ec32066e70c96d74e0c13235b02ead6e9e873a9"
+    "feature/traffic-statistics": "2968901116dcf0958f278180044a8963d4fcde2d"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -467,6 +467,10 @@
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
       "sha256": "50aa1efeeda521be280ffc24bc20f9d6ea08cce3c51ee7f31a5af40a6e5bae94"
     },
+    "Tests/SocketIO/udp_fixture_main.h": {
+      "commit": "2968901116dcf0958f278180044a8963d4fcde2d",
+      "sha256": "3397126eacbaaffba105caf47e4ec238086436537b37ca42998f2fa86d39ed28"
+    },
     "Tests/SocketIO/worker-native.json": {
       "commit": "9ec32066e70c96d74e0c13235b02ead6e9e873a9",
       "sha256": "b81f546cfdcaeb6800f42c96b81fdc15715bbcca16984fbbd03e2fe78cf5a7a1"
@@ -484,8 +488,8 @@
       "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
-      "sha256": "9c04f2a69943ce7e152f31fe0926dd806d8dbaf7d688b1f484e54e04db41c2ad"
+      "commit": "2968901116dcf0958f278180044a8963d4fcde2d",
+      "sha256": "588867d9d6dc4fe8dceb4cce3002ccd64f9d787a8f58e4824f78ecd29a634164"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
