@@ -2,7 +2,7 @@
 """Replay the UI sample and task bodies with scripted snapshots/state and sleep.
 
 No SwiftUI body rendering, Apple scheduling or real network traffic occurs here.
-The task uses real Swift cancellation; only its sleep boundary is controlled.
+The task uses real Swift cancellation; wall time, sleep and native read work are controlled.
 """
 import hashlib
 from pathlib import Path
@@ -63,22 +63,45 @@ with tempfile.TemporaryDirectory() as directory:
     sample = current[current.index('    private func sample()'):].rsplit('\n}', 1)[0]
     support = fixture.split('@main struct SamplingContractTests', 1)[0]\
         .replace('    // INSERT_EXACT_SAMPLE_METHOD', sample)
+    native_read = '    received = NativeSnapshot.rows.reduce'
+    assert support.count(native_read) == 1
+    # Only the native substitute advances controlled time; the product sample
+    # body is unchanged. This makes processing overruns observable to the task.
+    support = support.replace(native_read, '    Date.advanceForNativeRead()\n' + native_read)
     task_fixture = (ROOT / 'Tests/Statistics/SamplingTaskTests.swift').read_text()
     generated = support + task_fixture.replace('        // INSERT_EXACT_TASK_BODY',
         task.replace('Task.sleep(', 'SleepBoundary.sleep('))
     assert generated.count('// INSERT_EXACT_') == 0
+    sleep = 'SleepBoundary.sleep(for: .seconds(delay))'
+    clock = 'let time = ProcessInfo.processInfo.systemUptime'
+    assert generated.count(sleep) == 1 and generated.count(clock) == 1
+    variants = [
+        ('current-task', generated, None),
+        # Keep delay referenced so this mutation compiles with warnings-as-errors.
+        ('fixed-delay-negative', generated.replace(sleep,
+            'SleepBoundary.sleep(for: .seconds(delay * 0 + 0.5))'),
+            'FAIL: next sleep targets device-clock .0/.5 boundary'),
+        ('wall-time-rate-negative', generated.replace(clock,
+            'let time = Date().timeIntervalSinceReferenceDate'),
+            'FAIL: Total and peer rates use actual elapsed uptime'),
+    ]
     source = folder / 'TaskReplay.swift'
-    source.write_text(generated)
-    for optimized in (False, True):
-        if (mode == 'debug' and optimized) or (mode == 'optimized' and not optimized):
-            continue
-        executable = folder / 'task-test'
-        subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
-                        *(['-O'] if optimized else []),
-                        str(ROOT / 'Socks5/Statistics/TrafficStatistics.swift'),
-                        str(source), '-o', str(executable)], check=True, timeout=90)
-        result = subprocess.run([str(executable)], capture_output=True, text=True, timeout=45)
-        print('TEST: current-task optimized=', optimized, flush=True)
-        print(result.stdout, end='', flush=True)
-        assert result.returncode == 0 and 'PASS:' in result.stdout, result.stderr
+    for label, replay, expected_failure in variants:
+        source.write_text(replay)
+        for optimized in (False, True):
+            if (mode == 'debug' and optimized) or (mode == 'optimized' and not optimized):
+                continue
+            executable = folder / 'task-test'
+            subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
+                            *(['-O'] if optimized else []),
+                            str(ROOT / 'Socks5/Statistics/TrafficStatistics.swift'),
+                            str(source), '-o', str(executable)], check=True, timeout=90)
+            result = subprocess.run([str(executable)], capture_output=True, text=True, timeout=45)
+            print('TEST:', label, 'optimized=', optimized, flush=True)
+            print(result.stdout, end='', flush=True)
+            if expected_failure is None:
+                assert result.returncode == 0 and 'PASS:' in result.stdout, result.stderr
+            else:
+                assert result.returncode == 1 and expected_failure in result.stdout, result.stderr
+                print('EXPECTED SCHEDULING/CLOCK CONTRACT FAILURE', flush=True)
 print('PASS: exact sample-body replay, one publication and unchanged snapshot/rate semantics', flush=True)
