@@ -57,6 +57,20 @@ main (void)
     assert (wm_peer (a, (struct sockaddr *)&mapped, sizeof mapped) != scope1);
     assert (wm_peer (a, NULL, 0) == wm_unknown (a));
     assert (wm_peer (a, (struct sockaddr *)&ip, 1) == wm_unknown (a));
+    ip.sin_addr.s_addr = htonl (1);
+    assert (wm_peer (a, (struct sockaddr *)&ip, sizeof ip) != wm_unknown (a));
+    /* No concrete peer is specified by an all-zero normalized IP. */
+    size_t known = wm_snapshot (NULL, NULL, NULL, NULL);
+    ip.sin_addr.s_addr = INADDR_ANY;
+    assert (wm_peer (a, (struct sockaddr *)&ip, sizeof ip) == wm_unknown (a));
+    mapped.sin6_addr = in6addr_any;
+    mapped.sin6_scope_id = 0;
+    assert (wm_peer (a, (struct sockaddr *)&mapped, sizeof mapped) ==
+            wm_unknown (a));
+    inet_pton (AF_INET6, "::ffff:0.0.0.0", &mapped.sin6_addr);
+    assert (wm_peer (a, (struct sockaddr *)&mapped, sizeof mapped) ==
+            wm_unknown (a));
+    assert (wm_snapshot (NULL, NULL, NULL, NULL) == known);
     inet_pton (AF_INET, "10.12.13.15", &ip.sin_addr);
     fail_after = 0;
     assert (wm_peer (a, (struct sockaddr *)&ip, sizeof ip) == wm_unknown (a));
