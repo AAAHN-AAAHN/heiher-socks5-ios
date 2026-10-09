@@ -7,7 +7,7 @@
     "feature/server-control": "51e4c8ae7e03ddd4be3d1a76e922e03bca97f2c5",
     "feature/settings-persistence": "5a32e32d22f5c39dfc24a8814f3db7288868bce2",
     "feature/udp-compat": "c42a610cd02403b2930c2b8160adcbdad837a77f",
-    "feature/traffic-statistics": "fcdfa8aa7fe9e862660a251afbd91144be2fa431"
+    "feature/traffic-statistics": "54ce7e1145f4eda3e2bbb8019161234b1fc09ae1"
   },
   "owned_documents": [
     "README.md",
@@ -20,7 +20,7 @@
     "Build/check_ownership.py": "3f11ee85e1248ad3d891fd8867f21ef1e9f2a4c0",
     "Tests/AppIcon/check_icon.py": "ab95c5c00e4cdeb6c6b8c766a22e8aace1a93b41",
     "Tests/Background/check_scope.py": "47c2771b45fcf07a34ab5a354cecbba4963c746a",
-    "Tests/Statistics/audit.py": "d58fb847fd8d32b9de01f6189c90b6273f83f9a4",
+    "Tests/Statistics/audit.py": "564f346a58e0ad057eff6a06c1cb755090e255e2",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }

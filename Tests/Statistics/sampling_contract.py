@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Replay the exact UI sample body using scripted native snapshots/state storage.
+"""Replay the UI sample and task bodies with scripted snapshots/state and sleep.
 
 No SwiftUI body rendering, Apple scheduling or real network traffic occurs here.
-Only the method's enclosing type and external API/storage dependencies are replaced.
+The task uses real Swift cancellation; only its sleep boundary is controlled.
 """
 import hashlib
 from pathlib import Path
@@ -52,4 +52,33 @@ with tempfile.TemporaryDirectory() as directory:
             else:
                 assert result.returncode == 1 and 'FAIL: one client-state publication' in result.stdout, result.stderr
                 print('EXPECTED OLD PUBLICATION-COUNT FAILURE; not incorrect native byte accounting', flush=True)
+    current = VIEW.read_text()
+    task_start = '        .task(id: isVisible && scenePhase == .active) {\n'
+    task_end = '\n        }\n    }\n\n    /// One shared'
+    assert current.count(task_start) == 1 and current.count(task_end) == 1
+    task = current.split(task_start, 1)[1].split(task_end, 1)[0]
+    assert task.count('Task.sleep(') == 1
+    # Reuse the exact sample and its existing native/state substitutes. Keep
+    # the historical publication negative control and its assertions above.
+    sample = current[current.index('    private func sample()'):].rsplit('\n}', 1)[0]
+    support = fixture.split('@main struct SamplingContractTests', 1)[0]\
+        .replace('    // INSERT_EXACT_SAMPLE_METHOD', sample)
+    task_fixture = (ROOT / 'Tests/Statistics/SamplingTaskTests.swift').read_text()
+    generated = support + task_fixture.replace('        // INSERT_EXACT_TASK_BODY',
+        task.replace('Task.sleep(', 'SleepBoundary.sleep('))
+    assert generated.count('// INSERT_EXACT_') == 0
+    source = folder / 'TaskReplay.swift'
+    source.write_text(generated)
+    for optimized in (False, True):
+        if (mode == 'debug' and optimized) or (mode == 'optimized' and not optimized):
+            continue
+        executable = folder / 'task-test'
+        subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
+                        *(['-O'] if optimized else []),
+                        str(ROOT / 'Socks5/Statistics/TrafficStatistics.swift'),
+                        str(source), '-o', str(executable)], check=True, timeout=90)
+        result = subprocess.run([str(executable)], capture_output=True, text=True, timeout=45)
+        print('TEST: current-task optimized=', optimized, flush=True)
+        print(result.stdout, end='', flush=True)
+        assert result.returncode == 0 and 'PASS:' in result.stdout, result.stderr
 print('PASS: exact sample-body replay, one publication and unchanged snapshot/rate semantics', flush=True)
