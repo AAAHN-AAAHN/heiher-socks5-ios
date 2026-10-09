@@ -6,7 +6,7 @@
     "feature/server-control": "51e4c8ae7e03ddd4be3d1a76e922e03bca97f2c5",
     "feature/settings-persistence": "5a32e32d22f5c39dfc24a8814f3db7288868bce2",
     "feature/udp-compat": "c42a610cd02403b2930c2b8160adcbdad837a77f",
-    "feature/traffic-statistics": "07798a80016b860b98929bc967271ed2b58bac85"
+    "feature/traffic-statistics": "9ec32066e70c96d74e0c13235b02ead6e9e873a9"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -28,8 +28,8 @@
       "sha256": "c9862bb9f074354297b969822b2cbba22b18563a248c705ec113d8eceaec9c7b"
     },
     "Patches/hev-socket-meter-core.patch": {
-      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
-      "sha256": "28843560dd53feb3fa1bb55ddd3bcd3b1e9c6b48bc6194b68cc1e3a56ca9d182"
+      "commit": "9ec32066e70c96d74e0c13235b02ead6e9e873a9",
+      "sha256": "150bb052e03787c72f202e342e96e22a71b2038d8c21c1d5e513f6a06a7ddfbb"
     },
     "Patches/hev-socket-meter-server.patch": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
@@ -420,8 +420,8 @@
       "sha256": "484cbef7a5841119ee7ad90f2b6cee421a674fbadf6fbfd8d199cc32319ff341"
     },
     "Tests/SocketIO/integration.py": {
-      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
-      "sha256": "c507a6884d88f9dba8dc917baac6c319aa98527501e19fd66d03273dacc6a32b"
+      "commit": "9ec32066e70c96d74e0c13235b02ead6e9e873a9",
+      "sha256": "c735400a1197b3985c822d930f3011851456498c2be20793b6f656acaea9e73b"
     },
     "Tests/SocketIO/loopback.py": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
@@ -468,12 +468,12 @@
       "sha256": "50aa1efeeda521be280ffc24bc20f9d6ea08cce3c51ee7f31a5af40a6e5bae94"
     },
     "Tests/SocketIO/worker-native.json": {
-      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
-      "sha256": "94814d8c36edeb9ccdd8470b9055473ae0f21c1a240e93a97dc576982749ad94"
+      "commit": "9ec32066e70c96d74e0c13235b02ead6e9e873a9",
+      "sha256": "b81f546cfdcaeb6800f42c96b81fdc15715bbcca16984fbbd03e2fe78cf5a7a1"
     },
     "Tests/SocketIO/worker_boundaries.c": {
-      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
-      "sha256": "a52a56173ab2734f213d1c56ff18bafa577c19e0db4f15f8f249f5eabdde2f01"
+      "commit": "9ec32066e70c96d74e0c13235b02ead6e9e873a9",
+      "sha256": "25671331b23082c5db712711e429dc531728d249cbccbc8efae8a0c68ad13843"
     },
     "Tests/Statistics/SamplingContractTests.swift": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",

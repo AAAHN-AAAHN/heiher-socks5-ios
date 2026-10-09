@@ -40,12 +40,12 @@ def reply(s):
  return socket.inet_ntop(socket.AF_INET if h[3]==1 else socket.AF_INET6,tail[:-2]),int.from_bytes(tail[-2:],'big'),4+n
 
 class Host:
- def __init__(self,binary,out,workers=4,auth=False):
+ def __init__(self,binary,out,workers=4,auth=False,udp_listen=None):
   self.out=Path(out);self.out.mkdir(parents=True,exist_ok=True)
   # Reserve the same wildcard/family as the native listener, not only 127.0.0.1.
   with socket.socket(socket.AF_INET6) as s:
    s.setsockopt(socket.IPPROTO_IPV6,socket.IPV6_V6ONLY,0);s.bind(('::',0));self.port=s.getsockname()[1]
-  cfg=self.out/'config.yml';cfg.write_text(f"main:\n  workers: {workers}\n  listen-address: '::'\n  port: {self.port}\n  udp-port: 0\n  bind-address-v4: ''\n  bind-address-v6: ''\n"+("auth:\n  username: user\n  password: secret\n" if auth else ''))
+  cfg=self.out/'config.yml';cfg.write_text(f"main:\n  workers: {workers}\n  listen-address: '::'\n  port: {self.port}\n  udp-port: 0\n  bind-address-v4: ''\n  bind-address-v6: ''\n"+(f"  udp-listen-address: '{udp_listen}'\n" if udp_listen else '')+("auth:\n  username: user\n  password: secret\n" if auth else ''))
   self.log=(self.out/'server.log').open('w');self.p=subprocess.Popen([str(binary),str(cfg)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=self.log,text=True,bufsize=1)
   assert self.p.stdout.readline() == 'READY\n'
   self.auth=auth;self.rows={};self.totals=[0,0];self.points=[]
@@ -117,6 +117,28 @@ class Echo:
   for t in self.children:t.join()
   assert self.error is None,self.error
 
+def fixed_udp_peers(binary,out,workers,auth):
+ # A fixed UDP peer may use another IP/family than its TCP control connection.
+ h=Host(binary,out,workers,auth,udp_listen='::');e=Echo('127.0.0.4',True)
+ try:
+  for peer in ['127.0.0.3','::1']:
+   client=udp_socket(socket.AF_INET6 if ':' in peer else socket.AF_INET,'fixed client '+peer)
+   client.bind((peer,0));client.settimeout(2);control=None
+   try:
+    control,relay=h.connect('127.0.0.2',peer,client.getsockname()[1],cmd=3)
+    data=b'fixed-peer-meter';packet=b'\0\0\0'+addr(e.ip,e.port)+data
+    client.sendto(packet,relay[:2]);response,_=client.recvfrom(65536)
+    header=10 if response[3]==1 else 22
+    assert response[header:]==data[::-1]+b'END'
+    h.add(peer,len(response),len(packet));h.add(e.ip,len(data),len(data)+3)
+    h.check('fixed-udp-peer-'+peer)
+   finally:
+    if control is not None:control.close()
+    client.close()
+  return dict(checkpoints=len(h.points),rows=h.rows,totals=h.totals)
+ finally:
+  e.close();h.close()
+
 def suite(binary,out,workers,auth):
  h=Host(binary,out,workers,auth);servers=[]
  try:
@@ -153,7 +175,8 @@ def suite(binary,out,workers,auth):
   a.close();b.close();h.check('session-close-retains')
   # Direct A/B traffic does NOT enter this program/socket boundary.
   e=Echo('127.0.0.3');servers.append(e);c=socket.socket();c.bind(('127.0.0.2',0));c.connect(('127.0.0.3',e.port));c.sendall(b'\0\0\0\3abc');c.shutdown(socket.SHUT_WR);assert exact(c,6)==b'cbaEND';c.close();h.check('direct-bypass-not-counted')
-  return dict(workers=workers,auth=auth,checkpoints=len(h.points),rows=h.rows,totals=h.totals)
+  fixed=fixed_udp_peers(binary,out/'fixed-peers',workers,auth)
+  return dict(workers=workers,auth=auth,checkpoints=len(h.points)+fixed['checkpoints'],rows=h.rows,totals=h.totals,fixed_udp=fixed)
  finally:
   for e in servers:e.close()
   h.close()

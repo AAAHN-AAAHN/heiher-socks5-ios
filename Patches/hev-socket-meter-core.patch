@@ -1,9 +1,9 @@
 diff --git a/src/hev-socks5-meter.c b/src/hev-socks5-meter.c
 new file mode 100644
-index 0000000..05d2277
+index 0000000..80bc4a2
 --- /dev/null
 +++ b/src/hev-socks5-meter.c
-@@ -0,0 +1,158 @@
+@@ -0,0 +1,160 @@
 +/* One process/socket metric. Workers own counter writes; readers only sample. */
 +#include <errno.h>
 +#include <pthread.h>
@@ -112,10 +112,12 @@ index 0000000..05d2277
 +{
 +    HevSocks5 *self = context;
 +    void *peer = self->io_peer;
++    if (fd != self->fd && self->type == HEV_SOCKS5_TYPE_UDP_IN_UDP)
++        peer = self->io_udp_peer;
 +    if (msg && msg->msg_name)
 +        peer = hev_meter_peer (msg->msg_name, msg->msg_namelen);
-+    /* Only connected control streams/client relay sends have no msg_name.
-+     * Unconnected receive always provides the actual sender before filtering. */
++    /* Connected UDP relay writes may target a different IP from the control
++     * stream. Receives provide the actual message sender before filtering. */
 +    hev_meter_add (peer, writing ? bytes : 0, writing ? 0 : bytes);
 +}
 +
@@ -340,7 +342,7 @@ index a2db80e..2632ac9 100644
 
      return 0;
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index f1704a0..000a418 100644
+index f1704a0..75b642f 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -27,4 +27,5 @@
@@ -414,34 +416,51 @@ index f1704a0..000a418 100644
 +        res = hev_meter_recvmsg (fd, &mh, MSG_WAITALL, task_io_yielder, self);
          if (res != (addrlen - 2 + udp.datlen)) {
              LOG_D ("%p socks5 udp read udp data", self);
+@@ -727,4 +727,6 @@ retry:
+             peer = taddr[i];
+             HEV_SOCKS5 (self)->udp_associated = 1;
++            HEV_SOCKS5 (self)->io_udp_peer =
++                hev_meter_peer ((struct sockaddr *)&peer, sizeof (peer));
+         }
+
+@@ -918,4 +920,7 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
+
+     fd_a = hev_socks5_udp_get_fd (self);
++    if (HEV_SOCKS5 (self)->type == HEV_SOCKS5_TYPE_UDP_IN_UDP &&
++        HEV_SOCKS5 (self)->udp_associated)
++        HEV_SOCKS5 (self)->io_udp_peer = hev_meter_fd (fd_a);
+     if (hev_task_mod_fd (task, fd_a, POLLIN | POLLOUT) < 0)
+         hev_task_add_fd (task, fd_a, POLLIN | POLLOUT);
 diff --git a/src/hev-socks5.c b/src/hev-socks5.c
-index d06b5d4..0fa3b33 100644
+index d06b5d4..e154cf1 100644
 --- a/src/hev-socks5.c
 +++ b/src/hev-socks5.c
-@@ -68,4 +68,6 @@ hev_socks5_construct (HevSocks5 *self, HevSocks5Type type)
+@@ -68,4 +68,7 @@ hev_socks5_construct (HevSocks5 *self, HevSocks5Type type)
 
      self->fd = -1;
 +    self->io_peer = NULL;
 +    self->io_destination = NULL;
++    self->io_udp_peer = NULL;
      self->timeout = -1;
      self->type = type;
 diff --git a/src/hev-socks5.h b/src/hev-socks5.h
-index 40ad1cf..d571690 100644
+index 40ad1cf..b844baa 100644
 --- a/src/hev-socks5.h
 +++ b/src/hev-socks5.h
-@@ -49,4 +49,6 @@ struct _HevSocks5
+@@ -49,4 +49,7 @@ struct _HevSocks5
 
      int fd;
 +    void *io_peer;
 +    void *io_destination;
++    void *io_udp_peer;
      int timeout;
      unsigned int type : 2;
 diff --git a/src/worker_meter.c b/src/worker_meter.c
 new file mode 100644
-index 0000000..cebdb69
+index 0000000..f75bd33
 --- /dev/null
 +++ b/src/worker_meter.c
-@@ -0,0 +1,279 @@
+@@ -0,0 +1,282 @@
 +#include "worker_meter.h"
 +#include <stdatomic.h>
 +#include <stdlib.h>
@@ -657,15 +676,16 @@ index 0000000..cebdb69
 +                           memory_order_relaxed);
 +    if (++c->version == 0)
 +        atomic_store_explicit (&c->epoch, ++c->epoch_value,
-+                               memory_order_relaxed);
++                               memory_order_release);
 +    atomic_store_explicit (&c->sequence, c->version, memory_order_release);
 +}
 +static void
 +counter_read (const Counter *c, uint64_t *in, uint64_t *out)
 +{
 +    for (;;) {
++        /* A new epoch must order the following sequence read after wrap. */
 +        unsigned generation =
-+            atomic_load_explicit (&c->epoch, memory_order_relaxed);
++            atomic_load_explicit (&c->epoch, memory_order_acquire);
 +        unsigned before =
 +            atomic_load_explicit (&c->sequence, memory_order_acquire);
 +        if (before & 1u)
@@ -707,12 +727,14 @@ index 0000000..cebdb69
 +{
 +    uint64_t a = 0, b = 0;
 +    size_t count = 1;
-+    identity_read (&unknown, visit, context, &a, &b);
++    if (visit || in || out)
++        identity_read (&unknown, visit, context, &a, &b);
 +    for (unsigned i = 0; i < 256; i++)
 +        for (Identity *id =
 +                 atomic_load_explicit (&identities[i], memory_order_acquire);
 +             id; id = id->next) {
-+            identity_read (id, visit, context, &a, &b);
++            if (visit || in || out)
++                identity_read (id, visit, context, &a, &b);
 +            ++count;
 +        }
 +    if (in)
