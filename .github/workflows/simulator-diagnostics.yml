@@ -2,6 +2,7 @@ name: Diagnose Simulator boot and verify exact ServerControl
 on:
   push:
     branches: [work/simulator-diagnostics]
+    paths: [Diagnostics/CoreSimulator/diagnose.py]
   workflow_dispatch:
 permissions:
   contents: read

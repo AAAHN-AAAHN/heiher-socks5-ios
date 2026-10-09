@@ -40,6 +40,8 @@ The normal source checks are `python3 Build/check.py baseline` and `python3 Buil
 
 ## Operation and limitations
 
+On the auxiliary `work/simulator-diagnostics` branch, `docs/core-simulator-installation.md` describes the captured-app installation probe. Its host observations are independent of product verification.
+
 Use a clean full-history checkout and the commands selected by the checkout's feature manifest and workflow. Main is a baseline, not the integrated six-feature deliverable. Do not link a feature app against the committed unpatched framework when its public native interface requires a generated feature framework.
 
 The committed baseline framework's inventory records Xcode 27.0 and iPhoneOS SDK 27.0 as its build environment. This identifies that checked-in artifact; it is not evidence of runtime execution on the target phone. Feature and release product checks use their own recorded SDK and generated framework rather than treating the baseline build environment as the device's environment.
