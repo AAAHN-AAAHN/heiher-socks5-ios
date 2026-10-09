@@ -125,7 +125,10 @@ def verify_presentation():
     assert old_task.count(guard) == 1 and old_task.count(sleep) == 1
     approved_task = old_task.replace(guard,
         'guard isVisible && scenePhase == .active && !Task.isCancelled else { return }')\
-        .replace(sleep, 'Task.sleep(for: .milliseconds(500))')
+        .replace('                do { try await ' + sleep + ' }',
+                 '                let now = Date().timeIntervalSinceReferenceDate\n'
+                 '                let delay = ((now * 2).rounded(.down) + 1) / 2 - now\n'
+                 '                do { try await Task.sleep(for: .seconds(delay)) }')
     assert view.split('        .task(id:', 1)[1].split(renderer, 1)[0] == approved_task
 
     # Move the unchanged Form inside the visible/active gate. Hidden body
@@ -161,7 +164,7 @@ def verify_presentation():
     assert 'In is bytes the OS accepted toward that IP' in view
     assert 'Out is bytes this server consumed from that IP' in view
     assert 'Total sums peer endpoints' in view
-    assert 'last sample (about 0.5 seconds)' in view
+    assert 'over the actual sampling interval, in bits per second' in view
 
 
 def main():

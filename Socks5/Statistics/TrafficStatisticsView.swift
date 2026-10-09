@@ -46,7 +46,7 @@ struct TrafficStatisticsView: View {
                         }
                     }
                     Section {
-                        Text("Spd.: average successful socket I/O over the last sample (about 0.5 seconds), in bits per second; not link capacity.")
+                        Text("Spd.: average successful socket I/O over the actual sampling interval, in bits per second; not link capacity.")
                             .accessibilityIdentifier("measurement-speed")
                         Text("Vol.: successful server-owned TCP/UDP socket bytes since this process started. Server Stop/Start retains totals. Both client and destination peers are included.")
                             .accessibilityIdentifier("measurement-volume")
@@ -67,7 +67,9 @@ struct TrafficStatisticsView: View {
             clientsIncomplete = false
             sample()
             while !Task.isCancelled {
-                do { try await Task.sleep(for: .milliseconds(500)) }
+                let now = Date().timeIntervalSinceReferenceDate
+                let delay = ((now * 2).rounded(.down) + 1) / 2 - now
+                do { try await Task.sleep(for: .seconds(delay)) }
                 catch { return }
                 guard !Task.isCancelled else { return }
                 sample()

@@ -140,7 +140,8 @@ def inspect_sources():
     assert (ROOT / 'README.md').read_bytes() == (ROOT / 'docs/features/traffic-statistics.md').read_bytes()
     view = (ROOT / 'Socks5/Statistics/TrafficStatisticsView.swift').read_text()
     for text in ('.task(id: isVisible && scenePhase == .active)', 'while !Task.isCancelled',
-                 'Task.sleep(for: .milliseconds(500))', 'guard !Task.isCancelled else { return }',
+                 'Date().timeIntervalSinceReferenceDate', 'Task.sleep(for: .seconds(delay))',
+                 'guard !Task.isCancelled else { return }',
                  'guard isVisible && scenePhase == .active && !Task.isCancelled else { return }',
                  'ProcessInfo.processInfo.systemUptime', 'Double(statistics.received) + Double(statistics.sent)'):
         assert text in view, text
