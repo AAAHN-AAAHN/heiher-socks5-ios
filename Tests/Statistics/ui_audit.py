@@ -90,7 +90,7 @@ def add_test_target(app):
 
 
 def verify_presentation():
-    """Keep the frozen table/sampler behavior while changing only the metric API."""
+    """Keep the frozen table/sample behavior with the approved visibility cadence."""
     ui_base = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
     changed = set(output('git', 'diff', '--name-only', ui_base, 'HEAD', '--',
                          'Socks5', 'Socks5.xcodeproj').splitlines())
@@ -119,17 +119,33 @@ def verify_presentation():
         old_view.split(renderer, 1)[1].split(sampler, 1)[0]
     assert without_comments(view.split(sampler, 1)[1]) == \
         endpoint_names(without_comments(old_view.split(sampler, 1)[1]))
-    assert view.split('        .task(id:', 1)[1].split(renderer, 1)[0] == \
-        endpoint_names(old_view.split('        .task(id:', 1)[1].split(renderer, 1)[0])
+    old_task = endpoint_names(old_view.split('        .task(id:', 1)[1].split(renderer, 1)[0])
+    guard = 'guard isVisible && scenePhase == .active else { return }'
+    sleep = 'Task.sleep(for: .seconds(1))'
+    assert old_task.count(guard) == 1 and old_task.count(sleep) == 1
+    approved_task = old_task.replace(guard,
+        'guard isVisible && scenePhase == .active && !Task.isCancelled else { return }')\
+        .replace(sleep, 'Task.sleep(for: .milliseconds(500))')
+    assert view.split('        .task(id:', 1)[1].split(renderer, 1)[0] == approved_task
 
-    # All Form structure, title fonts and accessibility labels before the footer
-    # are unchanged apart from the two peer-specific empty/growth messages.
+    # Move the unchanged Form inside the visible/active gate. Hidden body
+    # evaluations cannot sort cached rows or format the tables.
     prefix = '                Section {\n                    Text("Spd.'
     old_prefix = endpoint_names(old_view.split(prefix, 1)[0])\
         .replace('No client payload recorded yet.', 'No peer socket I/O recorded yet.')\
         .replace('New clients will be included in the next sample.',
                  'Some peer rows are awaiting an update.')
-    assert view.split(prefix, 1)[0] == old_prefix
+    old_opening = ('    var body: some View {\n        let clientRows = clients.rows\n'
+                   '        NavigationStack {\n')
+    assert old_prefix.count(old_opening) == 1
+    leading, form = old_prefix.split(old_opening, 1)
+    approved_prefix = leading + ('    var body: some View {\n        NavigationStack {\n'
+        '            if isVisible && scenePhase == .active {\n'
+        '                let clientRows = clients.rows\n') + ''.join(
+            '    ' + line for line in form.splitlines(keepends=True))
+    assert view.split('    ' + prefix.replace('\n', '\n    '), 1)[0] == approved_prefix
+    assert ('                .navigationTitle("Statistics")\n            }\n        }\n'
+            '        .task(id: isVisible && scenePhase == .active)') in view
     assert 'DisclosureGroup' not in view
     assert view.count('summary(statistics, id: "total")') == 1
     assert view.count('summary(client.traffic, id: "client-\\(client.id)")') == 1
@@ -145,6 +161,7 @@ def verify_presentation():
     assert 'In is bytes the OS accepted toward that IP' in view
     assert 'Out is bytes this server consumed from that IP' in view
     assert 'Total sums peer endpoints' in view
+    assert 'last sample (about 0.5 seconds)' in view
 
 
 def main():
