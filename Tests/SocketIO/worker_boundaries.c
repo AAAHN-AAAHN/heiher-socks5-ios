@@ -1,5 +1,6 @@
 /* The actual common module, with allocator failures only at controlled points. */
 #include <stdlib.h>
+#include <unistd.h>
 #include <assert.h>
 static int fail_after = -1;
 static void *
@@ -78,6 +79,17 @@ main (void)
     assert (reuse == a);
     assert (wm_peer (reuse, (struct sockaddr *)&ip, sizeof ip) == p);
     wm_add (p, 3, 5);
+    /* Capacity queries must not read counters, even during publication. */
+    size_t required = wm_snapshot (NULL, NULL, NULL, NULL);
+    unsigned sequence = atomic_load (&p->counter.sequence);
+    unsigned unknown_sequence = atomic_load (&a->unknown.counter.sequence);
+    atomic_store (&p->counter.sequence, sequence | 1u);
+    atomic_store (&a->unknown.counter.sequence, unknown_sequence | 1u);
+    alarm (5); /* Bound a regression that waits on the paused publications. */
+    assert (wm_snapshot (NULL, NULL, NULL, NULL) == required);
+    alarm (0);
+    atomic_store (&p->counter.sequence, sequence);
+    atomic_store (&a->unknown.counter.sequence, unknown_sequence);
     size_t count = wm_snapshot (visit, NULL, &i, &o);
     assert (count == visits);
     assert (i == (uint64_t)UINT32_MAX + 17 + 3 + 1000 + 7 + 17 + 23);
@@ -87,7 +99,7 @@ main (void)
     inet_pton (AF_INET, "10.12.13.16", &ip.sin_addr);
     assert (wm_peer (b, (struct sockaddr *)&ip, sizeof ip) == wm_unknown (b));
     puts (
-        "PASS: worker ownership, normalized IP/scope, allocation fallbacks, coherent low-word/tag rollover, reuse, reentrant snapshot, ID exhaustion");
+        "PASS: worker ownership, normalized IP/scope, allocation fallbacks, coherent low-word/tag rollover, reuse, metadata-only query, reentrant snapshot, ID exhaustion");
     printf ("SIZES worker=%zu peer_part=%zu identity=%zu counter=%zu\n",
             sizeof (WmWorker), sizeof (WmPeer), sizeof (Identity),
             sizeof (Counter));
