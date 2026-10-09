@@ -208,7 +208,7 @@ index 0000000..8bf8c33
 +                        HevTaskIOYielder yielder, void *self);
 +#endif
 diff --git a/src/hev-socks5-server.c b/src/hev-socks5-server.c
-index 9abc372..9a5b9df 100644
+index 9abc372..051ee60 100644
 --- a/src/hev-socks5-server.c
 +++ b/src/hev-socks5-server.c
 @@ -21,4 +21,5 @@
@@ -308,14 +308,16 @@ index 9abc372..9a5b9df 100644
 +                          task_io_yielder, self);
      if (ret <= 0) {
          LOG_I ("%p socks5 server write response", self);
-@@ -391,4 +391,6 @@ hev_socks5_server_connect (HevSocks5Server *self, struct sockaddr_in6 *addr)
+@@ -391,4 +391,8 @@ hev_socks5_server_connect (HevSocks5Server *self, struct sockaddr_in6 *addr)
 
      self->fds[0] = fd;
-+    HEV_SOCKS5 (self)->io_destination =
-+        hev_meter_peer ((struct sockaddr *)addr, sizeof (*addr));
++    HEV_SOCKS5 (self)->io_destination = hev_meter_fd (fd);
++    if (!HEV_SOCKS5 (self)->io_destination)
++        HEV_SOCKS5 (self)->io_destination =
++            hev_meter_peer ((struct sockaddr *)addr, sizeof (*addr));
 
      return 0;
-@@ -614,4 +616,5 @@ hev_socks5_server_construct (HevSocks5Server *self, int fd)
+@@ -614,4 +618,5 @@ hev_socks5_server_construct (HevSocks5Server *self, int fd)
 
      HEV_SOCKS5 (self)->fd = fd;
 +    HEV_SOCKS5 (self)->io_peer = hev_meter_fd (fd);
@@ -457,10 +459,10 @@ index 40ad1cf..b844baa 100644
      unsigned int type : 2;
 diff --git a/src/worker_meter.c b/src/worker_meter.c
 new file mode 100644
-index 0000000..f75bd33
+index 0000000..207dc2b
 --- /dev/null
 +++ b/src/worker_meter.c
-@@ -0,0 +1,282 @@
+@@ -0,0 +1,286 @@
 +#include "worker_meter.h"
 +#include <stdatomic.h>
 +#include <stdlib.h>
@@ -595,6 +597,9 @@ index 0000000..f75bd33
 +        }
 +    } else
 +        return &w->unknown;
++    /* Unspecified addresses do not identify the peer chosen by the OS. */
++    if (!memcmp (ip, (const unsigned char[16]){ 0 }, sizeof (ip)))
++        return &w->unknown;
 +    for (unsigned i = 0; i < 16; i++)
 +        hash = (hash ^ ip[i]) * 16777619u;
 +    hash = (hash ^ scope ^ (unsigned)family) & 255u;
@@ -695,8 +700,9 @@ index 0000000..f75bd33
 +        unsigned ol = atomic_load_explicit (&c->out_lo, memory_order_relaxed);
 +        unsigned oh = atomic_load_explicit (&c->out_hi, memory_order_relaxed);
 +        atomic_thread_fence (memory_order_acquire);
++        /* Acquire a wrapped sequence before checking its epoch. */
 +        if (before !=
-+                atomic_load_explicit (&c->sequence, memory_order_relaxed) ||
++                atomic_load_explicit (&c->sequence, memory_order_acquire) ||
 +            generation !=
 +                atomic_load_explicit (&c->epoch, memory_order_relaxed))
 +            continue;
