@@ -7,6 +7,7 @@ show the formerly accepted input/marker cases; the current source must reject th
 import ast
 import errno
 import hashlib
+import json
 import os
 from pathlib import Path
 import socket
@@ -15,6 +16,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
+import zipfile
 
 import audit
 import ui_audit
@@ -175,6 +177,93 @@ class InputTests(unittest.TestCase):
                         self.assertEqual((out / name).exists(), label == 'old')
                     self.assertEqual((out / 'previous.log').read_text(), 'retained prior bytes\n')
         print('PASS: four actual workspace/optimized old/current marker cases; diagnostic logs preserved')
+
+    def test_ui_summary_verdict(self):
+        # Exercise the actual driver with controlled tools, never an Apple runtime.
+        valid = dict(result='Passed', totalTestCount=1, passedTests=1,
+                     failedTests=0, skippedTests=0, expectedFailures=0)
+        cases = [('valid', valid), ('zero', dict(valid, totalTestCount=0, passedTests=0)),
+                 ('skip', dict(valid, passedTests=0, skippedTests=1)),
+                 ('expected-failure', dict(valid, expectedFailures=1)), ('bad-json', 'not JSON')]
+        for key, value in valid.items():
+            cases.append(('wrong-' + key, dict(valid, **{key: 'Failed' if key == 'result' else value + 1})))
+            cases.append(('missing-' + key, {k: v for k, v in valid.items() if k != key}))
+            if key != 'result':
+                for label, invalid in [('string', str(value)), ('float', float(value)),
+                                       ('bool', bool(value)), ('null', None)]:
+                    cases.append((label + '-' + key, dict(valid, **{key: invalid})))
+        cases.append(('xcodebuild-failure', valid))
+        old = original(ui_audit, 'cf8628c43edecfaeb4e1ebf88527078183387cf4')
+        for version, module in [('old', old), ('current', ui_audit)]:
+            for case, summary in cases:
+                with self.subTest(version=version, case=case), tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory); out = root / 'out'; core = root / 'core'; work = root / 'work'
+                    tracked = repository(root)
+                    (root / 'Build').mkdir()
+                    (root / 'Build/features.json').write_text('{"features":["udp","statistics"]}')
+                    (core / 'src').mkdir(parents=True)
+                    (core / 'src/hev-main.h').write_text('controlled header')
+                    (core / 'module.modulemap').write_text('controlled module')
+                    entered = []
+                    def output(*args):
+                        if args[0] == 'git':
+                            return git(root, *args[1:]).decode()
+                        responses = {
+                            ('xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version'): '27.0',
+                            ('xcrun', '--sdk', 'iphonesimulator', '--show-sdk-path'): '/controlled-sdk',
+                            ('xcrun', 'simctl', 'list', 'runtimes', '-j'): json.dumps({'runtimes': [
+                                dict(isAvailable=True, identifier='com.apple.CoreSimulator.SimRuntime.iOS-27-0')]}),
+                            ('xcrun', 'simctl', 'list', 'devicetypes', '-j'): json.dumps({'devicetypes': [
+                                dict(name='iPhone 16', identifier='controlled-device')]}),
+                            ('xcrun', 'simctl', 'create', 'Statistics UI Audit', 'controlled-device',
+                             'com.apple.CoreSimulator.SimRuntime.iOS-27-0'): 'controlled-simulator'}
+                        return responses[args]
+                    def run(args, log, *unused, **kwargs):
+                        entered.append(log)
+                        if args[0] == 'git' and '--exit-code' in args:
+                            git(root, *args[1:])
+                        elif log == 'source-archive.log':
+                            with zipfile.ZipFile(out / 'source.zip', 'w') as archive:
+                                archive.write(tracked, 'tracked.txt')
+                                archive.writestr('HevSocks5Server.xcframework/fixture', 'controlled framework')
+                        elif log == 'native-combine.log':
+                            (work / 'libhev-socks5-server.a').write_bytes(b'controlled library')
+                        elif log == 'ui-test.log':
+                            if case == 'xcodebuild-failure':
+                                raise subprocess.CalledProcessError(65, args)
+                            product = work / 'DerivedData/Build/Products/Debug-iphonesimulator/Socks5.app/Socks5'
+                            product.parent.mkdir(parents=True)
+                            product.write_bytes(b'controlled app')
+                        elif log == 'test-summary.json':
+                            (out / log).write_text(summary if isinstance(summary, str) else json.dumps(summary))
+                        else:
+                            self.assertIn(log, ('native-apply.log', 'native-clean.log', 'native-simulator-build.log',
+                                'simulator-framework.log', 'simulator-boot.log', 'simulator-ready.log',
+                                'screenshots-export.log', 'cleanup-shutdown.log', 'cleanup-delete.log', 'native-reverse.log'))
+                    replacements = dict(ROOT=root, OUT=out, CORE=core, WORK=work, run=run, output=output,
+                                        verify_presentation=lambda: None, add_test_target=lambda app: None)
+                    with patch.multiple(module, **replacements), patch.object(module.sys, 'platform', 'darwin'), \
+                            patch.object(module.platform, 'machine', return_value='arm64'):
+                        if case == 'xcodebuild-failure':
+                            with self.assertRaises(subprocess.CalledProcessError) as caught:
+                                module.main()
+                            self.assertEqual(caught.exception.returncode, 65)
+                        elif version == 'current' and case != 'valid':
+                            error = (json.JSONDecodeError if case == 'bad-json' else
+                                     KeyError if case.startswith('missing-') else AssertionError)
+                            with self.assertRaises(error):
+                                module.main()
+                        else:
+                            module.main()
+                    accepted = case != 'xcodebuild-failure' and (version == 'old' or case == 'valid')
+                    self.assertEqual((out / 'SUCCESS.txt').exists(), accepted)
+                    self.assertEqual('test-summary.json' in entered, case != 'xcodebuild-failure')
+                    self.assertEqual(entered.count('ui-test.log'), 1)
+                    for log in ('cleanup-shutdown.log', 'cleanup-delete.log', 'native-reverse.log'):
+                        self.assertEqual(entered.count(log), 1)
+                    self.assertEqual(json.loads((out / 'cleanup.json').read_text()), [])
+        print(f'PASS: {2 * len(cases)} actual old/current UI verdict controls; complete result required, '
+              'tool failures rejected and cleanup preserved; no native/SDK/Simulator execution')
 
 
 if __name__ == '__main__':

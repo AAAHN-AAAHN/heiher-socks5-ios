@@ -22,7 +22,18 @@ mode = sys.argv[1] if len(sys.argv) > 1 else 'all'
 assert mode in ('all', 'debug', 'optimized')
 with tempfile.TemporaryDirectory() as directory:
     folder = Path(directory)
-    for label, text in [('current', VIEW.read_text()), ('prior-per-row-negative', previous.decode())]:
+    model = ROOT / 'Socks5/Statistics/TrafficStatistics.swift'
+    eager = model.read_text()
+    signature = 'address: @autoclosure () -> String'
+    assert eager.count(signature) == 1 and eager.count('address: address()') == 1
+    eager_model = folder / 'EagerModel.swift'
+    eager_model.write_text(eager.replace(signature, 'address: String')
+                          .replace('address: address()', 'address: address'))
+    for label, text, model_source, expected_failure in [
+        ('current', VIEW.read_text(), model, None),
+        ('prior-per-row-negative', previous.decode(), model, 'FAIL: one client-state publication'),
+        ('eager-address-negative', VIEW.read_text(), eager_model, 'FAIL: decode only newly observed peer addresses'),
+    ]:
         start = text.index('    private func sample()')
         body = text[start:].rsplit('\n}', 1)[0]
         # The historical negative control keeps its per-row publication and
@@ -42,16 +53,17 @@ with tempfile.TemporaryDirectory() as directory:
             executable = folder / 'test'
             subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
                             *(['-O'] if optimized else []),
-                            str(ROOT / 'Socks5/Statistics/TrafficStatistics.swift'),
+                            str(model_source),
                             str(source), '-o', str(executable)], check=True, timeout=90)
             result = subprocess.run([str(executable)], capture_output=True, text=True, timeout=45)
             print('TEST:', label, 'optimized=', optimized, flush=True)
             print(result.stdout, end='', flush=True)
-            if label == 'current':
+            if expected_failure is None:
                 assert result.returncode == 0 and 'PASS:' in result.stdout, result.stderr
             else:
-                assert result.returncode == 1 and 'FAIL: one client-state publication' in result.stdout, result.stderr
-                print('EXPECTED OLD PUBLICATION-COUNT FAILURE; not incorrect native byte accounting', flush=True)
+                assert result.returncode == 1 and expected_failure in result.stdout, result.stderr
+                print('EXPECTED OLD PUBLICATION-COUNT FAILURE; not incorrect native byte accounting'
+                      if label == 'prior-per-row-negative' else 'EXPECTED EAGER ADDRESS-DECODING FAILURE', flush=True)
     current = VIEW.read_text()
     task_start = '        .task(id: isVisible && scenePhase == .active) {\n'
     task_end = '\n        }\n    }\n\n    /// One shared'

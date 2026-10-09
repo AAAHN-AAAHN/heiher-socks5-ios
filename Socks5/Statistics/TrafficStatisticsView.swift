@@ -155,11 +155,9 @@ struct TrafficStatisticsView: View {
         // repeatedly copy the dictionary and invalidate the same view state.
         var sampledClients = clients
         for var row in rows.prefix(min(capacity, required)) {
-            let address = withUnsafePointer(to: &row.address) {
+            sampledClients.sample(id: row.id, address: withUnsafePointer(to: &row.address) {
                 $0.withMemoryRebound(to: CChar.self, capacity: 64) { String(cString: $0) }
-            }
-            sampledClients.sample(id: row.id, address: address, received: row.received,
-                                 sent: row.sent, at: time)
+            }, received: row.received, sent: row.sent, at: time)
         }
         clients = sampledClients
     }

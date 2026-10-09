@@ -110,15 +110,28 @@ def verify_presentation():
     def without_comments(text):
         return '\n'.join(line for line in text.splitlines() if not line.lstrip().startswith('//'))
 
-    # The complete model, renderer and sampling method retain their behavior.
-    # Only endpoint names and explanatory comments differ from the frozen UI.
-    assert without_comments(model) == endpoint_names(without_comments(old_model))
+    # Preserve the model and sampling behavior while decoding only new labels.
+    approved_model = endpoint_names(without_comments(old_model))
+    signature = 'address: String, received: UInt64'
+    entry = 'Entry(id: id, address: address)'
+    assert approved_model.count(signature) == 1 and approved_model.count(entry) == 1
+    approved_model = approved_model.replace(signature, 'address: @autoclosure () -> String, received: UInt64')\
+        .replace(entry, 'Entry(id: id, address: address())')
+    assert without_comments(model) == approved_model
     renderer = '    /// One shared'
     sampler = '    private func sample()'
     assert view.split(renderer, 1)[1].split(sampler, 1)[0] == \
         old_view.split(renderer, 1)[1].split(sampler, 1)[0]
-    assert without_comments(view.split(sampler, 1)[1]) == \
-        endpoint_names(without_comments(old_view.split(sampler, 1)[1]))
+    approved_sample = endpoint_names(without_comments(old_view.split(sampler, 1)[1]))
+    address_start = '            let address = withUnsafePointer(to: &row.address) {'
+    address_end = ('            }\n'
+                   '            sampledClients.sample(id: row.id, address: address, received: row.received,\n'
+                   '                                 sent: row.sent, at: time)')
+    assert approved_sample.count(address_start) == 1 and approved_sample.count(address_end) == 1
+    approved_sample = approved_sample.replace(address_start,
+        '            sampledClients.sample(id: row.id, address: withUnsafePointer(to: &row.address) {')\
+        .replace(address_end, '            }, received: row.received, sent: row.sent, at: time)')
+    assert without_comments(view.split(sampler, 1)[1]) == approved_sample
     old_task = endpoint_names(old_view.split('        .task(id:', 1)[1].split(renderer, 1)[0])
     guard = 'guard isVisible && scenePhase == .active else { return }'
     sleep = 'Task.sleep(for: .seconds(1))'
@@ -233,6 +246,11 @@ def main():
              '--output-path', OUT / 'screenshots'], 'screenshots-export.log')
         run(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', OUT / 'UI.xcresult',
              '--compact'], 'test-summary.json')
+        summary = json.loads((OUT / 'test-summary.json').read_text())
+        assert summary['result'] == 'Passed', summary
+        for key, expected in {'totalTestCount': 1, 'passedTests': 1,
+                              'failedTests': 0, 'skippedTests': 0, 'expectedFailures': 0}.items():
+            assert type(summary[key]) is int and summary[key] == expected, (key, summary)
         product = WORK / 'DerivedData/Build/Products/Debug-iphonesimulator/Socks5.app/Socks5'
         (OUT / 'simulator-app-sha256.txt').write_text(hashlib.sha256(product.read_bytes()).hexdigest() + '\n')
         for path, digest in snapshot.items():

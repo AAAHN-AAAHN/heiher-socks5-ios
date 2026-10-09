@@ -64,9 +64,9 @@ struct EndpointTrafficStatistics {
         }.sorted { $0.id < $1.id }
     }
 
-    mutating func sample(id: UInt64, address: String, received: UInt64,
+    mutating func sample(id: UInt64, address: @autoclosure () -> String, received: UInt64,
                          sent: UInt64, at time: TimeInterval) {
-        var entry = entries[id] ?? Entry(id: id, address: address)
+        var entry = entries[id] ?? Entry(id: id, address: address())
         entry.traffic.sample(received: received, sent: sent, at: time)
         entries[id] = entry
     }

@@ -42,6 +42,12 @@ struct HevSocks5EndpointStats {
     static var registerDuringCopy = 0
     static var queries = 0
     static var copies = 0
+    static var addressReads = 0
+}
+@MainActor func withUnsafePointer<T, Result>(to value: inout T,
+    _ body: (UnsafePointer<T>) throws -> Result) rethrows -> Result {
+    NativeSnapshot.addressReads += 1
+    return try Swift.withUnsafePointer(to: &value, body)
 }
 @MainActor func hev_socks5_server_endpoint_stats(_ received: inout UInt64, _ sent: inout UInt64) {
     received = NativeSnapshot.rows.reduce(0) { $0 &+ $1.received }
@@ -71,6 +77,7 @@ struct HevSocks5EndpointStats {
 @main struct SamplingContractTests {
     @MainActor static func main() {
         var checks = 0
+        var addressesReadOnce = true
         func check(_ condition: @autoclosure () -> Bool, _ message: String) {
             checks += 1
             if !condition() { print("FAIL:", message); exit(1) }
@@ -79,11 +86,15 @@ struct HevSocks5EndpointStats {
             let previousWrites = view.$clients.writes
             let queries = NativeSnapshot.queries
             let copies = NativeSnapshot.copies
+            let entries = view.clients.entries.count
+            let addressReads = NativeSnapshot.addressReads
             view.run()
             check(view.$clients.writes == previousWrites + 1,
                   "one client-state publication per snapshot; observed \(view.$clients.writes - previousWrites)")
             check(NativeSnapshot.queries == queries + 1 && NativeSnapshot.copies == copies + 1,
                   "one size query and one bounded copy; no retry loop")
+            addressesReadOnce = addressesReadOnce &&
+                NativeSnapshot.addressReads - addressReads == view.clients.entries.count - entries
         }
         let view = SamplingHarness()
         sample(view)
@@ -149,6 +160,7 @@ struct HevSocks5EndpointStats {
         sample(packed)
         check(packed.clients.entries[7]?.traffic.sendRate == 3, "reordered packed rows keep the same per-IP baseline")
         check(packed.statistics.received == 160 && packed.statistics.sent == 165, "packed Total sums endpoint directions")
+        check(addressesReadOnce, "decode only newly observed peer addresses")
         print("PASS:", checks, "exact sample-body checks; 512 peers/64 intervals, snapshot growth and packed IDs; no SwiftUI render-count claim")
     }
 }
