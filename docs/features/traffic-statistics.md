@@ -47,7 +47,7 @@ Private 64-bit values are published through C11 32-bit atomic words with release
 
 `hev_socks5_server_endpoint_stats()` fills two non-null outputs: `received` means peer In and `sent` means peer Out. `hev_socks5_server_endpoint_rows(nil, 0)` queries required capacity, including ID 0, using identity metadata without reading counters. A copy call packs up to the supplied capacity into caller-owned `HevSocks5EndpointStats` rows and returns the current required count. Stable IDs are independent of packed-array positions. No registry pointer escapes through the API.
 
-The view performs one capacity query and one bounded row copy per sample, then publishes one local dictionary snapshot. If concurrent registration exceeds capacity, cached rows remain and the view reports that new peers will appear on the next sample. This UI copy bound does not limit the native coherent-counter retry loop.
+The view performs one capacity query and one bounded row copy per sample, then publishes one local dictionary snapshot. Concurrent registration can defer some row updates across multiple samples; cached rows remain while later samples retry the bounded copy. This UI copy bound does not limit the native coherent-counter retry loop.
 
 ## Design rationale and resource cost
 

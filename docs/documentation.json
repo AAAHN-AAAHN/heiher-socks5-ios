@@ -7,7 +7,7 @@
     "feature/server-control": "51e4c8ae7e03ddd4be3d1a76e922e03bca97f2c5",
     "feature/settings-persistence": "5a32e32d22f5c39dfc24a8814f3db7288868bce2",
     "feature/udp-compat": "c42a610cd02403b2930c2b8160adcbdad837a77f",
-    "feature/traffic-statistics": "dfe25e4960cf316a795d7a94598331e889f396f0"
+    "feature/traffic-statistics": "fcdfa8aa7fe9e862660a251afbd91144be2fa431"
   },
   "owned_documents": [
     "README.md",

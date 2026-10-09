@@ -6,7 +6,7 @@
     "feature/server-control": "51e4c8ae7e03ddd4be3d1a76e922e03bca97f2c5",
     "feature/settings-persistence": "5a32e32d22f5c39dfc24a8814f3db7288868bce2",
     "feature/udp-compat": "c42a610cd02403b2930c2b8160adcbdad837a77f",
-    "feature/traffic-statistics": "dfe25e4960cf316a795d7a94598331e889f396f0"
+    "feature/traffic-statistics": "fcdfa8aa7fe9e862660a251afbd91144be2fa431"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -104,8 +104,8 @@
       "sha256": "94152e7914da36881aebc1fb8f00064326166e9423e8ae7897af91a8400441d5"
     },
     "Socks5/Statistics/TrafficStatisticsView.swift": {
-      "commit": "8aa502780f9349bbc340fc43b84749d5cb2a1b1a",
-      "sha256": "b9214e55a05188e53e5f6b7ebac23cd3aabc0a082e789286417ef1097c07fc73"
+      "commit": "52148f93990b07726e5474a36703dcc6680c11ea",
+      "sha256": "b7e33a0bd24633bd72e37fba15fb26d08dd62b67e3497f768fff2156a417282c"
     },
     "Tests/AppIcon/DecodeImages.swift": {
       "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
@@ -516,8 +516,8 @@
       "sha256": "c41980fccc66dacb9bddff470050fb0e24a1c658d1537568c8ed23a0cfe076d2"
     },
     "Tests/Statistics/ui_audit.py": {
-      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
-      "sha256": "71d409621df0bde452a65069dc4396d0111ea9d0f74e5476af3b78d35f447502"
+      "commit": "52148f93990b07726e5474a36703dcc6680c11ea",
+      "sha256": "c21dc248869fc4a64f1b287ce592713c407ec9fd59dae440a4a10c6451998850"
     },
     "Tests/baseline_audit.py": {
       "commit": "dafb19cda8cf80998b687b419b73f9181e47bd1e",
