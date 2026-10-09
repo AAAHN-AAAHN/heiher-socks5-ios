@@ -39,7 +39,7 @@ struct TrafficStatisticsView: View {
                                 .foregroundStyle(.secondary)
                         }
                         if clientsIncomplete {
-                            Text("New peers will be included in the next sample.")
+                            Text("Some peer rows are awaiting an update.")
                                 .font(.footnote)
                         }
                     }
@@ -137,8 +137,8 @@ struct TrafficStatisticsView: View {
         var received: UInt64 = 0
         var sent: UInt64 = 0
         hev_socks5_server_endpoint_stats(&received, &sent)
-        // A bounded snapshot reports concurrent registrations that did not fit.
-        // Existing UI rows stay cached; the next sample includes the new rows.
+        // Concurrent registration can defer row updates across multiple samples;
+        // keep cached rows while subsequent samples retry the bounded copy.
         let capacity = hev_socks5_server_endpoint_rows(nil, 0)
         var rows = [HevSocks5EndpointStats](repeating: HevSocks5EndpointStats(), count: capacity)
         let required = rows.withUnsafeMutableBufferPointer {

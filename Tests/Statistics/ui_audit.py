@@ -128,7 +128,7 @@ def verify_presentation():
     old_prefix = endpoint_names(old_view.split(prefix, 1)[0])\
         .replace('No client payload recorded yet.', 'No peer socket I/O recorded yet.')\
         .replace('New clients will be included in the next sample.',
-                 'New peers will be included in the next sample.')
+                 'Some peer rows are awaiting an update.')
     assert view.split(prefix, 1)[0] == old_prefix
     assert 'DisclosureGroup' not in view
     assert view.count('summary(statistics, id: "total")') == 1
