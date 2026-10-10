@@ -136,6 +136,7 @@ def main():
         subprocess.run(['xcodebuild', 'build', '-project', str(ROOT / 'Socks5.xcodeproj'), '-scheme', 'Socks5',
                         '-configuration', 'Release', '-sdk', 'iphonesimulator', '-arch', 'arm64',
                         'CONFIGURATION_BUILD_DIR=' + str(WORK / 'simulator'), 'CODE_SIGNING_ALLOWED=NO',
+                        'MARKETING_VERSION=3.0.0', 'CURRENT_PROJECT_VERSION=1',
                         'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES'], stdout=log, stderr=subprocess.STDOUT,
                        check=True, timeout=300, cwd=ROOT)
     app = WORK / 'simulator/Socks5.app'
