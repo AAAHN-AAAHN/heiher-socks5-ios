@@ -22,6 +22,8 @@ Standard UDP input validates minimum length, address form and length, reserved b
 
 UDP-over-TCP uses its own frame-length interpretation. The standard zero-RSV/FRAG rule is not applied to the frame's length field. Headers and bodies must be fully read before a message is reported complete. Successful messages preceding a later receive failure retain their completed count. A partially written stream frame is not reported as a successfully sent datagram, and a new frame is not appended as though the incomplete frame had succeeded.
 
+Domain destinations follow the configured address family. Forwarding compacts successfully resolved destinations, keeps empty payloads and continues after individual destination or send failures. Successful send prefixes advance the message index; a zero-progress or ordinary failed send skips that message without retrying an unbounded loop. An explicit cancellation result or association setup failure remains terminal.
+
 ### Adaptive buffer policy
 
 Each managed receive slot starts with a 1,500-byte data region. Larger required capacities are rounded up in 500-byte steps. A requirement of 48,001 bytes obtains 48,500 bytes; 30,001 obtains 30,500. The required size includes any protocol header stored in the same receive region. Allocation does not impose a separate arbitrary 65,536-byte ceiling, but wire-format, arithmetic, allocator, socket and network-path limits still apply.
@@ -34,7 +36,7 @@ The constants are `UDP_BUF_SIZE`, `UDP_BUFFER_GROW_STEP`, `UDP_BUFFER_HOLD_SECON
 
 ## Implementation and ownership
 
-The feature is expressed by `hev-udp-port-zero.patch`, `hev-udp-sockaddr.patch`, `hev-udp-peer-filter.patch` and `hev-udp-dynamic-buffer.patch`, applied at their manifest roots. The public message representation remains address, contiguous buffer and length. The existing association owns the sockets; its native task owns buffer lifetime and cleanup scheduling.
+The feature is expressed by `hev-udp-port-zero.patch`, `hev-udp-sockaddr.patch`, `hev-udp-peer-filter.patch` and `hev-udp-dynamic-buffer.patch`, applied at their manifest roots. Empty-payload acceptance and destination-error progress belong to the upstream core; the custom patches retain the stronger validation, adaptive capacity, peer policy and Darwin send correction. The public message representation remains address, contiguous buffer and length. The existing association owns the sockets; its native task owns buffer lifetime and cleanup scheduling.
 
 The port-zero patch applies to the server repository; the address, peer and dynamic-buffer patches apply to `src/core`. `UDPBuffers` owns the relay slots and the cleanup/idle deadlines, while each `UDPBuffer` describes one slot. Automatic growth belongs to this managed forwarder path. The public `hev_socks5_udp_recvmmsg()` entry retains caller-owned storage and does not resize an arbitrary caller buffer; capacity and truncation checks still prevent an undersized caller buffer from becoming a successful complete frame.
 
@@ -62,7 +64,7 @@ The fixed-port/unknown-peer policy is not silently changed to reduce association
 
 The buffer fixtures exercise demand rounding, expiry, large-to-small retention, overflow and allocation failure, queue/zero-length distinctions, truncation, partial success, cancellation and final cleanup. A reference history calculation checks the bucket policy rather than assuming the implementation's own result is correct. The live-hold and timer fixtures use actual sockets, clock, allocator and Hev scheduling; their test-only communication timeout is distinct from the application's configured timeout.
 
-The stream-boundary fixture checks complete frames, every tested truncation point, address/header consistency, partial sends and wire-length rejection in sanitizer and optimized configurations. The network suite compares full payload content and address, including payloads above the base capacity. Negative controls prove that missing peer, address, length or completion checks are detected. Observational fixed-unknown failures remain explicitly separate from required supported profiles.
+The stream-boundary fixture checks complete frames, every tested truncation point, address/header consistency, partial sends and wire-length rejection in sanitizer and optimized configurations. It also exercises the actual forwarding loop with compacted destinations, empty payloads, partial progress, zero-progress errors and direct cancellation, retaining the composed meter send path when present. The network suite compares full payload content and address, including payloads above the base capacity. Negative controls prove that missing peer, address, length or completion checks are detected. Observational fixed-unknown failures remain explicitly separate from required supported profiles.
 
 The feature's SDK checks compile the actual patched C/session and applicable Swift source for the configured target. They do not constitute a new device installation or an IPA produced by a native-only audit route. The documentation checker validates inherited prose without changing any of these functional test inputs or oracles.
 

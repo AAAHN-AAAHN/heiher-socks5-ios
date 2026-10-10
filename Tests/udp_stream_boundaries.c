@@ -1,13 +1,26 @@
 #define _GNU_SOURCE
-/* Actual production codec; only completed stream-I/O results are controlled.
- * No rewritten parser, timer, buffer helper, or application API. */
+/* Actual production codec/forwarder; completed I/O and resolution are controlled.
+ * No rewritten parser, forward loop, timer, buffer helper, or application API. */
 #define hev_task_io_socket_recv stream_recv
 #define hev_task_io_socket_recvmsg stream_recvmsg
 #define hev_task_io_socket_sendmsg stream_sendmsg
+#define hev_task_io_socket_sendmmsg stream_sendmmsg
+#define hev_socks5_addr_into_sockaddr6 stream_resolve
+/* The composed audit aliases meter I/O for inherited fixtures. Keep this send
+ * boundary distinct so bypassing udp_sendmmsg's meter hook is still detected. */
+#ifdef hev_meter_sendmmsg
+#undef hev_meter_sendmmsg
+#define hev_meter_sendmmsg stream_meter_sendmmsg
+#define FORWARD_EXPECT_METER 1
+#else
+#define FORWARD_EXPECT_METER 0
+#endif
 #include "hev-socks5-udp.c"
 #undef hev_task_io_socket_recv
 #undef hev_task_io_socket_recvmsg
 #undef hev_task_io_socket_sendmsg
+#undef hev_task_io_socket_sendmmsg
+#undef hev_socks5_addr_into_sockaddr6
 
 #include <assert.h>
 #include <stdio.h>
@@ -17,6 +30,123 @@ static size_t available, consumed, first_piece, emitted;
 static int end_result, send_calls, body_calls;
 static ssize_t send_result;
 static unsigned long cases;
+
+typedef struct
+{
+    unsigned mask;
+    int result;
+} ForwardCall;
+/* Bit i identifies framed datagram i; datagram 1 has an empty payload. Each
+ * call lists the exact offered vector and the completed lower-I/O result. */
+static const struct
+{
+    unsigned drop, count, accepted;
+    int result, bind_error;
+    ForwardCall calls[4];
+} forward_cases[] = {
+    { 4, 1, 11, 1, 0, { { 11, 3 } } }, /* Middle resolution failure; empty kept. */
+    { 15, 0, 0, 1, 0, { { 0, 0 } } }, /* All dropped: no bind or send. */
+    { 0, 3, 13, 1, 0, { { 15, 1 }, { 14, -1 }, { 12, 2 } } },
+    { 0, 1, 0, -1, 0, { { 15, -2 } } }, /* Direct cancellation is terminal. */
+    { 0, 2, 1, -1, 0, { { 15, 1 }, { 14, -2 } } },
+    { 0, 4, 0, 1, 0, { { 15, 0 }, { 14, 0 }, { 12, 0 }, { 8, 0 } } },
+    { 0, 4, 0, 1, 0, { { 15, -1 }, { 14, -1 }, { 12, -1 }, { 8, -1 } } },
+    { 0, 4, 4, 1, 0, { { 15, 0 }, { 14, -1 }, { 12, 1 }, { 8, 0 } } },
+    { 9, 1, 6, 1, 0, { { 6, 2 } } }, /* Bind first valid compacted address. */
+    { 13, 1, 2, 1, 0, { { 2, 1 } } }, /* Only an empty datagram. */
+    { 0, 0, 0, -1, -1, { { 0, 0 } } }, /* Binder failure stays terminal. */
+};
+static unsigned forward_case, forward_calls, forward_resolved, forward_bound;
+static unsigned forward_accepted, forward_meter_calls;
+static HevSocks5UDPMsg forward_messages[4];
+
+int
+stream_resolve (const HevSocks5Addr *source, struct sockaddr_in6 *address,
+                int *family)
+{
+    unsigned id = forward_resolved++;
+    assert (id < 4);
+    assert (!memcmp (source, forward_messages[id].addr,
+                     hev_socks5_addr_len (source)));
+    if (forward_cases[forward_case].drop & (1u << id))
+        return -1;
+    memset (address, 0, sizeof (*address));
+    address->sin6_family = AF_INET6;
+    address->sin6_port = htons (100 + id);
+    *family = AF_INET6;
+    return 0;
+}
+
+static int
+forward_bind (HevSocks5 *self, int fd, const struct sockaddr *address)
+{
+    unsigned first = 0;
+    (void)self;
+    while (forward_cases[forward_case].drop & (1u << first))
+        first++;
+    assert (first < 4 && fd == 23 && !forward_bound++);
+    assert (ntohs (((const struct sockaddr_in6 *)address)->sin6_port) ==
+            100 + first);
+    return forward_cases[forward_case].bind_error;
+}
+
+static int
+forward_send (int fd, void *messages, unsigned count, int flags,
+              HevTaskIOYielder yielder, void *self)
+{
+    struct mmsghdr *vector = messages;
+    const ForwardCall *call;
+    unsigned index = 0;
+    assert (fd == 23 && flags == MSG_WAITALL && self);
+    assert (yielder == task_io_yielder);
+    assert (forward_calls < forward_cases[forward_case].count);
+    call = &forward_cases[forward_case].calls[forward_calls++];
+    for (unsigned id = 0; id < 4; id++) {
+        struct msghdr *message;
+        struct sockaddr_in6 *address;
+        if (!(call->mask & (1u << id)))
+            continue;
+        assert (index < count);
+        message = &vector[index].msg_hdr;
+        address = message->msg_name;
+        assert (message->msg_namelen == sizeof (*address));
+        assert (address->sin6_family == AF_INET6);
+        assert (ntohs (address->sin6_port) == 100 + id);
+        assert (!message->msg_control && !message->msg_controllen);
+        assert (message->msg_iovlen == 1);
+        assert (message->msg_iov[0].iov_len == forward_messages[id].len);
+        assert (!memcmp (message->msg_iov[0].iov_base, forward_messages[id].buf,
+                         forward_messages[id].len));
+        if ((int)index < call->result) {
+            assert (!(forward_accepted & (1u << id)));
+            forward_accepted |= 1u << id;
+            vector[index].msg_len = message->msg_iov[0].iov_len;
+        }
+        index++;
+    }
+    assert (index == count);
+    errno = EIO;
+    return call->result;
+}
+
+int
+stream_sendmmsg (int fd, void *messages, unsigned count, int flags,
+                 HevTaskIOYielder yielder, void *self)
+{
+    assert (
+        !FORWARD_EXPECT_METER); /* Raw send must not bypass composed meter. */
+    return forward_send (fd, messages, count, flags, yielder, self);
+}
+
+#if FORWARD_EXPECT_METER
+int
+stream_meter_sendmmsg (int fd, void *messages, unsigned count, int flags,
+                       HevTaskIOYielder yielder, void *self)
+{
+    forward_meter_calls++;
+    return forward_send (fd, messages, count, flags, yielder, self);
+}
+#endif
 
 static int
 get_fd (HevSocks5UDP *self)
@@ -285,12 +415,83 @@ send_boundaries (void)
     cases++;
 }
 
+static void
+forward_boundaries (void)
+{
+    const int types[] = { 1, 3, 4 };
+    HevSocks5Class klass = { .base.iface = get_iface, .binder = forward_bind };
+    unsigned long count = 0;
+    for (forward_case = 0;
+         forward_case < sizeof (forward_cases) / sizeof (*forward_cases);
+         forward_case++) {
+        for (int managed = 0; managed <= 1; managed++) {
+            for (int rotation = 0; rotation < 3; rotation++) {
+                for (first_piece = 1; first_piece <= 5; first_piece += 4) {
+                    HevSocks5 self = { .base.klass = &klass.base,
+                                       .type = HEV_SOCKS5_TYPE_UDP_IN_TCP,
+                                       .timeout = 60000 };
+                    unsigned char base[4][UDP_BUF_SIZE];
+                    UDPBuffer slots[4] = { 0 };
+                    UDPBuffers owner = { .slots = slots, .count = 4 };
+                    size_t lengths[] = { 7, 0, 23, managed ? 2048 : 1232 };
+                    int bind = 0;
+                    available = consumed = 0;
+                    end_result = -1;
+                    forward_calls = forward_resolved = forward_bound = 0;
+                    forward_accepted = forward_meter_calls = 0;
+                    for (unsigned id = 0; id < 4; id++) {
+                        unsigned char *head = wire + available;
+                        size_t size = frame (head, types[(rotation + id) % 3],
+                                             lengths[id]);
+                        forward_messages[id] =
+                            (HevSocks5UDPMsg){ (void *)(head + 3),
+                                               head + size - lengths[id],
+                                               lengths[id] };
+                        available += size;
+                        slots[id] = (UDPBuffer){ .base = base[id],
+                                                 .capacity = UDP_BUF_SIZE,
+                                                 .owner = &owner };
+                    }
+                    assert (hev_socks5_udp_fwd_f (&self, 23, base, 4, &bind,
+                                                  managed ? slots : NULL) ==
+                            forward_cases[forward_case].result);
+                    assert (consumed == available && forward_resolved == 4);
+                    assert (forward_accepted ==
+                            forward_cases[forward_case].accepted);
+                    assert (forward_calls == forward_cases[forward_case].count);
+                    assert (forward_bound ==
+                            (forward_cases[forward_case].drop != 15));
+                    assert (bind == (forward_bound &&
+                                     !forward_cases[forward_case].bind_error));
+                    assert (forward_meter_calls ==
+                            (FORWARD_EXPECT_METER ? forward_calls : 0));
+                    if (forward_cases[forward_case].result == 1) {
+                        assert (!hev_socks5_udp_fwd_f (
+                            &self, 23, base, 4, &bind, managed ? slots : NULL));
+                        assert (forward_resolved == 4);
+                        assert (forward_calls ==
+                                forward_cases[forward_case].count);
+                    }
+                    for (unsigned id = 0; id < 4; id++)
+                        assert (!udp_buffer_resize (&slots[id], UDP_BUF_SIZE));
+                    assert (self.timeout == 60000);
+                    count++;
+                }
+            }
+        }
+    }
+    printf (
+        "PASS: %lu actual forward cases; compact vectors, empty payload, bounded errors, direct cancellation, meter route %s\n",
+        count, FORWARD_EXPECT_METER ? "checked" : "UDP only");
+}
+
 int
 main (void)
 {
     receive_boundaries ();
     header_boundaries ();
     send_boundaries ();
+    forward_boundaries ();
     printf (
         "PASS: %lu stream boundary cases; exact payload/address, partial-frame prefix and terminal write checks\n",
         cases);

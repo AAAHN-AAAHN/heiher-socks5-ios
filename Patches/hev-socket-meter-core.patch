@@ -1,6 +1,6 @@
 diff --git a/src/hev-socks5-meter.c b/src/hev-socks5-meter.c
 new file mode 100644
-index 0000000..80bc4a2
+index 0000000000000000000000000000000000000000..80bc4a206d31ae4a2b6d8274aef0f753edd93907
 --- /dev/null
 +++ b/src/hev-socks5-meter.c
 @@ -0,0 +1,160 @@
@@ -166,7 +166,7 @@ index 0000000..80bc4a2
 +}
 diff --git a/src/hev-socks5-meter.h b/src/hev-socks5-meter.h
 new file mode 100644
-index 0000000..8bf8c33
+index 0000000000000000000000000000000000000000..8bf8c3302bd56fbdd16914d24be0948ab5276ab7
 --- /dev/null
 +++ b/src/hev-socks5-meter.h
 @@ -0,0 +1,37 @@
@@ -208,27 +208,32 @@ index 0000000..8bf8c33
 +                        HevTaskIOYielder yielder, void *self);
 +#endif
 diff --git a/src/hev-socks5-server.c b/src/hev-socks5-server.c
-index 9abc372..051ee60 100644
+index ec4f2904abe9e6b5b9d149a57fe259f7c15105e9..8165af28a116f1c6247fe3817bf304dde5b0db11 100644
 --- a/src/hev-socks5-server.c
 +++ b/src/hev-socks5-server.c
-@@ -21,4 +21,5 @@
-
+@@ -20,6 +20,7 @@
+ #include "hev-socks5-logger-priv.h"
+ 
  #include "hev-socks5-server.h"
 +#include "hev-socks5-meter.h"
-
+ 
  #define task_io_yielder hev_socks5_task_io_yielder
-@@ -65,6 +66,6 @@ hev_socks5_server_read_auth_method (HevSocks5Server *self)
+ 
+@@ -64,8 +65,8 @@ hev_socks5_server_read_auth_method (HevSocks5Server *self)
+ 
      LOG_D ("%p socks5 server read auth method", self);
-
+ 
 -    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, &auth, 2, MSG_WAITALL,
 -                                   task_io_yielder, self);
 +    res = hev_meter_recv (HEV_SOCKS5 (self)->fd, &auth, 2, MSG_WAITALL,
 +                          task_io_yielder, self);
      if (res != 2) {
          LOG_I ("%p socks5 server read auth method", self);
-@@ -77,7 +78,6 @@ hev_socks5_server_read_auth_method (HevSocks5Server *self)
+         return -1;
+@@ -76,9 +77,8 @@ hev_socks5_server_read_auth_method (HevSocks5Server *self)
+         return -1;
      }
-
+ 
 -    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, &auth.methods,
 -                                   auth.method_len, MSG_WAITALL,
 -                                   task_io_yielder, self);
@@ -236,71 +241,87 @@ index 9abc372..051ee60 100644
 +                          MSG_WAITALL, task_io_yielder, self);
      if (res != auth.method_len) {
          LOG_I ("%p socks5 server read auth methods", self);
-@@ -112,6 +112,6 @@ hev_socks5_server_write_auth_method (HevSocks5Server *self, int auth_method)
+         return -1;
+@@ -111,8 +111,8 @@ hev_socks5_server_write_auth_method (HevSocks5Server *self, int auth_method)
+     auth.ver = HEV_SOCKS5_VERSION_5;
      auth.method = auth_method;
-
+ 
 -    res = hev_task_io_socket_send (HEV_SOCKS5 (self)->fd, &auth, 2, MSG_WAITALL,
 -                                   task_io_yielder, self);
 +    res = hev_meter_send (HEV_SOCKS5 (self)->fd, &auth, 2, MSG_WAITALL,
 +                          task_io_yielder, self);
      if (res <= 0) {
          LOG_I ("%p socks5 server write auth method", self);
-@@ -134,6 +134,6 @@ hev_socks5_server_read_auth_user (HevSocks5Server *self)
+         return -1;
+@@ -133,8 +133,8 @@ hev_socks5_server_read_auth_user (HevSocks5Server *self)
+ 
      LOG_D ("%p socks5 server read auth user", self);
-
+ 
 -    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, head, 2, MSG_WAITALL,
 -                                   task_io_yielder, self);
 +    res = hev_meter_recv (HEV_SOCKS5 (self)->fd, head, 2, MSG_WAITALL,
 +                          task_io_yielder, self);
      if (res != 2) {
          LOG_I ("%p socks5 server read auth user.ver", self);
-@@ -152,6 +152,6 @@ hev_socks5_server_read_auth_user (HevSocks5Server *self)
+         return -1;
+@@ -151,8 +151,8 @@ hev_socks5_server_read_auth_user (HevSocks5Server *self)
+         return -1;
      }
-
+ 
 -    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, name, nlen + 1,
 -                                   MSG_WAITALL, task_io_yielder, self);
 +    res = hev_meter_recv (HEV_SOCKS5 (self)->fd, name, nlen + 1, MSG_WAITALL,
 +                          task_io_yielder, self);
      if (res != (nlen + 1)) {
          LOG_I ("%p socks5 server read auth user.name", self);
-@@ -165,6 +165,6 @@ hev_socks5_server_read_auth_user (HevSocks5Server *self)
+         return -1;
+@@ -164,8 +164,8 @@ hev_socks5_server_read_auth_user (HevSocks5Server *self)
+         return -1;
      }
-
+ 
 -    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, pass, plen,
 -                                   MSG_WAITALL, task_io_yielder, self);
 +    res = hev_meter_recv (HEV_SOCKS5 (self)->fd, pass, plen, MSG_WAITALL,
 +                          task_io_yielder, self);
      if (res != plen) {
          LOG_I ("%p socks5 server read auth user.pass", self);
-@@ -205,6 +205,6 @@ hev_socks5_server_write_auth_user (HevSocks5Server *self, int auth_res)
+         return -1;
+@@ -204,8 +204,8 @@ hev_socks5_server_write_auth_user (HevSocks5Server *self, int auth_res)
+     buf[0] = 1;
      buf[1] = auth_res;
-
+ 
 -    res = hev_task_io_socket_send (HEV_SOCKS5 (self)->fd, buf, 2, MSG_WAITALL,
 -                                   task_io_yielder, self);
 +    res = hev_meter_send (HEV_SOCKS5 (self)->fd, buf, 2, MSG_WAITALL,
 +                          task_io_yielder, self);
      if (res <= 0) {
          LOG_I ("%p socks5 server write auth user", self);
-@@ -253,6 +253,6 @@ hev_socks5_server_read_request (HevSocks5Server *self, int *cmd, int *rep,
+         return -1;
+@@ -252,8 +252,8 @@ hev_socks5_server_read_request (HevSocks5Server *self, int *cmd, int *rep,
+ 
      LOG_D ("%p socks5 server read request", self);
-
+ 
 -    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, &req, 5, MSG_WAITALL,
 -                                   task_io_yielder, self);
 +    res = hev_meter_recv (HEV_SOCKS5 (self)->fd, &req, 5, MSG_WAITALL,
 +                          task_io_yielder, self);
      if (res != 5) {
          LOG_I ("%p socks5 server read request", self);
-@@ -282,6 +282,6 @@ hev_socks5_server_read_request (HevSocks5Server *self, int *cmd, int *rep,
+         return -1;
+@@ -281,8 +281,8 @@ hev_socks5_server_read_request (HevSocks5Server *self, int *cmd, int *rep,
+         return 0;
      }
-
+ 
 -    res = hev_task_io_socket_recv (HEV_SOCKS5 (self)->fd, req.addr.domain.addr,
 -                                   addrlen, MSG_WAITALL, task_io_yielder, self);
 +    res = hev_meter_recv (HEV_SOCKS5 (self)->fd, req.addr.domain.addr, addrlen,
 +                          MSG_WAITALL, task_io_yielder, self);
      if (res != addrlen) {
          *rep = HEV_SOCKS5_RES_REP_ADDR;
-@@ -340,6 +340,6 @@ hev_socks5_server_write_response (HevSocks5Server *self, int rep,
-
+         LOG_I ("%p socks5 server read addr", self);
+@@ -338,8 +338,8 @@ hev_socks5_server_write_response (HevSocks5Server *self, int rep,
+     res.rsv = 0;
+ 
      ret = hev_socks5_addr_from_sockaddr6 (&res.addr, addr);
 -    ret = hev_task_io_socket_send (HEV_SOCKS5 (self)->fd, &res, 3 + ret,
 -                                   MSG_WAITALL, task_io_yielder, self);
@@ -308,53 +329,65 @@ index 9abc372..051ee60 100644
 +                          task_io_yielder, self);
      if (ret <= 0) {
          LOG_I ("%p socks5 server write response", self);
-@@ -391,4 +391,8 @@ hev_socks5_server_connect (HevSocks5Server *self, struct sockaddr_in6 *addr)
-
+         return -1;
+@@ -389,6 +389,10 @@ hev_socks5_server_connect (HevSocks5Server *self, struct sockaddr_in6 *addr)
+     hev_socks5_set_timeout (HEV_SOCKS5 (self), timeout);
+ 
      self->fds[0] = fd;
 +    HEV_SOCKS5 (self)->io_destination = hev_meter_fd (fd);
 +    if (!HEV_SOCKS5 (self)->io_destination)
 +        HEV_SOCKS5 (self)->io_destination =
 +            hev_meter_peer ((struct sockaddr *)addr, sizeof (*addr));
-
+ 
      return 0;
-@@ -614,4 +618,5 @@ hev_socks5_server_construct (HevSocks5Server *self, int fd)
-
+ }
+@@ -612,6 +616,7 @@ hev_socks5_server_construct (HevSocks5Server *self, int fd)
+     HEV_OBJECT (self)->klass = HEV_SOCKS5_SERVER_TYPE;
+ 
      HEV_SOCKS5 (self)->fd = fd;
 +    HEV_SOCKS5 (self)->io_peer = hev_meter_fd (fd);
-
+ 
      self->fds[0] = -1;
+     self->fds[1] = -1;
 diff --git a/src/hev-socks5-tcp.c b/src/hev-socks5-tcp.c
-index a2db80e..2632ac9 100644
+index a2db80e34c33b65e924ee8f855a90ee819e75384..2632ac90d764ed218c8bb0a650f0a92f772b52a7 100644
 --- a/src/hev-socks5-tcp.c
 +++ b/src/hev-socks5-tcp.c
-@@ -13,4 +13,5 @@
-
+@@ -12,6 +12,7 @@
+ #include "hev-socks5-logger-priv.h"
+ 
  #include "hev-socks5-tcp.h"
 +#include "hev-socks5-meter.h"
-
+ 
  #define task_io_yielder hev_socks5_task_io_yielder
-@@ -33,5 +34,8 @@ hev_socks5_tcp_splicer (HevSocks5TCP *self, int fd)
+ 
+@@ -32,7 +33,10 @@ hev_socks5_tcp_splicer (HevSocks5TCP *self, int fd)
+     if (res < 0)
          hev_task_mod_fd (task, fd, POLLIN | POLLOUT);
-
+ 
 -    hev_task_io_splice (cfd, cfd, fd, fd, 8192, task_io_yielder, self);
 +    void *peers[2] = { HEV_SOCKS5 (self)->io_peer,
 +                       HEV_SOCKS5 (self)->io_destination };
 +    hev_task_io_splice_observed (cfd, cfd, fd, fd, 8192, task_io_yielder, self,
 +                                 hev_meter_stream, peers);
-
+ 
      return 0;
+ }
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index f1704a0..75b642f 100644
+index ec0caaa7c0e73de01938fd3987e2af8833c522c2..d3cab7c8cfd071bb4b6dcd22205ae4e4bcf54282 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
-@@ -27,4 +27,5 @@
-
+@@ -26,6 +26,7 @@
+ #include "hev-socks5-logger-priv.h"
+ 
  #include "hev-socks5-udp.h"
 +#include "hev-socks5-meter.h"
-
+ 
  #define UDP_BUF_SIZE 1500
-@@ -271,6 +272,6 @@ udp_buffer_recvmmsg (HevSocks5UDP *self, int fd, struct mmsghdr *messages,
-
+ 
+@@ -270,8 +271,8 @@ udp_buffer_recvmmsg (HevSocks5UDP *self, int fd, struct mmsghdr *messages,
+     unsigned int i;
+ 
      if (!buffers)
 -        return hev_task_io_socket_recvmmsg (fd, messages, num, flags,
 -                                            task_io_yielder, self);
@@ -362,7 +395,9 @@ index f1704a0..75b642f 100644
 +                                   self);
      for (i = 0; i < num; i++) {
          struct msghdr *msg = &messages[i].msg_hdr;
-@@ -289,6 +290,6 @@ udp_buffer_recvmmsg (HevSocks5UDP *self, int fd, struct mmsghdr *messages,
+         ssize_t needed = udp_buffer_datagram_size (fd, &buffers[i]);
+@@ -288,8 +289,8 @@ udp_buffer_recvmmsg (HevSocks5UDP *self, int fd, struct mmsghdr *messages,
+         msg->msg_iov[0].iov_base = udp_buffer_data (&buffers[i]);
          msg->msg_iov[0].iov_len = buffers[i].capacity;
          msg->msg_flags = 0;
 -        res = hev_task_io_socket_recvmmsg (fd, &messages[i], 1, MSG_DONTWAIT,
@@ -371,15 +406,19 @@ index f1704a0..75b642f 100644
 +                                  task_io_yielder, self);
          if (res <= 0)
              return i ? (int)i : res;
-@@ -331,4 +332,6 @@ udp_control_check (HevSocks5 *self)
-
+         if (!(msg->msg_flags & MSG_TRUNC) &&
+@@ -330,6 +331,8 @@ udp_control_check (HevSocks5 *self)
+         char buf;
+ 
          res = recv (self->fd, &buf, sizeof (buf), 0);
 +        if (res > 0)
 +            hev_meter_add (self->io_peer, 0, res);
          if ((res == 0) || ((res < 0) && (errno != EAGAIN))) {
              hev_socks5_set_timeout (self, 0);
-@@ -419,6 +422,6 @@ udp_sendmmsg (HevSocks5UDP *self, int fd, struct mmsghdr *messages,
-
+             return -1;
+@@ -418,8 +421,8 @@ udp_sendmmsg (HevSocks5UDP *self, int fd, struct mmsghdr *messages,
+ #endif
+ 
      do {
 -        res = hev_task_io_socket_sendmmsg (fd, messages + done, num - done,
 -                                           MSG_WAITALL, task_io_yielder, self);
@@ -387,18 +426,22 @@ index f1704a0..75b642f 100644
 +                                  task_io_yielder, self);
          if (res > 0)
              done += res;
-@@ -493,6 +496,6 @@ hev_socks5_udp_sendmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+ #if defined(__APPLE__)
+@@ -492,8 +495,8 @@ hev_socks5_udp_sendmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+         iov[i * 3 + 2].iov_len = msgv[i].len;
      }
-
+ 
 -    res = hev_task_io_socket_sendmsg (hev_socks5_udp_get_fd (self), &mh,
 -                                      MSG_WAITALL, task_io_yielder, self);
 +    res = hev_meter_sendmsg (hev_socks5_udp_get_fd (self), &mh, MSG_WAITALL,
 +                             task_io_yielder, self);
      if (res < 0 || (size_t)res != expected) {
          /* A partial frame cannot be followed by a new frame on this stream. */
-@@ -580,10 +583,8 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+         hev_socks5_set_timeout (HEV_SOCKS5 (self), 0);
+@@ -579,12 +582,10 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+         int addrlen;
          ssize_t res;
-
+ 
 -        res = hev_task_io_socket_recv (fd, &udp, 5, nonblock, task_io_yielder,
 -                                       self);
 +        res = hev_meter_recv (fd, &udp, 5, nonblock, task_io_yielder, self);
@@ -409,57 +452,68 @@ index f1704a0..75b642f 100644
 +            ssize_t tail = hev_meter_recv (fd, (char *)&udp + res, 5 - res,
 +                                           MSG_WAITALL, task_io_yielder, self);
              if (tail != 5 - res) {
-                 hev_socks5_set_timeout (HEV_SOCKS5 (self), 0);
-@@ -632,6 +633,5 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+                 if (tail >= 0)
+                     errno = EPIPE;
+@@ -635,8 +636,7 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+         iov[1].iov_base = msgv[i].buf + addrlen;
          iov[1].iov_len = udp.datlen;
-
+ 
 -        res = hev_task_io_socket_recvmsg (fd, &mh, MSG_WAITALL, task_io_yielder,
 -                                          self);
 +        res = hev_meter_recvmsg (fd, &mh, MSG_WAITALL, task_io_yielder, self);
          if (res != (addrlen - 2 + udp.datlen)) {
              LOG_D ("%p socks5 udp read udp data", self);
-@@ -727,4 +727,6 @@ retry:
+             if (res >= 0)
+@@ -732,6 +732,8 @@ retry:
+                 return -1;
              peer = taddr[i];
              HEV_SOCKS5 (self)->udp_associated = 1;
 +            HEV_SOCKS5 (self)->io_udp_peer =
 +                hev_meter_peer ((struct sockaddr *)&peer, sizeof (peer));
          }
-
-@@ -918,4 +920,7 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
-
+ 
+         msgv[count].addr = &udp->addr;
+@@ -931,6 +933,9 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
+     }
+ 
      fd_a = hev_socks5_udp_get_fd (self);
 +    if (HEV_SOCKS5 (self)->type == HEV_SOCKS5_TYPE_UDP_IN_UDP &&
 +        HEV_SOCKS5 (self)->udp_associated)
 +        HEV_SOCKS5 (self)->io_udp_peer = hev_meter_fd (fd_a);
      if (hev_task_mod_fd (task, fd_a, POLLIN | POLLOUT) < 0)
          hev_task_add_fd (task, fd_a, POLLIN | POLLOUT);
+     if (hev_task_add_fd (task, fd_b, POLLIN | POLLOUT) < 0)
 diff --git a/src/hev-socks5.c b/src/hev-socks5.c
-index d06b5d4..e154cf1 100644
+index d06b5d4b0506f75ef8eecccd5fe68e76630251b5..e154cf173c4794a0cbc42c31084a1f7b23144796 100644
 --- a/src/hev-socks5.c
 +++ b/src/hev-socks5.c
-@@ -68,4 +68,7 @@ hev_socks5_construct (HevSocks5 *self, HevSocks5Type type)
-
+@@ -67,6 +67,9 @@ hev_socks5_construct (HevSocks5 *self, HevSocks5Type type)
+     HEV_OBJECT (self)->klass = HEV_SOCKS5_TYPE;
+ 
      self->fd = -1;
 +    self->io_peer = NULL;
 +    self->io_destination = NULL;
 +    self->io_udp_peer = NULL;
      self->timeout = -1;
      self->type = type;
+     self->addr_family = HEV_SOCKS5_ADDR_FAMILY_UNSPEC;
 diff --git a/src/hev-socks5.h b/src/hev-socks5.h
-index 40ad1cf..b844baa 100644
+index 40ad1cf31d97f237488fc49ee8dd710eb9260e69..b844baa8556462c189186b2f5ab927720a9ed137 100644
 --- a/src/hev-socks5.h
 +++ b/src/hev-socks5.h
-@@ -49,4 +49,7 @@ struct _HevSocks5
-
+@@ -48,6 +48,9 @@ struct _HevSocks5
+     HevObject base;
+ 
      int fd;
 +    void *io_peer;
 +    void *io_destination;
 +    void *io_udp_peer;
      int timeout;
      unsigned int type : 2;
+     unsigned int udp_associated : 1;
 diff --git a/src/worker_meter.c b/src/worker_meter.c
 new file mode 100644
-index 0000000..207dc2b
+index 0000000000000000000000000000000000000000..207dc2bc4fd0e8efacf442f5d92fd659bcc10502
 --- /dev/null
 +++ b/src/worker_meter.c
 @@ -0,0 +1,286 @@
@@ -751,7 +805,7 @@ index 0000000..207dc2b
 +}
 diff --git a/src/worker_meter.h b/src/worker_meter.h
 new file mode 100644
-index 0000000..d93c191
+index 0000000000000000000000000000000000000000..d93c1911ae6478525a5fbcb4183179e680667473
 --- /dev/null
 +++ b/src/worker_meter.h
 @@ -0,0 +1,20 @@
