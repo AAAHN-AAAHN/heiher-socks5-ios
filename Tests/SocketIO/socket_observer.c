@@ -159,22 +159,31 @@ main (void)
                                                  &pos, observe, &pos) == 35);
     assert (accounted == 10);
     cases++;
-    for (int wr = 0; wr < 2; wr++) {
+    for (int scenario = 0; scenario < 6; scenario++) {
+        int wr = scenario / 3, stop = scenario % 3;
         struct mmsghdr mv[3] = { 0 };
         for (int i = 0; i < 3; i++) {
             mv[i].msg_hdr = msg;
             mv[i].msg_len = 999;
         }
 #ifndef MSG_WAITFORONE
-        reset (0, 7, -EIO, 0);
+        reset (0, 7, stop ? -EAGAIN : -EIO, 0);
 #else
-        reset (2, -EIO, 0, 0);
+        reset (2, stop ? -EAGAIN : -EIO, 0, 0);
 #endif
+        /* A canceled wait after accepted messages returns the prefix count;
+         * only cancellation before any progress is observable as -2. */
+        if (stop == 2)
+            reset (-EAGAIN, 0, 0, 0);
+        cancel = stop;
         int n = wr ? hev_task_io_socket_sendmmsg_observed (
                          99, mv, 3, MSG_WAITALL, yield, &pos, observe, &pos) :
                      hev_task_io_socket_recvmmsg_observed (
                          99, mv, 3, MSG_WAITALL, yield, &pos, observe, &pos);
-        assert (n == 2 && accounted == 7 && callbacks == 1 && errno == EIO);
+        assert (n == (stop == 2 ? -2 : 2));
+        assert (accounted == (stop == 2 ? 0 : 7));
+        assert (callbacks == (stop == 2 ? 0 : 1));
+        assert (errno == (stop ? EAGAIN : EIO) && yields == !!stop);
         cases++;
     }
     reset (4, -EIO, 0, 0);

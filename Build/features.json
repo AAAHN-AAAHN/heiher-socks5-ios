@@ -1,5 +1,5 @@
 {
-  "base_commit": "1a2130c1d0658e0483b421bfa808572bd16df82e",
+  "base_commit": "ed0871b303813884fd17541c12a270c3f198b8d7",
   "features": [
     "udp",
     "statistics"
@@ -36,8 +36,8 @@
     }
   ],
   "sources": {
-    ".": "f09341738c2dc7613b3a9d2ad3af93b669fdbe86",
-    "src/core": "162dd996299fc2d2bff2dd63728f8a2cd71ed31a",
+    ".": "354db395d4f5deba697741274d775d25315cb337",
+    "src/core": "a5cc1a6351d3d9f59c00c06547fa5e6ab85e4242",
     "third-part/hev-task-system": "e20b98914332613a5ed9da46ab5f1e894f3d3ef5",
     "third-part/yaml": "162227cd7d2b6108bc8bc133273e11413222ddf4"
   },
