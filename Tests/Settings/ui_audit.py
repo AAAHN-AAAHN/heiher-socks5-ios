@@ -2,8 +2,9 @@
 """Actual persistent settings UI on an isolated Simulator product, never an IPA.
 
 Reuses the repository's disposable test-target construction pattern. The runtime,
-project, native pin and prepare/Stop patch are unchanged; native/SDK success at the
-same HEAD is required. A Simulator result is not SideStore or LiveContainer proof.
+project and prepare/Stop patch are preserved; shared native inputs match the exact
+current main baseline. Native/SDK success at the same HEAD is required.
+A Simulator result is not SideStore or LiveContainer proof.
 """
 import hashlib
 import json
@@ -32,16 +33,24 @@ def output(*args):
 
 def verify_production():
     baseline = '78fa1e7a2d879d0cb516582a2eebdc6293d24d22'
+    source_base = 'ed0871b303813884fd17541c12a270c3f198b8d7'
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
     expected = json.loads(output('git', 'show', baseline + ':Build/features.json'))
     parent = json.loads((ROOT / 'docs/documentation.json').read_bytes())['parents']['feature/server-control']
     inherited = json.loads(output('git', 'show', parent + ':Build/features.json'))
-    expected['base_commit'] = inherited['base_commit']
+    shared = json.loads(output('git', 'show', source_base + ':Build/features.json'))
+    if (inherited['base_commit'] != source_base or inherited['sources'] != shared['sources']
+            or inherited['upstream_app'] != shared['upstream_app']):
+        raise RuntimeError('Server-control parent differs from the exact shared source baseline')
+    expected.update(base_commit=source_base, sources=shared['sources'],
+                    upstream_app=shared['upstream_app'])
     if config != expected:
-        raise RuntimeError('Settings configuration differs beyond the inherited main base')
+        raise RuntimeError('Settings configuration differs beyond the exact inherited source baseline')
     run(['git', 'diff', '--exit-code', baseline, 'HEAD', '--',
-         'Socks5', 'Socks5.xcodeproj', 'Patches', 'Build/upstream.json',
-         'HevSocks5Server.xcframework'], 'preserved-production.log')
+         'Socks5', 'Socks5.xcodeproj', 'Patches'], 'preserved-production.log')
+    run(['git', 'diff', '--exit-code', source_base, 'HEAD', '--',
+         'Build/upstream.json', 'Build/baseline-framework.json',
+         'HevSocks5Server.xcframework'], 'preserved-native-source.log')
 
 
 def add_test_target(app):
