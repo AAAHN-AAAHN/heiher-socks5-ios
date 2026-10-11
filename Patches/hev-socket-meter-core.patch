@@ -208,7 +208,7 @@ index 0000000000000000000000000000000000000000..8bf8c3302bd56fbdd16914d24be0948a
 +                        HevTaskIOYielder yielder, void *self);
 +#endif
 diff --git a/src/hev-socks5-server.c b/src/hev-socks5-server.c
-index ec4f2904abe9e6b5b9d149a57fe259f7c15105e9..8165af28a116f1c6247fe3817bf304dde5b0db11 100644
+index ddf9f08d09eda05b8f53526982399460bb4bd73d..a8f59510b1ba16070b24485bc53e375a671fe9e3 100644
 --- a/src/hev-socks5-server.c
 +++ b/src/hev-socks5-server.c
 @@ -20,6 +20,7 @@
@@ -297,7 +297,7 @@ index ec4f2904abe9e6b5b9d149a57fe259f7c15105e9..8165af28a116f1c6247fe3817bf304dd
      if (res <= 0) {
          LOG_I ("%p socks5 server write auth user", self);
          return -1;
-@@ -252,8 +252,8 @@ hev_socks5_server_read_request (HevSocks5Server *self, int *cmd, int *rep,
+@@ -256,8 +256,8 @@ hev_socks5_server_read_request (HevSocks5Server *self, int *cmd, int *rep,
  
      LOG_D ("%p socks5 server read request", self);
  
@@ -308,7 +308,7 @@ index ec4f2904abe9e6b5b9d149a57fe259f7c15105e9..8165af28a116f1c6247fe3817bf304dd
      if (res != 5) {
          LOG_I ("%p socks5 server read request", self);
          return -1;
-@@ -281,8 +281,8 @@ hev_socks5_server_read_request (HevSocks5Server *self, int *cmd, int *rep,
+@@ -285,8 +285,8 @@ hev_socks5_server_read_request (HevSocks5Server *self, int *cmd, int *rep,
          return 0;
      }
  
@@ -319,7 +319,7 @@ index ec4f2904abe9e6b5b9d149a57fe259f7c15105e9..8165af28a116f1c6247fe3817bf304dd
      if (res != addrlen) {
          *rep = HEV_SOCKS5_RES_REP_ADDR;
          LOG_I ("%p socks5 server read addr", self);
-@@ -338,8 +338,8 @@ hev_socks5_server_write_response (HevSocks5Server *self, int rep,
+@@ -342,8 +342,8 @@ hev_socks5_server_write_response (HevSocks5Server *self, int rep,
      res.rsv = 0;
  
      ret = hev_socks5_addr_from_sockaddr6 (&res.addr, addr);
@@ -330,7 +330,7 @@ index ec4f2904abe9e6b5b9d149a57fe259f7c15105e9..8165af28a116f1c6247fe3817bf304dd
      if (ret <= 0) {
          LOG_I ("%p socks5 server write response", self);
          return -1;
-@@ -389,6 +389,10 @@ hev_socks5_server_connect (HevSocks5Server *self, struct sockaddr_in6 *addr)
+@@ -393,6 +393,10 @@ hev_socks5_server_connect (HevSocks5Server *self, struct sockaddr_in6 *addr)
      hev_socks5_set_timeout (HEV_SOCKS5 (self), timeout);
  
      self->fds[0] = fd;
@@ -341,7 +341,7 @@ index ec4f2904abe9e6b5b9d149a57fe259f7c15105e9..8165af28a116f1c6247fe3817bf304dd
  
      return 0;
  }
-@@ -612,6 +616,7 @@ hev_socks5_server_construct (HevSocks5Server *self, int fd)
+@@ -621,6 +625,7 @@ hev_socks5_server_construct (HevSocks5Server *self, int fd)
      HEV_OBJECT (self)->klass = HEV_SOCKS5_SERVER_TYPE;
  
      HEV_SOCKS5 (self)->fd = fd;
@@ -374,7 +374,7 @@ index a2db80e34c33b65e924ee8f855a90ee819e75384..2632ac90d764ed218c8bb0a650f0a92f
      return 0;
  }
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index 1c45938d700256c2c225e2f8142bd069f8b25dc8..f336e7bcf84dc9e71d8dee72119de2e0472969d6 100644
+index 59152f41efc0145b860b08c14d28e1612c2c41cd..2513ad2904566e7d220c294f01b9b458f4c6980c 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -26,6 +26,7 @@
@@ -438,7 +438,7 @@ index 1c45938d700256c2c225e2f8142bd069f8b25dc8..f336e7bcf84dc9e71d8dee72119de2e0
      if (res < 0 || (size_t)res != expected) {
          /* A partial frame cannot be followed by a new frame on this stream. */
          hev_socks5_set_timeout (HEV_SOCKS5 (self), 0);
-@@ -583,12 +586,10 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -584,12 +587,10 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          int addrlen;
          ssize_t res;
  
@@ -454,7 +454,7 @@ index 1c45938d700256c2c225e2f8142bd069f8b25dc8..f336e7bcf84dc9e71d8dee72119de2e0
              if (tail != 5 - res) {
                  if (tail >= 0)
                      errno = EPIPE;
-@@ -639,8 +640,7 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -640,8 +641,7 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          iov[1].iov_base = msgv[i].buf + addrlen;
          iov[1].iov_len = udp.datlen;
  
@@ -464,7 +464,7 @@ index 1c45938d700256c2c225e2f8142bd069f8b25dc8..f336e7bcf84dc9e71d8dee72119de2e0
          if (res != (addrlen - 2 + udp.datlen)) {
              LOG_D ("%p socks5 udp read udp data", self);
              if (res >= 0)
-@@ -736,6 +736,8 @@ retry:
+@@ -744,6 +744,8 @@ retry:
                  return -1;
              peer = taddr[i];
              HEV_SOCKS5 (self)->udp_associated = 1;
@@ -473,7 +473,7 @@ index 1c45938d700256c2c225e2f8142bd069f8b25dc8..f336e7bcf84dc9e71d8dee72119de2e0
          }
  
          msgv[count].addr = &udp->addr;
-@@ -959,6 +961,9 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
+@@ -967,6 +969,9 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
      }
  
      fd_a = hev_socks5_udp_get_fd (self);

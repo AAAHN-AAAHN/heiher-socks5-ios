@@ -1,16 +1,19 @@
 diff --git a/src/hev-main.c b/src/hev-main.c
-index 0695ce6..1407624 100644
+index 0695ce6f122b17a3865521c86f3e174ddc25874f..14076246dbfb1cd42dbfeb51a397a6e05fbb863b 100644
 --- a/src/hev-main.c
 +++ b/src/hev-main.c
-@@ -23,4 +23,5 @@
-
+@@ -22,6 +22,7 @@
+ #include "hev-socks5-proxy.h"
+ 
  #include "hev-main.h"
 +#include "core/src/hev-socks5-meter.h"
-
+ 
  #ifdef __MSYS__
-@@ -132,4 +133,43 @@ hev_socks5_server_quit (void)
+ #define WEAK
+@@ -131,6 +132,45 @@ hev_socks5_server_quit (void)
+     hev_socks5_proxy_stop ();
  }
-
+ 
 +void
 +hev_socks5_server_endpoint_stats (uint64_t *received, uint64_t *sent)
 +{
@@ -52,20 +55,24 @@ index 0695ce6..1407624 100644
 +
  WEAK int
  main (int argc, char *argv[])
+ {
 diff --git a/src/hev-main.h b/src/hev-main.h
-index 37a3c8c..5c155d8 100644
+index 37a3c8ce0db9f734f07bfc57b3b59df8559562e6..5c155d8c3f47ff210b7762bbb571d458e8607d07 100644
 --- a/src/hev-main.h
 +++ b/src/hev-main.h
-@@ -10,4 +10,6 @@
+@@ -9,6 +9,8 @@
+ 
  #ifndef __HEV_MAIN_H__
  #define __HEV_MAIN_H__
 +#include <stddef.h>
 +#include <stdint.h>
-
+ 
  #ifdef __cplusplus
-@@ -52,4 +54,21 @@ int hev_socks5_server_main_from_str (const unsigned char *config_str,
+ extern "C" {
+@@ -51,6 +53,23 @@ int hev_socks5_server_main_from_str (const unsigned char *config_str,
+  */
  void hev_socks5_server_quit (void);
-
+ 
 +/* Socket boundary, peer viewpoint: received = bytes accepted TO this IP,
 + * sent = bytes consumed FROM this IP. Includes SOCKS framing/control bytes.
 + * Excludes OS-generated TCP/IP headers, ACKs and kernel retransmissions.
@@ -85,19 +92,23 @@ index 37a3c8c..5c155d8 100644
 +
  #ifdef __cplusplus
  }
+ #endif
 diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
-index 1cd4e4c..db4d791 100644
+index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..db4d791b450209055c2b5ba0af8b557642c9fe25 100644
 --- a/src/hev-socks5-proxy.c
 +++ b/src/hev-socks5-proxy.c
-@@ -21,4 +21,5 @@
+@@ -20,6 +20,7 @@
+ #include <hev-memory-allocator.h>
  #include <hev-socks5-authenticator.h>
-
+ 
 +#include "core/src/hev-socks5-meter.h"
  #include "hev-config.h"
  #include "hev-logger.h"
-@@ -161,4 +162,9 @@ retry:
+ #include "hev-socks5-worker.h"
+@@ -160,6 +161,11 @@ retry:
+         goto retry;
      }
-
+ 
 +    if (hev_meter_worker_enter () < 0) {
 +        hev_socks5_proxy_stop ();
 +        goto exit;
@@ -105,57 +116,71 @@ index 1cd4e4c..db4d791 100644
 +
      res = hev_task_system_init ();
      if (res < 0) {
-@@ -173,4 +179,5 @@ retry:
+         LOG_E ("socks5 proxy worker task system");
+@@ -172,6 +178,7 @@ retry:
+ 
      hev_task_system_fini ();
  exit:
 +    hev_meter_worker_leave ();
      return NULL;
  }
-@@ -188,4 +195,7 @@ hev_socks5_proxy_init (void)
+ 
+@@ -187,6 +194,9 @@ hev_socks5_proxy_init (void)
+     int res;
      int i;
-
+ 
 +    if (hev_meter_prepare () < 0 || hev_meter_worker_enter () < 0)
 +        return -1;
 +
      LOG_D ("socks5 proxy init");
-
-@@ -198,4 +208,5 @@ hev_socks5_proxy_init (void)
+ 
+     listen_addr = hev_config_get_listen_address ();
+@@ -197,6 +207,7 @@ hev_socks5_proxy_init (void)
+     res = hev_task_system_init ();
      if (res < 0) {
          LOG_E ("socks5 proxy task system");
 +        hev_meter_worker_leave ();
          return -1;
      }
-@@ -296,4 +307,5 @@ retry:
-
+ 
+@@ -295,6 +306,7 @@ retry:
+     }
+ 
      hev_task_system_fini ();
 +    hev_meter_worker_leave ();
  }
-
+ 
+ void
 diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c
-index 683a773..fc39508 100644
+index 4b38b4219645f6312700ecdcfef98db4fbe838e1..4fdeb5a03473ac8ea611918c7a8f6e7fbe929705 100644
 --- a/src/hev-socks5-worker.c
 +++ b/src/hev-socks5-worker.c
-@@ -23,4 +23,5 @@
+@@ -22,6 +22,7 @@
+ #include "hev-logger.h"
  #include "hev-compiler.h"
  #include "hev-socks5-session.h"
 +#include "core/src/hev-socks5-meter.h"
-
+ 
  #include "hev-socks5-worker.h"
-@@ -110,7 +111,10 @@ hev_socks5_worker_task_entry (void *data)
+ 
+@@ -109,9 +110,12 @@ hev_socks5_worker_task_entry (void *data)
+     for (;;) {
          HevSocks5Session *s;
          HevTask *task;
 +        struct sockaddr_storage peer;
 +        socklen_t peer_len = sizeof (peer);
          int nfd;
-
+ 
 -        nfd = hev_task_io_socket_accept (fd, NULL, NULL, task_io_yielder, self);
 +        nfd = hev_task_io_socket_accept (fd, (struct sockaddr *)&peer,
 +                                         &peer_len, task_io_yielder, self);
          if (nfd == -1) {
              LOG_E ("socks5 proxy accept");
-@@ -126,4 +130,9 @@ hev_socks5_worker_task_entry (void *data)
+             continue;
+@@ -125,6 +129,11 @@ hev_socks5_worker_task_entry (void *data)
+             continue;
          }
-
+ 
 +        /* A reset may invalidate getpeername before construction. accept already
 +         * supplied the peer; retain it for all queued bytes and later I/O. */
 +        HEV_SOCKS5 (s)->io_peer =
@@ -163,3 +188,4 @@ index 683a773..fc39508 100644
 +
          task = hev_task_new (stack_size);
          if (!task) {
+             hev_object_unref (HEV_OBJECT (s));

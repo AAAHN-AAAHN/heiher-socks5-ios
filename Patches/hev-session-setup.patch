@@ -1,0 +1,160 @@
+diff --git a/src/core/src/hev-socks5-misc.c b/src/core/src/hev-socks5-misc.c
+index a1f8e9d1498358b3be2805be4b909e134d714373..efe51c1d1e12ece1b60f4026eb0cb3a581082646 100644
+--- a/src/core/src/hev-socks5-misc.c
++++ b/src/core/src/hev-socks5-misc.c
+@@ -37,23 +37,16 @@ hev_socks5_task_io_yielder (HevTaskYieldType type, void *data)
+ {
+     HevSocks5 *self = data;
+ 
+-    if (type == HEV_TASK_YIELD) {
+-        hev_task_yield (HEV_TASK_YIELD);
+-        return 0;
+-    }
+-
+-    if (self->timeout < 0) {
+-        hev_task_yield (HEV_TASK_WAITIO);
+-    } else {
+-        int timeout = self->timeout;
+-        timeout = hev_task_sleep (timeout);
+-        if (timeout <= 0) {
+-            LOG_I ("%p io timeout", self);
+-            return -1;
+-        }
++    if (!self->timeout)
++        return -1;
++    if (type == HEV_TASK_YIELD || self->timeout < 0) {
++        hev_task_yield (type);
++    } else if (!hev_task_sleep (self->timeout)) {
++        hev_socks5_set_timeout (self, 0);
++        LOG_I ("%p io timeout", self);
++        return -1;
+     }
+-
+-    return 0;
++    return self->timeout ? 0 : -1;
+ }
+ 
+ int
+diff --git a/src/core/src/hev-socks5-server.c b/src/core/src/hev-socks5-server.c
+index ec4f2904abe9e6b5b9d149a57fe259f7c15105e9..ddf9f08d09eda05b8f53526982399460bb4bd73d 100644
+--- a/src/core/src/hev-socks5-server.c
++++ b/src/core/src/hev-socks5-server.c
+@@ -221,8 +221,10 @@ hev_socks5_server_auth (HevSocks5Server *self)
+     int res;
+ 
+     method = hev_socks5_server_read_auth_method (self);
++    if (!HEV_SOCKS5 (self)->timeout)
++        return -1;
+     res = hev_socks5_server_write_auth_method (self, method);
+-    if (res < 0)
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout)
+         return -1;
+ 
+     switch (method) {
+@@ -230,6 +232,8 @@ hev_socks5_server_auth (HevSocks5Server *self)
+         break;
+     case HEV_SOCKS5_AUTH_METHOD_USER:
+         res = hev_socks5_server_read_auth_user (self);
++        if (!HEV_SOCKS5 (self)->timeout)
++            return -1;
+         res |= hev_socks5_server_write_auth_user (self, res);
+         if (res < 0)
+             return -1;
+@@ -366,7 +370,7 @@ hev_socks5_server_connect (HevSocks5Server *self, struct sockaddr_in6 *addr)
+ 
+     klass = HEV_OBJECT_GET_CLASS (self);
+     res = klass->binder (HEV_SOCKS5 (self), fd, (struct sockaddr *)addr);
+-    if (res < 0) {
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout) {
+         LOG_W ("%p socks5 server bind", self);
+         hev_task_del_fd (hev_task_self (), fd);
+         close (fd);
+@@ -429,7 +433,7 @@ hev_socks5_server_bind (HevSocks5Server *self, struct sockaddr_in6 *addr)
+     }
+ 
+     res = sskptr->binder (self, fd, addr);
+-    if (res < 0) {
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout) {
+         LOG_W ("%p socks5 server bind", self);
+         hev_task_del_fd (hev_task_self (), fd);
+         close (fd);
+@@ -484,17 +488,19 @@ hev_socks5_server_handshake (HevSocks5Server *self)
+ 
+     LOG_D ("%p socks5 server handshake", self);
+ 
++    if (!HEV_SOCKS5 (self)->timeout)
++        return -1;
+     memset (&addr, 0, sizeof (addr));
+     timeout = hev_socks5_get_tcp_timeout ();
+     hev_socks5_set_timeout (HEV_SOCKS5 (self), timeout);
+ 
+     res = hev_socks5_server_auth (self);
+-    if (res < 0)
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout)
+         return -1;
+ 
+     rep = HEV_SOCKS5_RES_REP_SUCC;
+     res = hev_socks5_server_read_request (self, &cmd, &rep, &addr);
+-    if (res < 0)
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout)
+         return -1;
+ 
+     if (rep == HEV_SOCKS5_RES_REP_SUCC) {
+@@ -523,8 +529,11 @@ hev_socks5_server_handshake (HevSocks5Server *self)
+         }
+     }
+ 
++    if (!HEV_SOCKS5 (self)->timeout)
++        return -1;
+     res = hev_socks5_server_write_response (self, rep, &addr);
+-    if ((res < 0) || (rep != HEV_SOCKS5_RES_REP_SUCC))
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout ||
++        rep != HEV_SOCKS5_RES_REP_SUCC)
+         return -1;
+ 
+     return 0;
+diff --git a/src/hev-socks5-session.c b/src/hev-socks5-session.c
+index ef8556619e498b8217b16d75d16a2973b73ac62a..0cd870a0761396bfa01340c498d5d7e4698f0fb6 100644
+--- a/src/hev-socks5-session.c
++++ b/src/hev-socks5-session.c
+@@ -74,7 +74,7 @@ hev_socks5_session_bind (HevSocks5 *self, int fd, const struct sockaddr *dest)
+ 
+         memset (&addr, 0, sizeof (addr));
+         res = hev_netaddr_resolve (&addr, saddr, NULL);
+-        if (res < 0)
++        if (res < 0 || !self->timeout)
+             return -1;
+ 
+         res = bind (fd, (struct sockaddr *)&addr, sizeof (addr));
+@@ -145,7 +145,7 @@ hev_socks5_session_udp_bind (HevSocks5Server *self, int sock,
+         res = hev_netaddr_resolve (&addr, saddr, NULL);
+     else
+         res = getsockname (fd, (struct sockaddr *)&addr, &alen);
+-    if (res < 0)
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout)
+         return -1;
+ 
+     addr.sin6_port = htons (sport);
+@@ -187,7 +187,7 @@ hev_socks5_session_udp_bind (HevSocks5Server *self, int sock,
+         sport = src->sin6_port;
+         res = hev_netaddr_resolve (src, saddr, NULL);
+         src->sin6_port = sport;
+-        if (res < 0)
++        if (res < 0 || !HEV_SOCKS5 (self)->timeout)
+             return -1;
+     }
+ 
+diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c
+index 683a773999569784b2a42d1bab136ef1c44a8101..4b38b4219645f6312700ecdcfef98db4fbe838e1 100644
+--- a/src/hev-socks5-worker.c
++++ b/src/hev-socks5-worker.c
+@@ -196,6 +196,9 @@ hev_socks5_worker_new (int fd)
+     int nonblock = 1;
+     int res;
+ 
++    /* Complete session classes before the proxy starts worker threads. */
++    hev_socks5_session_class ();
++
+     self = hev_malloc0 (sizeof (HevSocks5Worker));
+     if (!self)
+         return NULL;
