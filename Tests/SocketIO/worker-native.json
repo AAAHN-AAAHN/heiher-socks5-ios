@@ -4,7 +4,7 @@
     "src/core/src/hev-socks5-meter.h": "c11ca39d49097ce9575a2a3b13205cb037866c6f51ad8e41d2df36abd9990871",
     "src/core/src/hev-socks5-server.c": "841e3560720b3819e6d77dc4365d863558609e568441f55220d9e8f970aa098d",
     "src/core/src/hev-socks5-tcp.c": "375c5409c968e7c2a0f202853349cc251e1ece9e14445d72810866e897afb256",
-    "src/core/src/hev-socks5-udp.c": "2304c0a7fd3c80d916794f8602becbcf5bfc286126a482c1707ad3275749a7a2",
+    "src/core/src/hev-socks5-udp.c": "f65dd77786add23d80bcadfa49285ddcc7b6a31af8df455f0f35169af140c5ee",
     "src/core/src/hev-socks5.c": "d97deabdfff39ea6b43644ec4bbecb604088bb6641a968f5cec58c0a642fd267",
     "src/core/src/hev-socks5.h": "6f3851a0c193360d7cdcf129da07470c920ff65f86843c6f087b635d8d7d3170",
     "src/core/src/worker_meter.c": "f661c1f5a816ec9d39d17074c75111b2ccf411b1f1dc076619cf0e155c25f703",

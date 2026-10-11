@@ -14,7 +14,7 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 SOCKET_BASE = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
-UDP = 'b9c7e74736aeb8a781d83a729d057009ce4e0f46'
+UDP = 'badf7c8a70561768f7251fdde070afce81b48791'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 SOCKET_PATCHES = [
     {'file': 'hev-socket-meter-task.patch', 'repository': 'third-part/hev-task-system'},
@@ -22,7 +22,8 @@ SOCKET_PATCHES = [
     {'file': 'hev-socket-meter-server.patch', 'repository': '.'},
 ]
 UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
-                        'udp_buffer_send.c', 'udp_stream_boundaries.c')
+                        'udp_buffer_send.c', 'udp_stream_boundaries.c', 'udp_splicer_lifetime.c',
+                        'udp_netaddr_errors.c')
 # Keep inherited fixtures' substituted I/O boundaries; real meter tests use no aliases.
 UDP_FIXTURE_INIT = ['-include', str(ROOT / 'Tests/SocketIO/udp_fixture_main.h')]
 UDP_FIXTURE_FLAGS = UDP_FIXTURE_INIT + [
@@ -32,6 +33,7 @@ UDP_FILES = {
     '.github/workflows/udp-compat-audit.yml': '.github/workflows/verify-build.yml',
     **{p: p for p in ('Patches/hev-udp-port-zero.patch', 'Patches/hev-udp-sockaddr.patch',
                      'Patches/hev-udp-peer-filter.patch', 'Patches/hev-udp-dynamic-buffer.patch',
+                     'Patches/hev-netaddr-result.patch',
                      'Tests/udp_peer_regression.py',
                      'Tests/udp_queue_observation.py',
                      'Tests/udp_compat_audit.py', 'Tests/udp_sockaddr_regression.py',
@@ -180,6 +182,7 @@ def native_checks(mode):
             task / 'bin/libhev-task-system.a']
     common = ['clang', '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread']
     includes = ['-I' + str(CORE / 'src'), '-I' + str(CORE / 'src/core/src'),
+                '-I' + str(CORE / 'src/misc'),
                 '-I' + str(task / 'src'), '-I' + str(task / 'include')]
     run([sys.executable, 'Tests/SocketIO/run.py', CORE, '--mode', mode,
          '--output', OUT / ('socket-' + mode)], mode + '-socket-io.log', timeout=600)
