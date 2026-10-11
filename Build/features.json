@@ -20,6 +20,10 @@
     {
       "file": "hev-udp-dynamic-buffer.patch",
       "repository": "src/core"
+    },
+    {
+      "file": "hev-netaddr-result.patch",
+      "repository": "."
     }
   ],
   "sources": {

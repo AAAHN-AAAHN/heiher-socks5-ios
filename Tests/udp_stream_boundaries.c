@@ -63,13 +63,18 @@ static const struct
     { 0, 4, 4, 1, 0, 0, { { 15, 0 }, { 14, -1 }, { 12, 1 }, { 8, 0 } } },
     { 9, 1, 6, 1, 0, 0, { { 6, 2 } } }, /* Bind first valid compacted address. */
     { 13, 1, 2, 1, 0, 0, { { 2, 1 } } }, /* Only an empty datagram. */
-    { 0, 0, 0, -1, -1, 0, { { 0, 0 } } }, /* Binder failure stays terminal. */
+    { 0, 0, 0, -1, -1, 1, { { 0, 0 } } }, /* Binder failure stays terminal. */
+    { 0, 0, 0, -1, 0, 2, { { 0, 0 } } }, /* Canceled in successful resolution. */
+    { 1, 0, 0, -1, 0, 2, { { 0, 0 } } }, /* Canceled in failed resolution. */
+    { 0, 0, 0, -1, 0, 3, { { 0, 0 } } }, /* Canceled in successful binding. */
+    { 0, 0, 0, -1, -1, 3, { { 0, 0 } } }, /* Canceled in failed binding. */
     { 0, 1, 1, -1, 0, 1, { { 15, 1 } } }, /* Terminal after a completed prefix. */
     { 0, 1, 0, -1, 0, 1, { { 15, -1 } } }, /* Terminal with an ordinary error. */
 };
 static unsigned forward_case, forward_calls, forward_resolved, forward_bound;
 static unsigned forward_accepted, forward_meter_calls;
 static int forward_terminal_receive;
+static HevSocks5 *forward_resolve_self;
 static HevSocks5UDPMsg forward_messages[4];
 static const struct
 {
@@ -164,6 +169,10 @@ stream_resolve (const HevSocks5Addr *source, struct sockaddr_in6 *address,
     unsigned id = forward_resolved++;
     assert (!forward_terminal_receive);
     assert (id < 4);
+    if (forward_resolve_self) {
+        assert (!id); /* No next resolver may run after cancellation. */
+        hev_socks5_set_timeout (forward_resolve_self, 0);
+    }
     assert (!memcmp (source, forward_messages[id].addr,
                      hev_socks5_addr_len (source)));
     if (forward_cases[forward_case].drop & (1u << id))
@@ -179,12 +188,13 @@ static int
 forward_bind (HevSocks5 *self, int fd, const struct sockaddr *address)
 {
     unsigned first = 0;
-    (void)self;
     while (forward_cases[forward_case].drop & (1u << first))
         first++;
     assert (first < 4 && fd == 23 && !forward_bound++);
     assert (ntohs (((const struct sockaddr_in6 *)address)->sin6_port) ==
             100 + first);
+    if (forward_cases[forward_case].stop == 3)
+        hev_socks5_set_timeout (self, 0);
     return forward_cases[forward_case].bind_error;
 }
 
@@ -556,17 +566,24 @@ forward_boundaries (void)
                                                  .capacity = UDP_BUF_SIZE,
                                                  .owner = &owner };
                     }
+                    forward_resolve_self =
+                        forward_cases[forward_case].stop == 2 ? &self : NULL;
                     assert (hev_socks5_udp_fwd_f (&self, 23, base, 4, &bind,
                                                   managed ? slots : NULL) ==
                             forward_cases[forward_case].result);
-                    assert (consumed == available && forward_resolved == 4);
+                    forward_resolve_self = NULL;
+                    assert (consumed == available);
+                    assert (forward_resolved ==
+                            (forward_cases[forward_case].stop == 2 ? 1 : 4));
                     assert (forward_accepted ==
                             forward_cases[forward_case].accepted);
                     assert (forward_calls == forward_cases[forward_case].count);
                     assert (forward_bound ==
-                            (forward_cases[forward_case].drop != 15));
+                            (forward_cases[forward_case].drop != 15 &&
+                             forward_cases[forward_case].stop != 2));
                     assert (bind == (forward_bound &&
-                                     !forward_cases[forward_case].bind_error));
+                                     !forward_cases[forward_case].bind_error &&
+                                     forward_cases[forward_case].stop != 3));
                     assert (forward_meter_calls ==
                             (FORWARD_EXPECT_METER ? forward_calls : 0));
                     if (forward_cases[forward_case].result == 1) {

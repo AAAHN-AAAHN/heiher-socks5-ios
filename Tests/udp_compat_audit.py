@@ -118,6 +118,7 @@ def main():
         'header-old-control.log', timeout=45)
     run(['make', 'clean'], 'clean.log', CORE)
     patch('hev-udp-dynamic-buffer.patch', CORE / 'src/core')
+    patch('hev-netaddr-result.patch', CORE)
     build()
 
     formatter = shutil.which('clang-format-18') or shutil.which('clang-format')
@@ -127,7 +128,9 @@ def main():
     if 'version 18.' not in version:
         raise RuntimeError(version)
     run([formatter, CORE / 'src/core/src/hev-socks5-udp.c'], 'expected-dynamic-core.c')
-    for name in ('udp_buffer_unit.c', 'udp_buffer_io.c', 'udp_buffer_timer.c', 'udp_buffer_send.c', 'udp_buffer_live_hold.c', 'udp_stream_boundaries.c'):
+    for name in ('udp_buffer_unit.c', 'udp_buffer_io.c', 'udp_buffer_timer.c',
+                 'udp_buffer_send.c', 'udp_buffer_live_hold.c', 'udp_stream_boundaries.c',
+                 'udp_splicer_lifetime.c', 'udp_netaddr_errors.c'):
         run([formatter, '--style=file:' + str(CORE / '.clang-format'), ROOT / 'Tests' / name],
             'expected-' + name)
         if (OUT / ('expected-' + name)).read_bytes() != (ROOT / 'Tests' / name).read_bytes():
@@ -147,7 +150,8 @@ def main():
         run(['xcrun', '--sdk', 'iphoneos', 'clang', '-target', 'arm64-apple-ios17.2',
              '-isysroot', sdk, '-std=gnu11', '-Wall', '-Werror', '-fsyntax-only',
              *includes, CORE / 'src/hev-socks5-session.c',
-             CORE / 'src/core/src/hev-socks5-udp.c'], 'ios-arm64-syntax.log')
+             CORE / 'src/core/src/hev-socks5-udp.c',
+             CORE / 'src/misc/hev-misc.c'], 'ios-arm64-syntax.log')
         if all(row['passed'] for row in baseline):
             raise RuntimeError('Darwin negative control did not reproduce either defect.')
         known = next(row for row in port_only if row['test'].startswith('UDP 127.0.0.1 hint=known'))
@@ -166,7 +170,8 @@ def main():
         network('limit-fixed-unknown-' + workers, '--fixed-udp-port', '--workers', workers, observation=True)
 
     compiler = os.environ.get('CC', 'clang')
-    includes = ['-I' + str(CORE / 'src/core/src'), '-I' + str(CORE / 'third-part/hev-task-system/include')]
+    includes = ['-I' + str(CORE / 'src/core/src'), '-I' + str(CORE / 'src/misc'),
+                '-I' + str(CORE / 'third-part/hev-task-system/include')]
     libs = [CORE / 'bin/libhev-socks5-server.a', CORE / 'third-part/yaml/bin/libyaml.a',
             CORE / 'third-part/hev-task-system/bin/libhev-task-system.a']
     executable = OUT / 'unit'
@@ -180,7 +185,8 @@ def main():
     run([executable], 'unit-optimized.log')
     executable.unlink()
 
-    for name in ('udp_buffer_unit', 'udp_buffer_io', 'udp_buffer_send', 'udp_stream_boundaries'):
+    for name in ('udp_buffer_unit', 'udp_buffer_io', 'udp_buffer_send',
+                 'udp_stream_boundaries', 'udp_splicer_lifetime', 'udp_netaddr_errors'):
         for mode, flags in [('asan', ['-O1', '-g', '-fsanitize=address,undefined',
                                      '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']),
                             ('optimized', ['-O3', '-fstrict-aliasing'])]:
