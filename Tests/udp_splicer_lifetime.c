@@ -229,7 +229,7 @@ send_frame (const struct sockaddr_in6 *address, unsigned int size)
 }
 
 static void
-run (Case value)
+run (Case value, int buffer_count)
 {
     struct sockaddr_in6 relay_address, target_address, peer_address,
         front_address;
@@ -294,7 +294,7 @@ run (Case value)
         ready (relay, POLLIN);
     }
     assert (hev_task_system_init () == 0);
-    hev_socks5_set_udp_copy_buffer_nums (2);
+    hev_socks5_set_udp_copy_buffer_nums (buffer_count);
     owner = hev_task_new (-1);
     controller = hev_task_new (-1);
     assert (owner && controller);
@@ -302,10 +302,10 @@ run (Case value)
     hev_task_run (controller, stop, NULL);
     hev_task_system_run ();
     hev_task_system_fini ();
-    printf ("%s: allocations=%u, outstanding=%u, after-stop=%u, "
+    printf ("%s: buffers=%d, allocations=%u, outstanding=%u, after-stop=%u, "
             "sleeps=%u, external-cancel=%d\n",
-            test.name, calls, outstanding, terminal_allocations, sleeps,
-            cancelled);
+            test.name, buffer_count, calls, outstanding, terminal_allocations,
+            sleeps, cancelled);
     fflush (stdout);
     assert (returned && !outstanding && !terminal_allocations);
     assert (cancelled == test.healthy && !!sleeps == test.healthy);
@@ -361,8 +361,10 @@ main (void)
           .backward = 1 },
     };
     signal (SIGPIPE, SIG_IGN);
-    for (size_t i = 0; i < sizeof (cases) / sizeof (cases[0]); i++)
-        run (cases[i]);
+    for (size_t i = 0; i < sizeof (cases) / sizeof (cases[0]); i++) {
+        run (cases[i], 2);
+        run (cases[i], 100);
+    }
     puts (
         "PASS: full relay cleanup, retained socket ownership, sticky terminal "
         "state and no subsequent reply consumption or allocation");

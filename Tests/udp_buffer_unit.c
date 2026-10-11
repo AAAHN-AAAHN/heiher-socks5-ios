@@ -19,12 +19,14 @@ int audit_clock (clockid_t clock, struct timespec *ts);
 uint64_t audit_clock_ns (clockid_t clock);
 #endif
 void *audit_malloc (size_t size);
+void *audit_malloc0 (size_t size);
 void audit_free (void *ptr);
 unsigned int audit_sleep (unsigned int milliseconds);
 
 #define clock_gettime audit_clock
 #define clock_gettime_nsec_np audit_clock_ns
 #define hev_malloc audit_malloc
+#define hev_malloc0 audit_malloc0
 #define hev_free audit_free
 #define hev_task_sleep audit_sleep
 #define hev_socks5_task_io_yielder audit_yielder
@@ -32,6 +34,7 @@ unsigned int audit_sleep (unsigned int milliseconds);
 #undef clock_gettime
 #undef clock_gettime_nsec_np
 #undef hev_malloc
+#undef hev_malloc0
 #undef hev_free
 #undef hev_task_sleep
 #undef hev_socks5_task_io_yielder
@@ -92,6 +95,15 @@ audit_malloc (size_t size)
     if (live_bytes > peak_bytes)
         peak_bytes = live_bytes;
     memset (ptr, 0xa5, size);
+    return ptr;
+}
+
+void *
+audit_malloc0 (size_t size)
+{
+    void *ptr = audit_malloc (size);
+    if (ptr)
+        memset (ptr, 0, size);
     return ptr;
 }
 
@@ -158,6 +170,94 @@ rounding (void)
     assert (udp_buffer_round (SIZE_MAX, &capacity) == -1 && errno == EOVERFLOW);
     puts (
         "PASS: 500-byte rounding; >65536 helper capacity; arithmetic overflow rejected");
+}
+
+static void
+workspace_boundaries (void)
+{
+    const size_t counts[] = { 1, 10, 11, 100, 342 };
+    UDPWorkspace workspace, unchanged;
+    UDPBuffer sentinel, *slots = &sentinel;
+    HevSocks5 self = { .timeout = 60000 };
+    unsigned int calls;
+
+    for (int managed = 0; managed < 2; managed++) {
+        for (size_t i = 0; i < sizeof (counts) / sizeof (*counts); i++) {
+            size_t n = counts[i];
+            unsigned char *base =
+                udp_workspace_new (&workspace, n, managed ? &slots : NULL);
+            assert (base);
+            struct
+            {
+                void *pointer;
+                size_t bytes, alignment;
+            } spans[] = {
+                { base, managed ? n * 2 * sizeof (*slots) : 0,
+                  _Alignof (UDPBuffer) },
+                { workspace.messages, n * sizeof (*workspace.messages),
+                  _Alignof (struct mmsghdr) },
+                { workspace.iov, n * 3 * sizeof (*workspace.iov),
+                  _Alignof (struct iovec) },
+                { workspace.packets, n * sizeof (*workspace.packets),
+                  _Alignof (HevSocks5UDPMsg) },
+                { workspace.addresses, n * sizeof (*workspace.addresses),
+                  _Alignof (struct sockaddr_in6) },
+                { workspace.reply_addresses, n * 19, 1 },
+                { workspace.prefixes, n * 3, 1 },
+            };
+            assert (sizeof (UDPPrefix) == 3 &&
+                    (!managed || (void *)slots == base));
+            uintptr_t end = (uintptr_t)base;
+            for (size_t j = 0; j < sizeof (spans) / sizeof (*spans); j++) {
+                uintptr_t start = (uintptr_t)spans[j].pointer;
+                assert (start >= end && start % spans[j].alignment == 0);
+                end = start + spans[j].bytes;
+                assert (end <= (uintptr_t)base + live_bytes);
+                memset (spans[j].pointer, (int)j + 1, spans[j].bytes);
+            }
+            for (size_t j = 0; j < sizeof (spans) / sizeof (*spans); j++) {
+                unsigned char *span = spans[j].pointer;
+                for (size_t k = 0; k < spans[j].bytes; k++)
+                    assert (span[k] == j + 1);
+            }
+            assert (end == (uintptr_t)base + live_bytes);
+            audit_free (base);
+            assert (!live_bytes);
+        }
+    }
+    memset (&workspace, 0xa5, sizeof (workspace));
+    memcpy (&unchanged, &workspace, sizeof (workspace));
+    slots = &sentinel;
+    calls = alloc_calls;
+    assert (!udp_workspace_new (&workspace, 0, &slots) && errno == EINVAL);
+    assert (!udp_workspace_new (&workspace, SIZE_MAX, &slots) &&
+            errno == EOVERFLOW);
+    assert (alloc_calls == calls && slots == &sentinel &&
+            !memcmp (&workspace, &unchanged, sizeof (workspace)));
+    size_t size = PTRDIFF_MAX - 1, offset = 17;
+    assert (udp_workspace_span (&size, 1, 4, 4, &offset) == -1);
+    assert (errno == EOVERFLOW && size == PTRDIFF_MAX - 1 && offset == 17);
+    size = 0;
+    assert (udp_workspace_span (&size, (size_t)PTRDIFF_MAX / 4 + 1, 4, 1,
+                                &offset) == -1);
+    assert (errno == EOVERFLOW && !size && offset == 17);
+    fail_next = 1;
+    assert (!udp_workspace_new (&workspace, 10, &slots) && errno == ENOMEM);
+    assert (alloc_calls == calls + 1 && !live_bytes && slots == &sentinel &&
+            !memcmp (&workspace, &unchanged, sizeof (workspace)));
+    calls = alloc_calls;
+    assert (!hev_socks5_udp_sendmmsg (NULL, NULL, 0));
+    assert (!hev_socks5_udp_recvmmsg (NULL, NULL, 0, 1));
+    assert (hev_socks5_udp_sendmmsg (&self, NULL, UINT_MAX) == -1 &&
+            errno == EOVERFLOW);
+    assert (hev_socks5_udp_recvmmsg (&self, NULL, UINT_MAX, 1) == -1 &&
+            errno == EOVERFLOW);
+    self.timeout = 0;
+    assert (hev_socks5_udp_sendmmsg (&self, NULL, 10) == -1);
+    assert (hev_socks5_udp_recvmmsg (&self, NULL, 10, 1) == -1);
+    assert (alloc_calls == calls && !live_bytes);
+    puts (
+        "PASS: aligned disjoint workspace spans, checked arithmetic, transactional ENOMEM and allocation-free no-op/terminal API entries");
 }
 
 static void
@@ -359,6 +459,7 @@ sleep_clock_domains (void)
 int
 main (void)
 {
+    workspace_boundaries ();
     rounding ();
     timeline_and_failures ();
     reference_histories ();

@@ -173,8 +173,9 @@ def reply_send_errors(port):
     return rows
 
 
-def prior_control(binary, directory):
-    with proxy_server(str(binary), directory / 'old.server.log') as port:
+def prior_control(binary, directory, udp_buffer_count):
+    with proxy_server(str(binary), directory / 'old.server.log',
+                      udp_buffer_count=udp_buffer_count) as port:
         with datagram(socket.AF_INET) as dest:
             dest.bind(('127.0.0.1', 0))
             endpoint = dest.getsockname()[:2]
@@ -191,19 +192,23 @@ def main():
     parser.add_argument('binary', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--old-control', action='store_true')
+    parser.add_argument('--udp-buffer-count', type=int, default=10)
     args = parser.parse_args()
     if not __debug__:
         parser.error('Assertions are mandatory')
+    if args.udp_buffer_count < 1:
+        parser.error('The buffer count must be positive')
     rows = []
     args.output.parent.mkdir(parents=True, exist_ok=True)
     try:
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
             if args.old_control:
-                rows.append(prior_control(args.binary.resolve(), directory))
+                rows.append(prior_control(args.binary.resolve(), directory, args.udp_buffer_count))
             else:
                 for workers in (1, 4):
-                    with proxy_server(str(args.binary.resolve()), directory / f'new-{workers}.server.log', workers) as port:
+                    with proxy_server(str(args.binary.resolve()), directory / f'new-{workers}.server.log', workers,
+                                      udp_buffer_count=args.udp_buffer_count) as port:
                         routes = [('127.0.0.1', False, 'known'), ('127.0.0.1', False, '0.0.0.0'),
                                   ('::1', False, 'known'), ('::1', False, '::'),
                                   ('127.0.0.1', True, 'known')]
@@ -223,6 +228,8 @@ def main():
                                 rows.append(dict(case='concurrent-association', workers=workers,
                                                  subcases=len(result)))
     finally:
+        for row in rows:
+            row['buffer_count'] = args.udp_buffer_count
         args.output.write_text(json.dumps(rows, indent=2) + '\n')
     print(json.dumps(dict(passed=True, recorded_cases=len(rows), old_control=args.old_control)))
 

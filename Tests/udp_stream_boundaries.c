@@ -1,4 +1,12 @@
 #define _GNU_SOURCE
+#include <sys/socket.h>
+
+ssize_t stream_datagram_recv (int fd, void *buf, size_t length, int flags);
+#if defined(__APPLE__)
+int stream_datagram_getsockopt (int fd, int level, int option, void *value,
+                                socklen_t *length);
+#endif
+
 /* Actual production codec/forwarder; completed I/O and resolution are controlled.
  * No rewritten parser, forward loop, timer, buffer helper, or application API. */
 #define hev_task_io_socket_recv stream_recv
@@ -7,6 +15,10 @@
 #define hev_task_io_socket_sendmsg stream_sendmsg
 #define hev_task_io_socket_sendmmsg stream_sendmmsg
 #define hev_socks5_addr_into_sockaddr6 stream_resolve
+#define recv stream_datagram_recv
+#if defined(__APPLE__)
+#define getsockopt stream_datagram_getsockopt
+#endif
 /* The composed audit aliases meter I/O for inherited fixtures. Keep this send
  * boundary distinct so bypassing udp_sendmmsg's meter hook is still detected. */
 #ifdef hev_meter_sendmmsg
@@ -23,6 +35,10 @@
 #undef hev_task_io_socket_sendmsg
 #undef hev_task_io_socket_sendmmsg
 #undef hev_socks5_addr_into_sockaddr6
+#undef recv
+#if defined(__APPLE__)
+#undef getsockopt
+#endif
 
 #include <assert.h>
 #include <stdio.h>
@@ -33,6 +49,9 @@ static size_t available, consumed, first_piece, emitted;
 static int end_result, send_calls, body_calls;
 static ssize_t send_result;
 static unsigned long cases;
+static int chunk_active, chunk_fault_call, chunk_cancel_call;
+static ssize_t chunk_fault_result;
+static unsigned chunk_requested, chunk_frames_seen;
 
 typedef struct
 {
@@ -96,29 +115,61 @@ static const struct
 static const size_t backward_lengths[] = { 7, 0, 23, 31 };
 static unsigned char backward_payloads[4][31];
 static unsigned backward_case, backward_calls, backward_accepted;
+static unsigned backward_receive_index;
 static int backward_active;
+
+ssize_t
+stream_datagram_recv (int fd, void *buf, size_t length, int flags)
+{
+    if (backward_active && fd == 23 && (flags & MSG_PEEK)) {
+        if (backward_receive_index < 4)
+            return backward_lengths[backward_receive_index];
+        errno = EAGAIN;
+        return -1;
+    }
+    return recv (fd, buf, length, flags);
+}
+
+#if defined(__APPLE__)
+int
+stream_datagram_getsockopt (int fd, int level, int option, void *value,
+                            socklen_t *length)
+{
+    if (backward_active && fd == 23 && level == SOL_SOCKET &&
+        option == SO_NREAD) {
+        assert (*length == sizeof (int));
+        *(int *)value = backward_receive_index < 4 ?
+                            backward_lengths[backward_receive_index] :
+                            0;
+        return 0;
+    }
+    return getsockopt (fd, level, option, value, length);
+}
+#endif
 
 int
 stream_recvmmsg (int fd, void *messages, unsigned count, int flags,
                  HevTaskIOYielder yielder, void *self)
 {
     struct mmsghdr *vector = messages;
-    assert (backward_active && fd == 23 && count == 4);
+    assert (backward_active && fd == 23 && count == 1);
     assert (flags == MSG_DONTWAIT && yielder == task_io_yielder && self);
     for (unsigned i = 0; i < count; i++) {
+        unsigned id = backward_receive_index++;
         struct msghdr *msg = &vector[i].msg_hdr;
         struct sockaddr_in6 *addr = msg->msg_name;
+        assert (id < 4);
         assert (msg->msg_namelen == sizeof (*addr));
         memset (addr, 0, sizeof (*addr));
         addr->sin6_family = AF_INET6;
-        addr->sin6_port = htons (100 + i);
+        addr->sin6_port = htons (100 + id);
         addr->sin6_addr.s6_addr[10] = addr->sin6_addr.s6_addr[11] = 0xff;
         addr->sin6_addr.s6_addr[12] = 127;
         addr->sin6_addr.s6_addr[15] = 1;
         assert (msg->msg_iovlen == 1 && msg->msg_iov[0].iov_len >= 31);
-        memcpy (msg->msg_iov[0].iov_base, backward_payloads[i],
-                backward_lengths[i]);
-        vector[i].msg_len = backward_lengths[i];
+        memcpy (msg->msg_iov[0].iov_base, backward_payloads[id],
+                backward_lengths[id]);
+        vector[i].msg_len = backward_lengths[id];
     }
     return count;
 }
@@ -332,11 +383,12 @@ ssize_t
 stream_sendmsg (int fd, const struct msghdr *message, int flags,
                 HevTaskIOYielder yielder, void *data)
 {
-    (void)yielder;
-    (void)data;
+    size_t start;
     assert (fd == 19 && flags == MSG_WAITALL);
     send_calls++;
-    emitted = 0;
+    if (!chunk_active)
+        emitted = 0;
+    start = emitted;
     for (size_t i = 0; i < (size_t)message->msg_iovlen; i++) {
         const struct iovec *iov = &message->msg_iov[i];
         assert (iov->iov_len <= sizeof (sent) - emitted);
@@ -344,6 +396,20 @@ stream_sendmsg (int fd, const struct msghdr *message, int flags,
         emitted += iov->iov_len;
     }
     errno = EIO;
+    if (chunk_active) {
+        unsigned remaining = chunk_requested - chunk_frames_seen;
+        unsigned frames = remaining > 10 ? 10 : remaining;
+        assert (yielder == task_io_yielder && HEV_SOCKS5 (data)->timeout);
+        assert (message->msg_iovlen == frames * 3);
+        chunk_frames_seen += frames;
+        if (send_calls == chunk_cancel_call)
+            hev_socks5_set_timeout (data, 0);
+        if (send_calls == chunk_fault_call)
+            return chunk_fault_result == SSIZE_MAX ?
+                       (ssize_t)(emitted - start) - 1 :
+                       chunk_fault_result;
+        return emitted - start;
+    }
     return send_result;
 }
 
@@ -505,6 +571,9 @@ domain_boundaries (void)
     } checks[] = { { 17, -1 }, { 17, 0 }, { 17, 4 },  { 17, 8 },
                    { 4, -1 },  { 5, -1 }, { 13, -1 }, { 15, -1 } };
     HevSocks5Class klass = { .base.iface = get_iface, .binder = forward_bind };
+    UDPWorkspace workspace;
+    void *allocation = udp_workspace_new (&workspace, 2, NULL);
+    assert (allocation);
     for (int managed = 0; managed < 2; managed++) {
         for (int prefix = 0; prefix < 2; prefix++) {
             for (unsigned i = 0; i < sizeof (checks) / sizeof (*checks); i++) {
@@ -560,9 +629,8 @@ domain_boundaries (void)
                     forward_calls = forward_resolved = forward_bound = 0;
                     forward_meter_calls = 0;
                     forward_terminal_receive = 1;
-                    assert (hev_socks5_udp_fwd_f (
-                                &self, 23, base, prefix + 1, &bind,
-                                managed ? slots : NULL) == -1);
+                    assert (hev_socks5_udp_fwd_f (&self, 23, prefix + 1, &bind,
+                                                  slots, &workspace) == -1);
                     assert (!self.timeout && consumed == available);
                     assert (!forward_resolved && !forward_bound && !bind);
                     assert (!forward_calls && !forward_meter_calls);
@@ -574,6 +642,7 @@ domain_boundaries (void)
     }
     puts (
         "PASS: complete and bounded NAME frames; NUL rejection preserves prior count and caller storage; terminal prefixes stop forwarding");
+    hev_free (allocation);
 }
 
 static void
@@ -584,9 +653,12 @@ send_boundaries (void)
                        .type = HEV_SOCKS5_TYPE_UDP_IN_TCP,
                        .timeout = 60000 };
     HevSocks5UDPMsg messages[2];
+    UDPWorkspace workspace;
+    void *allocation = udp_workspace_new (&workspace, 2, NULL);
     size_t first = frame (wire, 1, 7);
     size_t second = frame (wire + first, 4, 2048);
     size_t total = first + second;
+    assert (allocation);
     messages[0] = (HevSocks5UDPMsg){ (void *)(wire + 3), wire + 10, 7 };
     messages[1] = (HevSocks5UDPMsg){ (void *)(wire + first + 3),
                                      wire + first + 22, 2048 };
@@ -594,7 +666,7 @@ send_boundaries (void)
         int result;
         self.timeout = 60000;
         send_calls = 0;
-        result = hev_socks5_udp_sendmmsg_tcp (&self, messages, 2);
+        result = hev_socks5_udp_sendmmsg_tcp (&self, messages, 2, &workspace);
         assert (send_calls == 1 && emitted == total);
         assert (!memcmp (sent, wire, total));
         assert (result == (send_result == (ssize_t)total ? 2 : -1));
@@ -605,9 +677,113 @@ send_boundaries (void)
      * cannot represent 65536 payload bytes. Do not silently wrap it to zero. */
     messages[0].len = 65536;
     send_calls = 0;
-    assert (hev_socks5_udp_sendmmsg_tcp (&self, messages, 1) == -1);
+    assert (hev_socks5_udp_sendmmsg_tcp (&self, messages, 1, &workspace) == -1);
     assert (!send_calls);
     cases++;
+    hev_free (allocation);
+}
+
+/* A complete configured batch may need several bounded native sendmsg calls.
+ * Check the serialized stream independently, including zero-byte datagrams. */
+static void
+send_chunk_boundaries (void)
+{
+    const unsigned counts[] = { 9, 10, 11, 21, 343 };
+    const int types[] = { 1, 3, 4 };
+    const ssize_t failures[] = { -2, -1, 0, 1, SSIZE_MAX };
+    HevObjectClass klass = { .iface = get_iface };
+    HevSocks5 self = { .base.klass = &klass,
+                       .type = HEV_SOCKS5_TYPE_UDP_IN_TCP,
+                       .timeout = 60000 };
+    UDPWorkspace workspace;
+    void *allocation = udp_workspace_new (&workspace, 343, NULL);
+    HevSocks5UDPMsg *messages = calloc (343, sizeof (*messages));
+    size_t ends[344] = { 0 };
+    assert (allocation && messages);
+    for (unsigned i = 0; i < 343; i++) {
+        size_t length = i % 5 ? 4 + i % 13 : 0;
+        unsigned char *head = wire + ends[i];
+        size_t size = frame (head, types[i % 3], length);
+        size_t header = size - length;
+        assert (size <= sizeof (wire) - ends[i]);
+        head[header - 2] = i >> 8;
+        head[header - 1] = i;
+        for (size_t j = 0; j < length; j++)
+            head[header + j] = (i * 13 + j) % 251;
+        messages[i] =
+            (HevSocks5UDPMsg){ (void *)(head + 3), head + header, length };
+        ends[i + 1] = ends[i] + size;
+    }
+    chunk_active = 1;
+    chunk_fault_call = chunk_cancel_call = 0;
+    for (unsigned i = 0; i < sizeof (counts) / sizeof (*counts); i++) {
+        chunk_requested = counts[i];
+        chunk_frames_seen = emitted = send_calls = 0;
+        self.timeout = 60000;
+        assert (hev_socks5_udp_sendmmsg_tcp (&self, messages, counts[i],
+                                             &workspace) == (int)counts[i]);
+        assert (send_calls == (int)((counts[i] + 9) / 10));
+        assert (chunk_frames_seen == counts[i] && emitted == ends[counts[i]]);
+        assert (!memcmp (sent, wire, emitted) && self.timeout == 60000);
+        cases++;
+    }
+
+    /* An error/short second chunk must never append the third chunk. The
+     * positive one-frame prefix is incomplete even at a frame boundary. */
+    chunk_requested = 31;
+    chunk_fault_call = 2;
+    for (unsigned i = 0; i <= sizeof (failures) / sizeof (*failures); i++) {
+        chunk_fault_result = i < sizeof (failures) / sizeof (*failures) ?
+                                 failures[i] :
+                                 (ssize_t)(ends[11] - ends[10]);
+        chunk_frames_seen = emitted = send_calls = 0;
+        self.timeout = 60000;
+        assert (hev_socks5_udp_sendmmsg_tcp (&self, messages, 31, &workspace) ==
+                -1);
+        assert (send_calls == 2 && chunk_frames_seen == 20);
+        assert (emitted == ends[20] && !memcmp (sent, wire, emitted));
+        assert (!self.timeout);
+        cases++;
+    }
+    chunk_fault_call = 0;
+    for (chunk_cancel_call = 1; chunk_cancel_call <= 2; chunk_cancel_call++) {
+        chunk_frames_seen = emitted = send_calls = 0;
+        self.timeout = 60000;
+        assert (hev_socks5_udp_sendmmsg_tcp (&self, messages, 31, &workspace) ==
+                -1);
+        assert (send_calls == chunk_cancel_call);
+        assert (chunk_frames_seen == (unsigned)chunk_cancel_call * 10);
+        assert (emitted == ends[chunk_frames_seen]);
+        assert (!memcmp (sent, wire, emitted) && !self.timeout);
+        cases++;
+    }
+    chunk_cancel_call = 0;
+
+    /* Validation covers every original message before any chunk is sent. */
+    chunk_requested = 343;
+    for (unsigned mode = 0; mode < 3; mode++) {
+        HevSocks5Addr invalid = { .atype = mode == 0 ? 255 : 3 };
+        HevSocks5UDPMsg saved = messages[342];
+        invalid.domain.len = 249;
+        if (mode < 2)
+            messages[342].addr = &invalid;
+        else
+            messages[342].len = 65536;
+        chunk_frames_seen = emitted = send_calls = 0;
+        self.timeout = 60000;
+        assert (hev_socks5_udp_sendmmsg_tcp (&self, messages, 343,
+                                             &workspace) == -1);
+        assert (!send_calls && !emitted && !chunk_frames_seen);
+        assert (self.timeout == 60000);
+        messages[342] = saved;
+        cases++;
+    }
+    chunk_active = 0;
+    free (messages);
+    hev_free (allocation);
+
+    puts (
+        "PASS: 9/10/11/21/343-frame sends; complete stream, second-chunk failures, cancellation and prevalidation");
 }
 
 static void
@@ -615,11 +791,14 @@ forward_boundaries (void)
 {
     const int types[] = { 1, 3, 4 };
     HevSocks5Class klass = { .base.iface = get_iface, .binder = forward_bind };
+    UDPWorkspace workspace;
+    void *allocation = udp_workspace_new (&workspace, 4, NULL);
     unsigned long count = 0;
+    assert (allocation);
     for (forward_case = 0;
          forward_case < sizeof (forward_cases) / sizeof (*forward_cases);
          forward_case++) {
-        for (int managed = 0; managed <= 1; managed++) {
+        for (int expanded = 0; expanded <= 1; expanded++) {
             for (int rotation = 0; rotation < 3; rotation++) {
                 for (first_piece = 1; first_piece <= 5; first_piece += 4) {
                     HevSocks5 self = { .base.klass = &klass.base,
@@ -628,7 +807,7 @@ forward_boundaries (void)
                     unsigned char base[4][UDP_BUF_SIZE];
                     UDPBuffer slots[4] = { 0 };
                     UDPBuffers owner = { .slots = slots, .count = 4 };
-                    size_t lengths[] = { 7, 0, 23, managed ? 2048 : 1232 };
+                    size_t lengths[] = { 7, 0, 23, expanded ? 2048 : 1232 };
                     int bind = 0;
                     available = consumed = 0;
                     end_result = -1;
@@ -649,8 +828,8 @@ forward_boundaries (void)
                     }
                     forward_resolve_self =
                         forward_cases[forward_case].stop == 2 ? &self : NULL;
-                    assert (hev_socks5_udp_fwd_f (&self, 23, base, 4, &bind,
-                                                  managed ? slots : NULL) ==
+                    assert (hev_socks5_udp_fwd_f (&self, 23, 4, &bind, slots,
+                                                  &workspace) ==
                             forward_cases[forward_case].result);
                     forward_resolve_self = NULL;
                     assert (consumed == available);
@@ -668,8 +847,8 @@ forward_boundaries (void)
                     assert (forward_meter_calls ==
                             (FORWARD_EXPECT_METER ? forward_calls : 0));
                     if (forward_cases[forward_case].result == 1) {
-                        assert (!hev_socks5_udp_fwd_f (
-                            &self, 23, base, 4, &bind, managed ? slots : NULL));
+                        assert (!hev_socks5_udp_fwd_f (&self, 23, 4, &bind,
+                                                       slots, &workspace));
                         assert (forward_resolved == 4);
                         assert (forward_calls ==
                                 forward_cases[forward_case].count);
@@ -686,6 +865,7 @@ forward_boundaries (void)
     printf (
         "PASS: %lu actual forward cases; compact vectors, empty payload, bounded errors, terminal send prefixes, meter route %s\n",
         count, FORWARD_EXPECT_METER ? "checked" : "UDP only");
+    hev_free (allocation);
 }
 
 static void
@@ -699,59 +879,67 @@ forward_receive_boundaries (void)
                     { 7, 0, 60000 }, { 0, -2, 60000 }, { 2, -2, 60000 },
                     { 7, -2, 60000 } };
     HevSocks5Class klass = { .base.iface = get_iface, .binder = forward_bind };
+    UDPWorkspace workspace;
+    void *allocation = udp_workspace_new (&workspace, 2, NULL);
+    assert (allocation);
     forward_terminal_receive = 1;
-    for (int managed = 0; managed <= 1; managed++) {
-        for (unsigned i = 0; i < sizeof (endings) / sizeof (*endings); i++) {
-            HevSocks5 self = { .base.klass = &klass.base,
-                               .type = HEV_SOCKS5_TYPE_UDP_IN_TCP,
-                               .timeout = endings[i].timeout };
-            unsigned char base[2][UDP_BUF_SIZE];
-            UDPBuffer slots[2] = { 0 };
-            UDPBuffers owner = { .slots = slots, .count = 2 };
-            int bind = 0;
-            available = frame (wire, 1, 7);
-            frame (wire + available, 1, 23);
-            available += endings[i].cut;
-            consumed = 0;
-            first_piece = 2;
-            end_result = endings[i].end;
-            forward_calls = forward_resolved = forward_bound = 0;
-            forward_meter_calls = 0;
-            for (unsigned id = 0; id < 2; id++)
-                slots[id] = (UDPBuffer){ .base = base[id],
-                                         .capacity = UDP_BUF_SIZE,
-                                         .owner = &owner };
-            /* The decoder preserves the completed count (checked above), but
+    for (unsigned i = 0; i < sizeof (endings) / sizeof (*endings); i++) {
+        HevSocks5 self = { .base.klass = &klass.base,
+                           .type = HEV_SOCKS5_TYPE_UDP_IN_TCP,
+                           .timeout = endings[i].timeout };
+        unsigned char base[2][UDP_BUF_SIZE];
+        UDPBuffer slots[2] = { 0 };
+        UDPBuffers owner = { .slots = slots, .count = 2 };
+        int bind = 0;
+        available = frame (wire, 1, 7);
+        frame (wire + available, 1, 23);
+        available += endings[i].cut;
+        consumed = 0;
+        first_piece = 2;
+        end_result = endings[i].end;
+        forward_calls = forward_resolved = forward_bound = 0;
+        forward_meter_calls = 0;
+        for (unsigned id = 0; id < 2; id++)
+            slots[id] = (UDPBuffer){ .base = base[id],
+                                     .capacity = UDP_BUF_SIZE,
+                                     .owner = &owner };
+        /* The decoder preserves the completed count (checked above), but
              * terminal state must prevent resolution, binding and sending. */
-            assert (hev_socks5_udp_fwd_f (&self, 23, base, 2, &bind,
-                                          managed ? slots : NULL) == -1);
-            assert (!self.timeout && consumed == available);
-            assert (!forward_resolved && !forward_bound && !bind);
-            assert (!forward_calls && !forward_meter_calls);
-            for (unsigned id = 0; id < 2; id++)
-                assert (!udp_buffer_resize (&slots[id], UDP_BUF_SIZE));
-            cases++;
-        }
+        assert (hev_socks5_udp_fwd_f (&self, 23, 2, &bind, slots, &workspace) ==
+                -1);
+        assert (!self.timeout && consumed == available);
+        assert (!forward_resolved && !forward_bound && !bind);
+        assert (!forward_calls && !forward_meter_calls);
+        for (unsigned id = 0; id < 2; id++)
+            assert (!udp_buffer_resize (&slots[id], UDP_BUF_SIZE));
+        cases++;
     }
     forward_terminal_receive = 0;
     puts (
         "PASS: terminal received prefixes stop before resolution, bind or send");
+    hev_free (allocation);
 }
 
 static int
 backward_receive_send (HevSocks5 *self)
 {
-    unsigned char data[4][31];
-    struct sockaddr_in6 addr[4];
-    struct iovec iov[4];
-    struct mmsghdr messages[4] = { 0 };
+    unsigned char data[4][UDP_BUF_SIZE];
+    UDPBuffer slots[4] = { 0 };
+    UDPBuffers owner = { .slots = slots, .count = 4 };
+    UDPWorkspace workspace;
+    void *allocation = udp_workspace_new (&workspace, 4, NULL);
+    int result;
+    assert (allocation);
     for (unsigned i = 0; i < 4; i++) {
-        iov[i] = (struct iovec){ data[i], sizeof (data[i]) };
-        messages[i].msg_hdr.msg_iov = &iov[i];
-        messages[i].msg_hdr.msg_iovlen = 1;
-        messages[i].msg_hdr.msg_name = &addr[i];
+        slots[i] = (UDPBuffer){ .base = data[i],
+                                .capacity = UDP_BUF_SIZE,
+                                .owner = &owner };
     }
-    return hev_socks5_udp_fwd_b (self, 23, messages, 4, NULL);
+    backward_receive_index = 0;
+    result = hev_socks5_udp_fwd_b (self, 23, 4, slots, &workspace);
+    assert (backward_receive_index == 4);
+    hev_free (allocation);
+    return result;
 }
 
 static void
@@ -885,6 +1073,7 @@ main (void)
     header_boundaries ();
     domain_boundaries ();
     send_boundaries ();
+    send_chunk_boundaries ();
     forward_boundaries ();
     forward_receive_boundaries ();
     backward_boundaries ();
