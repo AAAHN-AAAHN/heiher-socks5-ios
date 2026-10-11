@@ -26,6 +26,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <hev-task-system.h>
 
 static unsigned char wire[140000], sent[140000];
 static size_t available, consumed, first_piece, emitted;
@@ -43,23 +44,32 @@ typedef struct
 static const struct
 {
     unsigned drop, count, accepted;
-    int result, bind_error;
+    int result, bind_error, stop;
     ForwardCall calls[4];
 } forward_cases[] = {
-    { 4, 1, 11, 1, 0, { { 11, 3 } } }, /* Middle resolution failure; empty kept. */
-    { 15, 0, 0, 1, 0, { { 0, 0 } } }, /* All dropped: no bind or send. */
-    { 0, 3, 13, 1, 0, { { 15, 1 }, { 14, -1 }, { 12, 2 } } },
-    { 0, 1, 0, -1, 0, { { 15, -2 } } }, /* Direct cancellation is terminal. */
-    { 0, 2, 1, -1, 0, { { 15, 1 }, { 14, -2 } } },
-    { 0, 4, 0, 1, 0, { { 15, 0 }, { 14, 0 }, { 12, 0 }, { 8, 0 } } },
-    { 0, 4, 0, 1, 0, { { 15, -1 }, { 14, -1 }, { 12, -1 }, { 8, -1 } } },
-    { 0, 4, 4, 1, 0, { { 15, 0 }, { 14, -1 }, { 12, 1 }, { 8, 0 } } },
-    { 9, 1, 6, 1, 0, { { 6, 2 } } }, /* Bind first valid compacted address. */
-    { 13, 1, 2, 1, 0, { { 2, 1 } } }, /* Only an empty datagram. */
-    { 0, 0, 0, -1, -1, { { 0, 0 } } }, /* Binder failure stays terminal. */
+    { 4,
+      1,
+      11,
+      1,
+      0,
+      0,
+      { { 11, 3 } } }, /* Middle resolution failure; empty kept. */
+    { 15, 0, 0, 1, 0, 0, { { 0, 0 } } }, /* All dropped: no bind or send. */
+    { 0, 3, 13, 1, 0, 0, { { 15, 1 }, { 14, -1 }, { 12, 2 } } },
+    { 0, 1, 0, -1, 0, 0, { { 15, -2 } } }, /* Direct cancellation is terminal. */
+    { 0, 2, 1, -1, 0, 0, { { 15, 1 }, { 14, -2 } } },
+    { 0, 4, 0, 1, 0, 0, { { 15, 0 }, { 14, 0 }, { 12, 0 }, { 8, 0 } } },
+    { 0, 4, 0, 1, 0, 0, { { 15, -1 }, { 14, -1 }, { 12, -1 }, { 8, -1 } } },
+    { 0, 4, 4, 1, 0, 0, { { 15, 0 }, { 14, -1 }, { 12, 1 }, { 8, 0 } } },
+    { 9, 1, 6, 1, 0, 0, { { 6, 2 } } }, /* Bind first valid compacted address. */
+    { 13, 1, 2, 1, 0, 0, { { 2, 1 } } }, /* Only an empty datagram. */
+    { 0, 0, 0, -1, -1, 0, { { 0, 0 } } }, /* Binder failure stays terminal. */
+    { 0, 1, 1, -1, 0, 1, { { 15, 1 } } }, /* Terminal after a completed prefix. */
+    { 0, 1, 0, -1, 0, 1, { { 15, -1 } } }, /* Terminal with an ordinary error. */
 };
 static unsigned forward_case, forward_calls, forward_resolved, forward_bound;
 static unsigned forward_accepted, forward_meter_calls;
+static int forward_terminal_receive;
 static HevSocks5UDPMsg forward_messages[4];
 static const struct
 {
@@ -152,6 +162,7 @@ stream_resolve (const HevSocks5Addr *source, struct sockaddr_in6 *address,
                 int *family)
 {
     unsigned id = forward_resolved++;
+    assert (!forward_terminal_receive);
     assert (id < 4);
     assert (!memcmp (source, forward_messages[id].addr,
                      hev_socks5_addr_len (source)));
@@ -212,6 +223,8 @@ forward_send (int fd, void *messages, unsigned count, int flags,
         index++;
     }
     assert (index == count);
+    if (forward_cases[forward_case].stop)
+        hev_socks5_set_timeout (self, 0);
     errno = EIO;
     return call->result;
 }
@@ -565,15 +578,66 @@ forward_boundaries (void)
                     }
                     for (unsigned id = 0; id < 4; id++)
                         assert (!udp_buffer_resize (&slots[id], UDP_BUF_SIZE));
-                    assert (self.timeout == 60000);
+                    assert (self.timeout ==
+                            (forward_cases[forward_case].stop ? 0 : 60000));
                     count++;
                 }
             }
         }
     }
     printf (
-        "PASS: %lu actual forward cases; compact vectors, empty payload, bounded errors, direct cancellation, meter route %s\n",
+        "PASS: %lu actual forward cases; compact vectors, empty payload, bounded errors, terminal send prefixes, meter route %s\n",
         count, FORWARD_EXPECT_METER ? "checked" : "UDP only");
+}
+
+static void
+forward_receive_boundaries (void)
+{
+    const struct
+    {
+        size_t cut;
+        int end, timeout;
+    } endings[] = { { 0, -1, 0 },    { 0, 0, 60000 },  { 2, 0, 60000 },
+                    { 7, 0, 60000 }, { 0, -2, 60000 }, { 2, -2, 60000 },
+                    { 7, -2, 60000 } };
+    HevSocks5Class klass = { .base.iface = get_iface, .binder = forward_bind };
+    forward_terminal_receive = 1;
+    for (int managed = 0; managed <= 1; managed++) {
+        for (unsigned i = 0; i < sizeof (endings) / sizeof (*endings); i++) {
+            HevSocks5 self = { .base.klass = &klass.base,
+                               .type = HEV_SOCKS5_TYPE_UDP_IN_TCP,
+                               .timeout = endings[i].timeout };
+            unsigned char base[2][UDP_BUF_SIZE];
+            UDPBuffer slots[2] = { 0 };
+            UDPBuffers owner = { .slots = slots, .count = 2 };
+            int bind = 0;
+            available = frame (wire, 1, 7);
+            frame (wire + available, 1, 23);
+            available += endings[i].cut;
+            consumed = 0;
+            first_piece = 2;
+            end_result = endings[i].end;
+            forward_calls = forward_resolved = forward_bound = 0;
+            forward_meter_calls = 0;
+            for (unsigned id = 0; id < 2; id++)
+                slots[id] = (UDPBuffer){ .base = base[id],
+                                         .capacity = UDP_BUF_SIZE,
+                                         .owner = &owner };
+            /* The decoder preserves the completed count (checked above), but
+             * terminal state must prevent resolution, binding and sending. */
+            assert (hev_socks5_udp_fwd_f (&self, 23, base, 2, &bind,
+                                          managed ? slots : NULL) == -1);
+            assert (!self.timeout && consumed == available);
+            assert (!forward_resolved && !forward_bound && !bind);
+            assert (!forward_calls && !forward_meter_calls);
+            for (unsigned id = 0; id < 2; id++)
+                assert (!udp_buffer_resize (&slots[id], UDP_BUF_SIZE));
+            cases++;
+        }
+    }
+    forward_terminal_receive = 0;
+    puts (
+        "PASS: terminal received prefixes stop before resolution, bind or send");
 }
 
 static int
@@ -638,14 +702,101 @@ backward_boundaries (void)
         FORWARD_EXPECT_METER ? "checked" : "UDP only");
 }
 
+typedef struct
+{
+    HevSocks5 *self;
+    HevTask *waiter;
+    int control;
+} WaitEnd;
+
+static void
+end_wait (void *data)
+{
+    WaitEnd *end = data;
+    if (end->control >= 0) {
+        /* Read readiness wakes the task without an explicit task wakeup. */
+        assert (!shutdown (end->control, SHUT_WR));
+    } else {
+        hev_socks5_set_timeout (end->self, 0);
+        hev_task_wakeup (end->waiter);
+    }
+}
+
+static int
+yield_case (unsigned mode, HevSocks5 *self)
+{
+    UDPBuffers buffers = { .next_cleanup =
+                               udp_buffer_now () + 60 * UDP_NSEC_PER_SEC };
+    if (mode == 2)
+        return udp_buffers_yield (HEV_TASK_WAITIO, self, &buffers);
+    return task_io_yielder (mode ? HEV_TASK_YIELD : HEV_TASK_WAITIO, self);
+}
+
+static void
+yielder_boundaries (void *data)
+{
+    HevSocks5 self = { .type = HEV_SOCKS5_TYPE_UDP_IN_TCP, .timeout = 1 };
+    (void)data;
+    /* Exercise the real generic yielder and timer, not a mocked -1 result. */
+    assert (task_io_yielder (HEV_TASK_WAITIO, &self) == -1);
+    assert (!self.timeout);
+    cases++;
+    /* Direct WAITIO/YIELD and the maintenance wrapper's separate sleep path. */
+    for (unsigned mode = 0; mode < 3; mode++) {
+        assert (yield_case (mode, &self) == -1);
+        cases++;
+        for (int control = 0; control <= 1; control++) {
+            for (int finite = 0; finite <= 1; finite++) {
+                int pair[2];
+                HevTask *ender = hev_task_new (-1);
+                WaitEnd end = { &self, hev_task_self (), -1 };
+                assert (ender);
+                self.type = control ? HEV_SOCKS5_TYPE_UDP_IN_UDP :
+                                      HEV_SOCKS5_TYPE_UDP_IN_TCP;
+                self.timeout = finite ? 60000 : -1;
+                if (control) {
+                    assert (!hev_task_io_socket_socketpair (
+                        AF_UNIX, SOCK_STREAM, 0, pair));
+                    self.fd = pair[1];
+                    end.control = pair[0];
+                    assert (!hev_task_add_fd (end.waiter, self.fd, POLLIN));
+                }
+                /* The new task runs only after the real yielder suspends us.
+                 * Finite cancellation wakes sleep with positive time left. */
+                hev_task_run (ender, end_wait, &end);
+                assert (yield_case (mode, &self) == -1);
+                assert (!self.timeout);
+                if (control) {
+                    assert (!hev_task_del_fd (end.waiter, self.fd));
+                    close (pair[0]);
+                    close (pair[1]);
+                }
+                hev_task_unref (ender);
+                cases++;
+            }
+        }
+    }
+    puts (
+        "PASS: real direct/maintenance yielder timeout, wake cancellation and control-close termination");
+}
+
 int
 main (void)
 {
+    HevTask *task;
     receive_boundaries ();
     header_boundaries ();
     send_boundaries ();
     forward_boundaries ();
+    forward_receive_boundaries ();
     backward_boundaries ();
+    assert (!hev_task_system_init ());
+    task = hev_task_new (-1);
+    assert (task);
+    hev_task_run (task, yielder_boundaries, NULL);
+    hev_task_system_run ();
+    hev_task_unref (task);
+    hev_task_system_fini ();
     printf (
         "PASS: %lu stream boundary cases; exact payload/address, partial-frame prefix and terminal write checks\n",
         cases);

@@ -269,6 +269,7 @@ headers (void)
                     header_batches = 1;
                     retry_yields = 0;
                     self.udp_associated = associated;
+                    self.timeout = 60000;
                     msg.buf = buffer;
                     msg.len = sizeof (buffer);
                     assert (hev_socks5_udp_recvmmsg_udp (&self, &msg, 1, 1,
@@ -290,6 +291,7 @@ headers (void)
             cancel_yield = mode == 2;
             retry_yields = 0;
             self.udp_associated = 0;
+            self.timeout = 60000;
             msg.buf = buffer;
             msg.len = sizeof (buffer);
             result = hev_socks5_udp_recvmmsg_udp (&self, &msg, 1, 1, NULL);
@@ -302,6 +304,7 @@ headers (void)
                 assert (errno == (mode == 1 ? EAGAIN : ECANCELED));
                 assert (retry_yields == (mode == 1 ? 12 : 1));
             }
+            assert (self.timeout == (cancel_yield ? 0 : 60000));
             header_batches = empty_after_header = cancel_yield = 0;
         }
     }
@@ -327,6 +330,7 @@ main (void)
     addresses ();
     for (pass = 0; pass < 2; pass++) {
         self.udp_associated = 0;
+        self.timeout = 60000;
         family = pass ? AF_INET6 : AF_INET;
         for (i = 0; i < 10; i++) {
             msgs[i].buf = buffers[i];
@@ -354,6 +358,7 @@ main (void)
             int result;
 
             self.udp_associated = 0;
+            self.timeout = 60000;
             msgs[0].buf = buffers[0];
             msgs[0].len = sizeof (buffers[0]);
             foreign_batches = 2;
@@ -372,6 +377,7 @@ main (void)
                         retry_yields == 1);
                 assert (connect_calls == before && !self.udp_associated);
             }
+            assert (self.timeout == (cancel_yield ? 0 : 60000));
         }
     }
     foreign_batches = empty_after_foreign = cancel_yield = 0;
@@ -385,6 +391,7 @@ main (void)
         vec[i].msg_hdr.msg_iovlen = 1;
     }
     for (pass = 0; pass < 20; pass++) {
+        self.timeout = 60000;
         family = pass % 2 ? AF_INET6 : AF_INET;
         for (i = 0; i < 10; i++)
             vec[i].msg_hdr.msg_namelen = sizeof (struct sockaddr_in);
