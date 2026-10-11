@@ -496,6 +496,87 @@ header_boundaries (void)
 }
 
 static void
+domain_boundaries (void)
+{
+    const struct
+    {
+        size_t cut;
+        int nul;
+    } checks[] = { { 17, -1 }, { 17, 0 }, { 17, 4 },  { 17, 8 },
+                   { 4, -1 },  { 5, -1 }, { 13, -1 }, { 15, -1 } };
+    HevSocks5Class klass = { .base.iface = get_iface, .binder = forward_bind };
+    for (int managed = 0; managed < 2; managed++) {
+        for (int prefix = 0; prefix < 2; prefix++) {
+            for (unsigned i = 0; i < sizeof (checks) / sizeof (*checks); i++) {
+                HevSocks5 self = { .base.klass = &klass.base,
+                                   .type = HEV_SOCKS5_TYPE_UDP_IN_TCP,
+                                   .timeout = 60000 };
+                unsigned char base[2][UDP_BUF_SIZE];
+                UDPBuffer slots[2] = { 0 };
+                UDPBuffers owner = { .slots = slots, .count = 2 };
+                HevSocks5UDPMsg messages[2] = { 0 };
+                size_t head = prefix ? frame (wire, 1, 7) : 0;
+                int valid = checks[i].nul < 0 && checks[i].cut == 17;
+                const unsigned char packet[] = { 0,   1,   16,  3,   9,   '1',
+                                                 '2', '7', '.', '0', '.', '0',
+                                                 '.', '1', 0,   53,  42 };
+                memcpy (wire + head, packet, sizeof (packet));
+                if (checks[i].nul >= 0)
+                    wire[head + 5 + checks[i].nul] = 0;
+                available = head + checks[i].cut;
+                consumed = end_result = 0;
+                first_piece = 2;
+                for (int id = 0; id < 2; id++) {
+                    slots[id] = (UDPBuffer){ .base = base[id],
+                                             .capacity = UDP_BUF_SIZE,
+                                             .owner = &owner };
+                    messages[id].buf = base[id];
+                    messages[id].len = sizeof (base[id]);
+                }
+                int result = hev_socks5_udp_recvmmsg_tcp (
+                    &self, messages, prefix + 1, 1, managed ? slots : NULL);
+                assert (result == (valid ? prefix + 1 : prefix ? prefix : -1));
+                assert (consumed == available &&
+                        self.timeout == (valid ? 60000 : 0));
+                if (prefix) {
+                    assert (messages[0].len == 7);
+                    assert (!memcmp (messages[0].addr, wire + 3, 7));
+                    assert (!memcmp (messages[0].buf, wire + 10, 7));
+                }
+                if (valid) {
+                    assert (messages[prefix].len == 1);
+                    assert (!memcmp (messages[prefix].addr, packet + 3, 13));
+                    assert (*(unsigned char *)messages[prefix].buf == 42);
+                } else {
+                    assert (!messages[prefix].addr);
+                    assert (messages[prefix].buf == base[prefix]);
+                    assert (messages[prefix].len == sizeof (base[prefix]));
+                    assert (errno == (checks[i].nul < 0 ? EPIPE : EINVAL));
+                }
+                if (checks[i].nul >= 0) {
+                    int bind = 0;
+                    self.timeout = 60000;
+                    consumed = 0;
+                    forward_calls = forward_resolved = forward_bound = 0;
+                    forward_meter_calls = 0;
+                    forward_terminal_receive = 1;
+                    assert (hev_socks5_udp_fwd_f (
+                                &self, 23, base, prefix + 1, &bind,
+                                managed ? slots : NULL) == -1);
+                    assert (!self.timeout && consumed == available);
+                    assert (!forward_resolved && !forward_bound && !bind);
+                    assert (!forward_calls && !forward_meter_calls);
+                    forward_terminal_receive = 0;
+                }
+                cases++;
+            }
+        }
+    }
+    puts (
+        "PASS: complete and bounded NAME frames; NUL rejection preserves prior count and caller storage; terminal prefixes stop forwarding");
+}
+
+static void
 send_boundaries (void)
 {
     HevObjectClass klass = { .iface = get_iface };
@@ -788,7 +869,6 @@ yielder_boundaries (void *data)
                     close (pair[0]);
                     close (pair[1]);
                 }
-                hev_task_unref (ender);
                 cases++;
             }
         }
@@ -803,6 +883,7 @@ main (void)
     HevTask *task;
     receive_boundaries ();
     header_boundaries ();
+    domain_boundaries ();
     send_boundaries ();
     forward_boundaries ();
     forward_receive_boundaries ();
@@ -812,7 +893,6 @@ main (void)
     assert (task);
     hev_task_run (task, yielder_boundaries, NULL);
     hev_task_system_run ();
-    hev_task_unref (task);
     hev_task_system_fini ();
     printf (
         "PASS: %lu stream boundary cases; exact payload/address, partial-frame prefix and terminal write checks\n",

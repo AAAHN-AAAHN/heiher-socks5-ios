@@ -24,6 +24,8 @@ static int cancel_yield;
 static unsigned char header_prefix[3];
 static int header_batches;
 static int empty_after_header;
+static const unsigned char *header_packet;
+static size_t header_packet_length;
 
 static int family = AF_INET;
 static int receive_error;
@@ -117,6 +119,8 @@ audit_recv (int fd, void *messages, unsigned int num, int flags,
     struct sockaddr_in6 v6 = { 0 };
     unsigned int i;
     const unsigned char packet[] = { 0, 0, 0, 1, 127, 0, 0, 1, 0, 53, 42 };
+    const unsigned char *packet_data = packet;
+    size_t packet_length = sizeof (packet);
 
     (void)flags;
     (void)yielder;
@@ -156,13 +160,18 @@ audit_recv (int fd, void *messages, unsigned int num, int flags,
             vec[0].msg_hdr.msg_namelen = sizeof (v6);
         }
     }
-    assert (vec[0].msg_hdr.msg_iov[0].iov_len >= sizeof (packet));
-    memcpy (vec[0].msg_hdr.msg_iov[0].iov_base, packet, sizeof (packet));
-    vec[0].msg_len = sizeof (packet);
+    if (header_batches && header_packet) {
+        packet_data = header_packet;
+        packet_length = header_packet_length;
+    }
+    assert (vec[0].msg_hdr.msg_iov[0].iov_len >= packet_length);
+    memcpy (vec[0].msg_hdr.msg_iov[0].iov_base, packet_data, packet_length);
+    vec[0].msg_len = packet_length;
     if (header_batches) {
         header_batches--;
-        memcpy (vec[0].msg_hdr.msg_iov[0].iov_base, header_prefix,
-                sizeof (header_prefix));
+        if (!header_packet)
+            memcpy (vec[0].msg_hdr.msg_iov[0].iov_base, header_prefix,
+                    sizeof (header_prefix));
     }
     return 1;
 }
@@ -313,6 +322,96 @@ headers (void)
         cases);
 }
 
+static void
+domains (void)
+{
+    const struct
+    {
+        size_t length;
+        int nul, valid;
+    } checks[] = { { 17, -1, 1 }, { 16, -1, 1 }, { 17, 0, 0 }, { 17, 4, 0 },
+                   { 17, 8, 0 },  { 4, -1, 0 },  { 5, -1, 0 }, { 15, -1, 0 } };
+    HevObjectClass klass = { .iface = get_iface };
+    unsigned char packet[] = { 0,   0,   0,   3,   9,   '1', '2', '7', '.',
+                               '0', '.', '0', '.', '1', 0,   53,  42 };
+
+    for (int pass = 0; pass < 2; pass++) {
+        family = pass ? AF_INET6 : AF_INET;
+        for (int associated = 0; associated < 2; associated++) {
+            for (unsigned i = 0; i < sizeof (checks) / sizeof (*checks); i++) {
+                HevSocks5 self = { .base.klass = &klass,
+                                   .type = HEV_SOCKS5_TYPE_UDP_IN_UDP,
+                                   .timeout = 60000,
+                                   .udp_associated = associated };
+                /* Exact allocation catches inspecting a NAME before its
+                 * declared bytes have actually arrived. */
+                unsigned char *buffer = malloc (checks[i].length);
+                HevSocks5UDPMsg msg = { .buf = buffer,
+                                        .len = checks[i].length };
+                int before = connect_calls;
+                assert (buffer);
+                memcpy (packet + 5, "127.0.0.1", 9);
+                if (checks[i].nul >= 0)
+                    packet[5 + checks[i].nul] = 0;
+                header_packet = packet;
+                header_packet_length = checks[i].length;
+                header_batches = empty_after_header = 1;
+                retry_yields = 0;
+                int result =
+                    hev_socks5_udp_recvmmsg_udp (&self, &msg, 1, 1, NULL);
+                assert (result == (checks[i].valid ? 1 : -1));
+                assert (connect_calls ==
+                        before + (!associated && checks[i].valid));
+                assert (self.udp_associated == (associated || checks[i].valid));
+                assert (self.timeout == 60000);
+                assert (retry_yields == !checks[i].valid);
+                if (checks[i].valid) {
+                    assert (msg.len == checks[i].length - 16);
+                    assert (!memcmp (msg.addr, packet + 3, 13));
+                } else {
+                    assert (errno == EAGAIN && !msg.addr);
+                    assert (msg.buf == buffer && msg.len == checks[i].length);
+                }
+                free (buffer);
+            }
+        }
+    }
+    header_packet = NULL;
+    header_batches = empty_after_header = 0;
+
+    /* The shared converter must reject the same lossy conversion even when
+     * called directly. Port bytes outside the name may still contain NUL. */
+    const int positions[] = { -1, 9, 0, 12 };
+    unsigned char address[] = { 3,   13,  '1', '2', '7', '.', '0', '.', '0',
+                                '.', '1', 't', 'a', 'i', 'l', 0,   53 };
+    for (unsigned i = 0; i < sizeof (positions) / sizeof (*positions); i++) {
+        struct sockaddr_in6 target = { 0 }, previous = target;
+        int family = AF_UNSPEC;
+        memcpy (address + 2, "127.0.0.1tail", 13);
+        address[1] = positions[i] < 0 ? 9 : 13;
+        if (positions[i] >= 0)
+            address[2 + positions[i]] = 0;
+        else {
+            address[11] = 0;
+            address[12] = 53;
+        }
+        int result =
+            hev_socks5_addr_into_sockaddr6 ((void *)address, &target, &family);
+        if (positions[i] < 0) {
+            assert (!result && family == AF_INET);
+            assert (target.sin6_port == htons (53));
+            assert (IN6_IS_ADDR_V4MAPPED (&target.sin6_addr));
+            assert (target.sin6_addr.s6_addr[12] == 127 &&
+                    target.sin6_addr.s6_addr[15] == 1);
+        } else {
+            assert (result == -1 && family == AF_UNSPEC);
+            assert (!memcmp (&target, &previous, sizeof (target)));
+        }
+    }
+    puts (
+        "PASS: bounded NAME, NUL rejection before peer learning, empty payload and lossless shared conversion");
+}
+
 int
 main (void)
 {
@@ -404,5 +503,6 @@ main (void)
     puts (
         "PASS: actual reply path; all 10 capacities reset, mixed families serialized correctly");
     headers ();
+    domains ();
     return 0;
 }

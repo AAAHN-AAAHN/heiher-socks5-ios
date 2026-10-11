@@ -24,6 +24,14 @@
     {
       "file": "hev-netaddr-result.patch",
       "repository": "."
+    },
+    {
+      "file": "hev-udp-domain.patch",
+      "repository": "src/core"
+    },
+    {
+      "file": "hev-session-setup.patch",
+      "repository": "."
     }
   ],
   "sources": {

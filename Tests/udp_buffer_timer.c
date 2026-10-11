@@ -52,7 +52,6 @@ main (void)
     assert (task);
     hev_task_run (task, run, NULL);
     hev_task_system_run ();
-    hev_task_unref (task);
     hev_task_system_fini ();
     return 0;
 }

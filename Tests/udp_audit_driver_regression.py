@@ -16,6 +16,19 @@ import udp_compat_audit as audit
 
 
 class AuditDriverTests(unittest.TestCase):
+    def test_repeated_stage_logs_preserve_failures(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            with patch.object(audit, 'OUT', out):
+                audit.run([sys.executable, '-c', 'print("earlier-stage")'], 'build.log')
+                with self.assertRaises(subprocess.CalledProcessError) as failure:
+                    audit.run([sys.executable, '-c',
+                               'print("failed-stage"); raise SystemExit(7)'], 'build.log')
+            self.assertEqual(failure.exception.returncode, 7)
+            text = (out / 'build.log').read_text()
+            self.assertIn('\nearlier-stage\n', text)
+            self.assertIn('\nfailed-stage\n', text)
+
     def check_failure(self, *, existing_core=False, wrong_composition=False,
                       previous_success=True):
         with tempfile.TemporaryDirectory() as directory:

@@ -127,8 +127,6 @@ main (void)
     hev_task_run (receiver, consume, NULL);
     hev_task_run (sender, produce, NULL);
     hev_task_system_run ();
-    hev_task_unref (sender);
-    hev_task_unref (receiver);
     hev_task_system_fini ();
     close (input);
     close (output);

@@ -113,6 +113,17 @@ main (void)
     assert (udp_sendmmsg (&self, 19, messages, 2) == 2);
     assert (calls == 2 && get_calls == 1 && sets == 1 && capacity == 48001);
     assert (messages[0].msg_len == 7 && messages[1].msg_len == 48001);
+    /* Progress gives a different unsent index its own single repair attempt. */
+    reset (messages);
+    iov[0].iov_len = 12001;
+    script[0] = -EMSGSIZE;
+    script[1] = script[2] = 1;
+    expected_offset[2] = 1;
+    script_count = 3;
+    assert (udp_sendmmsg (&self, 19, messages, 2) == 2);
+    assert (calls == 3 && get_calls == 2 && sets == 2 && capacity == 48001);
+    assert (messages[0].msg_len == 12001 && messages[1].msg_len == 48001);
+    iov[0].iov_len = 7;
     for (int failure = 0; failure < 3; failure++) {
         reset (messages);
         script[0] = -EMSGSIZE;
