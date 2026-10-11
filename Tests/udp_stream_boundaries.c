@@ -3,6 +3,7 @@
  * No rewritten parser, forward loop, timer, buffer helper, or application API. */
 #define hev_task_io_socket_recv stream_recv
 #define hev_task_io_socket_recvmsg stream_recvmsg
+#define hev_task_io_socket_recvmmsg stream_recvmmsg
 #define hev_task_io_socket_sendmsg stream_sendmsg
 #define hev_task_io_socket_sendmmsg stream_sendmmsg
 #define hev_socks5_addr_into_sockaddr6 stream_resolve
@@ -18,6 +19,7 @@
 #include "hev-socks5-udp.c"
 #undef hev_task_io_socket_recv
 #undef hev_task_io_socket_recvmsg
+#undef hev_task_io_socket_recvmmsg
 #undef hev_task_io_socket_sendmsg
 #undef hev_task_io_socket_sendmmsg
 #undef hev_socks5_addr_into_sockaddr6
@@ -59,6 +61,91 @@ static const struct
 static unsigned forward_case, forward_calls, forward_resolved, forward_bound;
 static unsigned forward_accepted, forward_meter_calls;
 static HevSocks5UDPMsg forward_messages[4];
+static const struct
+{
+    unsigned count, accepted;
+    int result, stop;
+    ForwardCall calls[4];
+} backward_cases[] = {
+    { 1, 15, 1, 0, { { 15, 4 } } },
+    { 3, 13, 1, 0, { { 15, 1 }, { 14, -1 }, { 12, 2 } } },
+    { 1, 0, -1, 0, { { 15, -2 } } },
+    { 2, 1, -1, 0, { { 15, 1 }, { 14, -2 } } },
+    { 4, 0, 1, 0, { { 15, 0 }, { 14, 0 }, { 12, 0 }, { 8, 0 } } },
+    { 4, 0, 1, 0, { { 15, -1 }, { 14, -1 }, { 12, -1 }, { 8, -1 } } },
+    { 4, 4, 1, 0, { { 15, 0 }, { 14, -1 }, { 12, 1 }, { 8, 0 } } },
+    { 1, 0, -1, 1, { { 15, -1 } } }, /* Canceled with an ordinary error. */
+    { 1, 1, -1, 1, { { 15, 1 } } }, /* Cancellation after a sent prefix. */
+    { 0, 0, -1, -1, { { 0, 0 } } }, /* Already canceled before sending. */
+};
+static const size_t backward_lengths[] = { 7, 0, 23, 31 };
+static unsigned char backward_payloads[4][31];
+static unsigned backward_case, backward_calls, backward_accepted;
+static int backward_active;
+
+int
+stream_recvmmsg (int fd, void *messages, unsigned count, int flags,
+                 HevTaskIOYielder yielder, void *self)
+{
+    struct mmsghdr *vector = messages;
+    assert (backward_active && fd == 23 && count == 4);
+    assert (flags == MSG_DONTWAIT && yielder == task_io_yielder && self);
+    for (unsigned i = 0; i < count; i++) {
+        struct msghdr *msg = &vector[i].msg_hdr;
+        struct sockaddr_in6 *addr = msg->msg_name;
+        assert (msg->msg_namelen == sizeof (*addr));
+        memset (addr, 0, sizeof (*addr));
+        addr->sin6_family = AF_INET6;
+        addr->sin6_port = htons (100 + i);
+        addr->sin6_addr.s6_addr[10] = addr->sin6_addr.s6_addr[11] = 0xff;
+        addr->sin6_addr.s6_addr[12] = 127;
+        addr->sin6_addr.s6_addr[15] = 1;
+        assert (msg->msg_iovlen == 1 && msg->msg_iov[0].iov_len >= 31);
+        memcpy (msg->msg_iov[0].iov_base, backward_payloads[i],
+                backward_lengths[i]);
+        vector[i].msg_len = backward_lengths[i];
+    }
+    return count;
+}
+
+static int
+backward_send (int fd, void *messages, unsigned count, int flags,
+               HevTaskIOYielder yielder, void *self)
+{
+    struct mmsghdr *vector = messages;
+    const ForwardCall *call;
+    unsigned index = 0;
+    assert (fd == 19 && flags == MSG_WAITALL && yielder == task_io_yielder);
+    assert (backward_calls < backward_cases[backward_case].count);
+    call = &backward_cases[backward_case].calls[backward_calls++];
+    for (unsigned id = 0; id < 4; id++) {
+        struct msghdr *msg;
+        HevSocks5Addr *addr;
+        if (!(call->mask & (1u << id)))
+            continue;
+        assert (index < count);
+        msg = &vector[index].msg_hdr;
+        assert (!msg->msg_name && !msg->msg_namelen && msg->msg_iovlen == 3);
+        assert (msg->msg_iov[0].iov_len == 3);
+        assert (!memcmp (msg->msg_iov[0].iov_base, "\0\0", 3));
+        addr = msg->msg_iov[1].iov_base;
+        assert (msg->msg_iov[1].iov_len == 7 && addr->atype == 1);
+        assert (addr->ipv4.port == htons (100 + id));
+        assert (msg->msg_iov[2].iov_len == backward_lengths[id]);
+        assert (!memcmp (msg->msg_iov[2].iov_base, backward_payloads[id],
+                         backward_lengths[id]));
+        if ((int)index < call->result) {
+            assert (!(backward_accepted & (1u << id)));
+            backward_accepted |= 1u << id;
+        }
+        index++;
+    }
+    assert (index == count);
+    if (backward_cases[backward_case].stop)
+        hev_socks5_set_timeout (self, 0);
+    errno = EIO;
+    return call->result;
+}
 
 int
 stream_resolve (const HevSocks5Addr *source, struct sockaddr_in6 *address,
@@ -135,7 +222,9 @@ stream_sendmmsg (int fd, void *messages, unsigned count, int flags,
 {
     assert (
         !FORWARD_EXPECT_METER); /* Raw send must not bypass composed meter. */
-    return forward_send (fd, messages, count, flags, yielder, self);
+    return backward_active ?
+               backward_send (fd, messages, count, flags, yielder, self) :
+               forward_send (fd, messages, count, flags, yielder, self);
 }
 
 #if FORWARD_EXPECT_METER
@@ -144,7 +233,9 @@ stream_meter_sendmmsg (int fd, void *messages, unsigned count, int flags,
                        HevTaskIOYielder yielder, void *self)
 {
     forward_meter_calls++;
-    return forward_send (fd, messages, count, flags, yielder, self);
+    return backward_active ?
+               backward_send (fd, messages, count, flags, yielder, self) :
+               forward_send (fd, messages, count, flags, yielder, self);
 }
 #endif
 
@@ -485,6 +576,68 @@ forward_boundaries (void)
         count, FORWARD_EXPECT_METER ? "checked" : "UDP only");
 }
 
+static int
+backward_receive_send (HevSocks5 *self)
+{
+    unsigned char data[4][31];
+    struct sockaddr_in6 addr[4];
+    struct iovec iov[4];
+    struct mmsghdr messages[4] = { 0 };
+    for (unsigned i = 0; i < 4; i++) {
+        iov[i] = (struct iovec){ data[i], sizeof (data[i]) };
+        messages[i].msg_hdr.msg_iov = &iov[i];
+        messages[i].msg_hdr.msg_iovlen = 1;
+        messages[i].msg_hdr.msg_name = &addr[i];
+    }
+    return hev_socks5_udp_fwd_b (self, 23, messages, 4, NULL);
+}
+
+static void
+backward_boundaries (void)
+{
+    HevObjectClass klass = { .iface = get_iface };
+    HevSocks5 self = { .base.klass = &klass,
+                       .type = HEV_SOCKS5_TYPE_UDP_IN_UDP };
+    size_t expected = 0;
+    backward_active = 1;
+    for (unsigned i = 0; i < 4; i++) {
+        memset (backward_payloads[i], i, sizeof (backward_payloads[i]));
+        expected += 10 + backward_lengths[i];
+    }
+    for (backward_case = 0;
+         backward_case < sizeof (backward_cases) / sizeof (*backward_cases);
+         backward_case++) {
+        self.timeout = backward_cases[backward_case].stop < 0 ? 0 : 60000;
+        backward_calls = backward_accepted = forward_meter_calls = 0;
+        assert (backward_receive_send (&self) ==
+                backward_cases[backward_case].result);
+        assert (backward_calls == backward_cases[backward_case].count);
+        assert (backward_accepted == backward_cases[backward_case].accepted);
+        assert (forward_meter_calls ==
+                (FORWARD_EXPECT_METER ? backward_calls : 0));
+        assert (self.timeout ==
+                (backward_cases[backward_case].stop ? 0 : 60000));
+        cases++;
+    }
+    /* The backward loop must never append another TCP frame after any short
+     * or failed write, including a write that completed earlier whole frames. */
+    self.type = HEV_SOCKS5_TYPE_UDP_IN_TCP;
+    for (send_result = -2; send_result <= (ssize_t)expected; send_result++) {
+        int result;
+        self.timeout = 60000;
+        send_calls = 0;
+        result = backward_receive_send (&self);
+        assert (send_calls == 1 && emitted == expected);
+        assert (result == (send_result == (ssize_t)expected ? 1 : -1));
+        assert (self.timeout == (result == 1 ? 60000 : 0));
+        cases++;
+    }
+    backward_active = 0;
+    printf (
+        "PASS: backward UDP send prefixes, empty payloads, bounded errors, cancellation, TCP partial-write termination, meter route %s\n",
+        FORWARD_EXPECT_METER ? "checked" : "UDP only");
+}
+
 int
 main (void)
 {
@@ -492,6 +645,7 @@ main (void)
     header_boundaries ();
     send_boundaries ();
     forward_boundaries ();
+    backward_boundaries ();
     printf (
         "PASS: %lu stream boundary cases; exact payload/address, partial-frame prefix and terminal write checks\n",
         cases);

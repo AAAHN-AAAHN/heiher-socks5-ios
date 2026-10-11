@@ -50,7 +50,7 @@ jobs:
       - name: Audit exact sources, native UDP behavior and address memory safety
         shell: bash
         run: python3 Tests/udp_compat_audit.py
-      - name: Type check the unchanged app with the actual iOS 27 SDK
+      - name: Type check the unchanged app sources with the actual iOS 27 SDK
         if: runner.os == 'macOS'
         shell: bash
         run: |

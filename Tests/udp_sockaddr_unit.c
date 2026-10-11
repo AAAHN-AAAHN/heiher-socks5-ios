@@ -315,7 +315,8 @@ main (void)
 {
     HevObjectClass klass = { .iface = get_iface };
     HevSocks5 self = { .base.klass = &klass,
-                       .type = HEV_SOCKS5_TYPE_UDP_IN_UDP };
+                       .type = HEV_SOCKS5_TYPE_UDP_IN_UDP,
+                       .timeout = 60000 };
     unsigned char buffers[10][64];
     HevSocks5UDPMsg msgs[10];
     struct sockaddr_in6 addrs[10];
