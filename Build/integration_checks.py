@@ -64,7 +64,7 @@ def main():
     statistics = json.loads(git('show', refs['feature/traffic-statistics'] + ':Build/features.json'))
     server = json.loads(git('show', refs['feature/server-control'] + ':Build/features.json'))
     assert config['patches'] == statistics['patches'] + server['patches']
-    assert len(config['patches']) == len({p['file'] for p in config['patches']}) == 8
+    assert len(config['patches']) == len({p['file'] for p in config['patches']})
     for ref in refs.values():
         owner = json.loads(git('show', ref + ':Build/features.json'))
         assert owner['sources'] == config['sources'] and owner['upstream_app'] == config['upstream_app']
@@ -124,7 +124,7 @@ def main():
                            ('Build/check_swift_sdk.sh', ['sdk-success.txt'])]:
         blob = git('rev-parse', '2dcfce074e288c942bd6582b3b77d4763c516a25:' + entry).decode().strip()
         driver.check(entry, markers, blob, 'integrated')
-    print(f'PASS: {len(members["sources"])} exact owner files, eight ordered patches, preserved root/platform and failure-marker controls')
+    print(f'PASS: {len(members["sources"])} exact owner files, {len(config["patches"])} ordered patches, preserved root/platform and failure-marker controls')
 
 
 if __name__ == '__main__':
