@@ -5,8 +5,8 @@
     "feature/background": "669e2a906802ea507e2665f18b43d1383915d49d",
     "feature/server-control": "bccfcd4f75e2c998f1bc1fb497b18a046d43c16b",
     "feature/settings-persistence": "126a30d21209c816916814756e2ab015d2aaac36",
-    "feature/udp-compat": "e7410299dbfe5c70bdb7e6227e4369ae7b14be8b",
-    "feature/traffic-statistics": "5701496230a2fd18ac83bb4fb2c1bd2df0f2a77f"
+    "feature/udp-compat": "b9c7e74736aeb8a781d83a729d057009ce4e0f46",
+    "feature/traffic-statistics": "b80a46c41ad0b1d594fbd137be4ece2104053ed5"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -19,8 +19,8 @@
       "path": ".github/workflows/udp-compat-audit.yml"
     },
     "Build/inherited-workflows/traffic-statistics-verify-build.yml": {
-      "commit": "bf99270ff3bcec5a1c141563cb4140bafaa1d783",
-      "sha256": "d955e675cf4dd07a9ccfba845e5b8bef0490429293f0c84a3e62c74d28c13940",
+      "commit": "b80a46c41ad0b1d594fbd137be4ece2104053ed5",
+      "sha256": "1274b78f02f1687775934ef49738b300d2a5e3f8f3433005d98ec03644c2cb3c",
       "path": ".github/workflows/verify-build.yml"
     },
     "Patches/hev-server-startup-stop.patch": {
@@ -28,8 +28,8 @@
       "sha256": "c9862bb9f074354297b969822b2cbba22b18563a248c705ec113d8eceaec9c7b"
     },
     "Patches/hev-socket-meter-core.patch": {
-      "commit": "bf99270ff3bcec5a1c141563cb4140bafaa1d783",
-      "sha256": "966aa8943ea536041773750212e311e4ada973afceb6c08ade3d4ea8b922e4f0"
+      "commit": "b80a46c41ad0b1d594fbd137be4ece2104053ed5",
+      "sha256": "de83f573e676dc59a6a2a4d1fcce55e8124b769be25b3bfff23e191d3be91641"
     },
     "Patches/hev-socket-meter-server.patch": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
@@ -40,8 +40,8 @@
       "sha256": "8d3c46fa65429cc0c6208085ac7aa751e3e10209a9157ebb97ef0f81e9890751"
     },
     "Patches/hev-udp-dynamic-buffer.patch": {
-      "commit": "e7410299dbfe5c70bdb7e6227e4369ae7b14be8b",
-      "sha256": "cd4e23f8db03b1f57b19862a3319fd8ab3a4972204f081f18e6506c90f7dde01"
+      "commit": "b9c7e74736aeb8a781d83a729d057009ce4e0f46",
+      "sha256": "5b0619ecfc517b350c4a81c47e758a9f496200b8fc9d9247ba728d53bed99899"
     },
     "Patches/hev-udp-peer-filter.patch": {
       "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
@@ -472,8 +472,8 @@
       "sha256": "3397126eacbaaffba105caf47e4ec238086436537b37ca42998f2fa86d39ed28"
     },
     "Tests/SocketIO/worker-native.json": {
-      "commit": "bf99270ff3bcec5a1c141563cb4140bafaa1d783",
-      "sha256": "64d16dd3b0935fc1b1b9a529faa0c5dc3574988a0accc158e2d1832211c5ad3d"
+      "commit": "b80a46c41ad0b1d594fbd137be4ece2104053ed5",
+      "sha256": "76a0340995b3f0c1e13011eebbced65dd70f64d37fa27a0cfdc9813937613ca2"
     },
     "Tests/SocketIO/worker_boundaries.c": {
       "commit": "8aa502780f9349bbc340fc43b84749d5cb2a1b1a",
@@ -492,8 +492,8 @@
       "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "bf99270ff3bcec5a1c141563cb4140bafaa1d783",
-      "sha256": "cef73dd025e13ee4188add08873ab0f38da679351781318dbdbea85065037245"
+      "commit": "b80a46c41ad0b1d594fbd137be4ece2104053ed5",
+      "sha256": "8594e4e6971016335fd0c27866f93478086be07bd73f6a17f6bed7c20b53f635"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
@@ -584,12 +584,12 @@
       "sha256": "84ad1b5749463c66ec9afd16a1aef8bd033692036b6f696500d388868feed646"
     },
     "Tests/udp_sockaddr_unit.c": {
-      "commit": "e7410299dbfe5c70bdb7e6227e4369ae7b14be8b",
-      "sha256": "7225cadf8ed6205c1de1745608db4e46d70026a6638d3fa718b9d492d41dfef6"
+      "commit": "b9c7e74736aeb8a781d83a729d057009ce4e0f46",
+      "sha256": "9c9317dc6123179612ed4560a197e63015d6dc00010ddd072b98269529444623"
     },
     "Tests/udp_stream_boundaries.c": {
-      "commit": "e7410299dbfe5c70bdb7e6227e4369ae7b14be8b",
-      "sha256": "b8e1ae2e078666b0e276328e0a8be838b5f07fd7c6f4143996a64cc1f2a0cbc4"
+      "commit": "b9c7e74736aeb8a781d83a729d057009ce4e0f46",
+      "sha256": "2d12786e2f0197387f9d32bcbc404a9b2bd62bf24833fc0801af96732035165d"
     }
   },
   "files": {
