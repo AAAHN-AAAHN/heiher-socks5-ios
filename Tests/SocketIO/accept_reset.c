@@ -105,9 +105,10 @@ main (int argc, char **argv)
         usleep (1000);
     }
     if (ready != (unsigned)workers)
-        fprintf (stderr,
-                 "Accept-reset readiness failed: workers=%u/%d first-WAITIO deadline=2s\n",
-                 ready, workers);
+        fprintf (
+            stderr,
+            "Accept-reset readiness failed: workers=%u/%d first-WAITIO deadline=2s\n",
+            ready, workers);
     assert (ready == (unsigned)workers);
     int client = -1;
     for (int i = 0; i < 2000; ++i) {
