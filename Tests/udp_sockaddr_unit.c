@@ -5,6 +5,9 @@
 #define getpeername audit_getpeername
 #define hev_task_io_socket_recvmmsg audit_recv
 #define hev_task_io_socket_sendmmsg audit_send
+#if defined(__APPLE__)
+#define getsockopt audit_getsockopt
+#endif
 #include "hev-socks5-udp.c"
 #undef recv
 #undef hev_socks5_task_io_yielder
@@ -12,6 +15,9 @@
 #undef getpeername
 #undef hev_task_io_socket_recvmmsg
 #undef hev_task_io_socket_sendmmsg
+#if defined(__APPLE__)
+#undef getsockopt
+#endif
 
 #include <assert.h>
 #include <stdint.h>
@@ -32,6 +38,7 @@ static int receive_error;
 static int connect_error;
 static int connect_calls;
 static int send_calls;
+static int backward_consumed;
 static struct sockaddr_in6 peer;
 
 static int
@@ -53,13 +60,24 @@ get_iface (HevObject *self, void *type)
 ssize_t
 audit_control_recv (int fd, void *buf, size_t length, int flags)
 {
-    (void)fd;
     (void)buf;
     (void)length;
-    (void)flags;
+    if (fd == 11 && (flags & MSG_PEEK) && !receive_error && !backward_consumed)
+        return 11;
     errno = EAGAIN;
     return -1;
 }
+
+#if defined(__APPLE__)
+int
+audit_getsockopt (int fd, int level, int option, void *value, socklen_t *length)
+{
+    assert (fd == 11 && level == SOL_SOCKET && option == SO_NREAD);
+    assert (*length == sizeof (int));
+    *(int *)value = receive_error || backward_consumed ? 0 : 11;
+    return 0;
+}
+#endif
 
 int
 audit_yield (HevTaskYieldType type, void *data)
@@ -173,6 +191,8 @@ audit_recv (int fd, void *messages, unsigned int num, int flags,
             memcpy (vec[0].msg_hdr.msg_iov[0].iov_base, header_prefix,
                     sizeof (header_prefix));
     }
+    if (fd == 11)
+        backward_consumed++;
     return 1;
 }
 
@@ -264,9 +284,12 @@ headers (void)
                        .type = HEV_SOCKS5_TYPE_UDP_IN_UDP };
     unsigned char buffer[64];
     HevSocks5UDPMsg msg;
+    UDPWorkspace workspace;
+    void *allocation = udp_workspace_new (&workspace, 1, NULL);
     unsigned int cases = 0;
     int pass, associated, field, value, mode;
 
+    assert (allocation);
     for (pass = 0; pass < 2; pass++) {
         family = pass ? AF_INET6 : AF_INET;
         for (associated = 0; associated < 2; associated++) {
@@ -281,8 +304,8 @@ headers (void)
                     self.timeout = 60000;
                     msg.buf = buffer;
                     msg.len = sizeof (buffer);
-                    assert (hev_socks5_udp_recvmmsg_udp (&self, &msg, 1, 1,
-                                                         NULL) == 1);
+                    assert (hev_socks5_udp_recvmmsg_udp (
+                                &self, &msg, 1, 1, NULL, &workspace) == 1);
                     assert (!header_batches && retry_yields == 1);
                     assert (connect_calls == before + !associated);
                     assert (self.udp_associated && msg.len == 1);
@@ -303,7 +326,8 @@ headers (void)
             self.timeout = 60000;
             msg.buf = buffer;
             msg.len = sizeof (buffer);
-            result = hev_socks5_udp_recvmmsg_udp (&self, &msg, 1, 1, NULL);
+            result = hev_socks5_udp_recvmmsg_udp (&self, &msg, 1, 1, NULL,
+                                                  &workspace);
             if (mode == 0) {
                 assert (result == 1 && retry_yields == 12);
                 assert (connect_calls == before + 1 && msg.len == 1);
@@ -320,6 +344,7 @@ headers (void)
     printf (
         "PASS: %u RSV/FRAG byte/family/association cases; rejected queues and cancellation\n",
         cases);
+    hev_free (allocation);
 }
 
 static void
@@ -332,9 +357,12 @@ domains (void)
     } checks[] = { { 17, -1, 1 }, { 16, -1, 1 }, { 17, 0, 0 }, { 17, 4, 0 },
                    { 17, 8, 0 },  { 4, -1, 0 },  { 5, -1, 0 }, { 15, -1, 0 } };
     HevObjectClass klass = { .iface = get_iface };
+    UDPWorkspace workspace;
+    void *allocation = udp_workspace_new (&workspace, 1, NULL);
     unsigned char packet[] = { 0,   0,   0,   3,   9,   '1', '2', '7', '.',
                                '0', '.', '0', '.', '1', 0,   53,  42 };
 
+    assert (allocation);
     for (int pass = 0; pass < 2; pass++) {
         family = pass ? AF_INET6 : AF_INET;
         for (int associated = 0; associated < 2; associated++) {
@@ -357,8 +385,8 @@ domains (void)
                 header_packet_length = checks[i].length;
                 header_batches = empty_after_header = 1;
                 retry_yields = 0;
-                int result =
-                    hev_socks5_udp_recvmmsg_udp (&self, &msg, 1, 1, NULL);
+                int result = hev_socks5_udp_recvmmsg_udp (&self, &msg, 1, 1,
+                                                          NULL, &workspace);
                 assert (result == (checks[i].valid ? 1 : -1));
                 assert (connect_calls ==
                         before + (!associated && checks[i].valid));
@@ -410,6 +438,7 @@ domains (void)
     }
     puts (
         "PASS: bounded NAME, NUL rejection before peer learning, empty payload and lossless shared conversion");
+    hev_free (allocation);
 }
 
 int
@@ -420,12 +449,15 @@ main (void)
                        .type = HEV_SOCKS5_TYPE_UDP_IN_UDP,
                        .timeout = 60000 };
     unsigned char buffers[10][64];
+    unsigned char backward_buffers[10][UDP_BUF_SIZE];
     HevSocks5UDPMsg msgs[10];
-    struct sockaddr_in6 addrs[10];
-    struct iovec iov[10];
-    struct mmsghdr vec[10] = { 0 };
+    UDPBuffer slots[10] = { 0 };
+    UDPBuffers owner = { .slots = slots, .count = 10 };
+    UDPWorkspace workspace;
+    void *allocation = udp_workspace_new (&workspace, 10, NULL);
     int i, pass;
 
+    assert (allocation);
     addresses ();
     for (pass = 0; pass < 2; pass++) {
         self.udp_associated = 0;
@@ -436,14 +468,17 @@ main (void)
             msgs[i].len = sizeof (buffers[i]);
         }
         receive_error = 1;
-        assert (hev_socks5_udp_recvmmsg_udp (&self, msgs, 10, 1, NULL) == -1);
+        assert (hev_socks5_udp_recvmmsg_udp (&self, msgs, 10, 1, NULL,
+                                             &workspace) == -1);
         assert (!self.udp_associated && connect_calls == pass * 2);
         receive_error = 0;
         connect_error = 1;
-        assert (hev_socks5_udp_recvmmsg_udp (&self, msgs, 10, 1, NULL) == -1);
+        assert (hev_socks5_udp_recvmmsg_udp (&self, msgs, 10, 1, NULL,
+                                             &workspace) == -1);
         assert (!self.udp_associated && errno == EACCES);
         connect_error = 0;
-        assert (hev_socks5_udp_recvmmsg_udp (&self, msgs, 10, 1, NULL) == 1);
+        assert (hev_socks5_udp_recvmmsg_udp (&self, msgs, 10, 1, NULL,
+                                             &workspace) == 1);
         assert (self.udp_associated && msgs[0].len == 1);
         assert (peer.sin6_port == htons (5300));
         assert (!!IN6_IS_ADDR_V4MAPPED (&peer.sin6_addr) == !pass);
@@ -464,7 +499,8 @@ main (void)
             retry_yields = 0;
             empty_after_foreign = i == 1;
             cancel_yield = i == 2;
-            result = hev_socks5_udp_recvmmsg_udp (&self, msgs, 1, 1, NULL);
+            result = hev_socks5_udp_recvmmsg_udp (&self, msgs, 1, 1, NULL,
+                                                  &workspace);
             if (i == 0) {
                 assert (result == 1 && retry_yields == 2);
                 assert (connect_calls == before + 1 && msgs[0].len == 1);
@@ -483,26 +519,31 @@ main (void)
     puts (
         "PASS: rejected batches yield and drain; only real empty queues return EAGAIN; cancellation wins");
     for (i = 0; i < 10; i++) {
-        iov[i].iov_base = buffers[i];
-        iov[i].iov_len = sizeof (buffers[i]);
-        vec[i].msg_hdr.msg_name = &addrs[i];
-        vec[i].msg_hdr.msg_iov = &iov[i];
-        vec[i].msg_hdr.msg_iovlen = 1;
+        slots[i] = (UDPBuffer){ .base = backward_buffers[i],
+                                .capacity = UDP_BUF_SIZE,
+                                .owner = &owner };
     }
     for (pass = 0; pass < 20; pass++) {
         self.timeout = 60000;
         family = pass % 2 ? AF_INET6 : AF_INET;
         for (i = 0; i < 10; i++)
-            vec[i].msg_hdr.msg_namelen = sizeof (struct sockaddr_in);
+            workspace.messages[i].msg_hdr.msg_namelen =
+                sizeof (struct sockaddr_in);
+        backward_consumed = 0;
         receive_error = 1;
-        assert (hev_socks5_udp_fwd_b (&self, 11, vec, 10, NULL) == 0);
+        assert (hev_socks5_udp_fwd_b (&self, 11, 10, slots, &workspace) == 0);
+        for (i = 0; i < 10; i++)
+            assert (workspace.messages[i].msg_hdr.msg_namelen ==
+                    sizeof (struct sockaddr_in6));
         receive_error = 0;
-        assert (hev_socks5_udp_fwd_b (&self, 11, vec, 10, NULL) == 1);
+        assert (hev_socks5_udp_fwd_b (&self, 11, 10, slots, &workspace) == 1);
+        assert (backward_consumed == 1);
     }
     assert (send_calls == 20);
     puts (
         "PASS: actual reply path; all 10 capacities reset, mixed families serialized correctly");
     headers ();
     domains ();
+    hev_free (allocation);
     return 0;
 }

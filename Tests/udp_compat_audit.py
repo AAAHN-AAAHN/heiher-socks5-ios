@@ -221,6 +221,9 @@ def main():
          '--output', OUT / 'header-regression.json'], 'header-regression.log', timeout=45)
     run([sys.executable, 'Tests/udp_buffer_network.py', CORE / 'bin/hev-socks5-server',
          '--output', OUT / 'buffer-network.json'], 'buffer-network.log', timeout=120)
+    run([sys.executable, 'Tests/udp_buffer_network.py', CORE / 'bin/hev-socks5-server',
+         '--udp-buffer-count', '342', '--output', OUT / 'buffer-large-batch.json'],
+        'buffer-large-batch.log', timeout=120)
     run([sys.executable, 'Tests/udp_buffer_benchmark.py', old_binary,
          CORE / 'bin/hev-socks5-server', '--output', OUT / 'buffer-benchmark.json'],
         'buffer-benchmark.log', timeout=180)
