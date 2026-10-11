@@ -122,7 +122,8 @@ def exchange(udp, destination, size):
 
 
 @contextlib.contextmanager
-def proxy_server(binary, log_path, workers=1, fixed_udp_port=False, unbound=False):
+def proxy_server(binary, log_path, workers=1, fixed_udp_port=False, unbound=False,
+                 udp_buffer_count=10):
     with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as reserve:
         # Reserve the same dual-stack wildcard scope used by the actual server.
         reserve.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
@@ -138,8 +139,10 @@ def proxy_server(binary, log_path, workers=1, fixed_udp_port=False, unbound=Fals
   udp-port: %d
 %smisc:
   log-level: debug
+  udp-copy-buffer-nums: %d
 ''' % (workers, port, port if fixed_udp_port else 0,
-       '' if unbound else "  bind-address-v4: '0.0.0.0'\n  bind-address-v6: '::'\n"))
+       '' if unbound else "  bind-address-v4: '0.0.0.0'\n  bind-address-v6: '::'\n",
+       udp_buffer_count))
         proc = subprocess.Popen([binary, str(conf)], stdout=log, stderr=subprocess.STDOUT)
         try:
             for _ in range(100):

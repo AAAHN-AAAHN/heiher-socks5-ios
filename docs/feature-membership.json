@@ -5,8 +5,8 @@
     "feature/background": "669e2a906802ea507e2665f18b43d1383915d49d",
     "feature/server-control": "bccfcd4f75e2c998f1bc1fb497b18a046d43c16b",
     "feature/settings-persistence": "126a30d21209c816916814756e2ab015d2aaac36",
-    "feature/udp-compat": "2e2cdf4d879225ecd97ae10eaf7d9e9be19e3e12",
-    "feature/traffic-statistics": "b86ce2fe509d4f31635dae46ae08049cdf4dd9ac"
+    "feature/udp-compat": "23ce31d217e0e621b1621c866b03c563bef88685",
+    "feature/traffic-statistics": "cfee6e4743891893acd6c6d04a44cc84268b5d78"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -19,8 +19,8 @@
       "path": ".github/workflows/udp-compat-audit.yml"
     },
     "Build/inherited-workflows/traffic-statistics-verify-build.yml": {
-      "commit": "b86ce2fe509d4f31635dae46ae08049cdf4dd9ac",
-      "sha256": "afed9a9d409f1b91d0e808a7af439c9f3e1401d3b156963ac3699cb0c09fd6a2",
+      "commit": "cfee6e4743891893acd6c6d04a44cc84268b5d78",
+      "sha256": "e3d28425b8c16f2a5fd6ea35255cbd2ebeebec268bcd7fd4a3c06bb767b0e5d6",
       "path": ".github/workflows/verify-build.yml"
     },
     "Patches/hev-netaddr-result.patch": {
@@ -32,8 +32,8 @@
       "sha256": "c9862bb9f074354297b969822b2cbba22b18563a248c705ec113d8eceaec9c7b"
     },
     "Patches/hev-socket-meter-core.patch": {
-      "commit": "36e7bca37ec8288488431a95581aded6c467d94e",
-      "sha256": "0b13fcce6af3f7842b4a98869c537db9f75ea93088fb6b6d1f23ec14a0f0df90"
+      "commit": "cfee6e4743891893acd6c6d04a44cc84268b5d78",
+      "sha256": "5f094cd73fd8e311f68e25eb6a0bebd89e0555000f38e7c148cec9e7f673b8bb"
     },
     "Patches/hev-socket-meter-server.patch": {
       "commit": "36e7bca37ec8288488431a95581aded6c467d94e",
@@ -44,8 +44,8 @@
       "sha256": "ae628fce483994c79d7ad0d82e9fbb980012c9d9900f1aaaddceaa7e38be88e0"
     },
     "Patches/hev-udp-dynamic-buffer.patch": {
-      "commit": "badf7c8a70561768f7251fdde070afce81b48791",
-      "sha256": "b06ce60deeea2803dce26056d09410f90667c029473685cf1e78716f0074165c"
+      "commit": "23ce31d217e0e621b1621c866b03c563bef88685",
+      "sha256": "31bc2f9ef3bd9179affee7048dd14d23f591bc662b17dd84332ad9a357f49da8"
     },
     "Patches/hev-udp-peer-filter.patch": {
       "commit": "2e2cdf4d879225ecd97ae10eaf7d9e9be19e3e12",
@@ -496,8 +496,8 @@
       "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "b86ce2fe509d4f31635dae46ae08049cdf4dd9ac",
-      "sha256": "eed8877319868e0651f94d5e9a740e291f728f9071bf9fe81591f9ac20d662ab"
+      "commit": "cfee6e4743891893acd6c6d04a44cc84268b5d78",
+      "sha256": "2b1edb60f12bf3f58f15c23a60fe7611d0d7f99f10e4fc63918c8b601982be20"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
@@ -564,12 +564,12 @@
       "sha256": "404b0051804817045a6ececf06100707078d7fd9b9003042fbf06a14d99a8e6b"
     },
     "Tests/udp_buffer_unit.c": {
-      "commit": "d21790da8d877ed2b578e225e5a0d9edd64bd4b3",
-      "sha256": "b7f1d294673a7b26132253c2e3b103dc1b5de44a3749ce3a165097243f05917f"
+      "commit": "23ce31d217e0e621b1621c866b03c563bef88685",
+      "sha256": "9522c8f0cc09072635603d7b525b0451fc57a14af1e1ab089dd975a45141b24e"
     },
     "Tests/udp_compat_audit.py": {
-      "commit": "105d95770e18e13a491b23e0fb925f22843aa395",
-      "sha256": "ca1156a47dadc894311b1b981af54eff11a55ef516205005e87a418196c021d0"
+      "commit": "23ce31d217e0e621b1621c866b03c563bef88685",
+      "sha256": "789482c495026e32fadbd66b0506a91d7992598998665cef4dd06a640e5d2e26"
     },
     "Tests/udp_header_regression.py": {
       "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
@@ -588,28 +588,28 @@
       "sha256": "9a6d95b3b140adb243722897be97973f67a7ab38e4219c01536e7aaabbf663a7"
     },
     "Tests/udp_sockaddr_regression.py": {
-      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
-      "sha256": "84ad1b5749463c66ec9afd16a1aef8bd033692036b6f696500d388868feed646"
+      "commit": "23ce31d217e0e621b1621c866b03c563bef88685",
+      "sha256": "18e8fdfba42b807c06fb8aa755a3cc98eeeaf4df0dc9529464caa2ec9ce2fa36"
     },
     "Tests/udp_sockaddr_unit.c": {
-      "commit": "105d95770e18e13a491b23e0fb925f22843aa395",
-      "sha256": "f0f4f7297490c6465056d8b9ac0f2a8a8e86ebe3b6a7edad1c25d07df2e08182"
+      "commit": "23ce31d217e0e621b1621c866b03c563bef88685",
+      "sha256": "d81af1ca6682d4c5e6d4cc9e70d65d062eb6db598ce7b50fba3c70c5fde27c74"
     },
     "Tests/udp_splicer_lifetime.c": {
-      "commit": "105d95770e18e13a491b23e0fb925f22843aa395",
-      "sha256": "c9095e159d772c3b6b3873e30fc069d2c8479d8d42e3f7e9743eb1c4d340fe0d"
+      "commit": "23ce31d217e0e621b1621c866b03c563bef88685",
+      "sha256": "7d1fe4e42261415b6c6a23de6f44cee925c47611e520a521a3f76dcc9c5b6548"
     },
     "Tests/udp_stream_boundaries.c": {
-      "commit": "105d95770e18e13a491b23e0fb925f22843aa395",
-      "sha256": "b13f179672a8c1dff60c23daa1b0dc503c2c07e80d99b95225d26ab9bc5684c2"
+      "commit": "23ce31d217e0e621b1621c866b03c563bef88685",
+      "sha256": "d15a8c9b7d3bc23bff88c37b6a761b013efdfa9036a338234de4859332f84369"
     },
     "Tests/udp_session_setup.c": {
       "commit": "105d95770e18e13a491b23e0fb925f22843aa395",
       "sha256": "3e4c50bc7c4ea2d21a9187d79339820da1a717eefc1dcd5bf5cdbacb32c6cb3c"
     },
     "Patches/hev-udp-domain.patch": {
-      "commit": "105d95770e18e13a491b23e0fb925f22843aa395",
-      "sha256": "ff2ea6ae3e489d8d210c0fc628d34d660c1431b7262babc04c1e8c518af9ca22"
+      "commit": "23ce31d217e0e621b1621c866b03c563bef88685",
+      "sha256": "316d2f832dfca09e4aac57055a6b364681b270bf4815f0164b0c0d82dd3f8b15"
     },
     "Patches/hev-session-setup.patch": {
       "commit": "105d95770e18e13a491b23e0fb925f22843aa395",
@@ -618,6 +618,6 @@
   },
   "files": {
     "Socks5/Settings/SettingsStore.swift": "e13d64e5dda6923f105d93b2145733e94286339a370419699a48f3c432b0a7ef",
-    "Tests/udp_buffer_network.py": "d75746901f341d8c55dbddb297b5377c1a5323619c7c007f6f8d8e2249133f38"
+    "Tests/udp_buffer_network.py": "66fb430ab26f7d69c8b5d22a78f8d1d50428919f83bf4b354ea10c90e5fc7703"
   }
 }

@@ -40,10 +40,10 @@ index 2b5e12231ac551ac689a9e4d52bad01df02ca281..a1f8e9d1498358b3be2805be4b909e13
          name[addr->domain.len] = '\0';
          memcpy (&port, addr->domain.addr + addr->domain.len, 2);
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index 1c45938d700256c2c225e2f8142bd069f8b25dc8..59152f41efc0145b860b08c14d28e1612c2c41cd 100644
+index 7463f01e0be77c324c35bf1b2b147ac744263dfc..dfeb495402d5d60ddf7b9af5aef2c148f36db4a2 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
-@@ -578,6 +578,7 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -706,6 +706,7 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
  
      for (i = 0; i < num; i++) {
          HevSocks5UDPHdr udp;
@@ -51,7 +51,7 @@ index 1c45938d700256c2c225e2f8142bd069f8b25dc8..59152f41efc0145b860b08c14d28e161
          struct iovec iov[2];
          struct msghdr mh = { 0 };
          int addrlen;
-@@ -648,14 +649,20 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -776,14 +777,20 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
              hev_socks5_set_timeout (HEV_SOCKS5 (self), 0);
              return rlen ? rlen : -1;
          }
@@ -75,7 +75,7 @@ index 1c45938d700256c2c225e2f8142bd069f8b25dc8..59152f41efc0145b860b08c14d28e161
  
          rlen++;
      }
-@@ -726,7 +733,8 @@ retry:
+@@ -855,7 +862,8 @@ retry:
          if (udp->addr.atype == HEV_SOCKS5_ADDR_TYPE_NAME && mvec[i].msg_len < 5)
              continue;
          addrlen = hev_socks5_addr_len (&udp->addr);

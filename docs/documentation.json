@@ -6,8 +6,8 @@
     "feature/background": "669e2a906802ea507e2665f18b43d1383915d49d",
     "feature/server-control": "bccfcd4f75e2c998f1bc1fb497b18a046d43c16b",
     "feature/settings-persistence": "126a30d21209c816916814756e2ab015d2aaac36",
-    "feature/udp-compat": "2e2cdf4d879225ecd97ae10eaf7d9e9be19e3e12",
-    "feature/traffic-statistics": "b86ce2fe509d4f31635dae46ae08049cdf4dd9ac"
+    "feature/udp-compat": "23ce31d217e0e621b1621c866b03c563bef88685",
+    "feature/traffic-statistics": "cfee6e4743891893acd6c6d04a44cc84268b5d78"
   },
   "owned_documents": [
     "README.md",
@@ -20,7 +20,7 @@
     "Build/check_ownership.py": "3f11ee85e1248ad3d891fd8867f21ef1e9f2a4c0",
     "Tests/AppIcon/check_icon.py": "9a352124f097bd9f1c03c255daece0f9feb85f08",
     "Tests/Background/check_scope.py": "5b0f97f2d1b5b806ae2d1c6d967c318ca210325f",
-    "Tests/Statistics/audit.py": "a963c742d45f0f78802a540a6edddf9154952c75",
+    "Tests/Statistics/audit.py": "8f7664ac2db0bf4870bc1c5439ffed34805778cd",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }

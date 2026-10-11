@@ -14,7 +14,7 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 SOCKET_BASE = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
-UDP = '2e2cdf4d879225ecd97ae10eaf7d9e9be19e3e12'
+UDP = '23ce31d217e0e621b1621c866b03c563bef88685'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 SOCKET_PATCHES = [
     {'file': 'hev-socket-meter-task.patch', 'repository': 'third-part/hev-task-system'},
@@ -195,6 +195,9 @@ def native_checks(mode):
         run([sys.executable, 'Tests/' + script, CORE / 'bin/hev-socks5-server',
              '--output', OUT / (mode + '-' + label + '.json')],
             mode + '-' + label + '.log', timeout=timeout)
+    run([sys.executable, 'Tests/udp_buffer_network.py', CORE / 'bin/hev-socks5-server',
+         '--udp-buffer-count', '342', '--output', OUT / (mode + '-large-batch.json')],
+        mode + '-large-batch.log', timeout=120)
     sanitize = ['-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
                 '-fno-omit-frame-pointer']
     env = dict(os.environ, ASAN_OPTIONS='detect_leaks=0', UBSAN_OPTIONS='halt_on_error=1')
