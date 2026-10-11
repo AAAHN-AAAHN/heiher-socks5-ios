@@ -13,12 +13,34 @@
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
+#include <hev-task.h>
 #include "hev-main.h"
 #include "hev-socks5-session.h"
 
 static atomic_int reset_seen;
 static int reset_errno, server_result;
 static char config[256];
+static pthread_mutex_t ready_lock = PTHREAD_MUTEX_INITIALIZER;
+static const void *ready_workers[8];
+static unsigned ready_count;
+
+/* The reset oracle requires a running engine, as the restart fixture does. */
+void
+socket_io_worker_wait (const void *worker, int type)
+{
+    if (type != HEV_TASK_WAITIO)
+        return;
+    pthread_mutex_lock (&ready_lock);
+    for (unsigned i = 0; i < ready_count; ++i) {
+        if (ready_workers[i] == worker) {
+            pthread_mutex_unlock (&ready_lock);
+            return;
+        }
+    }
+    assert (ready_count < sizeof (ready_workers) / sizeof (*ready_workers));
+    ready_workers[ready_count++] = worker;
+    pthread_mutex_unlock (&ready_lock);
+}
 
 HevSocks5Session *__real_hev_socks5_session_new (int fd);
 HevSocks5Session *
@@ -51,6 +73,8 @@ int
 main (int argc, char **argv)
 {
     int workers = argc > 1 ? atoi (argv[1]) : 4;
+    assert (workers > 0 &&
+            workers <= (int)(sizeof (ready_workers) / sizeof (*ready_workers)));
     int family = argc > 2 && !strcmp (argv[2], "6") ? AF_INET6 : AF_INET;
     struct sockaddr_in listen = { .sin_family = AF_INET,
                                   .sin_addr.s_addr = htonl (INADDR_LOOPBACK) };
@@ -71,6 +95,20 @@ main (int argc, char **argv)
               workers, port);
     pthread_t thread;
     assert (!pthread_create (&thread, NULL, server, NULL));
+    unsigned ready = 0;
+    for (int i = 0; i < 2000; ++i) {
+        pthread_mutex_lock (&ready_lock);
+        ready = ready_count;
+        pthread_mutex_unlock (&ready_lock);
+        if (ready == (unsigned)workers)
+            break;
+        usleep (1000);
+    }
+    if (ready != (unsigned)workers)
+        fprintf (stderr,
+                 "Accept-reset readiness failed: workers=%u/%d first-WAITIO deadline=2s\n",
+                 ready, workers);
+    assert (ready == (unsigned)workers);
     int client = -1;
     for (int i = 0; i < 2000; ++i) {
         int fd = socket (family, SOCK_STREAM, 0);
