@@ -19,8 +19,8 @@ run([sys.executable,HERE/'contract.py',n,'--composition',a.composition])
 run([a.cc,'-O2','-pthread','-I'+str(n/'src'),HERE/'meter_host.c',
      n/'bin/libhev-socks5-server.a',n/'third-part/yaml/bin/libyaml.a',
      task/'bin/libhev-task-system.a','-o',host])
-# Keep the normal native host unchanged; only the restart fixture observes its first
-# accept wait before exposing READY/STATS to the original three-cycle driver.
+# Keep the normal native host unchanged. The restart and Linux accept-reset
+# fixtures observe workers' first accept wait before exercising a running engine.
 worker=(n/'src/hev-socks5-worker.c').read_text()
 yield_point='    hev_task_yield (type);\n'
 assert worker.count(yield_point)==1
@@ -49,8 +49,8 @@ with prepared_loopback():
 if sys.platform == 'linux':
  exe=out/'accept-reset'
  run([a.cc,'-O2','-pthread','-I'+str(n/'src'),'-I'+str(n/'src/misc'),
-      '-I'+str(n/'src/core/include'),'-I'+str(task/'include'),HERE/'accept_reset.c',
+      '-I'+str(n/'src/core/include'),'-I'+str(task/'include'),HERE/'accept_reset.c',observed,
       n/'bin/libhev-socks5-server.a',n/'third-part/yaml/bin/libyaml.a',
       task/'bin/libhev-task-system.a','-Wl,--wrap=hev_socks5_session_new','-o',exe])
  for workers in (1,4,8):
-  for family in (4,6): run([exe,str(workers),str(family)])
+  for family in (4,6): run([exe,str(workers),str(family)],timeout=15)

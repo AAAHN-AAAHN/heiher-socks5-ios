@@ -6,7 +6,7 @@
     "feature/server-control": "bccfcd4f75e2c998f1bc1fb497b18a046d43c16b",
     "feature/settings-persistence": "126a30d21209c816916814756e2ab015d2aaac36",
     "feature/udp-compat": "e7410299dbfe5c70bdb7e6227e4369ae7b14be8b",
-    "feature/traffic-statistics": "bf99270ff3bcec5a1c141563cb4140bafaa1d783"
+    "feature/traffic-statistics": "de46fd5c4d45710623632e172169a35df4a6bb51"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -408,8 +408,8 @@
       "sha256": "2c3f7125e079c54835f738b575b5ab3243bf0a024e7d152194d128d32881aa58"
     },
     "Tests/SocketIO/accept_reset.c": {
-      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
-      "sha256": "d1ab9e6355a29369085b10eea6e3baf0b6ec948f83de6855b37ef5ade9d58b3c"
+      "commit": "de46fd5c4d45710623632e172169a35df4a6bb51",
+      "sha256": "a6b1f82d4ecc473ff141a0a2ae0c4c509f985d2abe4d5d3c82e8de7f2caa421b"
     },
     "Tests/SocketIO/connected_peer.c": {
       "commit": "8aa502780f9349bbc340fc43b84749d5cb2a1b1a",
@@ -452,8 +452,8 @@
       "sha256": "97acd9467b1f33cb6579ea7ccdf9c1ab0b5774bf47a6e466f53ed275bd0fa5c8"
     },
     "Tests/SocketIO/run.py": {
-      "commit": "8aa502780f9349bbc340fc43b84749d5cb2a1b1a",
-      "sha256": "a5917efc1d5edc678f22cf8310ccf109f4dd2cedf12bb31c95469740c8eb73a2"
+      "commit": "de46fd5c4d45710623632e172169a35df4a6bb51",
+      "sha256": "21ce2a34b554e34de227f10a6b32a2cc8cd402850dbcb065c05282d3f01bcd32"
     },
     "Tests/SocketIO/snapshot_rows.c": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
