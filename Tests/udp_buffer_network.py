@@ -140,6 +140,39 @@ def malformed_frames(port):
     return rows
 
 
+def reply_send_errors(port):
+    # A legal remote IPv4 UDP payload can exceed the client wire limit after
+    # the ten-byte SOCKS header is added. Drop only that reply, then continue.
+    rows = []
+    with datagram(socket.AF_INET) as destination:
+        destination.bind(('127.0.0.1', 0))
+        endpoint = destination.getsockname()[:2]
+        addr = encode(*endpoint)
+        for hint in ('known', '0.0.0.0'):
+            with association(('127.0.0.1', port), hint) as (_, udp):
+                udp.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 512 * 1024)
+                udp.send(b'\0\0\0' + addr + b'initial')
+                original, peer = destination.recvfrom(70000)
+                assert original == b'initial'
+                fitting = payload(65507 - 3 - len(addr), 17)
+                assert destination.sendto(fitting, peer) == len(fitting)
+                assert udp.recv(70000) == b'\0\0\0' + addr + fitting
+                assert destination.sendto(payload(65507, 19), peer) == 65507
+                for original in (b'queued-after-oversized', b''):
+                    destination.sendto(original, peer)
+                    assert udp.recv(70000) == b'\0\0\0' + addr + original
+                # The same association must also handle a fresh request/reply.
+                udp.send(b'\0\0\0' + addr + b'continuation')
+                original, next_peer = destination.recvfrom(70000)
+                assert original == b'continuation' and next_peer == peer
+                destination.sendto(original, peer)
+                assert udp.recv(70000) == b'\0\0\0' + addr + original
+                rows.append(dict(case='oversized-reply-send-error', hint=hint,
+                                 remote_payload=65507, required_socks_bytes=65517,
+                                 fitting_payload=len(fitting), continued=True))
+    return rows
+
+
 def prior_control(binary, directory):
     with proxy_server(str(binary), directory / 'old.server.log') as port:
         with datagram(socket.AF_INET) as dest:
@@ -180,6 +213,9 @@ def main():
                                 row['workers'] = workers
                             rows.extend(batch)
                         rows.extend(malformed_frames(port))
+                        for row in reply_send_errors(port):
+                            row['workers'] = workers
+                            rows.append(row)
                         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
                             futures = [pool.submit(single, port, ip, False, hint) for ip, _, hint in routes[:4]]
                             for f in futures:

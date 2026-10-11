@@ -374,7 +374,7 @@ index a2db80e34c33b65e924ee8f855a90ee819e75384..2632ac90d764ed218c8bb0a650f0a92f
      return 0;
  }
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index ec0caaa7c0e73de01938fd3987e2af8833c522c2..d3cab7c8cfd071bb4b6dcd22205ae4e4bcf54282 100644
+index 0fd1966ca6d20ed471fcdf3e6b7bd6d83ffecc84..2716810cb45bc1586b65b65f1192975f4190af70 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -26,6 +26,7 @@
@@ -473,7 +473,7 @@ index ec0caaa7c0e73de01938fd3987e2af8833c522c2..d3cab7c8cfd071bb4b6dcd22205ae4e4
          }
  
          msgv[count].addr = &udp->addr;
-@@ -931,6 +933,9 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
+@@ -942,6 +944,9 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
      }
  
      fd_a = hev_socks5_udp_get_fd (self);
