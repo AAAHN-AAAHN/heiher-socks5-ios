@@ -1,5 +1,5 @@
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index 084c03b98d8f80b646381d5cbf82eca95de2eddb..5016df65e4a0b66ecdebfef8fbbce46856e042a6 100644
+index 7c14969f3ff478678f4959d22394fe3b47fee3c3..328f2b69526ca4f3f82e385ef02c82ddccbc17fb 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -25,6 +25,27 @@

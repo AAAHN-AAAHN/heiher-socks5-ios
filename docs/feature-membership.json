@@ -5,8 +5,8 @@
     "feature/background": "669e2a906802ea507e2665f18b43d1383915d49d",
     "feature/server-control": "bccfcd4f75e2c998f1bc1fb497b18a046d43c16b",
     "feature/settings-persistence": "126a30d21209c816916814756e2ab015d2aaac36",
-    "feature/udp-compat": "105d95770e18e13a491b23e0fb925f22843aa395",
-    "feature/traffic-statistics": "36e7bca37ec8288488431a95581aded6c467d94e"
+    "feature/udp-compat": "2e2cdf4d879225ecd97ae10eaf7d9e9be19e3e12",
+    "feature/traffic-statistics": "b86ce2fe509d4f31635dae46ae08049cdf4dd9ac"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -19,8 +19,8 @@
       "path": ".github/workflows/udp-compat-audit.yml"
     },
     "Build/inherited-workflows/traffic-statistics-verify-build.yml": {
-      "commit": "36e7bca37ec8288488431a95581aded6c467d94e",
-      "sha256": "3b41c14ab209f8d04628c63052eec3b3d7c2c7df1f48871fa0e794108745aaee",
+      "commit": "b86ce2fe509d4f31635dae46ae08049cdf4dd9ac",
+      "sha256": "afed9a9d409f1b91d0e808a7af439c9f3e1401d3b156963ac3699cb0c09fd6a2",
       "path": ".github/workflows/verify-build.yml"
     },
     "Patches/hev-netaddr-result.patch": {
@@ -48,16 +48,16 @@
       "sha256": "b06ce60deeea2803dce26056d09410f90667c029473685cf1e78716f0074165c"
     },
     "Patches/hev-udp-peer-filter.patch": {
-      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
-      "sha256": "54a4e0dd41a46953cc8a04256da60a42fb09eed27a10631c230de5c5ff5aebaa"
+      "commit": "2e2cdf4d879225ecd97ae10eaf7d9e9be19e3e12",
+      "sha256": "4e5bd22e463200189203315a437323509dcb3a7934c756ea706625fa58f7e86b"
     },
     "Patches/hev-udp-port-zero.patch": {
       "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
       "sha256": "9cd0a43550a6128046f81d11bd16971e426386e2656e3e8f16fa790d57bbb315"
     },
     "Patches/hev-udp-sockaddr.patch": {
-      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
-      "sha256": "0b2088e6f0519fe01d9d0c64d0bda4cc5909f292ed9095613a1b2434f930ac0e"
+      "commit": "2e2cdf4d879225ecd97ae10eaf7d9e9be19e3e12",
+      "sha256": "c49d796baeddc2d4cfcc65204746c3cd3465f124eab48540abac4cdf7caa1d94"
     },
     "Socks5/Assets.xcassets/AppIcon.appiconset/AppIcon.png": {
       "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
@@ -496,8 +496,8 @@
       "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "36e7bca37ec8288488431a95581aded6c467d94e",
-      "sha256": "b1c4927961c5ab5a72375e5915eec6e0e6fae0d130aef688a90b4467dcb2889b"
+      "commit": "b86ce2fe509d4f31635dae46ae08049cdf4dd9ac",
+      "sha256": "eed8877319868e0651f94d5e9a740e291f728f9071bf9fe81591f9ac20d662ab"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
