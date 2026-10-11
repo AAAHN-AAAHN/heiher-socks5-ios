@@ -31,6 +31,14 @@
       "repository": "."
     },
     {
+      "file": "hev-udp-domain.patch",
+      "repository": "src/core"
+    },
+    {
+      "file": "hev-session-setup.patch",
+      "repository": "."
+    },
+    {
       "file": "hev-socket-meter-task.patch",
       "repository": "third-part/hev-task-system"
     },

@@ -14,7 +14,7 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 SOCKET_BASE = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
-UDP = 'badf7c8a70561768f7251fdde070afce81b48791'
+UDP = '105d95770e18e13a491b23e0fb925f22843aa395'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 SOCKET_PATCHES = [
     {'file': 'hev-socket-meter-task.patch', 'repository': 'third-part/hev-task-system'},
@@ -23,7 +23,7 @@ SOCKET_PATCHES = [
 ]
 UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
                         'udp_buffer_send.c', 'udp_stream_boundaries.c', 'udp_splicer_lifetime.c',
-                        'udp_netaddr_errors.c')
+                        'udp_netaddr_errors.c', 'udp_session_setup.c')
 # Keep inherited fixtures' substituted I/O boundaries; real meter tests use no aliases.
 UDP_FIXTURE_INIT = ['-include', str(ROOT / 'Tests/SocketIO/udp_fixture_main.h')]
 UDP_FIXTURE_FLAGS = UDP_FIXTURE_INIT + [
@@ -33,7 +33,8 @@ UDP_FILES = {
     '.github/workflows/udp-compat-audit.yml': '.github/workflows/verify-build.yml',
     **{p: p for p in ('Patches/hev-udp-port-zero.patch', 'Patches/hev-udp-sockaddr.patch',
                      'Patches/hev-udp-peer-filter.patch', 'Patches/hev-udp-dynamic-buffer.patch',
-                     'Patches/hev-netaddr-result.patch',
+                     'Patches/hev-netaddr-result.patch', 'Patches/hev-udp-domain.patch',
+                     'Patches/hev-session-setup.patch',
                      'Tests/udp_peer_regression.py',
                      'Tests/udp_queue_observation.py',
                      'Tests/udp_compat_audit.py', 'Tests/udp_sockaddr_regression.py',
@@ -76,7 +77,8 @@ def check_udp_inheritance():
     assert ('    uses: ./.github/workflows/udp-compat-audit.yml\n'
             f'    with:\n      ref: {UDP}\n') in workflow, 'UDP workflow prerequisite differs'
     assert '    needs: udp-prerequisite\n' in workflow
-    assert 'udp_stream_boundaries.c' in UDP_COMPOSED_SOURCES, 'Missing composed stream execution'
+    for source in ('udp_stream_boundaries.c', 'udp_session_setup.c'):
+        assert source in UDP_COMPOSED_SOURCES, 'Missing composed execution: ' + source
     entries = {}
     for record in git('ls-tree', '-rz', UDP).split(b'\0'):
         if record:
@@ -331,7 +333,8 @@ def main():
     assert len(hashes) == 17
     (OUT / 'statistics-source-hashes.json').write_text(json.dumps(hashes, indent=2) + '\n')
     # Test-only C follows the same formatter; never silently rewrite reviewed files.
-    for path in [*(ROOT / 'Tests/SocketIO').glob('*.c'), ROOT / 'Tests/udp_stream_boundaries.c']:
+    for path in [*(ROOT / 'Tests/SocketIO').glob('*.c'), ROOT / 'Tests/udp_stream_boundaries.c',
+                 ROOT / 'Tests/udp_session_setup.c']:
         target = OUT / ('formatted-' + path.name)
         formatted = subprocess.check_output([formatter, '--style=file:' + str(CORE / '.clang-format'), str(path)])
         target.write_bytes(formatted)

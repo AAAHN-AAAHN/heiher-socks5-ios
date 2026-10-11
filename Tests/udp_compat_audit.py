@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -15,8 +16,13 @@ SUMMARY = []
 
 
 def run(args, name, cwd=ROOT, timeout=180):
-    with (OUT / name).open('w') as log:
-        subprocess.run([str(arg) for arg in args], cwd=cwd, stdout=log,
+    args = [str(arg) for arg in args]
+    mode = 'a' if name.endswith('.log') else 'w'
+    with (OUT / name).open(mode) as log:
+        if mode == 'a':
+            log.write(json.dumps(args) + '\n')
+            log.flush()
+        subprocess.run(args, cwd=cwd, stdout=log,
                        stderr=subprocess.STDOUT, check=True, timeout=timeout)
 
 
@@ -117,8 +123,8 @@ def main():
          '--old-control', '--output', OUT / 'header-old-control.json'],
         'header-old-control.log', timeout=45)
     run(['make', 'clean'], 'clean.log', CORE)
-    patch('hev-udp-dynamic-buffer.patch', CORE / 'src/core')
-    patch('hev-netaddr-result.patch', CORE)
+    for item in CONFIG['patches'][3:]:
+        patch(item['file'], CORE / item['repository'])
     build()
 
     formatter = shutil.which('clang-format-18') or shutil.which('clang-format')
@@ -130,7 +136,8 @@ def main():
     run([formatter, CORE / 'src/core/src/hev-socks5-udp.c'], 'expected-dynamic-core.c')
     for name in ('udp_buffer_unit.c', 'udp_buffer_io.c', 'udp_buffer_timer.c',
                  'udp_buffer_send.c', 'udp_buffer_live_hold.c', 'udp_stream_boundaries.c',
-                 'udp_splicer_lifetime.c', 'udp_netaddr_errors.c'):
+                 'udp_splicer_lifetime.c', 'udp_netaddr_errors.c',
+                 'udp_session_setup.c'):
         run([formatter, '--style=file:' + str(CORE / '.clang-format'), ROOT / 'Tests' / name],
             'expected-' + name)
         if (OUT / ('expected-' + name)).read_bytes() != (ROOT / 'Tests' / name).read_bytes():
@@ -147,11 +154,13 @@ def main():
         includes = ['-I' + str(CORE / path) for path in (
             'src/misc', 'src/core/include', 'src/core/src',
             'third-part/yaml/src', 'third-part/hev-task-system/include')]
+        sources = {CORE / item['repository'] / name
+                   for item in CONFIG['patches']
+                   for name in re.findall(r'^\+\+\+ b/(.+\.c)$',
+                                          (ROOT / 'Patches' / item['file']).read_text(), re.M)}
         run(['xcrun', '--sdk', 'iphoneos', 'clang', '-target', 'arm64-apple-ios17.2',
              '-isysroot', sdk, '-std=gnu11', '-Wall', '-Werror', '-fsyntax-only',
-             *includes, CORE / 'src/hev-socks5-session.c',
-             CORE / 'src/core/src/hev-socks5-udp.c',
-             CORE / 'src/misc/hev-misc.c'], 'ios-arm64-syntax.log')
+             *includes, *sorted(sources)], 'ios-arm64-syntax.log')
         if all(row['passed'] for row in baseline):
             raise RuntimeError('Darwin negative control did not reproduce either defect.')
         known = next(row for row in port_only if row['test'].startswith('UDP 127.0.0.1 hint=known'))
@@ -170,7 +179,8 @@ def main():
         network('limit-fixed-unknown-' + workers, '--fixed-udp-port', '--workers', workers, observation=True)
 
     compiler = os.environ.get('CC', 'clang')
-    includes = ['-I' + str(CORE / 'src/core/src'), '-I' + str(CORE / 'src/misc'),
+    includes = ['-I' + str(CORE / 'src'), '-I' + str(CORE / 'src/core/src'),
+                '-I' + str(CORE / 'src/misc'),
                 '-I' + str(CORE / 'third-part/hev-task-system/include')]
     libs = [CORE / 'bin/libhev-socks5-server.a', CORE / 'third-part/yaml/bin/libyaml.a',
             CORE / 'third-part/hev-task-system/bin/libhev-task-system.a']
@@ -186,7 +196,8 @@ def main():
     executable.unlink()
 
     for name in ('udp_buffer_unit', 'udp_buffer_io', 'udp_buffer_send',
-                 'udp_stream_boundaries', 'udp_splicer_lifetime', 'udp_netaddr_errors'):
+                 'udp_stream_boundaries', 'udp_splicer_lifetime', 'udp_netaddr_errors',
+                 'udp_session_setup'):
         for mode, flags in [('asan', ['-O1', '-g', '-fsanitize=address,undefined',
                                      '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']),
                             ('optimized', ['-O3', '-fstrict-aliasing'])]:

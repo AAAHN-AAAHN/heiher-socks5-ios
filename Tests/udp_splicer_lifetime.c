@@ -301,8 +301,6 @@ run (Case value)
     hev_task_run (owner, consume, NULL);
     hev_task_run (controller, stop, NULL);
     hev_task_system_run ();
-    hev_task_unref (controller);
-    hev_task_unref (owner);
     hev_task_system_fini ();
     printf ("%s: allocations=%u, outstanding=%u, after-stop=%u, "
             "sleeps=%u, external-cancel=%d\n",
