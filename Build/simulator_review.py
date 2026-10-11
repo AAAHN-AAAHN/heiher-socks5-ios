@@ -42,7 +42,7 @@ def run(*args, timeout=120):
     return result.stdout.strip()
 
 
-def preserve_failed_app(app):
+def preserve_failed_app(app, device=None):
     """Observe only after failure; never replace it or mutate the built app."""
     try:
         evidence = OUT / 'failure-app'
@@ -55,14 +55,26 @@ def preserve_failed_app(app):
                 archive.add(app, arcname=app.name)
         except Exception as error:
             result['errors'].append('archive: ' + repr(error))
-        command = ['codesign', '--verify', '--deep', '--strict', '--verbose=4', str(app)]
-        result['signature_check'] = {'command': command, 'timeout_seconds': 15}
-        try:
-            with (evidence / 'codesign-verify.log').open('wb') as log:
-                checked = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, timeout=15)
-            result['signature_check']['exit'] = checked.returncode
-        except Exception as error:
-            result['signature_check']['error'] = repr(error)
+        checks = [('signature_check', 'codesign-verify.log',
+                   ['codesign', '--verify', '--deep', '--strict', '--verbose=4', str(app)])]
+        if device:
+            result['device'] = device
+            options = ['show', '--last', '10m', '--style', 'compact', '--info', '--debug', '--predicate']
+            checks += [
+                ('simulator_log', 'simulator-system.log',
+                 ['xcrun', 'simctl', 'spawn', device, 'log', *options,
+                  'process == "installd" OR process == "installcoordinationd" OR process == "lsd" OR eventMessage CONTAINS "hev.Socks5"']),
+                ('host_log', 'host-device.log',
+                 ['/usr/bin/log', *options, f'eventMessage CONTAINS[c] "{device}"']),
+            ]
+        for name, filename, command in checks:
+            result[name] = {'command': command, 'log': filename, 'timeout_seconds': 15}
+            try:
+                with (evidence / filename).open('wb') as log:
+                    checked = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, timeout=15)
+                result[name]['exit'] = checked.returncode
+            except Exception as error:
+                result[name]['error'] = repr(error)
         (evidence / 'capture.json').write_text(json.dumps(result, indent=2) + '\n')
     except Exception as error:
         try:
@@ -223,7 +235,7 @@ def main():
         success_text = ('PASS: saved tabs, Start/relaunch/TCP and Stop in original/remapped Simulator installs. Not a physical SideStore/LiveContainer or background audio test.\n')
     except Exception:
         if installation_started:
-            preserve_failed_app(app)
+            preserve_failed_app(app, device)
         raise
     finally:
         cleanup = []

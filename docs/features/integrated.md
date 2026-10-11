@@ -60,7 +60,7 @@ The package checks require exact generated-framework/source identity, successful
 
 The seeded Simulator cases cover original/remapped identity, tabs and durable Start/Stop with actual TCP responses. The three UI cases verify independent audio, server/setting behavior and known large IPv4/IPv6 volumes in the actual Total/IP tables across Stop/Start and orientation. Runtime-warning and cleanup checks remain required. Scrolling and hittability establish access, not simultaneous unoccluded display of every row.
 
-On Simulator installation or subsequent failure, the release harness preserves the actual app bundle, Unix modes and signature diagnostics; partial timeout output remains in the original log.
+On Simulator installation or subsequent failure, the release harness preserves the actual app bundle, Unix modes and signature diagnostics; partial timeout output remains in the original log. Before cleanup, it also records the failing device's installation-service logs and host messages matching that device UUID, each with a 15-second limit. Diagnostic failures never replace the original failure or relax the 120-second installation limit.
 
 ## Operation and limitations
 
