@@ -538,7 +538,7 @@ index a2db80e34c33b65e924ee8f855a90ee819e75384..c947402b4dcf215fa00ed25b46b069dd
      hev_task_io_splice (cfd, cfd, fd, fd, 8192, task_io_yielder, self);
  
 diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
-index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..5ec8473fd14b98efdc21a52f40fb1a92d1922fa1 100644
+index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..eee416859c7769f8d1c8dc5810c5d2a7877f18cb 100644
 --- a/src/hev-socks5-proxy.c
 +++ b/src/hev-socks5-proxy.c
 @@ -8,6 +8,7 @@
@@ -646,13 +646,11 @@ index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..5ec8473fd14b98efdc21a52f40fb1a92
      atomic_fetch_or (&tsync, SYNC_SEND);
  
      return 0;
-@@ -272,6 +319,13 @@ hev_socks5_proxy_fini (void)
+@@ -272,6 +319,11 @@ hev_socks5_proxy_fini (void)
  
      LOG_D ("socks5 proxy fini");
  
 +    atomic_store (&signal_worker, NULL);
-+    if (signal_installed & 2)
-+        sigaction (SIGUSR1, &signal_previous_reload, NULL);
 +    while (atomic_load (&signal_users))
 +        usleep (500);
 +    atomic_store (&signal_reload, 0);
@@ -660,10 +658,12 @@ index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..5ec8473fd14b98efdc21a52f40fb1a92
  retry:
      res = atomic_fetch_and (&tsync, ~(SYNC_SEND | SYNC_STOP | SYNC_SENT));
      if (res & SYNC_WAIT) {
-@@ -295,6 +349,9 @@ retry:
+@@ -295,6 +347,11 @@ retry:
      }
  
      hev_task_system_fini ();
++    if (signal_installed & 2)
++        sigaction (SIGUSR1, &signal_previous_reload, NULL);
 +    if (signal_installed & 1)
 +        sigaction (SIGPIPE, &signal_previous_pipe, NULL);
 +    signal_installed = 0;
@@ -702,6 +702,19 @@ index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..5ec8473fd14b98efdc21a52f40fb1a92
 +{
 +    hev_socks5_proxy_stop_inner (1);
 +}
+diff --git a/Makefile b/Makefile
+index 3d5f50d416f37569bae5123deba9faa0349ec965..1fa7671c12c5249fda0a992a2399b0fb2b0e9d0f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -32,7 +32,7 @@ $(SHARED_TARGET) : LDFLAGS+=-shared -pthread
+ 
+ -include build.mk
+ CCFLAGS+=$(VERSION_CFLAGS)
+-TPFLAGS=ENABLE_STACK_OVERFLOW_DETECTOR=1
++TPFLAGS=ENABLE_STACK_OVERFLOW_DETECTOR=0
+ CCSRCS=$(filter %.c,$(SRCFILES))
+ ASSRCS=$(filter %.S,$(SRCFILES))
+ LDOBJS=$(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(CCSRCS)) \
 diff --git a/src/hev-socks5-worker.h b/src/hev-socks5-worker.h
 index 199fbf64494e77ec89fba4761c97c340895ddd44..7b2ba690258286190f39bf1d2013ae0962a3f3e7 100644
 --- a/src/hev-socks5-worker.h
