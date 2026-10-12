@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 /* Exercise the actual worker lifecycle and descriptors. Only named allocation,
- * registration and read-error boundaries are injected. EOF comes from a real
+ * registration, read-error and EINTR write boundaries are injected. EOF comes from a real
  * socket shutdown. Constructor-owned tasks retain their production 64KiB
  * default; the observer uses 8KiB (64KiB under ASan). Normal sessions use 8KiB. */
 #include <assert.h>
@@ -35,6 +35,7 @@ static void worker_free (void *);
 static int worker_socketpair (int, int, int, int[2]);
 static int worker_add (HevTask *, int, unsigned int);
 static ssize_t worker_read (int, void *, size_t, HevTaskIOYielder, void *);
+static ssize_t worker_write (int, const void *, size_t);
 static int worker_accept (int, struct sockaddr *, socklen_t *, HevTaskIOYielder,
                           void *);
 static HevTask *worker_task_new (int);
@@ -48,6 +49,7 @@ static void worker_object_unref (HevObject *);
 #define socketpair worker_socketpair
 #define hev_task_add_fd worker_add
 #define hev_task_io_read worker_read
+#define write worker_write
 #define hev_task_io_socket_accept worker_accept
 #define hev_task_new worker_task_new
 #define hev_task_unref worker_task_unref
@@ -60,6 +62,7 @@ static void worker_object_unref (HevObject *);
 #undef socketpair
 #undef hev_task_add_fd
 #undef hev_task_io_read
+#undef write
 #undef hev_task_io_socket_accept
 #undef hev_task_new
 #undef hev_task_unref
@@ -78,19 +81,24 @@ enum
     TASK_OOM,
     ACCEPT_ERROR,
     ACCEPT_SETUP,
+    STOP_EINTR,
+    RELOAD_EINTR,
     WORKER_OOM,
     WORKER_TASK1,
-    WORKER_TASK2
+    WORKER_TASK2,
+    CASE_COUNT
 };
-static const char *names[] = { "normal",     "listener-add", "event-add",
-                               "event-eof",  "event-error",  "session-oom",
-                               "task-oom",   "accept-error", "accept-setup",
-                               "worker-oom", "worker-task1", "worker-task2" };
+static const char *names[] = { "normal",       "listener-add", "event-add",
+                               "event-eof",    "event-error",  "session-oom",
+                               "task-oom",     "accept-error", "accept-setup",
+                               "stop-eintr",   "reload-eintr", "worker-oom",
+                               "worker-task1", "worker-task2" };
 static int test, listener, event_fds[2] = { -1, -1 };
 static int observer_ran, intervention, add_faults, read_calls, accept_calls;
 static int accepted[8], accepted_count, accepts_before_observer;
 static int failed_accepts_before_observer, accept_after_stop, wakeup_stopped;
 static int terminal_read_retries;
+static int write_calls, write_faults, reload_reads;
 static int task_calls, tasks_created, tasks_released, session_calls;
 static int sessions_created, sessions_released;
 static HevObject *session_objects[8];
@@ -151,6 +159,7 @@ static ssize_t
 worker_read (int fd, void *buf, size_t len, HevTaskIOYielder yielder,
              void *data)
 {
+    ssize_t res;
     read_calls++;
     if ((test == EVENT_EOF || test == EVENT_ERROR) && read_calls > 1) {
         /* Preserve a FAIL, then supply a Stop byte only for fixture teardown
@@ -165,7 +174,26 @@ worker_read (int fd, void *buf, size_t len, HevTaskIOYielder yielder,
         errno = EIO;
         return -1;
     }
-    return hev_task_io_read (fd, buf, len, yielder, data);
+    res = hev_task_io_read (fd, buf, len, yielder, data);
+    if (res == 1 && *(char *)buf == 'r')
+        reload_reads++;
+    return res;
+}
+
+static ssize_t
+worker_write (int fd, const void *buf, size_t len)
+{
+    if (fd == event_fds[1] && len == 1 &&
+        ((test == STOP_EINTR && *(const char *)buf == 's') ||
+         (test == RELOAD_EINTR && *(const char *)buf == 'r'))) {
+        write_calls++;
+        if (!write_faults) {
+            write_faults++;
+            errno = EINTR;
+            return -1;
+        }
+    }
+    return write (fd, buf, len);
 }
 
 static int
@@ -277,8 +305,19 @@ observe_and_stop (void *data)
 {
     (void)data;
     observer_ran = 1;
+    if (test == RELOAD_EINTR) {
+        int i;
+        hev_socks5_worker_reload (worker);
+        for (i = 0; !reload_reads; i++) {
+            assert (i < 100);
+            hev_task_sleep (1);
+        }
+        assert (worker->run && reload_reads == 1);
+        hev_socks5_worker_stop (worker);
+        return;
+    }
     if (test == SESSION_OOM || test == TASK_OOM || test == NORMAL ||
-        test == ACCEPT_ERROR || test == ACCEPT_SETUP) {
+        test == ACCEPT_ERROR || test == ACCEPT_SETUP || test == STOP_EINTR) {
         hev_socks5_worker_stop (worker);
         return;
     }
@@ -311,6 +350,7 @@ run_one (int which)
     accepted_count = accepts_before_observer = failed_accepts_before_observer =
         0;
     accept_after_stop = wakeup_stopped = terminal_read_retries = 0;
+    write_calls = write_faults = reload_reads = 0;
     task_calls = tasks_created = tasks_released = session_calls = 0;
     sessions_created = sessions_released = 0;
     worker = NULL;
@@ -378,6 +418,11 @@ run_one (int which)
         if (test == ACCEPT_SETUP)
             passed &= accepts_before_observer == 1 && accepted_count >= 1 &&
                       !session_calls;
+        if (test == STOP_EINTR || test == RELOAD_EINTR)
+            passed &= write_faults == 1 && write_calls == 2 &&
+                      reload_reads == (test == RELOAD_EINTR) &&
+                      !(atomic_load (&worker->tsync) &
+                        (SYNC_WAIT | SYNC_SENT_S | SYNC_SENT_R));
         hev_socks5_worker_destroy (worker);
         passed &= !worker_allocation && !open_fd (listener) &&
                   !open_fd (event_fds[0]) && !open_fd (event_fds[1]) &&
@@ -391,15 +436,16 @@ run_one (int which)
             assert (close (clients[i]) == 0);
         }
     }
-    printf (
-        "%s intervention=%d add_faults=%d read=%d accept=%d accepted=%d "
-        "before_observer=%d session=%d/%d task=%d/%d worker_heap=%d "
-        "ownership=%d after_stop=%d stopped_wakeup=%d observer_stack=%d %s\n",
-        names[test], intervention, add_faults, read_calls, accept_calls,
-        accepted_count, accepts_before_observer, sessions_created,
-        sessions_released, tasks_created, tasks_released,
-        worker_allocation != NULL, ownership, accept_after_stop, wakeup_stopped,
-        TEST_STACK_SIZE, passed ? "PASS" : "FAIL");
+    printf ("%s intervention=%d add_faults=%d read=%d accept=%d accepted=%d "
+            "before_observer=%d session=%d/%d task=%d/%d worker_heap=%d "
+            "ownership=%d after_stop=%d stopped_wakeup=%d observer_stack=%d "
+            "write=%d write_eintr=%d reload=%d %s\n",
+            names[test], intervention, add_faults, read_calls, accept_calls,
+            accepted_count, accepts_before_observer, sessions_created,
+            sessions_released, tasks_created, tasks_released,
+            worker_allocation != NULL, ownership, accept_after_stop,
+            wakeup_stopped, TEST_STACK_SIZE, write_calls, write_faults,
+            reload_reads, passed ? "PASS" : "FAIL");
     hev_task_system_fini ();
     return passed ? 0 : 1;
 }
@@ -407,10 +453,15 @@ run_one (int which)
 int
 main (void)
 {
-    int which, failed = 0;
-    for (which = 0; which < 12; which++)
+    int which, first = 0, last = CASE_COUNT, failed = 0;
+#ifdef WORKER_FAILURE_CASE
+    first = WORKER_FAILURE_CASE;
+    assert (first >= 0 && first < CASE_COUNT);
+    last = first + 1;
+#endif
+    for (which = first; which < last; which++)
         failed += !!run_one (which);
-    printf ("worker failures: %d/12 cases PASS; failures=%d\n", 12 - failed,
-            failed);
+    printf ("worker failures: %d/%d cases PASS; failures=%d\n",
+            last - first - failed, last - first, failed);
     return failed ? 1 : 0;
 }

@@ -25,6 +25,7 @@
 static int setup_dns (const char *, const char *, const struct addrinfo *,
                       struct addrinfo **);
 static int setup_socket (int);
+static int setup_sockname (int, struct sockaddr *, socklen_t *);
 static int setup_bind (int, const struct sockaddr *, socklen_t);
 static int setup_connect (int, const struct sockaddr *, socklen_t,
                           HevTaskIOYielder, void *);
@@ -40,6 +41,10 @@ static int short_send_length, short_send_write;
 #include "hev-socks5-misc.c"
 #ifdef hev_meter_recv
 #include "hev-socks5-meter.h"
+static void *setup_meter_fd (int);
+static void *setup_meter_peer (const struct sockaddr *, socklen_t);
+#define hev_meter_fd setup_meter_fd
+#define hev_meter_peer setup_meter_peer
 #endif
 #define hev_socks5_socket setup_socket
 #define hev_socks5_tcp_iface setup_tcp_iface
@@ -48,7 +53,11 @@ static int short_send_length, short_send_write;
     (setup_io_calls++, hev_task_io_socket_recv (__VA_ARGS__))
 #define hev_task_io_socket_send(...) \
     (setup_io_calls++, setup_send (__VA_ARGS__))
+#define getsockname setup_sockname
 #include "hev-socks5-server.c"
+#undef getsockname
+#undef hev_meter_fd
+#undef hev_meter_peer
 #undef hev_task_io_socket_recv
 #undef hev_task_io_socket_send
 #undef hev_socks5_socket
@@ -80,6 +89,27 @@ static int stopped, sockets_after_stop, binds_after_stop, connects_after_stop;
 static int control, client, result, created[2], created_count, failures;
 static unsigned char request[32];
 static size_t request_length;
+static int fail_bound_name, bound_name_calls;
+static struct sockaddr_in6 bound_address;
+#ifdef HEV_SOCKS5_METER_H
+static int destination_fallbacks;
+static struct sockaddr_in6 meter_destination;
+static void *
+setup_meter_fd (int fd)
+{
+    if (created_count && fd == created[0])
+        return NULL; /* Exercise the existing destination fallback. */
+    return hev_meter_fd (fd);
+}
+static void *
+setup_meter_peer (const struct sockaddr *address, socklen_t length)
+{
+    assert (length == sizeof (meter_destination));
+    destination_fallbacks++;
+    memcpy (&meter_destination, address, length);
+    return hev_meter_peer (address, length);
+}
+#endif
 
 static ssize_t
 setup_send (int fd, const void *data, size_t length, int flags,
@@ -97,6 +127,21 @@ setup_send (int fd, const void *data, size_t length, int flags,
                                          yielder, self) == short_send_result);
     errno = EPIPE;
     return short_send_result;
+}
+
+static int
+setup_sockname (int fd, struct sockaddr *address, socklen_t *length)
+{
+    assert (created_count == 1 && fd == created[0]);
+    bound_name_calls++;
+    if (fail_bound_name) {
+        errno = EIO;
+        return -1;
+    }
+    int result = getsockname (fd, address, length);
+    assert (!result && *length == sizeof (bound_address));
+    memcpy (&bound_address, address, sizeof (bound_address));
+    return result;
 }
 
 static void *
@@ -250,7 +295,7 @@ handshake_coordinator (void *unused)
 }
 
 static void
-handshake_setup (int where, int cancel)
+handshake_setup (int where, int cancel, int name_error)
 {
     static const char *configs[] = {
         "main:\n  workers: 1\n  listen-address: '::1'\n  port: 1080\n",
@@ -266,6 +311,11 @@ handshake_setup (int where, int cancel)
     int acceptor, destination = -1, flags, bad;
     stage = where;
     cancel_case = cancel;
+    fail_bound_name = name_error;
+    bound_name_calls = 0;
+#ifdef HEV_SOCKS5_METER_H
+    destination_fallbacks = 0;
+#endif
     pending = released = completed = started = returned = stopped = 0;
     sockets_after_stop = binds_after_stop = connects_after_stop =
         created_count = 0;
@@ -320,21 +370,37 @@ handshake_setup (int where, int cancel)
             assert (errno == EINTR);
     }
     expected = cancel ? (where >= 4 ? 0 : 2) : 24;
-    bad = bytes != expected || (cancel ? result >= 0 : result != 0) ||
+    bad = bytes != expected ||
+          (cancel || name_error ? result >= 0 : result != 0) ||
           sockets_after_stop || binds_after_stop || connects_after_stop ||
           (where == 5 && (setup_io_calls || pending || created_count));
     if (bytes >= 2)
         assert (response[0] == 5 && response[1] == 0);
     if (!cancel)
-        assert (bytes >= 4 && response[2] == 5 && response[3] == 0);
+        assert (bytes >= 4 && response[2] == 5 &&
+                response[3] == (name_error ? 1 : 0));
+    if (where == 3 && !cancel) {
+        assert (bound_name_calls == 1);
+#ifdef HEV_SOCKS5_METER_H
+        assert (destination_fallbacks == 1);
+        assert (meter_destination.sin6_port == target.sin6_port);
+        assert (!memcmp (&meter_destination.sin6_addr, &target.sin6_addr, 16));
+#endif
+        if (!name_error) {
+            assert (response[5] == 4);
+            assert (!memcmp (response + 6, &bound_address.sin6_addr, 16));
+            assert (!memcmp (response + 22, &bound_address.sin6_port, 2));
+        }
+    }
     for (int i = 0; i < created_count; i++)
         assert (fcntl (created[i], F_GETFD) == -1 && errno == EBADF);
     assert (fcntl (control, F_GETFD) == -1 && errno == EBADF);
     printf (
-        "%s: setup stage=%d cancel=%d result=%d response=%zu "
+        "%s: setup stage=%d cancel=%d name-error=%d result=%d response=%zu "
         "after-stop socket/bind/connect=%d/%d/%d io-calls=%u; descriptors closed\n",
-        bad ? "FAIL" : "PASS", where, cancel, result, bytes, sockets_after_stop,
-        binds_after_stop, connects_after_stop, setup_io_calls);
+        bad ? "FAIL" : "PASS", where, cancel, name_error, result, bytes,
+        sockets_after_stop, binds_after_stop, connects_after_stop,
+        setup_io_calls);
     failures += bad;
     close (client);
     if (destination >= 0)
@@ -504,8 +570,9 @@ main (void)
     short_handshake (2);
     for (int where = 0; where < 5; where++)
         for (int cancel = 0; cancel <= 1; cancel++)
-            handshake_setup (where, cancel);
-    handshake_setup (5, 1);
+            handshake_setup (where, cancel, 0);
+    handshake_setup (5, 1, 0);
+    handshake_setup (3, 0, 1);
     assert (!hev_task_system_init ());
     task = hev_task_new (-1);
     assert (task);

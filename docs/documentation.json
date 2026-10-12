@@ -4,10 +4,10 @@
   "parents": {
     "feature/app-icon": "3d54b142e14bc5eaf98239df54c545faf44be86d",
     "feature/background": "8012d36365538e53c749eba8994bdb38ed02e2cd",
-    "feature/server-control": "bccfcd4f75e2c998f1bc1fb497b18a046d43c16b",
-    "feature/settings-persistence": "126a30d21209c816916814756e2ab015d2aaac36",
-    "feature/udp-compat": "861a021835981494d9db9790d6373cbb1179c0f2",
-    "feature/traffic-statistics": "582d6505e13d554966ebd9451cd219ab93af4850"
+    "feature/server-control": "76ea24405ab748e35652f82ea04cc201b22253de",
+    "feature/settings-persistence": "0ff60ead99afb8f751dbf697f46048724fa18563",
+    "feature/udp-compat": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+    "feature/traffic-statistics": "d1ca1ff827a27a0f4bb62295c63edccd921beff9"
   },
   "owned_documents": [
     "README.md",

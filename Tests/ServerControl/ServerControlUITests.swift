@@ -24,10 +24,11 @@ final class ServerControlUITests: XCTestCase {
         XCTAssertEqual(app.textFields.element(boundBy: 1).value as? String, "::")
         XCTAssertEqual(app.textFields.element(boundBy: 2).value as? String, "1080")
         reveal(ipv6Only, in: app, upward: true)
+        // Require each tap to reach its new value before issuing the next tap.
         ipv6Only.tap()
-        XCTAssertEqual(ipv6Only.value as? String, "1")
+        XCTAssertTrue(waitUntil { ipv6Only.value as? String == "1" }, "One tap must enable IPv6-only listening")
         ipv6Only.tap()
-        XCTAssertEqual(ipv6Only.value as? String, "0")
+        XCTAssertTrue(waitUntil { ipv6Only.value as? String == "0" }, "One tap must disable IPv6-only listening")
         reveal(start, in: app, upward: true)
         XCTAssertTrue(start.isEnabled)
         XCTAssertFalse(stop.isEnabled)

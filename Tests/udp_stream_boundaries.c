@@ -52,6 +52,7 @@ static unsigned long cases;
 static int chunk_active, chunk_fault_call, chunk_cancel_call;
 static ssize_t chunk_fault_result;
 static unsigned chunk_requested, chunk_frames_seen;
+static int name_send_active;
 
 typedef struct
 {
@@ -290,12 +291,35 @@ forward_send (int fd, void *messages, unsigned count, int flags,
     return call->result;
 }
 
+static int
+name_sendmmsg (int fd, void *messages, unsigned count, int flags)
+{
+    struct mmsghdr *vector = messages;
+    assert (fd == 19 && count == 2 && flags == MSG_WAITALL);
+    send_calls++;
+    emitted = 0;
+    for (unsigned i = 0; i < count; i++) {
+        struct msghdr *msg = &vector[i].msg_hdr;
+        assert (msg->msg_iovlen == 3);
+        assert (!memcmp (msg->msg_iov[0].iov_base, "\0\0", 3));
+        for (unsigned j = 0; j < 3; j++) {
+            assert (msg->msg_iov[j].iov_len <= sizeof (sent) - emitted);
+            memcpy (sent + emitted, msg->msg_iov[j].iov_base,
+                    msg->msg_iov[j].iov_len);
+            emitted += msg->msg_iov[j].iov_len;
+        }
+    }
+    return count;
+}
+
 int
 stream_sendmmsg (int fd, void *messages, unsigned count, int flags,
                  HevTaskIOYielder yielder, void *self)
 {
     assert (
         !FORWARD_EXPECT_METER); /* Raw send must not bypass composed meter. */
+    if (name_send_active)
+        return name_sendmmsg (fd, messages, count, flags);
     return backward_active ?
                backward_send (fd, messages, count, flags, yielder, self) :
                forward_send (fd, messages, count, flags, yielder, self);
@@ -307,6 +331,8 @@ stream_meter_sendmmsg (int fd, void *messages, unsigned count, int flags,
                        HevTaskIOYielder yielder, void *self)
 {
     forward_meter_calls++;
+    if (name_send_active)
+        return name_sendmmsg (fd, messages, count, flags);
     return backward_active ?
                backward_send (fd, messages, count, flags, yielder, self) :
                forward_send (fd, messages, count, flags, yielder, self);
@@ -567,9 +593,10 @@ domain_boundaries (void)
     const struct
     {
         size_t cut;
-        int nul;
-    } checks[] = { { 17, -1 }, { 17, 0 }, { 17, 4 },  { 17, 8 },
-                   { 4, -1 },  { 5, -1 }, { 13, -1 }, { 15, -1 } };
+        int nul, empty;
+    } checks[] = { { 17, -1, 0 }, { 17, 0, 0 }, { 17, 4, 0 },  { 17, 8, 0 },
+                   { 4, -1, 0 },  { 5, -1, 0 }, { 13, -1, 0 }, { 15, -1, 0 },
+                   { 7, -1, 1 },  { 8, -1, 1 } };
     HevSocks5Class klass = { .base.iface = get_iface, .binder = forward_bind };
     UDPWorkspace workspace;
     void *allocation = udp_workspace_new (&workspace, 2, NULL);
@@ -585,10 +612,16 @@ domain_boundaries (void)
                 UDPBuffers owner = { .slots = slots, .count = 2 };
                 HevSocks5UDPMsg messages[2] = { 0 };
                 size_t head = prefix ? frame (wire, 1, 7) : 0;
-                int valid = checks[i].nul < 0 && checks[i].cut == 17;
-                const unsigned char packet[] = { 0,   1,   16,  3,   9,   '1',
-                                                 '2', '7', '.', '0', '.', '0',
-                                                 '.', '1', 0,   53,  42 };
+                int invalid_name = checks[i].empty || checks[i].nul >= 0;
+                int valid = !invalid_name && checks[i].cut == 17;
+                unsigned char packet[] = { 0,   1,   16,  3,   9,   '1',
+                                           '2', '7', '.', '0', '.', '0',
+                                           '.', '1', 0,   53,  42 };
+                if (checks[i].empty) {
+                    packet[1] = checks[i].cut - 7;
+                    packet[2] = 7;
+                    packet[4] = 0;
+                }
                 memcpy (wire + head, packet, sizeof (packet));
                 if (checks[i].nul >= 0)
                     wire[head + 5 + checks[i].nul] = 0;
@@ -620,9 +653,9 @@ domain_boundaries (void)
                     assert (!messages[prefix].addr);
                     assert (messages[prefix].buf == base[prefix]);
                     assert (messages[prefix].len == sizeof (base[prefix]));
-                    assert (errno == (checks[i].nul < 0 ? EPIPE : EINVAL));
+                    assert (errno == (invalid_name ? EINVAL : EPIPE));
                 }
-                if (checks[i].nul >= 0) {
+                if (invalid_name) {
                     int bind = 0;
                     self.timeout = 60000;
                     consumed = 0;
@@ -784,6 +817,64 @@ send_chunk_boundaries (void)
 
     puts (
         "PASS: 9/10/11/21/343-frame sends; complete stream, second-chunk failures, cancellation and prevalidation");
+}
+
+/* The public send APIs validate every address before any write. */
+static void
+send_name_boundaries (void)
+{
+    const unsigned lengths[] = { 0, 1, 248, 249, 255 };
+    HevObjectClass klass = { .iface = get_iface };
+    HevSocks5 self = { .base.klass = &klass };
+    unsigned char payload[7] = { 1, 2, 3, 4, 5, 6, 7 };
+    for (unsigned transport = 0; transport < 2; transport++) {
+        self.type = transport ? HEV_SOCKS5_TYPE_UDP_IN_TCP :
+                                HEV_SOCKS5_TYPE_UDP_IN_UDP;
+        for (unsigned i = 0; i < sizeof (lengths) / sizeof (*lengths); i++) {
+            for (unsigned invalid_index = 0; invalid_index < 2;
+                 invalid_index++) {
+                for (int nul = -1; nul < 3; nul++) {
+                    HevSocks5Addr addresses[2] = { 0 }, saved[2];
+                    HevSocks5UDPMsg messages[2], original[2];
+                    for (unsigned j = 0; j < 2; j++) {
+                        HevSocks5Addr *addr = &addresses[j];
+                        addr->atype = HEV_SOCKS5_ADDR_TYPE_NAME;
+                        addr->domain.len = j == invalid_index ? lengths[i] : 1;
+                        memset (addr->domain.addr, 'x', addr->domain.len);
+                        messages[j] =
+                            (HevSocks5UDPMsg){ addr, payload, j ? 7 : 0 };
+                    }
+                    if (nul >= 0 && lengths[i]) {
+                        unsigned position = nul == 0 ? 0 :
+                                            nul == 1 ? lengths[i] / 2 :
+                                                       lengths[i] - 1;
+                        addresses[invalid_index].domain.addr[position] = 0;
+                    }
+                    memcpy (saved, addresses, sizeof (saved));
+                    memcpy (original, messages, sizeof (original));
+                    self.timeout = 60000;
+                    name_send_active = !transport;
+                    emitted = send_calls = 0;
+                    send_result =
+                        lengths[i] + 22; /* Two headers and 7B payload. */
+                    int valid = lengths[i] && nul < 0 &&
+                                (!transport || lengths[i] <= 248);
+                    int result = hev_socks5_udp_sendmmsg (&self, messages, 2);
+                    assert (result == (valid ? 2 : -1));
+                    assert (send_calls == valid && self.timeout == 60000);
+                    assert (valid ? emitted == (size_t)send_result : !emitted);
+                    assert (!memcmp (saved, addresses, sizeof (saved)) &&
+                            !memcmp (original, messages, sizeof (original)));
+                    assert (
+                        !memcmp (payload, "\1\2\3\4\5\6\7", sizeof (payload)));
+                    cases++;
+                }
+            }
+        }
+    }
+    name_send_active = 0;
+    puts (
+        "PASS: public UDP/TCP send NAME lengths 0/1/248/249/255; first/later empty or NUL names write nothing; caller storage and terminal state preserved");
 }
 
 static void
@@ -1074,6 +1165,7 @@ main (void)
     domain_boundaries ();
     send_boundaries ();
     send_chunk_boundaries ();
+    send_name_boundaries ();
     forward_boundaries ();
     forward_receive_boundaries ();
     backward_boundaries ();

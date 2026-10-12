@@ -94,7 +94,7 @@ index 37a3c8ce0db9f734f07bfc57b3b59df8559562e6..5c155d8c3f47ff210b7762bbb571d458
  }
  #endif
 diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
-index 154bb1f4c710bfe6c37b6da77d09b5958c3da1f4..123bb4c8198590055ca11986fccbdbb97e4498ab 100644
+index de7dbc32e659e6467589d193d014bf931e4645a2..0425531838eed2d494ddd5f919fcfa1cca403b57 100644
 --- a/src/hev-socks5-proxy.c
 +++ b/src/hev-socks5-proxy.c
 @@ -20,6 +20,7 @@
@@ -110,7 +110,7 @@ index 154bb1f4c710bfe6c37b6da77d09b5958c3da1f4..123bb4c8198590055ca11986fccbdbb9
      }
  
 +    if (hev_meter_worker_enter () < 0) {
-+        hev_socks5_proxy_stop ();
++        hev_socks5_proxy_stop_inner (0);
 +        goto exit;
 +    }
 +
@@ -118,7 +118,7 @@ index 154bb1f4c710bfe6c37b6da77d09b5958c3da1f4..123bb4c8198590055ca11986fccbdbb9
      if (res < 0) {
          LOG_E ("socks5 proxy worker task system");
 @@ -172,6 +178,7 @@ retry:
- 
+     hev_socks5_proxy_stop_inner (0);
      hev_task_system_fini ();
  exit:
 +    hev_meter_worker_leave ();
@@ -152,7 +152,7 @@ index 154bb1f4c710bfe6c37b6da77d09b5958c3da1f4..123bb4c8198590055ca11986fccbdbb9
  
  void
 diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c
-index fe4def59a804a096b39b2d605c5de712405a4416..fc8c4be05e1a63f7aaae9b35b52394164daaf4ee 100644
+index 09233208fca2b0df1135f235f5cebaacfa5675c0..086d89c55a22c6c86b6c170fffe3d5964f6786f1 100644
 --- a/src/hev-socks5-worker.c
 +++ b/src/hev-socks5-worker.c
 @@ -22,6 +22,7 @@
