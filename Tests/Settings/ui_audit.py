@@ -32,7 +32,7 @@ def output(*args):
 
 
 def verify_production():
-    baseline = '78fa1e7a2d879d0cb516582a2eebdc6293d24d22'
+    baseline = 'cc78af2f170ecaf560fc2f6e41a4a4cd47729464'
     source_base = 'ed0871b303813884fd17541c12a270c3f198b8d7'
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
     expected = json.loads(output('git', 'show', baseline + ':Build/features.json'))
