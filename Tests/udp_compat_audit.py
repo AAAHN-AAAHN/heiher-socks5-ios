@@ -116,9 +116,13 @@ def main():
          '--output', OUT / 'peer-filtered.json'], 'peer-filtered.log', timeout=45)
     old_binary = OUT / 'three-patch-server'
     shutil.copy2(CORE / 'bin/hev-socks5-server', old_binary)
-    run([sys.executable, 'Tests/udp_worker_resources.py', old_binary,
-         '--old-control', '--output', OUT / 'worker-resource-old-control.json'],
-        'worker-resource-old-control.log', timeout=30)
+    if sys.platform == 'linux':
+        run([sys.executable, 'Tests/udp_worker_resources.py', old_binary,
+             '--old-control', '--output', OUT / 'worker-resource-old-control.json'],
+            'worker-resource-old-control.log', timeout=30)
+    else:
+        print('SKIP: old-server FD starvation control is Linux-only; '
+              'the current-server resource checks remain required.', flush=True)
     run([sys.executable, 'Tests/udp_buffer_network.py', old_binary,
          '--old-control', '--output', OUT / 'buffer-old-control.json'],
         'buffer-old-control.log', timeout=45)

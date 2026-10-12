@@ -244,7 +244,7 @@ index ef8556619e498b8217b16d75d16a2973b73ac62a..0cd870a0761396bfa01340c498d5d7e4
      }
  
 diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c
-index 683a773999569784b2a42d1bab136ef1c44a8101..8366908d3d4595fa1318291f9ab5bdd678ba1ac7 100644
+index 683a773999569784b2a42d1bab136ef1c44a8101..fe4def59a804a096b39b2d605c5de712405a4416 100644
 --- a/src/hev-socks5-worker.c
 +++ b/src/hev-socks5-worker.c
 @@ -103,32 +103,36 @@ hev_socks5_worker_task_entry (void *data)
@@ -325,11 +325,12 @@ index 683a773999569784b2a42d1bab136ef1c44a8101..8366908d3d4595fa1318291f9ab5bdd6
  
          if (val == 'r') {
              atomic_fetch_and (&self->tsync, ~SYNC_SENT_R);
-@@ -183,8 +193,10 @@ hev_socks5_event_task_entry (void *data)
+@@ -183,8 +193,11 @@ hev_socks5_event_task_entry (void *data)
          }
      }
  
 +exit:
++    atomic_fetch_and (&self->tsync, ~SYNC_SEND);
      WRITE_ONCE (self->run, 0);
 -    hev_task_wakeup (self->task_worker);
 +    if (hev_task_get_state (self->task_worker) != HEV_TASK_STOPPED)
@@ -337,7 +338,7 @@ index 683a773999569784b2a42d1bab136ef1c44a8101..8366908d3d4595fa1318291f9ab5bdd6
  
      hev_task_del_fd (task, self->event_fds[0]);
  }
-@@ -196,6 +208,9 @@ hev_socks5_worker_new (int fd)
+@@ -196,6 +209,9 @@ hev_socks5_worker_new (int fd)
      int nonblock = 1;
      int res;
  

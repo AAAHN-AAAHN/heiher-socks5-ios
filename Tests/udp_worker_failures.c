@@ -353,6 +353,8 @@ run_one (int which)
         hev_socks5_worker_start (worker);
         hev_task_run (observer, observe_and_stop, NULL);
         hev_task_system_run ();
+        if (test == EVENT_EOF)
+            hev_socks5_worker_stop (worker);
         ownership = open_fd (listener) && open_fd (event_fds[0]) &&
                     open_fd (event_fds[1]);
         passed &= !worker->run && !intervention && !accept_after_stop &&
