@@ -86,7 +86,7 @@ final class IntegrationUITests: XCTestCase {
         expectAudioState("Off")
         audio.tap()
         XCTAssertEqual(audio.value as? String, "1")
-        expectAudioState("Playing silent WAV continuously", timeout: 30)
+        expectAudioState("Playing silent WAV continuously", timeout: 10)
         // Starting/stopping the combined engine must not turn the independent audio off.
         app.tabBars.buttons["Server"].tap()
         for _ in 0..<6 {
@@ -101,12 +101,12 @@ final class IntegrationUITests: XCTestCase {
         XCTAssertTrue(waitUntil { !Self.handshake() })
         app.tabBars.buttons["Background"].tap()
         XCTAssertEqual(audio.value as? String, "1")
-        expectAudioState("Playing silent WAV continuously", timeout: 30)
+        expectAudioState("Playing silent WAV continuously", timeout: 10)
         app.terminate()
         app.launch()
         XCTAssertTrue(app.navigationBars["Background"].waitForExistence(timeout: 10))
         XCTAssertEqual(audio.value as? String, "1", "Saved audio intent must survive relaunch")
-        expectAudioState("Playing silent WAV continuously", timeout: 30)
+        expectAudioState("Playing silent WAV continuously", timeout: 10)
         audio.tap()
         XCTAssertEqual(audio.value as? String, "0")
         expectAudioState("Off")

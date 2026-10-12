@@ -137,7 +137,7 @@ def main():
     for name in ('udp_buffer_unit.c', 'udp_buffer_io.c', 'udp_buffer_timer.c',
                  'udp_buffer_send.c', 'udp_buffer_live_hold.c', 'udp_stream_boundaries.c',
                  'udp_splicer_lifetime.c', 'udp_netaddr_errors.c',
-                 'udp_session_setup.c'):
+                 'udp_session_setup.c', 'udp_address_conversion.c'):
         run([formatter, '--style=file:' + str(CORE / '.clang-format'), ROOT / 'Tests' / name],
             'expected-' + name)
         if (OUT / ('expected-' + name)).read_bytes() != (ROOT / 'Tests' / name).read_bytes():
@@ -197,7 +197,7 @@ def main():
 
     for name in ('udp_buffer_unit', 'udp_buffer_io', 'udp_buffer_send',
                  'udp_stream_boundaries', 'udp_splicer_lifetime', 'udp_netaddr_errors',
-                 'udp_session_setup'):
+                 'udp_session_setup', 'udp_address_conversion'):
         for mode, flags in [('asan', ['-O1', '-g', '-fsanitize=address,undefined',
                                      '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']),
                             ('optimized', ['-O3', '-fstrict-aliasing'])]:
