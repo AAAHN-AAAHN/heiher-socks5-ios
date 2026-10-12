@@ -1,5 +1,5 @@
 diff --git a/src/hev-socks5-misc-priv.h b/src/hev-socks5-misc-priv.h
-index 8770a5facf2c7465ea812b12bbf867de89db028c..6c395802b65bd144ccb6577a6c27fc54b47c665c 100644
+index 8770a5facf2c7465ea812b12bbf867de89db028c..c17dc5f3ddba70ea9a56ed17b99ad1d5e8308545 100644
 --- a/src/hev-socks5-misc-priv.h
 +++ b/src/hev-socks5-misc-priv.h
 @@ -11,6 +11,7 @@
@@ -10,40 +10,76 @@ index 8770a5facf2c7465ea812b12bbf867de89db028c..6c395802b65bd144ccb6577a6c27fc54
  
  #include <hev-task.h>
  #include <hev-task-io.h>
-@@ -22,6 +23,15 @@
+@@ -22,6 +23,16 @@
  extern "C" {
  #endif
  
 +/* Inspect only a complete address, after validating its declared byte length.
-+ * A length-prefixed name must not lose a suffix in the native string APIs. */
++ * A name must be nonempty and retain its complete native string identity. */
 +static inline int
-+hev_socks5_addr_has_nul (const HevSocks5Addr *addr)
++hev_socks5_addr_name_invalid (const HevSocks5Addr *addr)
 +{
 +    return addr->atype == HEV_SOCKS5_ADDR_TYPE_NAME &&
-+           memchr (addr->domain.addr, 0, addr->domain.len) != NULL;
++           (!addr->domain.len ||
++            memchr (addr->domain.addr, 0, addr->domain.len) != NULL);
 +}
 +
  int hev_socks5_socket (int type);
  
  const char *hev_socks5_addr_into_str (const HevSocks5Addr *addr, char *buf,
 diff --git a/src/hev-socks5-misc.c b/src/hev-socks5-misc.c
-index ca122f8d009a5aef033d11a08226e3944bd9a262..3585d85ad1fdccf0408a4ad8037aeaf50d14eaa4 100644
+index ca122f8d009a5aef033d11a08226e3944bd9a262..3ba5c7fc03ddb281bbce729d17351784024740ce 100644
 --- a/src/hev-socks5-misc.c
 +++ b/src/hev-socks5-misc.c
-@@ -213,6 +213,8 @@ hev_socks5_addr_into_sockaddr6 (const HevSocks5Addr *addr,
+@@ -133,9 +133,12 @@ int
+ hev_socks5_addr_from_name (HevSocks5Addr *addr, const char *name, int _port)
+ {
+     uint16_t port = _port;
++    size_t len = strnlen (name, 256);
++    if (!len || len == 256)
++        return -1;
+     addr->atype = HEV_SOCKS5_ADDR_TYPE_NAME;
+-    strncpy ((char *)addr->domain.addr, name, 256);
+-    addr->domain.len = strlen ((char *)addr->domain.addr);
++    memcpy (addr->domain.addr, name, len);
++    addr->domain.len = len;
+     memcpy ((char *)addr->domain.addr + addr->domain.len, &port, 2);
+     return 4 + addr->domain.len;
+ }
+@@ -213,6 +216,8 @@ hev_socks5_addr_into_sockaddr6 (const HevSocks5Addr *addr,
      case HEV_SOCKS5_ADDR_TYPE_NAME: {
          char name[256];
          uint16_t port;
-+        if (hev_socks5_addr_has_nul (addr))
++        if (hev_socks5_addr_name_invalid (addr))
 +            return -1;
          memcpy (name, addr->domain.addr, addr->domain.len);
          name[addr->domain.len] = '\0';
          memcpy (&port, addr->domain.addr + addr->domain.len, 2);
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index d43206f92538a3a9d014b35b21129a9b597b61b0..ddf24abf69c2a541dfcd824a31d75bf256be94bc 100644
+index 5dcbea806dcda33c2974b72532e798ea3325e4a9..6127a5307d39bc2b8a41cd641da8e9853529cf41 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
-@@ -706,6 +706,7 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -569,8 +569,8 @@ hev_socks5_udp_sendmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+         int addrlen;
+ 
+         addrlen = hev_socks5_addr_len (msgv[i].addr);
+-        if (addrlen <= 0 || addrlen > UINT8_MAX - 3 ||
+-            msgv[i].len > UINT16_MAX ||
++        if (addrlen <= 0 || hev_socks5_addr_name_invalid (msgv[i].addr) ||
++            addrlen > UINT8_MAX - 3 || msgv[i].len > UINT16_MAX ||
+             expected > (size_t)SSIZE_MAX - (3 + addrlen + msgv[i].len)) {
+             LOG_D ("%p socks5 udp addr", self);
+             return -1;
+@@ -628,7 +628,7 @@ hev_socks5_udp_sendmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+         int addrlen;
+ 
+         addrlen = hev_socks5_addr_len (msgv[i].addr);
+-        if (addrlen <= 0) {
++        if (addrlen <= 0 || hev_socks5_addr_name_invalid (msgv[i].addr)) {
+             LOG_D ("%p socks5 udp addr", self);
+             return -1;
+         }
+@@ -709,6 +709,7 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
  
      for (i = 0; i < num; i++) {
          HevSocks5UDPHdr udp;
@@ -51,14 +87,14 @@ index d43206f92538a3a9d014b35b21129a9b597b61b0..ddf24abf69c2a541dfcd824a31d75bf2
          struct iovec iov[2];
          struct msghdr mh = { 0 };
          int addrlen;
-@@ -776,14 +777,20 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -779,14 +780,20 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
              hev_socks5_set_timeout (HEV_SOCKS5 (self), 0);
              return rlen ? rlen : -1;
          }
 +        addr = msgv[i].buf;
 +        addr->atype = udp.addr.atype;
 +        addr->domain.len = udp.addr.domain.len;
-+        if (hev_socks5_addr_has_nul (addr)) {
++        if (hev_socks5_addr_name_invalid (addr)) {
 +            errno = EINVAL;
 +            hev_socks5_set_timeout (HEV_SOCKS5 (self), 0);
 +            return rlen ? rlen : -1;
@@ -75,13 +111,33 @@ index d43206f92538a3a9d014b35b21129a9b597b61b0..ddf24abf69c2a541dfcd824a31d75bf2
  
          rlen++;
      }
-@@ -855,7 +862,8 @@ retry:
+@@ -858,7 +865,8 @@ retry:
          if (udp->addr.atype == HEV_SOCKS5_ADDR_TYPE_NAME && mvec[i].msg_len < 5)
              continue;
          addrlen = hev_socks5_addr_len (&udp->addr);
 -        if (addrlen <= 0 || (size_t)(3 + addrlen) > mvec[i].msg_len)
 +        if (addrlen <= 0 || (size_t)(3 + addrlen) > mvec[i].msg_len ||
-+            hev_socks5_addr_has_nul (&udp->addr))
++            hev_socks5_addr_name_invalid (&udp->addr))
              continue;
          doff = 3 + addrlen;
  
+diff --git a/src/hev-socks5-client-tcp.c b/src/hev-socks5-client-tcp.c
+index 167baeef6bb54b8a0785f586dd4e0789cd95501d..644cbc89afa35604942a9e927a6779ca9dc963fc 100644
+--- a/src/hev-socks5-client-tcp.c
++++ b/src/hev-socks5-client-tcp.c
+@@ -23,11 +23,14 @@ hev_socks5_client_tcp_new_name (const char *name, int port)
+     HevSocks5Addr addr;
+     int res;
+ 
++    res = hev_socks5_addr_from_name (&addr, name, port);
++    if (res < 0)
++        return NULL;
++
+     self = hev_malloc0 (sizeof (HevSocks5ClientTCP));
+     if (!self)
+         return NULL;
+ 
+-    hev_socks5_addr_from_name (&addr, name, port);
+     res = hev_socks5_client_tcp_construct (self, &addr);
+     if (res < 0) {
+         hev_free (self);

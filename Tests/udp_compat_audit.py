@@ -146,7 +146,7 @@ def main():
                  'udp_splicer_lifetime.c', 'udp_netaddr_errors.c',
                  'udp_session_setup.c', 'udp_address_conversion.c',
                  'udp_reactor_resources.c', 'udp_worker_failures.c',
-                 'udp_proxy_worker_cascade.c'):
+                 'udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c'):
         run([formatter, '--style=file:' + str(CORE / '.clang-format'), ROOT / 'Tests' / name],
             'expected-' + name)
         if (OUT / ('expected-' + name)).read_bytes() != (ROOT / 'Tests' / name).read_bytes():
@@ -162,7 +162,8 @@ def main():
         sdk = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path'], text=True).strip()
         includes = ['-I' + str(CORE / path) for path in (
             'src/misc', 'src/core/include', 'src/core/src',
-            'third-part/yaml/src', 'third-part/hev-task-system/include')]
+            'third-part/yaml/src', 'third-part/hev-task-system/include',
+            'third-part/hev-task-system/src')]
         sources = {CORE / item['repository'] / name
                    for item in CONFIG['patches']
                    for name in re.findall(r'^\+\+\+ b/(.+\.c)$',
@@ -190,7 +191,8 @@ def main():
     compiler = os.environ.get('CC', 'clang')
     includes = ['-I' + str(CORE / 'src'), '-I' + str(CORE / 'src/core/src'),
                 '-I' + str(CORE / 'src/misc'),
-                '-I' + str(CORE / 'third-part/hev-task-system/include')]
+                '-I' + str(CORE / 'third-part/hev-task-system/include'),
+                '-I' + str(CORE / 'third-part/hev-task-system/src')]
     libs = [CORE / 'bin/libhev-socks5-server.a', CORE / 'third-part/yaml/bin/libyaml.a',
             CORE / 'third-part/hev-task-system/bin/libhev-task-system.a']
     executable = OUT / 'unit'
@@ -208,7 +210,7 @@ def main():
                  'udp_stream_boundaries', 'udp_splicer_lifetime', 'udp_netaddr_errors',
                  'udp_session_setup', 'udp_address_conversion',
                  'udp_reactor_resources', 'udp_worker_failures',
-                 'udp_proxy_worker_cascade'):
+                 'udp_proxy_worker_cascade', 'udp_dns_lifecycle'):
         for mode, flags in [('asan', ['-O1', '-g', '-fsanitize=address,undefined',
                                      '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']),
                             ('optimized', ['-O3', '-fstrict-aliasing'])]:
@@ -218,6 +220,15 @@ def main():
                 name + '-' + mode + '-build.log')
             run([executable], name + '-' + mode + '.log')
             executable.unlink()
+    if sys.platform == 'darwin':
+        executable = OUT / 'auth-publication-tsan'
+        run([compiler, '-std=gnu11', '-O1', '-g', '-Wall', '-Werror', '-pthread',
+             '-fsanitize=thread', *includes, ROOT / 'Tests/udp_proxy_worker_cascade.c',
+             CORE / 'third-part/hev-task-system/src/lib/object/hev-object-atomic.c',
+             *libs, '-o', executable], 'auth-publication-tsan-build.log')
+        run(['env', 'TSAN_OPTIONS=halt_on_error=1', executable, '--auth-publication'],
+            'auth-publication-tsan.log', timeout=40)
+        executable.unlink()
     executable = OUT / 'buffer-real-timer'
     run([compiler, '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread', *includes,
          ROOT / 'Tests/udp_buffer_timer.c', *libs, '-o', executable], 'buffer-real-timer-build.log')

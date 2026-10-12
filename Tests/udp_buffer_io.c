@@ -6,21 +6,24 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 
-static int fail_allocation, short_query;
+static int fail_allocation, short_query, query_error;
 void *io_malloc (size_t size);
 void io_free (void *ptr);
 ssize_t io_recv (int fd, void *buf, size_t len, int flags);
+ssize_t io_recvmsg (int fd, struct msghdr *message, int flags);
 int io_getsockopt (int fd, int level, int option, void *value,
                    socklen_t *length);
 
 #define hev_malloc io_malloc
 #define hev_free io_free
 #define recv io_recv
+#define recvmsg io_recvmsg
 #define getsockopt io_getsockopt
 #include "hev-socks5-udp.c"
 #undef hev_malloc
 #undef hev_free
 #undef recv
+#undef recvmsg
 #undef getsockopt
 
 #include <stdio.h>
@@ -43,16 +46,42 @@ ssize_t
 io_recv (int fd, void *buf, size_t len, int flags)
 {
 #if defined(__linux__)
-    if (short_query && (flags & MSG_PEEK))
-        return 1;
+    if (flags & MSG_PEEK) {
+        if (query_error) {
+            errno = query_error;
+            return -1;
+        }
+        if (short_query)
+            return 1;
+    }
 #endif
     return recv (fd, buf, len, flags);
+}
+
+ssize_t
+io_recvmsg (int fd, struct msghdr *message, int flags)
+{
+    if (flags & MSG_PEEK) {
+        if (query_error) {
+            errno = query_error;
+            return -1;
+        }
+        if (short_query) {
+            message->msg_flags &= ~MSG_TRUNC;
+            return 1;
+        }
+    }
+    return recvmsg (fd, message, flags);
 }
 
 int
 io_getsockopt (int fd, int level, int option, void *value, socklen_t *length)
 {
 #if defined(__APPLE__)
+    if (query_error && option == SO_NREAD) {
+        errno = query_error;
+        return -1;
+    }
     if (short_query && option == SO_NREAD) {
         assert (*length == sizeof (int));
         *(int *)value = 1;
@@ -158,7 +187,13 @@ family_test (int family)
     const unsigned int sizes[] = { 0, 2048, 48001 };
     for (int i = 0; i < 3; i++) {
         size_t capacity;
+#if defined(__APPLE__) || defined(__linux__)
         assert (udp_buffer_round (sizes[i], &capacity) == 0);
+#else
+        capacity = UDP_BUF_SIZE;
+        while (capacity < sizes[i])
+            capacity *= 2;
+#endif
         assert (buffers[i].capacity == capacity);
         assert (messages[i].msg_len == sizes[i]);
         assert (!(messages[i].msg_hdr.msg_flags & MSG_TRUNC));
@@ -188,6 +223,28 @@ family_test (int family)
     assert (recv (input, received, sizeof (received), 0) == 2048);
     assert (!memcmp (received, payload, 2048));
     fail_allocation = 0;
+
+    /* A portable size probe may grow storage before returning its length.
+     * Resource failure there is terminal too; ordinary query errors retain
+     * their existing state. Every rejected query leaves the datagram intact. */
+    const int query_errors[] = { ENOMEM, EOVERFLOW, EAGAIN, EINTR };
+    for (size_t i = 0; i < sizeof (query_errors) / sizeof (*query_errors);
+         i++) {
+        self.timeout = 60000;
+        assert (send (output, payload, 2048, 0) == 2048);
+        wait_readable (input, udp_buffer_now () + 2 * UDP_NSEC_PER_SEC);
+        query_error = query_errors[i];
+        assert (udp_buffer_recvmmsg (&self, input, messages, 1, MSG_DONTWAIT,
+                                     buffers) == -1);
+        assert (errno == query_error);
+        assert (
+            self.timeout ==
+            (query_error == ENOMEM || query_error == EOVERFLOW ? 0 : 60000));
+        assert (!buffers[0].history && buffers[0].capacity == UDP_BUF_SIZE);
+        query_error = 0;
+        assert (recv (input, received, sizeof (received), 0) == 2048);
+        assert (!memcmp (received, payload, 2048));
+    }
     close (input);
     close (output);
     puts (

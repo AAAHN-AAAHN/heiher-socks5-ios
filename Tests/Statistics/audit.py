@@ -14,7 +14,7 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 SOCKET_BASE = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
-UDP = '861a021835981494d9db9790d6373cbb1179c0f2'
+UDP = 'b5e7cb9cad0807b208de7ccbdf5224aab2bdad71'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 SOCKET_PATCHES = [
     {'file': 'hev-socket-meter-task.patch', 'repository': 'third-part/hev-task-system'},
@@ -24,7 +24,8 @@ SOCKET_PATCHES = [
 UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
                         'udp_buffer_send.c', 'udp_stream_boundaries.c', 'udp_splicer_lifetime.c',
                         'udp_netaddr_errors.c', 'udp_session_setup.c', 'udp_address_conversion.c',
-                        'udp_reactor_resources.c', 'udp_worker_failures.c', 'udp_proxy_worker_cascade.c')
+                        'udp_reactor_resources.c', 'udp_worker_failures.c',
+                        'udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c')
 # Keep inherited fixtures' substituted I/O boundaries; real meter tests use no aliases.
 UDP_FIXTURE_INIT = ['-include', str(ROOT / 'Tests/SocketIO/udp_fixture_main.h')]
 UDP_FIXTURE_FLAGS = UDP_FIXTURE_INIT + [
@@ -79,7 +80,8 @@ def check_udp_inheritance():
             f'    with:\n      ref: {UDP}\n') in workflow, 'UDP workflow prerequisite differs'
     assert '    needs: udp-prerequisite\n' in workflow
     for source in ('udp_stream_boundaries.c', 'udp_session_setup.c', 'udp_address_conversion.c',
-                   'udp_reactor_resources.c', 'udp_worker_failures.c', 'udp_proxy_worker_cascade.c'):
+                   'udp_reactor_resources.c', 'udp_worker_failures.c',
+                   'udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c'):
         assert source in UDP_COMPOSED_SOURCES, 'Missing composed execution: ' + source
     entries = {}
     for record in git('ls-tree', '-rz', UDP).split(b'\0'):
@@ -218,9 +220,15 @@ def native_checks(mode):
                 mode + '-' + executable.name + '-build.log')
             run([executable], mode + '-' + executable.name + '.log', env=env)
             executable.unlink()
+        executable = OUT / ('socket-meter-pool-failure-' + label)
+        run([*common, *extra, *includes, 'Tests/SocketIO/meter_pool_failure.c',
+             *libs, '-o', executable], mode + '-' + executable.name + '-build.log')
+        run([executable], mode + '-' + executable.name + '.log', env=env)
+        executable.unlink()
         for source in UDP_COMPOSED_SOURCES:
             executable = OUT / ('composed-' + Path(source).stem + '-' + label)
-            run([*common, *extra, '-Wno-unused-function', *UDP_FIXTURE_FLAGS, *includes,
+            flags = [] if source in ('udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c') else UDP_FIXTURE_FLAGS
+            run([*common, *extra, '-Wno-unused-function', *flags, *includes,
                  ROOT / 'Tests' / source, *libs, '-o', executable],
                 mode + '-' + executable.name + '-build.log')
             run([executable], mode + '-' + executable.name + '.log', env=env)
@@ -232,6 +240,13 @@ def native_checks(mode):
         run([executable], 'udp-live-retention.log', timeout=490)
         executable.unlink()
     if sys.platform == 'darwin':
+        executable = OUT / 'auth-publication-tsan'
+        run([*common, '-O1', '-g', '-fsanitize=thread', *includes,
+             'Tests/udp_proxy_worker_cascade.c', task / 'src/lib/object/hev-object-atomic.c',
+             *libs, '-o', executable], mode + '-auth-publication-tsan-build.log')
+        run([executable, '--auth-publication'], mode + '-auth-publication-tsan.log',
+            env=dict(os.environ, TSAN_OPTIONS='halt_on_error=1'), timeout=40)
+        executable.unlink()
         for name in ('registry', 'worker_boundaries'):
             executable = OUT / ('socket-' + name + '-tsan')
             run([*common, '-O1', '-g', '-fsanitize=thread', *includes,

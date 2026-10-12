@@ -1,5 +1,5 @@
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b597b61b0 100644
+index 125a1c575be6ed228bdfedb31223e1598ecff430..5dcbea806dcda33c2974b72532e798ea3325e4a9 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -9,6 +9,10 @@
@@ -13,7 +13,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
  #include <string.h>
  #include <unistd.h>
  
-@@ -25,6 +29,369 @@
+@@ -25,6 +29,372 @@
  
  #define UDP_BUF_SIZE 1500
  
@@ -356,8 +356,11 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
 +        ssize_t needed = udp_buffer_datagram_size (fd, &buffers[i]);
 +        int res;
 +
-+        if (needed < 0)
++        if (needed < 0) {
++            if (errno == ENOMEM || errno == EOVERFLOW)
++                hev_socks5_set_timeout (HEV_SOCKS5 (self), 0);
 +            return i ? (int)i : -1;
++        }
 +        if (udp_buffer_reserve (&buffers[i], needed) < 0) {
 +            /* Do not consume and forward a truncated prefix on allocation failure.
 +             * Terminate this association, rather than spin on its queue head. */
@@ -383,7 +386,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
  static void
  hev_socks5_udp_addr_normalize (struct sockaddr_in6 *addr)
  {
-@@ -47,10 +414,8 @@ hev_socks5_udp_addr_normalize (struct sockaddr_in6 *addr)
+@@ -47,10 +417,8 @@ hev_socks5_udp_addr_normalize (struct sockaddr_in6 *addr)
  }
  
  static int
@@ -395,13 +398,14 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
      if (self->type == HEV_SOCKS5_TYPE_UDP_IN_UDP) {
          ssize_t res;
          char buf;
-@@ -61,8 +426,68 @@ task_io_yielder (HevTaskYieldType type, void *data)
+@@ -61,8 +429,68 @@ task_io_yielder (HevTaskYieldType type, void *data)
              return -1;
          }
      }
 +    return 0;
 +}
-+
+ 
+-    return hev_socks5_task_io_yielder (type, data);
 +static int
 +task_io_yielder (HevTaskYieldType type, void *data)
 +{
@@ -421,8 +425,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
 +{
 +    uint64_t now, deadline, remaining;
 +    unsigned int delay, result;
- 
--    return hev_socks5_task_io_yielder (type, data);
++
 +    if (!self->timeout)
 +        return -1;
 +    if (type == HEV_TASK_YIELD) {
@@ -465,7 +468,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
  }
  
  int
-@@ -74,47 +499,114 @@ hev_socks5_udp_get_fd (HevSocks5UDP *self)
+@@ -74,47 +502,114 @@ hev_socks5_udp_get_fd (HevSocks5UDP *self)
      return iface->get_fd (self);
  }
  
@@ -599,7 +602,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
      }
  
      return num;
-@@ -122,11 +614,11 @@ hev_socks5_udp_sendmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -122,11 +617,11 @@ hev_socks5_udp_sendmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
  
  static int
  hev_socks5_udp_sendmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
@@ -615,7 +618,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
      int i, res;
  
      for (i = 0; i < num; i++) {
-@@ -141,46 +633,69 @@ hev_socks5_udp_sendmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -141,46 +636,69 @@ hev_socks5_udp_sendmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          udp[i].datlen = 0;
          udp[i].hdrlen = 0;
  
@@ -700,7 +703,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
  {
      int i, fd, rlen = 0;
  
-@@ -192,39 +707,52 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -192,39 +710,52 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
      for (i = 0; i < num; i++) {
          HevSocks5UDPHdr udp;
          struct iovec iov[2];
@@ -774,7 +777,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
          }
  
          mh.msg_name = NULL;
-@@ -245,8 +773,11 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -245,8 +776,11 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
              LOG_D ("%p socks5 udp read udp data", self);
              if (res >= 0)
                  errno = EPIPE;
@@ -787,7 +790,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
  
          msgv[i].addr = msgv[i].buf;
          msgv[i].buf = iov[1].iov_base;
-@@ -262,12 +793,13 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -262,12 +796,13 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
  
  static int
  hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
@@ -805,7 +808,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
      int i, fd, res, count = 0;
  
      fd = hev_socks5_udp_get_fd (self);
-@@ -283,13 +815,13 @@ retry:
+@@ -283,13 +818,13 @@ retry:
          mvec[i].msg_hdr.msg_controllen = 0;
          mvec[i].msg_hdr.msg_iov = &iov[i];
          mvec[i].msg_hdr.msg_iovlen = 1;
@@ -823,7 +826,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
      if (res <= 0) {
          if (res != -1 || errno != EAGAIN)
              LOG_D ("%p socks5 udp read udp", self);
-@@ -304,7 +836,7 @@ retry:
+@@ -304,7 +839,7 @@ retry:
      hev_socks5_udp_addr_normalize (&peer);
  
      for (i = 0; i < res; i++) {
@@ -832,7 +835,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
          int addrlen;
          int doff;
  
-@@ -316,6 +848,17 @@ retry:
+@@ -316,6 +851,17 @@ retry:
               peer.sin6_port != taddr[i].sin6_port))
              continue;
  
@@ -850,7 +853,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
          if (!HEV_SOCKS5 (self)->udp_associated) {
              if (connect (fd, (struct sockaddr *)&taddr[i], sizeof (taddr[i])) <
                  0)
-@@ -324,72 +867,88 @@ retry:
+@@ -324,72 +870,88 @@ retry:
              HEV_SOCKS5 (self)->udp_associated = 1;
          }
  
@@ -978,7 +981,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
          int n, ret;
  
          for (i = 0, n = 0; i < res; i++) {
-@@ -404,6 +963,10 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
+@@ -404,6 +966,10 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
              family = hev_socks5_get_addr_family (HEV_SOCKS5 (self));
              ret = hev_socks5_addr_into_sockaddr6 (svec[i].addr, &addr[n],
                                                    &family);
@@ -989,7 +992,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
              if (ret < 0) {
                  LOG_D ("%p socks5 udp sockaddr", self);
                  continue;
-@@ -425,15 +988,20 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
+@@ -425,15 +991,20 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
              struct sockaddr *addr = dvec[0].msg_hdr.msg_name;
              ret = skptr->binder (HEV_SOCKS5 (self), fd, addr);
              if (ret < 0) {
@@ -1012,7 +1015,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
              if (ret <= 0) {
                  if (ret == -2)
                      return -1;
-@@ -452,29 +1020,55 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
+@@ -452,29 +1023,55 @@ hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, void *buf, unsigned int num,
  }
  
  static int
@@ -1080,7 +1083,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b
      }
      if (res <= 0) {
          if (res == -1 && errno == EAGAIN)
-@@ -492,60 +1086,73 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
+@@ -492,60 +1089,73 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
      HevTask *task = hev_task_self ();
      int res_f = 1, res_b = 1;
      int bind = 0;
