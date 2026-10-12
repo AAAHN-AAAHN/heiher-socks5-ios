@@ -1,5 +1,5 @@
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index 125a1c575be6ed228bdfedb31223e1598ecff430..7463f01e0be77c324c35bf1b2b147ac744263dfc 100644
+index 125a1c575be6ed228bdfedb31223e1598ecff430..d43206f92538a3a9d014b35b21129a9b597b61b0 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -9,6 +9,10 @@
@@ -1080,7 +1080,7 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..7463f01e0be77c324c35bf1b2b147ac7
      }
      if (res <= 0) {
          if (res == -1 && errno == EAGAIN)
-@@ -492,60 +1086,71 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
+@@ -492,60 +1086,73 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
      HevTask *task = hev_task_self ();
      int res_f = 1, res_b = 1;
      int bind = 0;
@@ -1095,32 +1095,18 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..7463f01e0be77c324c35bf1b2b147ac7
  
      num = hev_socks5_get_udp_copy_buffer_nums ();
 -    buf = hev_malloc (UDP_BUF_SIZE * num * 2);
+-    if (!buf)
 +    if (!HEV_SOCKS5 (self)->timeout || num <= 0 ||
 +        (size_t)num > (size_t)PTRDIFF_MAX / (UDP_BUF_SIZE * 2) ||
 +        (size_t)num > (size_t)PTRDIFF_MAX / (sizeof (UDPBuffer) * 2))
-+        return -1;
-+    buf = hev_malloc ((size_t)UDP_BUF_SIZE * num * 2);
-     if (!buf)
          return -1;
- 
-+    buffers.count = (size_t)num * 2;
-+    allocation = udp_workspace_new (&workspace, num, &buffers.slots);
-+    if (!allocation) {
-+        hev_free (buf);
-+        return -1;
-+    }
-+    for (size_t i = 0; i < buffers.count; i++) {
-+        buffers.slots[i].base = (char *)buf + UDP_BUF_SIZE * i;
-+        buffers.slots[i].capacity = UDP_BUF_SIZE;
-+        buffers.slots[i].owner = &buffers;
-+    }
-+
+-
      fd_a = hev_socks5_udp_get_fd (self);
-     if (hev_task_mod_fd (task, fd_a, POLLIN | POLLOUT) < 0)
-         hev_task_add_fd (task, fd_a, POLLIN | POLLOUT);
-     if (hev_task_add_fd (task, fd_b, POLLIN | POLLOUT) < 0)
-         hev_task_mod_fd (task, fd_b, POLLIN | POLLOUT);
- 
+-    if (hev_task_mod_fd (task, fd_a, POLLIN | POLLOUT) < 0)
+-        hev_task_add_fd (task, fd_a, POLLIN | POLLOUT);
+-    if (hev_task_add_fd (task, fd_b, POLLIN | POLLOUT) < 0)
+-        hev_task_mod_fd (task, fd_b, POLLIN | POLLOUT);
+-
 -    {
 -        struct mmsghdr vec[num];
 -        struct sockaddr_in6 addr[num];
@@ -1140,19 +1126,39 @@ index 125a1c575be6ed228bdfedb31223e1598ecff430..7463f01e0be77c324c35bf1b2b147ac7
 -
 -        for (;;) {
 -            HevTaskYieldType type;
--
++    if (hev_task_mod_fd (task, fd_a, POLLIN | POLLOUT) < 0 &&
++        hev_task_add_fd (task, fd_a, POLLIN | POLLOUT) < 0)
++        return -1;
++    if (hev_task_add_fd (task, fd_b, POLLIN | POLLOUT) < 0 &&
++        hev_task_mod_fd (task, fd_b, POLLIN | POLLOUT) < 0)
++        return -1;
+ 
 -            if (res_f >= 0)
 -                res_f = hev_socks5_udp_fwd_f (self, fd_b, buf, num, &bind);
 -            if (res_b >= 0)
 -                res_b = hev_socks5_udp_fwd_b (self, fd_b, vec, num);
--
++    buf = hev_malloc ((size_t)UDP_BUF_SIZE * num * 2);
++    if (!buf)
++        return -1;
+ 
 -            if (res_f > 0 || res_b > 0)
 -                type = HEV_TASK_YIELD;
 -            else if ((res_f & res_b) == 0)
 -                type = HEV_TASK_WAITIO;
 -            else
 -                break;
--
++    buffers.count = (size_t)num * 2;
++    allocation = udp_workspace_new (&workspace, num, &buffers.slots);
++    if (!allocation) {
++        hev_free (buf);
++        return -1;
++    }
++    for (size_t i = 0; i < buffers.count; i++) {
++        buffers.slots[i].base = (char *)buf + UDP_BUF_SIZE * i;
++        buffers.slots[i].capacity = UDP_BUF_SIZE;
++        buffers.slots[i].owner = &buffers;
++    }
+ 
 -            if (task_io_yielder (type, self))
 -                break;
 -        }

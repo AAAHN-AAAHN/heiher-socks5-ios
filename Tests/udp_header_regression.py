@@ -8,7 +8,7 @@ import struct
 import tempfile
 import time
 
-from udp_sockaddr_regression import association, decode_bytes, encode, proxy_server
+from udp_sockaddr_regression import association, decode_bytes, encode, exact, proxy_server
 
 
 PREFIXES = [('fragment-first', b'\0\0\1'), ('fragment-last', b'\0\0\x82'),
@@ -47,6 +47,44 @@ def roundtrip(udp, dest, address, payload):
     source, offset = decode_bytes(reply[3:])
     assert reply[:3] == b'\0\0\0' and source == dest.getsockname()[:2]
     assert reply[3 + offset:] == payload
+
+
+def setup_reserved(port, ip):
+    """TCP request RSV validation, independently of datagram RSV/FRAG."""
+    hint = '::' if ':' in ip else '0.0.0.0'
+    responses, closes = [], []
+    with destination(ip) as dest:
+        address = encode(*dest.getsockname()[:2])
+        for reserved in (0, 1, 255):
+            with socket.create_connection((ip, port), timeout=2) as control:
+                control.sendall(b'\x05\x01\x00')
+                assert exact(control, 2) == b'\x05\x00'
+                control.sendall(bytes([5, 3, reserved]) + encode(hint, 0))
+                head = exact(control, 4)
+                assert (head[0], head[2]) == (5, 0), 'Invalid setup reply header'
+                assert head[3] in (1, 4), 'Invalid setup reply address type'
+                tail = exact(control, {1: 4, 4: 16}[head[3]] + 2)
+                relay, _ = decode_bytes(head[3:] + tail)
+                responses.append(dict(reserved=reserved, reply=(head + tail).hex()))
+                assert head[1] == (1 if reserved else 0), ('setup RSV accepted', reserved, head[1])
+                if reserved:
+                    try:
+                        assert control.recv(1) == b'', 'Rejected setup did not close'
+                        closes.append('EOF')
+                    except ConnectionResetError:
+                        closes.append('RST')
+                else:
+                    assert relay[0] == ip and relay[1], ('Unusable relay', relay)
+                    with destination(ip) as udp:
+                        udp.settimeout(2)
+                        udp.connect(relay)
+                        roundtrip(udp, dest, address, b'setup-RSV-zero')
+            if reserved:
+                # Each malformed setup is followed by an independent valid one.
+                with association((ip, port), hint) as (_, udp):
+                    roundtrip(udp, dest, address, b'after-bad-setup-' + bytes([reserved]))
+    return dict(case='setup-request-reserved', ip=ip, responses=responses,
+                rejected_control_closes=closes, normal_roundtrips=3, passed=True)
 
 
 def first_peer(port, ip, label, prefix, old_control):
@@ -124,6 +162,10 @@ def main():
                 with proxy_server(str(args.binary.resolve()),
                                   Path(temp) / f'header-{workers}.log', workers) as port:
                     for ip in ('127.0.0.1', '::1'):
+                        if not args.old_control:
+                            row = setup_reserved(port, ip)
+                            row['workers'] = workers
+                            rows.append(row)
                         prefixes = (PREFIXES[0], PREFIXES[3]) if args.old_control else PREFIXES
                         for label, prefix in prefixes:
                             row = first_peer(port, ip, label, prefix, args.old_control)

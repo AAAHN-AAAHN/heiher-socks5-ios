@@ -5,8 +5,8 @@
     "feature/background": "8012d36365538e53c749eba8994bdb38ed02e2cd",
     "feature/server-control": "bccfcd4f75e2c998f1bc1fb497b18a046d43c16b",
     "feature/settings-persistence": "126a30d21209c816916814756e2ab015d2aaac36",
-    "feature/udp-compat": "ed165b380b20c7c59d2e2a22d63116fddc195b47",
-    "feature/traffic-statistics": "33048683736fc76ab8bffefa7201e3df823ab0c8"
+    "feature/udp-compat": "861a021835981494d9db9790d6373cbb1179c0f2",
+    "feature/traffic-statistics": "582d6505e13d554966ebd9451cd219ab93af4850"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -19,8 +19,8 @@
       "path": ".github/workflows/udp-compat-audit.yml"
     },
     "Build/inherited-workflows/traffic-statistics-verify-build.yml": {
-      "commit": "54b68624cd55c4d9606475226ac5daad35d0f3fc",
-      "sha256": "62a63830de7f276ea5c3012f43ed090dc531a5c8db15ed9e75e80fd5a844fd81",
+      "commit": "582d6505e13d554966ebd9451cd219ab93af4850",
+      "sha256": "b6d8752ef631ef2f06a3d42e4771d573b707a30f1c28cbd81a62b03bfd3a1ebf",
       "path": ".github/workflows/verify-build.yml"
     },
     "Patches/hev-netaddr-result.patch": {
@@ -32,20 +32,20 @@
       "sha256": "c9862bb9f074354297b969822b2cbba22b18563a248c705ec113d8eceaec9c7b"
     },
     "Patches/hev-socket-meter-core.patch": {
-      "commit": "0ac6286f00629b7ab0af5db4864f9c1be71b1fdc",
-      "sha256": "853ccfa532838ca49fc0a7cdb036e39c93d3eb9b1049f8b6b32c1e6429e5cf2a"
+      "commit": "582d6505e13d554966ebd9451cd219ab93af4850",
+      "sha256": "60d48adda02db4c4f5518b5e22729228c58691b8b12f39c1dd25a9de29d36a02"
     },
     "Patches/hev-socket-meter-server.patch": {
-      "commit": "36e7bca37ec8288488431a95581aded6c467d94e",
-      "sha256": "260c1ef9efe0659992d774ef2a98979b7e2fcbfe7556ee0382923aae5019b849"
+      "commit": "582d6505e13d554966ebd9451cd219ab93af4850",
+      "sha256": "1f033fd7bfab235102f7f5e6097f7ff79e9fbba704c476f0e6ced3bd91ae9958"
     },
     "Patches/hev-socket-meter-task.patch": {
       "commit": "36e7bca37ec8288488431a95581aded6c467d94e",
       "sha256": "ae628fce483994c79d7ad0d82e9fbb980012c9d9900f1aaaddceaa7e38be88e0"
     },
     "Patches/hev-udp-dynamic-buffer.patch": {
-      "commit": "23ce31d217e0e621b1621c866b03c563bef88685",
-      "sha256": "31bc2f9ef3bd9179affee7048dd14d23f591bc662b17dd84332ad9a357f49da8"
+      "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
+      "sha256": "6e04c971a64755d0eed280624c4ff3242f55bb2291ac008935ad313477469e11"
     },
     "Patches/hev-udp-peer-filter.patch": {
       "commit": "2e2cdf4d879225ecd97ae10eaf7d9e9be19e3e12",
@@ -476,8 +476,8 @@
       "sha256": "3397126eacbaaffba105caf47e4ec238086436537b37ca42998f2fa86d39ed28"
     },
     "Tests/SocketIO/worker-native.json": {
-      "commit": "0ac6286f00629b7ab0af5db4864f9c1be71b1fdc",
-      "sha256": "6c92df5249871a885182bbfbc6eb0621a6b8c9d78a77be91cc8ebb507414edde"
+      "commit": "582d6505e13d554966ebd9451cd219ab93af4850",
+      "sha256": "1cac9dc8d559ff3f93248a1cc07d3e3a753927a4a2cbe1e4dc2ecbcbff662f9c"
     },
     "Tests/SocketIO/worker_boundaries.c": {
       "commit": "8aa502780f9349bbc340fc43b84749d5cb2a1b1a",
@@ -496,8 +496,8 @@
       "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "54b68624cd55c4d9606475226ac5daad35d0f3fc",
-      "sha256": "cc305ce3763c372acbc3e294cd3310e03c5495fc9ba754e6d04dd427c6120d9b"
+      "commit": "582d6505e13d554966ebd9451cd219ab93af4850",
+      "sha256": "982e31f7c120ebc31dafd3fbc6314045dfcba4dd6b79d828cdb61cfd5c2acc61"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
@@ -568,12 +568,12 @@
       "sha256": "9522c8f0cc09072635603d7b525b0451fc57a14af1e1ab089dd975a45141b24e"
     },
     "Tests/udp_compat_audit.py": {
-      "commit": "b6737da512b7d93a7ecb61b05f72d62e561edb45",
-      "sha256": "28f7da59eec512751fc99c9bfc8dc3b8afdbe450f381c290dabc1b68a2c3d481"
+      "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
+      "sha256": "2d7afb6f59b014b48639be1cdd6fcb6764b3bf08e94ee1b46964b7cd8419b304"
     },
     "Tests/udp_header_regression.py": {
-      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
-      "sha256": "3e5b51cf521e38d54e14a89178752c8648276f20a59da2896456e2d90dbd6805"
+      "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
+      "sha256": "751ea8f67a7225095437eeb406b1a2e794b617319d55f681ef6e45c5c918a116"
     },
     "Tests/udp_netaddr_errors.c": {
       "commit": "badf7c8a70561768f7251fdde070afce81b48791",
@@ -608,16 +608,32 @@
       "sha256": "effcce0d531e7cc067f25225bd27c7ce420c9c07f2881f2380f743bce3571f30"
     },
     "Patches/hev-udp-domain.patch": {
-      "commit": "e6b13ece9cba20982721da11ba9d97974f5eb880",
-      "sha256": "617f446aefe57a489f5cf0a455f98d9122f75a5d2e69643c167e536d17c84430"
+      "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
+      "sha256": "33f88e5371e2e50cd90a5e8dd1359ed8f3e43d6e7bcd4fd87b48c75b8aab7d3a"
     },
     "Patches/hev-session-setup.patch": {
-      "commit": "e6b13ece9cba20982721da11ba9d97974f5eb880",
-      "sha256": "8b9a0496baf60619fe2cef725641d6e30879f847b51bbcda2c2987399902d159"
+      "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
+      "sha256": "8163ac504f3e4221776a7fc6d481e9a0d7bf8937b697960c2eb350416320996b"
     },
     "Tests/udp_address_conversion.c": {
-      "commit": "b6737da512b7d93a7ecb61b05f72d62e561edb45",
-      "sha256": "040dace248ce848e6482cb4b1231a219faeea15c32aa7c1f8cb250b16647cfc7"
+      "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
+      "sha256": "61da54b2583b266f046ea34ce7bf722a8cafaefbe5b90ba26314121a05eaeea6"
+    },
+    "Tests/udp_proxy_worker_cascade.c": {
+      "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
+      "sha256": "6853f029752282b93de1aa0c7e556f180e12b3004cbdc0d21cbc0356841afecc"
+    },
+    "Tests/udp_reactor_resources.c": {
+      "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
+      "sha256": "4e8b4d0082f7bf2ee42178406aa4deb1965f503aad7a1212825ddbb5e7723921"
+    },
+    "Tests/udp_worker_failures.c": {
+      "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
+      "sha256": "4f754d8fd1a8c3274ab5015d8f2602516218c14c5574f69a9180954c8c6d2139"
+    },
+    "Tests/udp_worker_resources.py": {
+      "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
+      "sha256": "0d6d66b9f943396b7cdaaa994213a2043b99800db655381bde468cb291c49f61"
     }
   },
   "files": {
