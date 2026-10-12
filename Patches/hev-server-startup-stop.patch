@@ -31,7 +31,7 @@ diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c
 diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
 --- a/src/hev-socks5-proxy.c
 +++ b/src/hev-socks5-proxy.c
-@@ -315,6 +315,13 @@
+@@ -315,4 +315,11 @@
  }
  
  void
@@ -43,8 +43,6 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
 +
 +void
  hev_socks5_proxy_stop (void)
- {
-     int res;
 diff --git a/src/hev-socks5-proxy.h b/src/hev-socks5-proxy.h
 --- a/src/hev-socks5-proxy.h
 +++ b/src/hev-socks5-proxy.h
@@ -96,10 +94,7 @@ diff --git a/src/hev-main.h b/src/hev-main.h
 diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
 --- a/src/hev-socks5-proxy.c
 +++ b/src/hev-socks5-proxy.c
-@@ -50,19 +50,18 @@
- static atomic_int tsync;
- static HevSocks5WorkerData *worker_list;
- 
+@@ -53,16 +53,15 @@
 -static void
 +static int
  hev_socks5_proxy_load_file (HevSocks5Authenticator *auth, const char *file)

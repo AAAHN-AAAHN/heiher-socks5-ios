@@ -1,7 +1,7 @@
 {
   "base_commit": "ed0871b303813884fd17541c12a270c3f198b8d7",
   "branches": {
-    "feature/server-control": "bccfcd4f75e2c998f1bc1fb497b18a046d43c16b"
+    "feature/server-control": "d1532b72fd8cc2850eaefcc002482fb4386d27ff"
   },
   "sources": {
     "Socks5/Server/ServerSettings.swift": {
@@ -17,8 +17,8 @@
       "sha256": "0684c8be1fae897e045ca22471e33c26e1a5ed950c45c107ad04009742ea7208"
     },
     "Patches/hev-server-startup-stop.patch": {
-      "commit": "8ce44ced1c7c21e3f8f2c5fe59ec42142c110d9f",
-      "sha256": "c9862bb9f074354297b969822b2cbba22b18563a248c705ec113d8eceaec9c7b"
+      "commit": "d1532b72fd8cc2850eaefcc002482fb4386d27ff",
+      "sha256": "77b46a0a4a58d1fdb219d11cde4a99a085799ccf7027e7309ee42ba53eb314db"
     },
     "Tests/server_lifecycle_host.c": {
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
