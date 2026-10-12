@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <hev-task.h>
 #include <hev-task-io.h>
+#include <hev-task-system.h>
 #include "hev-main.h"
 #include "hev-socks5-worker.h"
 
@@ -28,10 +29,11 @@ enum
     FIX_FLOOD
 };
 static pthread_t fixture_owner, fixture_carrier;
+static struct sigaction fixture_previous_bus, fixture_previous_segv;
 static atomic_int fixture_started, fixture_captured, fixture_release;
 static atomic_int fixture_drain, fixture_finished;
 static volatile sig_atomic_t fixture_host_reload, fixture_host_pipe;
-static int fixture_created, fixture_faults;
+static int fixture_created, fixture_faults, fixture_main_finalized;
 static atomic_int fixture_mode, fixture_fds[12];
 static _Atomic (HevSocks5Worker *) fixture_borrowed;
 static int fixture_workers;
@@ -40,6 +42,8 @@ static atomic_int fixture_gate_armed, fixture_gate_hits;
 static atomic_int fixture_eintr_armed, fixture_eintr_hits, fixture_queued;
 static _Thread_local atomic_int fixture_in_signal;
 static void fixture_worker_start (HevSocks5Worker *);
+static void fixture_check_action (int, const struct sigaction *);
+static void fixture_task_system_fini (void);
 static HevSocks5Worker *fixture_worker_new (int);
 static void fixture_signal_notify (HevSocks5Worker *);
 static int fixture_usleep (useconds_t);
@@ -50,6 +54,7 @@ static void fixture_set_auth (HevSocks5Worker *, HevSocks5Authenticator *);
 static ssize_t fixture_write (int, const void *, size_t);
 static ssize_t fixture_read (int, void *, size_t, HevTaskIOYielder, void *);
 
+#define hev_task_system_fini fixture_task_system_fini
 #define hev_socks5_worker_start fixture_worker_start
 #define hev_socks5_worker_new fixture_worker_new
 #define hev_socks5_worker_signal_reload fixture_signal_notify
@@ -57,6 +62,7 @@ static ssize_t fixture_read (int, void *, size_t, HevTaskIOYielder, void *);
 #define usleep fixture_usleep
 #define sigaction(...) fixture_sigaction (__VA_ARGS__)
 #include "hev-socks5-proxy.c"
+#undef hev_task_system_fini
 #undef hev_socks5_worker_start
 #undef hev_socks5_worker_new
 #undef hev_socks5_worker_signal_reload
@@ -85,10 +91,21 @@ static ssize_t fixture_read (int, void *, size_t, HevTaskIOYielder, void *);
 #undef SYNC_SENT_R
 
 static void
+fixture_task_system_fini (void)
+{
+    hev_task_system_fini ();
+    if (pthread_equal (pthread_self (), fixture_owner))
+        fixture_main_finalized = 1;
+}
+
+static void
 fixture_worker_start (HevSocks5Worker *worker)
 {
-    if (pthread_equal (pthread_self (), fixture_owner))
+    if (pthread_equal (pthread_self (), fixture_owner)) {
         assert (fcntl (worker->event_fds[1], F_GETFL) & O_NONBLOCK);
+        fixture_check_action (SIGBUS, &fixture_previous_bus);
+        fixture_check_action (SIGSEGV, &fixture_previous_segv);
+    }
     hev_socks5_worker_start (worker);
     if (pthread_equal (pthread_self (), fixture_owner))
         atomic_store (&fixture_started, 1);
@@ -256,6 +273,9 @@ fixture_sigaction (int number, const struct sigaction *action,
         errno = EINVAL;
         return -1;
     }
+    if (action && number == SIGUSR1 &&
+        action->sa_handler != reload_signal_handler)
+        assert (worker_list == NULL && fixture_main_finalized);
     return sigaction (number, action, previous);
 }
 
@@ -288,6 +308,13 @@ fixture_check_action (int number, const struct sigaction *expected)
     struct sigaction actual;
     assert (!sigaction (number, NULL, &actual));
     assert (actual.sa_sigaction == expected->sa_sigaction);
+    if (actual.sa_flags != expected->sa_flags)
+        fprintf (stderr,
+                 "signal flags: signal=%d mode=%d workers=%d actual=%#x "
+                 "expected=%#x saved_reload=%#x saved_pipe=%#x\n",
+                 number, (int)fixture_mode, fixture_workers, actual.sa_flags,
+                 expected->sa_flags, signal_previous_reload.sa_flags,
+                 signal_previous_pipe.sa_flags);
     assert (actual.sa_flags == expected->sa_flags);
     for (int signal = 1; signal < NSIG; signal++)
         assert (sigismember (&actual.sa_mask, signal) ==
@@ -351,7 +378,7 @@ fixture_case (int mode, int workers)
     atomic_store (&fixture_eintr_armed, 0);
     atomic_store (&fixture_eintr_hits, 0);
     atomic_store (&fixture_queued, 0);
-    fixture_created = fixture_faults = 0;
+    fixture_created = fixture_faults = fixture_main_finalized = 0;
     fixture_borrowed = NULL;
     fixture_host_reload = fixture_host_pipe = 0;
     atomic_store (&fixture_started, 0);
@@ -359,6 +386,9 @@ fixture_case (int mode, int workers)
     atomic_store (&fixture_release, 0);
     atomic_store (&fixture_drain, 0);
     atomic_store (&fixture_finished, 0);
+    /* Preserve the host's existing handlers, including sanitizer handlers. */
+    assert (!sigaction (SIGBUS, NULL, &fixture_previous_bus));
+    assert (!sigaction (SIGSEGV, NULL, &fixture_previous_segv));
     action.sa_sigaction = fixture_host_handler;
     action.sa_flags = SA_RESTART | SA_SIGINFO;
     assert (!sigemptyset (&action.sa_mask));
@@ -414,6 +444,8 @@ fixture_case (int mode, int workers)
     }
     fixture_check_action (SIGUSR1, &previous_reload);
     fixture_check_action (SIGPIPE, &previous_pipe);
+    fixture_check_action (SIGBUS, &fixture_previous_bus);
+    fixture_check_action (SIGSEGV, &fixture_previous_segv);
     assert (!fixture_host_reload && !fixture_host_pipe);
     assert (!raise (SIGUSR1) && !raise (SIGPIPE));
     assert (fixture_host_reload == (mode != FIX_IGNORED) &&
