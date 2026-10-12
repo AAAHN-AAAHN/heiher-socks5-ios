@@ -94,7 +94,7 @@ index 37a3c8ce0db9f734f07bfc57b3b59df8559562e6..5c155d8c3f47ff210b7762bbb571d458
  }
  #endif
 diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
-index de7dbc32e659e6467589d193d014bf931e4645a2..0425531838eed2d494ddd5f919fcfa1cca403b57 100644
+index 5ec8473fd14b98efdc21a52f40fb1a92d1922fa1..bb6b8cc474a486462b09ff422e79b79e0a8d4261 100644
 --- a/src/hev-socks5-proxy.c
 +++ b/src/hev-socks5-proxy.c
 @@ -20,6 +20,7 @@
@@ -125,9 +125,7 @@ index de7dbc32e659e6467589d193d014bf931e4645a2..0425531838eed2d494ddd5f919fcfa1c
      return NULL;
  }
  
-@@ -187,6 +194,9 @@ hev_socks5_proxy_init (void)
-     int res;
-     int i;
+@@ -189,4 +196,7 @@ hev_socks5_proxy_init (void)
  
 +    if (hev_meter_prepare () < 0 || hev_meter_worker_enter () < 0)
 +        return -1;
@@ -143,16 +141,14 @@ index de7dbc32e659e6467589d193d014bf931e4645a2..0425531838eed2d494ddd5f919fcfa1c
          return -1;
      }
  
-@@ -295,6 +306,7 @@ retry:
-     }
- 
-     hev_task_system_fini ();
+@@ -298,4 +309,5 @@ retry:
 +    hev_meter_worker_leave ();
  }
  
  void
+ hev_socks5_proxy_run (void)
 diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c
-index 09233208fca2b0df1135f235f5cebaacfa5675c0..086d89c55a22c6c86b6c170fffe3d5964f6786f1 100644
+index 052bdf5f41fcd632777b847412d755dfd7217baa..5c24d805b2aeec75b14e1f1601f1f6a2f22358e9 100644
 --- a/src/hev-socks5-worker.c
 +++ b/src/hev-socks5-worker.c
 @@ -22,6 +22,7 @@

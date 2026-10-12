@@ -12,20 +12,21 @@
     "third-part/hev-task-system/src/lib/io/basic/hev-task-io.c": "9c534a0730794e54237133c418e40b4703d262a373108fed6a20e6f12a053a45",
     "third-part/hev-task-system/src/lib/io/basic/hev-task-io.h": "d93443ca3e9835724236fb2a4974711525ae599711b971c7dde4154413b80212",
     "third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.c": "6bd439c3ed42ebdac0a246a3554125ae7240383ec9be8dee436080b392295632",
-    "third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.h": "d3f446bdf2c36fa1e9de28234ef0bfffd4d0309eb842d19df3de955f47013b06"
+    "third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.h": "d3f446bdf2c36fa1e9de28234ef0bfffd4d0309eb842d19df3de955f47013b06",
+    "src/hev-socks5-worker.h": "efa2f8223e4349549d3cb03e97eb4eac6016d07381849a05514f2c0094c75c11"
   },
   "compositions": {
     "statistics": {
       "src/hev-main.c": "9b50cc6dd1509451efe89f2a0e849a9b10acccc0b49b36d87efbafa722f2e689",
       "src/hev-main.h": "56a2df5734d5cf3c127e286ece74ddcdbd409cbe7fe7f3fe0e3f1ef985be00e6",
-      "src/hev-socks5-proxy.c": "89dd46791e3151c86951eef2196ab6a1e62b4ac5011e2e6b23e1c6443518d205",
-      "src/hev-socks5-worker.c": "c5ea75f4b9b14bfabb5e1b2362e7009875e615b1da3f4161912aa6b8da9532db"
+      "src/hev-socks5-proxy.c": "35adbe4aaa65ab87e97583263f7af06bd28c6853d29dd2f354375433d9c5cd0a",
+      "src/hev-socks5-worker.c": "1cd4dc66d302ff251b7a9cf4a6a9584ec5141cdccb65e9397d7d505c24c532e7"
     },
     "integrated": {
       "src/hev-main.c": "0654a702aeaa0e6ac6d9f46d431b36767b9dae6b6082076d48347d7b931b5df4",
       "src/hev-main.h": "f10c791c4577a5c289a86ef01e6b5befde9f2ca7470e903a7d84aa53dbf71f0a",
-      "src/hev-socks5-proxy.c": "51556ffc18490341155a781513d5c9e459f6023e4c1226caeb892b1fcdfb18ad",
-      "src/hev-socks5-worker.c": "b851906f93b2ee0e07e99b06a3ed9b470cf3b3152960015e25e9c4a062ae0226"
+      "src/hev-socks5-proxy.c": "e4a364ad4995dcdb7cbe4fed49e728ff2a81fc54fde62f38c3be25943b06135d",
+      "src/hev-socks5-worker.c": "521fef014ebdba8280de296b407c357f0999ee15852216cf100995d8e80d36e8"
     }
   }
 }

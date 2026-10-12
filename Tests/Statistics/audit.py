@@ -14,7 +14,7 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 SOCKET_BASE = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
-UDP = 'b5e7cb9cad0807b208de7ccbdf5224aab2bdad71'
+UDP = 'ea209bd162de821a0d1d9b9a7c6c1cb45e88b60f'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 SOCKET_PATCHES = [
     {'file': 'hev-socket-meter-task.patch', 'repository': 'third-part/hev-task-system'},
@@ -25,7 +25,8 @@ UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_
                         'udp_buffer_send.c', 'udp_stream_boundaries.c', 'udp_splicer_lifetime.c',
                         'udp_netaddr_errors.c', 'udp_session_setup.c', 'udp_address_conversion.c',
                         'udp_reactor_resources.c', 'udp_worker_failures.c',
-                        'udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c')
+                        'udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c',
+                        'udp_signal_lifecycle.c')
 # Keep inherited fixtures' substituted I/O boundaries; real meter tests use no aliases.
 UDP_FIXTURE_INIT = ['-include', str(ROOT / 'Tests/SocketIO/udp_fixture_main.h')]
 UDP_FIXTURE_FLAGS = UDP_FIXTURE_INIT + [
@@ -81,7 +82,8 @@ def check_udp_inheritance():
     assert '    needs: udp-prerequisite\n' in workflow
     for source in ('udp_stream_boundaries.c', 'udp_session_setup.c', 'udp_address_conversion.c',
                    'udp_reactor_resources.c', 'udp_worker_failures.c',
-                   'udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c'):
+                   'udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c',
+                   'udp_signal_lifecycle.c'):
         assert source in UDP_COMPOSED_SOURCES, 'Missing composed execution: ' + source
     entries = {}
     for record in git('ls-tree', '-rz', UDP).split(b'\0'):
@@ -227,7 +229,8 @@ def native_checks(mode):
         executable.unlink()
         for source in UDP_COMPOSED_SOURCES:
             executable = OUT / ('composed-' + Path(source).stem + '-' + label)
-            flags = [] if source in ('udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c') else UDP_FIXTURE_FLAGS
+            flags = [] if source in ('udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c',
+                                     'udp_signal_lifecycle.c') else UDP_FIXTURE_FLAGS
             run([*common, *extra, '-Wno-unused-function', *flags, *includes,
                  ROOT / 'Tests' / source, *libs, '-o', executable],
                 mode + '-' + executable.name + '-build.log')
