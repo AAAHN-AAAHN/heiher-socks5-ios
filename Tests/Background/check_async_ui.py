@@ -117,16 +117,33 @@ def main():
     try:
         run(['xcrun', 'simctl', 'boot', identifier], 'boot.log')
         run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'ready.log', timeout=120)
-        run(['xcodebuild', 'test', '-project', app / 'Socks5.xcodeproj', '-scheme', 'AsyncAudioAudit',
-             '-destination', 'platform=iOS Simulator,id=' + identifier, '-parallel-testing-enabled', 'NO',
-             '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
-             '-collect-test-diagnostics', 'never', 'CODE_SIGNING_ALLOWED=NO',
-             'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES'], 'ui-test.log', timeout=900)
-        run(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', OUT / 'UI.xcresult'], 'test-summary.json')
-        run(['xcrun', 'xcresulttool', 'export', 'attachments', '--path', OUT / 'UI.xcresult',
-             '--output-path', OUT / 'attachments'], 'attachments.log')
-        run(['xcrun', 'xcresulttool', 'get', 'object', '--legacy', '--format', 'json',
-             '--path', OUT / 'UI.xcresult'], 'result-object.json')
+        test_failure = None
+        try:
+            run(['xcodebuild', 'test', '-project', app / 'Socks5.xcodeproj', '-scheme', 'AsyncAudioAudit',
+                 '-destination', 'platform=iOS Simulator,id=' + identifier, '-parallel-testing-enabled', 'NO',
+                 '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
+                 '-collect-test-diagnostics', 'never', 'CODE_SIGNING_ALLOWED=NO',
+                 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES'], 'ui-test.log', timeout=900)
+        except Exception as exc:
+            test_failure = exc
+        diagnostic_failure = None
+        for command, log in [
+            (['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', OUT / 'UI.xcresult'],
+             'test-summary.json'),
+            (['xcrun', 'xcresulttool', 'export', 'attachments', '--path', OUT / 'UI.xcresult',
+              '--output-path', OUT / 'attachments'], 'attachments.log'),
+            (['xcrun', 'xcresulttool', 'get', 'object', '--legacy', '--format', 'json',
+              '--path', OUT / 'UI.xcresult'], 'result-object.json'),
+        ]:
+            try:
+                run(command, log)
+            except Exception as exc:
+                if diagnostic_failure is None:
+                    diagnostic_failure = exc
+        if test_failure is not None:
+            raise test_failure
+        if diagnostic_failure is not None:
+            raise diagnostic_failure
         summary = json.loads((OUT / 'test-summary.json').read_text())
         if summary.get('failedTests', 0) != 0 or summary.get('passedTests', 0) < 1:
             raise RuntimeError('Actual XCTest result is not a completed pass')
