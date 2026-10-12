@@ -2,11 +2,11 @@
   "base_commit": "ed0871b303813884fd17541c12a270c3f198b8d7",
   "branches": {
     "feature/app-icon": "3d54b142e14bc5eaf98239df54c545faf44be86d",
-    "feature/background": "6ecb5ba5e42d459718adc46dfa3e9ecf63d09839",
+    "feature/background": "8012d36365538e53c749eba8994bdb38ed02e2cd",
     "feature/server-control": "bccfcd4f75e2c998f1bc1fb497b18a046d43c16b",
     "feature/settings-persistence": "126a30d21209c816916814756e2ab015d2aaac36",
-    "feature/udp-compat": "e2895fc8e45594fec86ca446fa29222a4ba4ec87",
-    "feature/traffic-statistics": "664fac2939fec11ea9a27e0a8aeaaf72c1501566"
+    "feature/udp-compat": "82c04939fe2c078eac18a4ac44b56921d5bca62d",
+    "feature/traffic-statistics": "d0c18ec1b24469279bb95e7e4f1fe2705cd79153"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -19,8 +19,8 @@
       "path": ".github/workflows/udp-compat-audit.yml"
     },
     "Build/inherited-workflows/traffic-statistics-verify-build.yml": {
-      "commit": "0ac6286f00629b7ab0af5db4864f9c1be71b1fdc",
-      "sha256": "1a3cb4576595bbf76e3230d261313d989066fcf82313022eec755aaa3b2e842b",
+      "commit": "6b6ab34f7215f4c7f8e54597c8d869022e275cbb",
+      "sha256": "73e89334fb38d06044e2cc738907792a26d9d8baae32ef25606e4b8a9dcd681d",
       "path": ".github/workflows/verify-build.yml"
     },
     "Patches/hev-netaddr-result.patch": {
@@ -56,8 +56,8 @@
       "sha256": "9cd0a43550a6128046f81d11bd16971e426386e2656e3e8f16fa790d57bbb315"
     },
     "Patches/hev-udp-sockaddr.patch": {
-      "commit": "b6737da512b7d93a7ecb61b05f72d62e561edb45",
-      "sha256": "d487a67e4756533762f5200fa08e7d58208240e428235ad8f64f7f1f5aed2828"
+      "commit": "e6b13ece9cba20982721da11ba9d97974f5eb880",
+      "sha256": "ac53a142a4215b9ae2cea2eabc9cfc939d0277eead2a68ef41fc4f76d7c64173"
     },
     "Socks5/Assets.xcassets/AppIcon.appiconset/AppIcon.png": {
       "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
@@ -212,8 +212,8 @@
       "sha256": "3c328e52f33d5c731306a535b6bb923eb1bce27e89eb0367b67c213be761017d"
     },
     "Tests/Background/check_async_ui.py": {
-      "commit": "a0325fb3f292818c587087c442b76a0d994964e1",
-      "sha256": "53c16ddac2fc6f7f1648de8914c9f798523f01fd5d3b7c6e69facd5c0af1b11c"
+      "commit": "964ef52cb2340a57f7274d0f155ec580c4aade6a",
+      "sha256": "36fc0de081599066c16f46a4cd727c7cd4bc9ade4b0df573d8ec24f264d42b58"
     },
     "Tests/Background/check_audio_sdk.sh": {
       "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
@@ -496,8 +496,8 @@
       "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "0ac6286f00629b7ab0af5db4864f9c1be71b1fdc",
-      "sha256": "f84cc7fcb34d407e255eda809b453f99ac73cb70810c7060e55f0aec34c32c97"
+      "commit": "6b6ab34f7215f4c7f8e54597c8d869022e275cbb",
+      "sha256": "cafa0a08a4dc1c9b7d3d066360b0d79384e80bd9f94020057f48e66a7fc655df"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
@@ -608,12 +608,12 @@
       "sha256": "effcce0d531e7cc067f25225bd27c7ce420c9c07f2881f2380f743bce3571f30"
     },
     "Patches/hev-udp-domain.patch": {
-      "commit": "b6737da512b7d93a7ecb61b05f72d62e561edb45",
-      "sha256": "401fc8f495f93648d73d95b086aee3dc57cd15c19904ed763e63588a24379c56"
+      "commit": "e6b13ece9cba20982721da11ba9d97974f5eb880",
+      "sha256": "617f446aefe57a489f5cf0a455f98d9122f75a5d2e69643c167e536d17c84430"
     },
     "Patches/hev-session-setup.patch": {
-      "commit": "b6737da512b7d93a7ecb61b05f72d62e561edb45",
-      "sha256": "cac4bc5abfa5f754a377e8d5dc57badd9de860cbcb46556860670db381c02b19"
+      "commit": "e6b13ece9cba20982721da11ba9d97974f5eb880",
+      "sha256": "8b9a0496baf60619fe2cef725641d6e30879f847b51bbcda2c2987399902d159"
     },
     "Tests/udp_address_conversion.c": {
       "commit": "b6737da512b7d93a7ecb61b05f72d62e561edb45",

@@ -3,11 +3,11 @@
   "frozen_source": "01359cc28e593c9c5e24698241494d406e9f05b5",
   "parents": {
     "feature/app-icon": "3d54b142e14bc5eaf98239df54c545faf44be86d",
-    "feature/background": "6ecb5ba5e42d459718adc46dfa3e9ecf63d09839",
+    "feature/background": "8012d36365538e53c749eba8994bdb38ed02e2cd",
     "feature/server-control": "bccfcd4f75e2c998f1bc1fb497b18a046d43c16b",
     "feature/settings-persistence": "126a30d21209c816916814756e2ab015d2aaac36",
-    "feature/udp-compat": "e2895fc8e45594fec86ca446fa29222a4ba4ec87",
-    "feature/traffic-statistics": "664fac2939fec11ea9a27e0a8aeaaf72c1501566"
+    "feature/udp-compat": "82c04939fe2c078eac18a4ac44b56921d5bca62d",
+    "feature/traffic-statistics": "d0c18ec1b24469279bb95e7e4f1fe2705cd79153"
   },
   "owned_documents": [
     "README.md",
@@ -20,7 +20,7 @@
     "Build/check_ownership.py": "3f11ee85e1248ad3d891fd8867f21ef1e9f2a4c0",
     "Tests/AppIcon/check_icon.py": "9a352124f097bd9f1c03c255daece0f9feb85f08",
     "Tests/Background/check_scope.py": "5b0f97f2d1b5b806ae2d1c6d967c318ca210325f",
-    "Tests/Statistics/audit.py": "4e9c4b64212d5da9c647af85acb02f5e6f64395e",
+    "Tests/Statistics/audit.py": "01bbdf10fe84817aeff072dc2b3f45ed888fe915",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }
