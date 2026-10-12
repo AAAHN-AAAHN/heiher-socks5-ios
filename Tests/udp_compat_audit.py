@@ -146,7 +146,8 @@ def main():
                  'udp_splicer_lifetime.c', 'udp_netaddr_errors.c',
                  'udp_session_setup.c', 'udp_address_conversion.c',
                  'udp_reactor_resources.c', 'udp_worker_failures.c',
-                 'udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c'):
+                 'udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c',
+                 'udp_signal_lifecycle.c'):
         run([formatter, '--style=file:' + str(CORE / '.clang-format'), ROOT / 'Tests' / name],
             'expected-' + name)
         if (OUT / ('expected-' + name)).read_bytes() != (ROOT / 'Tests' / name).read_bytes():
@@ -210,7 +211,8 @@ def main():
                  'udp_stream_boundaries', 'udp_splicer_lifetime', 'udp_netaddr_errors',
                  'udp_session_setup', 'udp_address_conversion',
                  'udp_reactor_resources', 'udp_worker_failures',
-                 'udp_proxy_worker_cascade', 'udp_dns_lifecycle'):
+                 'udp_proxy_worker_cascade', 'udp_dns_lifecycle',
+                 'udp_signal_lifecycle'):
         for mode, flags in [('asan', ['-O1', '-g', '-fsanitize=address,undefined',
                                      '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']),
                             ('optimized', ['-O3', '-fstrict-aliasing'])]:
