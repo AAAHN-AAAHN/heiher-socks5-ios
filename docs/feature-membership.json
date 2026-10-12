@@ -14,7 +14,7 @@
     }
   },
   "files": {
-    "Patches/hev-server-startup-stop.patch": "c9862bb9f074354297b969822b2cbba22b18563a248c705ec113d8eceaec9c7b"
+    "Patches/hev-server-startup-stop.patch": "77b46a0a4a58d1fdb219d11cde4a99a085799ccf7027e7309ee42ba53eb314db"
   },
   "responsibility": "Server control only; no persistent application settings. Historical source is retained by the downstream persistence merge. The locally extended lifecycle patch is hash-locked under files; the original pre-start hunk remains verified against the old settings commit."
 }
