@@ -2,7 +2,7 @@
   "common": {
     "src/core/src/hev-socks5-meter.c": "38e83c2b6008a032ed56c9cc6598a1812b132d7e6fa2c481f7f04037e08754f7",
     "src/core/src/hev-socks5-meter.h": "c11ca39d49097ce9575a2a3b13205cb037866c6f51ad8e41d2df36abd9990871",
-    "src/core/src/hev-socks5-server.c": "87eaaa0b4f3f434c5e2fe18ea0ba18098ffed12e7c74a7ec5f68415ce0e0e18d",
+    "src/core/src/hev-socks5-server.c": "8382dbda5605c39853958bfcae9dba5098d5a82d0906a786469073fd9778776d",
     "src/core/src/hev-socks5-tcp.c": "375c5409c968e7c2a0f202853349cc251e1ece9e14445d72810866e897afb256",
     "src/core/src/hev-socks5-udp.c": "98950c84dbb1f68a24030fd821abcb60daff0852920fb31a7e518d8c41d759ba",
     "src/core/src/hev-socks5.c": "d97deabdfff39ea6b43644ec4bbecb604088bb6641a968f5cec58c0a642fd267",

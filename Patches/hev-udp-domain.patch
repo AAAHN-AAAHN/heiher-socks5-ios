@@ -27,7 +27,7 @@ index 8770a5facf2c7465ea812b12bbf867de89db028c..6c395802b65bd144ccb6577a6c27fc54
  
  const char *hev_socks5_addr_into_str (const HevSocks5Addr *addr, char *buf,
 diff --git a/src/hev-socks5-misc.c b/src/hev-socks5-misc.c
-index 2b5e12231ac551ac689a9e4d52bad01df02ca281..a1f8e9d1498358b3be2805be4b909e134d714373 100644
+index e43f336d538f994936405f236a88beb8d1538cff..3e3a3594615e93150143ed44064e6b85f7ceee9b 100644
 --- a/src/hev-socks5-misc.c
 +++ b/src/hev-socks5-misc.c
 @@ -213,6 +213,8 @@ hev_socks5_addr_into_sockaddr6 (const HevSocks5Addr *addr,

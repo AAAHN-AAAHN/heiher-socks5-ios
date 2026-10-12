@@ -30,6 +30,11 @@ static int setup_connect (int, const struct sockaddr *, socklen_t,
                           HevTaskIOYielder, void *);
 static void *setup_tcp_iface (void);
 static unsigned int setup_io_calls;
+static ssize_t setup_send (int, const void *, size_t, int, HevTaskIOYielder,
+                           void *);
+static unsigned int setup_send_calls;
+static int short_send_active, short_send_at, short_send_result;
+static int short_send_length, short_send_write;
 
 #define hev_task_dns_getaddrinfo setup_dns
 #include "hev-socks5-misc.c"
@@ -42,7 +47,7 @@ static unsigned int setup_io_calls;
 #define hev_task_io_socket_recv(...) \
     (setup_io_calls++, hev_task_io_socket_recv (__VA_ARGS__))
 #define hev_task_io_socket_send(...) \
-    (setup_io_calls++, hev_task_io_socket_send (__VA_ARGS__))
+    (setup_io_calls++, setup_send (__VA_ARGS__))
 #include "hev-socks5-server.c"
 #undef hev_task_io_socket_recv
 #undef hev_task_io_socket_send
@@ -75,6 +80,24 @@ static int stopped, sockets_after_stop, binds_after_stop, connects_after_stop;
 static int control, client, result, created[2], created_count, failures;
 static unsigned char request[32];
 static size_t request_length;
+
+static ssize_t
+setup_send (int fd, const void *data, size_t length, int flags,
+            HevTaskIOYielder yielder, void *self)
+{
+    setup_send_calls++;
+    if (!short_send_active || setup_send_calls != (unsigned)short_send_at)
+        return hev_task_io_socket_send (fd, data, length, flags, yielder, self);
+    assert (length == (size_t)short_send_length && flags == MSG_WAITALL);
+    /* Full-handshake cases put the exact short prefix onto a real stream.
+     * The controlled result represents a later ordinary I/O error: unlike
+     * cancellation, it does not change the session timeout. */
+    if (short_send_write && short_send_result > 0)
+        assert (hev_task_io_socket_send (fd, data, short_send_result, flags,
+                                         yielder, self) == short_send_result);
+    errno = EPIPE;
+    return short_send_result;
+}
 
 static void *
 setup_tcp_iface (void)
@@ -319,6 +342,111 @@ handshake_setup (int where, int cancel)
     hev_task_system_fini ();
 }
 
+/* The native MSG_WAITALL helper may return a completed positive prefix after
+ * an ordinary error. Each protocol response must still be complete. */
+static void
+short_write_boundaries (void)
+{
+    HevSocks5Server server = { .base.fd = -1, .base.timeout = 60000 };
+    struct sockaddr_in6 address = { .sin6_family = AF_INET6 };
+    unsigned cases = 0, before = failures;
+    short_send_active = short_send_at = 1;
+    short_send_write = 0;
+    for (int writer = 0; writer < 4; writer++) {
+        memset (&address.sin6_addr, 0, sizeof (address.sin6_addr));
+        if (writer == 2)
+            address.sin6_addr.s6_addr[10] = address.sin6_addr.s6_addr[11] =
+                0xff;
+        address.sin6_addr.s6_addr[15] = 1;
+        short_send_length = writer < 2 ? 2 : writer == 2 ? 10 : 22;
+        for (short_send_result = -2; short_send_result <= short_send_length;
+             short_send_result++) {
+            int result;
+            setup_send_calls = 0;
+            result =
+                writer == 0 ?
+                    hev_socks5_server_write_auth_method (&server, 0) :
+                writer == 1 ?
+                    hev_socks5_server_write_auth_user (&server, 0) :
+                    hev_socks5_server_write_response (&server, 0, &address);
+            assert (setup_send_calls == 1 && server.base.timeout == 60000);
+            failures += (result == 0) !=
+                        (short_send_result == short_send_length);
+            cases++;
+        }
+    }
+    short_send_active = 0;
+    printf (
+        "%s: %u method/user/IPv4/IPv6 response write boundaries; %u incomplete responses accepted\n",
+        failures == (int)before ? "PASS" : "FAIL", cases, failures - before);
+}
+
+static void
+short_handshake (int response)
+{
+    const char *config =
+        "main:\n  workers: 1\n  listen-address: '::1'\n  port: 1080\n";
+    struct sockaddr_in6 address;
+    unsigned char received[64];
+    size_t bytes = 0;
+    int acceptor, bad;
+    stage = 6;
+    pending = released = completed = started = returned = stopped = 0;
+    sockets_after_stop = binds_after_stop = connects_after_stop =
+        created_count = 0;
+    setup_io_calls = setup_send_calls = 0;
+    short_send_active = short_send_write = 1;
+    short_send_at = response;
+    short_send_result = 1;
+    short_send_length = response == 1 ? 2 : 22;
+    assert (!hev_config_init_from_str ((const unsigned char *)config,
+                                       strlen (config)));
+    assert (!hev_task_system_init ());
+    acceptor = listener (&address);
+    client = socket (AF_INET6, SOCK_STREAM, 0);
+    assert (client >= 0 &&
+            !connect (client, (void *)&address, sizeof (address)));
+    control = accept (acceptor, NULL, NULL);
+    assert (control >= 0 && !fcntl (control, F_SETFL, O_NONBLOCK));
+    close (acceptor);
+    memset (request, 0, sizeof (request));
+    memcpy (request, (unsigned char[]){ 5, 1, 0, 5, 3, 0, 4 }, 7);
+    request_length = 25;
+    assert (send (client, request, request_length, 0) == request_length);
+    session = hev_socks5_session_new (control);
+    owner = hev_task_new (-1);
+    assert (session && owner);
+    session->task = owner;
+    hev_task_run (owner, handshake_owner, NULL);
+    hev_task_system_run ();
+    assert (returned);
+    short_send_active = short_send_write = 0;
+    while (bytes < sizeof (received)) {
+        ssize_t count =
+            recv (client, received + bytes, sizeof (received) - bytes, 0);
+        if (count > 0)
+            bytes += count;
+        else if (!count || (count < 0 && errno == ECONNRESET))
+            break;
+        else
+            assert (errno == EINTR);
+    }
+    bad = result >= 0 || bytes != (response == 1 ? 1u : 3u) ||
+          setup_send_calls != (unsigned)response ||
+          created_count != (response == 1 ? 0 : 2) ||
+          (response == 1 && setup_io_calls != 3) || pending;
+    for (int i = 0; i < created_count; i++)
+        assert (fcntl (created[i], F_GETFD) == -1 && errno == EBADF);
+    assert (fcntl (control, F_GETFD) == -1 && errno == EBADF);
+    printf (
+        "%s: short handshake response=%d result=%d bytes=%zu sends=%u sockets=%d; stage boundary checked; descriptors closed\n",
+        bad ? "FAIL" : "PASS", response, result, bytes, setup_send_calls,
+        created_count);
+    failures += bad;
+    close (client);
+    hev_task_system_fini ();
+}
+
 typedef struct
 {
     HevSocks5 *self;
@@ -371,6 +499,9 @@ main (void)
     signal (SIGPIPE, SIG_IGN);
     alarm (15);
     class_setup ();
+    short_write_boundaries ();
+    short_handshake (1);
+    short_handshake (2);
     for (int where = 0; where < 5; where++)
         for (int cancel = 0; cancel <= 1; cancel++)
             handshake_setup (where, cancel);

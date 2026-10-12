@@ -14,7 +14,7 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 SOCKET_BASE = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
-UDP = '23ce31d217e0e621b1621c866b03c563bef88685'
+UDP = 'e2895fc8e45594fec86ca446fa29222a4ba4ec87'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 SOCKET_PATCHES = [
     {'file': 'hev-socket-meter-task.patch', 'repository': 'third-part/hev-task-system'},
@@ -23,7 +23,7 @@ SOCKET_PATCHES = [
 ]
 UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
                         'udp_buffer_send.c', 'udp_stream_boundaries.c', 'udp_splicer_lifetime.c',
-                        'udp_netaddr_errors.c', 'udp_session_setup.c')
+                        'udp_netaddr_errors.c', 'udp_session_setup.c', 'udp_address_conversion.c')
 # Keep inherited fixtures' substituted I/O boundaries; real meter tests use no aliases.
 UDP_FIXTURE_INIT = ['-include', str(ROOT / 'Tests/SocketIO/udp_fixture_main.h')]
 UDP_FIXTURE_FLAGS = UDP_FIXTURE_INIT + [
@@ -77,7 +77,7 @@ def check_udp_inheritance():
     assert ('    uses: ./.github/workflows/udp-compat-audit.yml\n'
             f'    with:\n      ref: {UDP}\n') in workflow, 'UDP workflow prerequisite differs'
     assert '    needs: udp-prerequisite\n' in workflow
-    for source in ('udp_stream_boundaries.c', 'udp_session_setup.c'):
+    for source in ('udp_stream_boundaries.c', 'udp_session_setup.c', 'udp_address_conversion.c'):
         assert source in UDP_COMPOSED_SOURCES, 'Missing composed execution: ' + source
     entries = {}
     for record in git('ls-tree', '-rz', UDP).split(b'\0'):

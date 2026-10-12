@@ -1,3 +1,31 @@
+diff --git a/src/hev-socks5-misc.c b/src/hev-socks5-misc.c
+index 2b5e12231ac551ac689a9e4d52bad01df02ca281..e43f336d538f994936405f236a88beb8d1538cff 100644
+--- a/src/hev-socks5-misc.c
++++ b/src/hev-socks5-misc.c
+@@ -223,6 +223,7 @@
+         return -1;
+     }
+ 
++    saddr->sin6_scope_id = 0;
+     return 0;
+ }
+ 
+@@ -282,6 +283,7 @@
+     case AF_INET6: {
+         struct sockaddr_in6 *sa = (struct sockaddr_in6 *)result->ai_addr;
+         memcpy (&saddr->sin6_addr, &sa->sin6_addr, 16);
++        saddr->sin6_scope_id = sa->sin6_scope_id;
+         *family = HEV_SOCKS5_ADDR_FAMILY_IPV6;
+         break;
+     }
+@@ -301,6 +303,7 @@
+ 
+     saddr->sin6_family = AF_INET6;
+     saddr->sin6_port = htons (port);
++    saddr->sin6_scope_id = 0;
+ 
+     res = hev_socks5_name_resolve_ipv4 (name, saddr);
+     if (res == 0) {
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
 index 7c14969f3ff478678f4959d22394fe3b47fee3c3..328f2b69526ca4f3f82e385ef02c82ddccbc17fb 100644
 --- a/src/hev-socks5-udp.c
