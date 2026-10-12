@@ -162,6 +162,17 @@ def main():
         run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'final-index.log')
     except Exception as exc:
         failure = exc
+        for log, command in [
+            ('failure-processes.log', ['/bin/ps', '-A', '-o', 'pid,ppid,stat,pcpu,pmem,rss,etime,comm']),
+            ('failure-devices.json', ['xcrun', 'simctl', 'list', 'devices', '-j']),
+        ]:
+            try:
+                run(command, log, timeout=5)
+            except Exception as diagnostic:
+                try:
+                    (OUT / (log + '.error.txt')).write_text(str(diagnostic) + '\n')
+                except Exception:
+                    pass
     finally:
         for action in ('shutdown', 'delete'):
             try:
