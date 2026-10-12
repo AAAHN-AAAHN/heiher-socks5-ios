@@ -6,8 +6,8 @@
     "feature/background": "8012d36365538e53c749eba8994bdb38ed02e2cd",
     "feature/server-control": "76ea24405ab748e35652f82ea04cc201b22253de",
     "feature/settings-persistence": "0ff60ead99afb8f751dbf697f46048724fa18563",
-    "feature/udp-compat": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
-    "feature/traffic-statistics": "d1ca1ff827a27a0f4bb62295c63edccd921beff9"
+    "feature/udp-compat": "ea209bd162de821a0d1d9b9a7c6c1cb45e88b60f",
+    "feature/traffic-statistics": "e26ee11e1a3f64c60335673e1af1963317cfafee"
   },
   "owned_documents": [
     "README.md",

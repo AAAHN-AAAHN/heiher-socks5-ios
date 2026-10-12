@@ -50,6 +50,16 @@ def patches():
         yield item['repository'], ROOT / 'Patches' / item['file']
 
 
+def apply_patch(repo, patch, reverse=False):
+    if CONFIG['name'] == 'integrated' and patch.name == 'hev-server-startup-stop.patch':
+        from server_patch import apply as apply_server_patch
+        apply_server_patch(repo, patch, reverse=reverse)
+        return
+    options = ['-R'] if reverse else ['--whitespace=error-all']
+    git(repo, 'apply', *options, '--check', str(patch))
+    git(repo, 'apply', *options, str(patch))
+
+
 def apply(core):
     for relative, sha in CONFIG['sources'].items():
         repo = core / relative
@@ -60,8 +70,7 @@ def apply(core):
         assert not (git(repo, 'ls-files', '--others', '--exclude-standard') or
                     git(repo, 'ls-files', '--others', '--', 'src', 'include', '.rev-id')), 'Untracked native input: ' + relative
     for relative, patch in patches():
-        git(core / relative, 'apply', '--check', '--whitespace=error-all', str(patch))
-        git(core / relative, 'apply', '--whitespace=error-all', str(patch))
+        apply_patch(core / relative, patch)
         print(hashlib.sha256(patch.read_bytes()).hexdigest(), patch.name)
 
 
@@ -79,8 +88,7 @@ def formatting(core, formatter):
 
 def reverse(core):
     for relative, patch in reversed(list(patches())):
-        git(core / relative, 'apply', '-R', '--check', str(patch))
-        git(core / relative, 'apply', '-R', str(patch))
+        apply_patch(core / relative, patch, reverse=True)
     for relative in CONFIG['sources']:
         git(core / relative, 'diff', '--exit-code', 'HEAD', '--')
         git(core / relative, 'diff', '--cached', '--exit-code', 'HEAD', '--')

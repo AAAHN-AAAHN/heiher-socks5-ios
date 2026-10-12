@@ -1,0 +1,72 @@
+{
+  "patch": "hev-server-startup-stop.patch",
+  "patch_sha256": "77b46a0a4a58d1fdb219d11cde4a99a085799ccf7027e7309ee42ba53eb314db",
+  "projected_patch_sha256": "3cb0eb1acc6a9f1a29f4cdf4d6075a2bf2660ebb436eee63535f6fbad8e80712",
+  "context": {
+    "before": "     signal (SIGPIPE, SIG_IGN);\n     signal (SIGUSR1, sigint_handler);\n     atomic_fetch_or (&tsync, SYNC_SEND);\n",
+    "after": "     res = hev_socks5_worker_set_reload_notify (worker_list[0].worker,\n                                                hev_socks5_proxy_reload_notify);\n     if (res < 0)\n"
+  },
+  "index_lines": [],
+  "files": {
+    "src/hev-main.c": {
+      "before": {
+        "mode": "100644",
+        "sha256": "9b50cc6dd1509451efe89f2a0e849a9b10acccc0b49b36d87efbafa722f2e689",
+        "blob_sha1": "14076246dbfb1cd42dbfeb51a397a6e05fbb863b"
+      },
+      "after": {
+        "mode": "100644",
+        "sha256": "0654a702aeaa0e6ac6d9f46d431b36767b9dae6b6082076d48347d7b931b5df4",
+        "blob_sha1": "357c3a429ca3321cdd92b5532b9f4a9eac3a05fb"
+      }
+    },
+    "src/hev-main.h": {
+      "before": {
+        "mode": "100644",
+        "sha256": "56a2df5734d5cf3c127e286ece74ddcdbd409cbe7fe7f3fe0e3f1ef985be00e6",
+        "blob_sha1": "5c155d8c3f47ff210b7762bbb571d458e8607d07"
+      },
+      "after": {
+        "mode": "100644",
+        "sha256": "f10c791c4577a5c289a86ef01e6b5befde9f2ca7470e903a7d84aa53dbf71f0a",
+        "blob_sha1": "147a6fbeac164ff55356d0632a9bf6f78ad505ab"
+      }
+    },
+    "src/hev-socks5-proxy.c": {
+      "before": {
+        "mode": "100644",
+        "sha256": "35adbe4aaa65ab87e97583263f7af06bd28c6853d29dd2f354375433d9c5cd0a",
+        "blob_sha1": "bb6b8cc474a486462b09ff422e79b79e0a8d4261"
+      },
+      "after": {
+        "mode": "100644",
+        "sha256": "e4a364ad4995dcdb7cbe4fed49e728ff2a81fc54fde62f38c3be25943b06135d",
+        "blob_sha1": "78eb872bc6929d1f3ed95565490f40de89c67cd8"
+      }
+    },
+    "src/hev-socks5-proxy.h": {
+      "before": {
+        "mode": "100644",
+        "sha256": "a7a30dbb4c279d7dda638139957ee12acaf07b9988cbc3a426118f1c64fc7af4",
+        "blob_sha1": "d94ebeaf668f2f2812a72d9a2cbefb0d4098d58f"
+      },
+      "after": {
+        "mode": "100644",
+        "sha256": "449268d277241bb1c96b23d639ce5589aff8b900ad31c2d98c5c1dfbf3ee7b20",
+        "blob_sha1": "c867c251d1b953e07dd480c3d38030045621f4a2"
+      }
+    },
+    "src/hev-socks5-worker.c": {
+      "before": {
+        "mode": "100644",
+        "sha256": "1cd4dc66d302ff251b7a9cf4a6a9584ec5141cdccb65e9397d7d505c24c532e7",
+        "blob_sha1": "5c24d805b2aeec75b14e1f1601f1f6a2f22358e9"
+      },
+      "after": {
+        "mode": "100644",
+        "sha256": "521fef014ebdba8280de296b407c357f0999ee15852216cf100995d8e80d36e8",
+        "blob_sha1": "fd94876c646c077b4886f8b746cd30fe584ebf31"
+      }
+    }
+  }
+}
