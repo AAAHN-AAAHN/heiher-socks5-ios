@@ -1,5 +1,5 @@
 diff --git a/src/core/src/hev-socks5-misc.c b/src/core/src/hev-socks5-misc.c
-index 3e3a3594615e93150143ed44064e6b85f7ceee9b..47c5377e83f13baf3244e8f1afed9f7867b2d045 100644
+index 3585d85ad1fdccf0408a4ad8037aeaf50d14eaa4..714bcd9bb9a73a847a886956ade11c709a0c007c 100644
 --- a/src/core/src/hev-socks5-misc.c
 +++ b/src/core/src/hev-socks5-misc.c
 @@ -37,23 +37,16 @@ hev_socks5_task_io_yielder (HevTaskYieldType type, void *data)

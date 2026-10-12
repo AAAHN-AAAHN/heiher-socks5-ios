@@ -14,7 +14,7 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 SOCKET_BASE = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
-UDP = 'e2895fc8e45594fec86ca446fa29222a4ba4ec87'
+UDP = '82c04939fe2c078eac18a4ac44b56921d5bca62d'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 SOCKET_PATCHES = [
     {'file': 'hev-socket-meter-task.patch', 'repository': 'third-part/hev-task-system'},
