@@ -14,7 +14,7 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 SOCKET_BASE = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
-UDP = 'ed165b380b20c7c59d2e2a22d63116fddc195b47'
+UDP = '861a021835981494d9db9790d6373cbb1179c0f2'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 SOCKET_PATCHES = [
     {'file': 'hev-socket-meter-task.patch', 'repository': 'third-part/hev-task-system'},
@@ -23,7 +23,8 @@ SOCKET_PATCHES = [
 ]
 UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
                         'udp_buffer_send.c', 'udp_stream_boundaries.c', 'udp_splicer_lifetime.c',
-                        'udp_netaddr_errors.c', 'udp_session_setup.c', 'udp_address_conversion.c')
+                        'udp_netaddr_errors.c', 'udp_session_setup.c', 'udp_address_conversion.c',
+                        'udp_reactor_resources.c', 'udp_worker_failures.c', 'udp_proxy_worker_cascade.c')
 # Keep inherited fixtures' substituted I/O boundaries; real meter tests use no aliases.
 UDP_FIXTURE_INIT = ['-include', str(ROOT / 'Tests/SocketIO/udp_fixture_main.h')]
 UDP_FIXTURE_FLAGS = UDP_FIXTURE_INIT + [
@@ -77,7 +78,8 @@ def check_udp_inheritance():
     assert ('    uses: ./.github/workflows/udp-compat-audit.yml\n'
             f'    with:\n      ref: {UDP}\n') in workflow, 'UDP workflow prerequisite differs'
     assert '    needs: udp-prerequisite\n' in workflow
-    for source in ('udp_stream_boundaries.c', 'udp_session_setup.c', 'udp_address_conversion.c'):
+    for source in ('udp_stream_boundaries.c', 'udp_session_setup.c', 'udp_address_conversion.c',
+                   'udp_reactor_resources.c', 'udp_worker_failures.c', 'udp_proxy_worker_cascade.c'):
         assert source in UDP_COMPOSED_SOURCES, 'Missing composed execution: ' + source
     entries = {}
     for record in git('ls-tree', '-rz', UDP).split(b'\0'):
@@ -191,6 +193,7 @@ def native_checks(mode):
     # Preserve the UDP parent's protocol and buffer checks on the composed core.
     for script, label, timeout in [('udp_peer_regression.py', 'peer', 45),
                                     ('udp_header_regression.py', 'header', 120),
+                                    ('udp_worker_resources.py', 'worker-resources', 30),
                                     ('udp_buffer_network.py', 'dynamic-network', 120)]:
         run([sys.executable, 'Tests/' + script, CORE / 'bin/hev-socks5-server',
              '--output', OUT / (mode + '-' + label + '.json')],
@@ -336,8 +339,8 @@ def main():
     assert len(hashes) == 17
     (OUT / 'statistics-source-hashes.json').write_text(json.dumps(hashes, indent=2) + '\n')
     # Test-only C follows the same formatter; never silently rewrite reviewed files.
-    for path in [*(ROOT / 'Tests/SocketIO').glob('*.c'), ROOT / 'Tests/udp_stream_boundaries.c',
-                 ROOT / 'Tests/udp_session_setup.c']:
+    for path in [*(ROOT / 'Tests/SocketIO').glob('*.c'),
+                 *(ROOT / 'Tests' / source for source in UDP_COMPOSED_SOURCES)]:
         target = OUT / ('formatted-' + path.name)
         formatted = subprocess.check_output([formatter, '--style=file:' + str(CORE / '.clang-format'), str(path)])
         target.write_bytes(formatted)
