@@ -5,8 +5,8 @@
     "feature/background": "8012d36365538e53c749eba8994bdb38ed02e2cd",
     "feature/server-control": "bccfcd4f75e2c998f1bc1fb497b18a046d43c16b",
     "feature/settings-persistence": "126a30d21209c816916814756e2ab015d2aaac36",
-    "feature/udp-compat": "82c04939fe2c078eac18a4ac44b56921d5bca62d",
-    "feature/traffic-statistics": "d0c18ec1b24469279bb95e7e4f1fe2705cd79153"
+    "feature/udp-compat": "ed165b380b20c7c59d2e2a22d63116fddc195b47",
+    "feature/traffic-statistics": "33048683736fc76ab8bffefa7201e3df823ab0c8"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -19,8 +19,8 @@
       "path": ".github/workflows/udp-compat-audit.yml"
     },
     "Build/inherited-workflows/traffic-statistics-verify-build.yml": {
-      "commit": "6b6ab34f7215f4c7f8e54597c8d869022e275cbb",
-      "sha256": "73e89334fb38d06044e2cc738907792a26d9d8baae32ef25606e4b8a9dcd681d",
+      "commit": "54b68624cd55c4d9606475226ac5daad35d0f3fc",
+      "sha256": "62a63830de7f276ea5c3012f43ed090dc531a5c8db15ed9e75e80fd5a844fd81",
       "path": ".github/workflows/verify-build.yml"
     },
     "Patches/hev-netaddr-result.patch": {
@@ -496,8 +496,8 @@
       "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "6b6ab34f7215f4c7f8e54597c8d869022e275cbb",
-      "sha256": "cafa0a08a4dc1c9b7d3d066360b0d79384e80bd9f94020057f48e66a7fc655df"
+      "commit": "54b68624cd55c4d9606475226ac5daad35d0f3fc",
+      "sha256": "cc305ce3763c372acbc3e294cd3310e03c5495fc9ba754e6d04dd427c6120d9b"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
