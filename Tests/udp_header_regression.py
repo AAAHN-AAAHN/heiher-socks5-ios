@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real loopback RSV/FRAG rejection, first-peer safety and queue continuation."""
+"""Real loopback request/UDP headers, first-peer safety and CONNECT replies."""
 import argparse
 import json
 from pathlib import Path
@@ -87,7 +87,39 @@ def setup_reserved(port, ip):
                 rejected_control_closes=closes, normal_roundtrips=3, passed=True)
 
 
-def first_peer(port, ip, label, prefix, old_control):
+def connect_bound(port, control_ip, target_ip, domain):
+    """The target's accepted peer is the independent oracle for CONNECT BND."""
+    family = socket.AF_INET6 if ':' in target_ip else socket.AF_INET
+    with socket.socket(family, socket.SOCK_STREAM) as target:
+        target.bind((target_ip, 0))
+        target.listen(1)
+        target.settimeout(2)
+        endpoint = target.getsockname()[:2]
+        address = (b'\3' + bytes([len(target_ip)]) + target_ip.encode() +
+                   struct.pack('!H', endpoint[1]) if domain else encode(*endpoint))
+        with socket.create_connection((control_ip, port), timeout=2) as control:
+            control.sendall(b'\5\1\0')
+            assert exact(control, 2) == b'\5\0'
+            control.sendall(b'\5\1\0' + address)
+            head = exact(control, 4)
+            assert head[:3] == b'\5\0\0' and head[3] in (1, 4), 'Invalid CONNECT reply'
+            tail = exact(control, {1: 6, 4: 18}[head[3]])
+            bound, _ = decode_bytes(head[3:] + tail)
+            accepted, peer = target.accept()
+            with accepted:
+                accepted.settimeout(2)
+                assert bound == peer[:2], ('CONNECT BND differs from actual peer', bound, peer)
+                payload = bytes(range(256)) * 16
+                control.sendall(payload)
+                assert exact(accepted, len(payload)) == payload
+                accepted.sendall(payload[::-1])
+                assert exact(control, len(payload)) == payload[::-1]
+    return dict(case='connect-bound-address', control_ip=control_ip, target_ip=target_ip,
+                domain=domain, reported_bound=bound, actual_peer=peer[:2],
+                duplex_payload_bytes=len(payload), passed=True)
+
+
+def first_peer(port, ip, label, prefix, old_control, empty_name=False):
     hint = '::' if ':' in ip else '0.0.0.0'
     with destination(ip) as dest, association((ip, port), hint) as (_, good):
         address = encode(*dest.getsockname()[:2])
@@ -95,7 +127,9 @@ def first_peer(port, ip, label, prefix, old_control):
             other.bind((ip, 0))
             other.connect(good.getpeername())
             bad_payload = b'invalid-first-' + label.encode()
-            other.send(prefix + address + bad_payload)
+            bad_address = (b'\3\0' + struct.pack('!H', dest.getsockname()[1])
+                           if empty_name else address)
+            other.send(prefix + bad_address + bad_payload)
             observed = drain(dest)
             if old_control:
                 assert len(observed) == 1 and observed[0][0] == bad_payload
@@ -172,6 +206,15 @@ def main():
                             row['workers'] = workers
                             rows.append(row)
                         if not args.old_control:
+                            row = first_peer(port, ip, 'empty-NAME', b'\0\0\0', False,
+                                             empty_name=True)
+                            row['workers'] = workers
+                            rows.append(row)
+                            for target in ('127.0.0.1', '::1'):
+                                for domain in (False, True):
+                                    row = connect_bound(port, ip, target, domain)
+                                    row['workers'] = workers
+                                    rows.append(row)
                             for hint in ('known', '::' if ':' in ip else '0.0.0.0'):
                                 row = queued(port, ip, hint, False)
                                 row['workers'] = workers

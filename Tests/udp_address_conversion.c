@@ -18,6 +18,75 @@ static void address_dns_free (struct addrinfo *);
 #undef hev_task_dns_getaddrinfo
 #undef freeaddrinfo
 
+/* Keep client construction under the same address-boundary oracle. */
+static unsigned name_allocations;
+static int reject_name_allocation;
+static void *
+name_malloc0 (size_t size)
+{
+    name_allocations++;
+    return reject_name_allocation ? NULL : hev_malloc0 (size);
+}
+#define hev_malloc0 name_malloc0
+#include "hev-socks5-client-tcp.c"
+#undef hev_malloc0
+
+static unsigned
+name_construction (void)
+{
+    const unsigned lengths[] = { 0, 1, 2, 254, 255, 256, 257, 511 };
+    const uint16_t ports[] = { 0, 53, 65535 };
+    unsigned cases = 0;
+    for (unsigned i = 0; i < sizeof (lengths) / sizeof (*lengths); i++) {
+        for (unsigned p = 0; p < sizeof (ports) / sizeof (*ports); p++) {
+            char name[512];
+            HevSocks5Addr address, expected;
+            unsigned length = lengths[i];
+            int valid = length && length <= 255;
+            uint16_t port = htons (ports[p]);
+            memset (name, 'x', sizeof (name));
+            name[length] = 0;
+            memset (&address, 0xa5, sizeof (address));
+            expected = address;
+            if (valid) {
+                expected.atype = HEV_SOCKS5_ADDR_TYPE_NAME;
+                expected.domain.len = length;
+                memcpy (expected.domain.addr, name, length);
+                memcpy (expected.domain.addr + length, &port, 2);
+            }
+            int result = hev_socks5_addr_from_name (&address, name, port);
+            assert (result == (valid ? (int)length + 4 : -1));
+            assert (!memcmp (&address, &expected, sizeof (address)));
+            unsigned before = name_allocations;
+            reject_name_allocation = !valid;
+            HevSocks5ClientTCP *client =
+                hev_socks5_client_tcp_new_name (name, port);
+            assert (!!client == valid && name_allocations == before + valid);
+            if (client) {
+                assert (!memcmp (client->addr, &expected, length + 4));
+                hev_object_unref (HEV_OBJECT (client));
+            }
+            cases++;
+        }
+    }
+    /* Exactly 256 readable bytes suffice to reject an overlong name. */
+    char bounded[256];
+    HevSocks5Addr address, saved;
+    memset (bounded, 'x', sizeof (bounded));
+    memset (&address, 0xa5, sizeof (address));
+    saved = address;
+    assert (hev_socks5_addr_from_name (&address, bounded, 0) == -1);
+    assert (!memcmp (&address, &saved, sizeof (address)));
+    unsigned before = name_allocations;
+    reject_name_allocation = 1;
+    assert (!hev_socks5_client_tcp_new_name (bounded, 0));
+    assert (name_allocations == before);
+    reject_name_allocation = 0;
+    puts (
+        "PASS: NAME construction lengths 0/1/2/254/255/256/257/511; exact bytes and port; rejection preserves output and allocates nothing");
+    return cases + 1;
+}
+
 static const struct
 {
     const char *name, *numeric;
@@ -42,6 +111,7 @@ static int
 address_dns (const char *name, const char *service,
              const struct addrinfo *hints, struct addrinfo **result)
 {
+    assert (current_name < sizeof (names) / sizeof (*names));
     assert (!strcmp (name, names[current_name].name) &&
             names[current_name].dns);
     assert (!service && hints->ai_family == requested_family);
@@ -85,7 +155,7 @@ main (void)
         struct sockaddr_in6 address;
         uint64_t after;
     } target;
-    unsigned failures = 0, cases = 0;
+    unsigned failures = 0, cases = name_construction ();
     target.before = UINT64_C (0x0123456789abcdef);
     target.after = UINT64_C (0xfedcba9876543210);
     for (int poisoned = 0; poisoned < 2; poisoned++) {
@@ -186,6 +256,11 @@ main (void)
                                             &family) == -1);
     assert (!memcmp (&saved, &target.address, sizeof (saved)) &&
             family == AF_UNSPEC);
+    invalid[1] = 0; /* Empty NAME must fail before DNS or output mutation. */
+    assert (hev_socks5_addr_into_sockaddr6 ((void *)invalid, &target.address,
+                                            &family) == -1);
+    assert (!memcmp (&saved, &target.address, sizeof (saved)) &&
+            family == AF_UNSPEC && dns_calls == before);
     invalid[0] = 255;
     assert (hev_socks5_addr_into_sockaddr6 ((void *)invalid, &target.address,
                                             &family) == -1);

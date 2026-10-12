@@ -353,9 +353,11 @@ domains (void)
     const struct
     {
         size_t length;
-        int nul, valid;
-    } checks[] = { { 17, -1, 1 }, { 16, -1, 1 }, { 17, 0, 0 }, { 17, 4, 0 },
-                   { 17, 8, 0 },  { 4, -1, 0 },  { 5, -1, 0 }, { 15, -1, 0 } };
+        int nul, valid, empty;
+    } checks[] = { { 17, -1, 1, 0 }, { 16, -1, 1, 0 }, { 17, 0, 0, 0 },
+                   { 17, 4, 0, 0 },  { 17, 8, 0, 0 },  { 4, -1, 0, 0 },
+                   { 5, -1, 0, 0 },  { 15, -1, 0, 0 }, { 7, -1, 0, 1 },
+                   { 8, -1, 0, 1 } };
     HevObjectClass klass = { .iface = get_iface };
     UDPWorkspace workspace;
     void *allocation = udp_workspace_new (&workspace, 1, NULL);
@@ -378,6 +380,7 @@ domains (void)
                                         .len = checks[i].length };
                 int before = connect_calls;
                 assert (buffer);
+                packet[4] = checks[i].empty ? 0 : 9;
                 memcpy (packet + 5, "127.0.0.1", 9);
                 if (checks[i].nul >= 0)
                     packet[5 + checks[i].nul] = 0;
@@ -437,7 +440,7 @@ domains (void)
         }
     }
     puts (
-        "PASS: bounded NAME, NUL rejection before peer learning, empty payload and lossless shared conversion");
+        "PASS: bounded nonempty NAME, NUL rejection before peer learning, empty payload and lossless shared conversion");
     hev_free (allocation);
 }
 
