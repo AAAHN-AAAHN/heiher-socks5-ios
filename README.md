@@ -18,7 +18,7 @@ A length-prefixed NAME destination must preserve its complete identity when pass
 
 IPv4, IPv4-mapped IPv6, native IPv6 and address scope are normalized for the native APIs and SOCKS address representation. The address in a reply describes the actual remote sender. Address conversion preserves complete IPv6 storage and respects strict-aliasing requirements rather than reinterpreting incompatible structures in place. Shared destination conversion retains an IPv6 scope returned by the existing resolver and clears a previous scope for an unscoped IPv4 or IPv6 destination, including when callers reuse an output address. Scoped NAME text uses the existing resolver's complete socket-address result, including on Darwin. The requested port remains unchanged; no separate zone parser is added.
 
-The TCP request header requires version 5 and a zero reserved byte before address resolution or relay setup. A malformed request receives a failure response and its control connection closes. This is separate from the reserved-byte and fragment checks on UDP datagrams.
+The TCP request header requires version 5 and a zero reserved byte before address resolution or relay setup. On rejection by these checks, the server attempts its existing failure response and closes the control connection. This is separate from the reserved-byte and fragment checks on UDP datagrams.
 
 Worker construction completes the native session class hierarchy before the proxy starts worker threads. Session creation then uses complete class descriptors, including their TCP and UDP interfaces and server-specific bind callbacks.
 

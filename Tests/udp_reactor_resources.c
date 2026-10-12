@@ -293,10 +293,10 @@ run_case (void *data)
         passed &= primary_calls == 1 &&
                   fallback_calls == (mode == SUCCESS ? 0 : 1);
     if (api == UDP_BACK || api == UDP_FRONT || api >= SERVICE_UDP_TCP) {
-        /* Registration may precede allocation. Both orders must return with
-         * no outstanding allocation and no data I/O on either failure. */
+        /* Both registrations precede relay allocation. A registration failure
+         * therefore allocates no relay storage and performs no data I/O. */
         if (mode == FAILURE)
-            passed &= allocation_calls == 0 || allocation_calls == 2;
+            passed &= allocation_calls == 0;
         else
             passed &= allocation_calls ==
                       (unsigned int)(fail_alloc ? fail_alloc : 2);
