@@ -94,8 +94,6 @@ main (void)
                 for (unsigned p = 0; p < sizeof (ports) / sizeof (*ports);
                      p++) {
                     memset (&target.address, 0, sizeof (target.address));
-                    if (poisoned)
-                        target.address.sin6_scope_id = UINT32_C (0xa5a5a5a5);
                     for (current_name = 0;
                          current_name < sizeof (names) / sizeof (*names);
                          current_name++) {
@@ -111,6 +109,8 @@ main (void)
                         wire[1] = length;
                         memcpy (wire + 2, names[current_name].name, length);
                         memcpy (wire + 2 + length, &port, 2);
+                        if (poisoned)
+                            target.address.sin6_scope_id = 31;
                         result =
                             direct ?
                                 hev_socks5_name_into_sockaddr6 (

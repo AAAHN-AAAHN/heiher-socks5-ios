@@ -116,6 +116,9 @@ def main():
          '--output', OUT / 'peer-filtered.json'], 'peer-filtered.log', timeout=45)
     old_binary = OUT / 'three-patch-server'
     shutil.copy2(CORE / 'bin/hev-socks5-server', old_binary)
+    run([sys.executable, 'Tests/udp_worker_resources.py', old_binary,
+         '--old-control', '--output', OUT / 'worker-resource-old-control.json'],
+        'worker-resource-old-control.log', timeout=30)
     run([sys.executable, 'Tests/udp_buffer_network.py', old_binary,
          '--old-control', '--output', OUT / 'buffer-old-control.json'],
         'buffer-old-control.log', timeout=45)
@@ -137,7 +140,9 @@ def main():
     for name in ('udp_buffer_unit.c', 'udp_buffer_io.c', 'udp_buffer_timer.c',
                  'udp_buffer_send.c', 'udp_buffer_live_hold.c', 'udp_stream_boundaries.c',
                  'udp_splicer_lifetime.c', 'udp_netaddr_errors.c',
-                 'udp_session_setup.c', 'udp_address_conversion.c'):
+                 'udp_session_setup.c', 'udp_address_conversion.c',
+                 'udp_reactor_resources.c', 'udp_worker_failures.c',
+                 'udp_proxy_worker_cascade.c'):
         run([formatter, '--style=file:' + str(CORE / '.clang-format'), ROOT / 'Tests' / name],
             'expected-' + name)
         if (OUT / ('expected-' + name)).read_bytes() != (ROOT / 'Tests' / name).read_bytes():
@@ -197,7 +202,9 @@ def main():
 
     for name in ('udp_buffer_unit', 'udp_buffer_io', 'udp_buffer_send',
                  'udp_stream_boundaries', 'udp_splicer_lifetime', 'udp_netaddr_errors',
-                 'udp_session_setup', 'udp_address_conversion'):
+                 'udp_session_setup', 'udp_address_conversion',
+                 'udp_reactor_resources', 'udp_worker_failures',
+                 'udp_proxy_worker_cascade'):
         for mode, flags in [('asan', ['-O1', '-g', '-fsanitize=address,undefined',
                                      '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']),
                             ('optimized', ['-O3', '-fstrict-aliasing'])]:
@@ -219,6 +226,8 @@ def main():
     executable.unlink()
     run([sys.executable, 'Tests/udp_header_regression.py', CORE / 'bin/hev-socks5-server',
          '--output', OUT / 'header-regression.json'], 'header-regression.log', timeout=45)
+    run([sys.executable, 'Tests/udp_worker_resources.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / 'worker-resources.json'], 'worker-resources.log', timeout=30)
     run([sys.executable, 'Tests/udp_buffer_network.py', CORE / 'bin/hev-socks5-server',
          '--output', OUT / 'buffer-network.json'], 'buffer-network.log', timeout=120)
     run([sys.executable, 'Tests/udp_buffer_network.py', CORE / 'bin/hev-socks5-server',
