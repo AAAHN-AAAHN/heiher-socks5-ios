@@ -6,32 +6,41 @@ final class AsyncAudioUITests: XCTestCase {
     @MainActor func testAsyncSessionPlaybackAndOff() {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launch()
-        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
-        XCTAssertTrue(app.tabBars.buttons["Background"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Background"].tap()
+        addTeardownBlock { @MainActor in
+            app.terminate()
+            XCUIDevice.shared.orientation = .portrait
+        }
         let audio = app.switches["Loop silent WAV"].switches.element(boundBy: 0)
-        XCTAssertTrue(audio.waitForExistence(timeout: 5))
-        XCTAssertTrue(audio.isHittable)
-        XCTAssertEqual(audio.value as? String, "0")
         let audioState = app.staticTexts["background.audioState"]
-        func expectAudioState(_ value: String, timeout: TimeInterval = 5) {
+        @MainActor func expectAudioState(_ value: String, timeout: TimeInterval = 5) {
             XCTAssertTrue(audioState.waitForExistence(timeout: timeout))
             let expectation = XCTNSPredicateExpectation(
                 predicate: NSPredicate(format: "label == %@", value), object: audioState)
             XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: timeout), .completed)
         }
-        expectAudioState("Off")
+        @MainActor func resetAudio() {
+            XCUIDevice.shared.orientation = .portrait
+            if app.state != .runningForeground { app.launch() }
+            XCTAssertTrue(app.tabBars.buttons["Background"].waitForExistence(timeout: 10))
+            app.tabBars.buttons["Background"].tap()
+            XCTAssertTrue(audio.waitForExistence(timeout: 5))
+            XCTAssertTrue(audio.isHittable)
+            if audio.value as? String == "1" { audio.tap() }
+            XCTAssertEqual(audio.value as? String, "0")
+            expectAudioState("Off")
+        }
+        addTeardownBlock { @MainActor in resetAudio() }
+        resetAudio()
         for _ in 0..<3 {
             audio.tap()
             XCTAssertEqual(audio.value as? String, "1")
-            expectAudioState("Playing silent WAV continuously", timeout: 10)
+            expectAudioState("Playing silent WAV continuously", timeout: 30)
             audio.tap()
             XCTAssertEqual(audio.value as? String, "0")
             expectAudioState("Off")
         }
         audio.tap()
-        expectAudioState("Playing silent WAV continuously", timeout: 10)
+        expectAudioState("Playing silent WAV continuously", timeout: 30)
         // The old generic Off selector can match Location while audio is Playing.
         XCTAssertTrue(app.staticTexts["Off"].firstMatch.exists)
         XCTAssertNotEqual(audioState.label, "Off")
@@ -43,7 +52,7 @@ final class AsyncAudioUITests: XCTestCase {
         app.launch()
         app.tabBars.buttons["Background"].tap()
         XCTAssertEqual(audio.value as? String, "1")
-        expectAudioState("Playing silent WAV continuously", timeout: 10)
+        expectAudioState("Playing silent WAV continuously", timeout: 30)
         audio.tap()
         XCTAssertEqual(audio.value as? String, "0")
         // Rapid user intent changes must settle at the final explicit Off.

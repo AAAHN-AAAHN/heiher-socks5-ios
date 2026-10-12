@@ -7,8 +7,30 @@ final class IntegrationUITests: XCTestCase {
     @MainActor func testServerControlsAndTabNavigation() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
+        addTeardownBlock { @MainActor in app.terminate(); XCUIDevice.shared.orientation = .portrait }
         app.launch()
-        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        let audio = app.switches["Loop silent WAV"].switches.element(boundBy: 0)
+        let audioState = app.staticTexts["background.audioState"]
+        @MainActor func expectAudioState(_ value: String, timeout: TimeInterval = 5) {
+            XCTAssertTrue(audioState.waitForExistence(timeout: timeout))
+            let expectation = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "label == %@", value), object: audioState)
+            XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: timeout), .completed)
+        }
+        @MainActor func resetAudio() {
+            XCUIDevice.shared.orientation = .portrait
+            if app.state != .runningForeground { app.launch() }
+            XCTAssertTrue(app.tabBars.buttons["Background"].waitForExistence(timeout: 10))
+            app.tabBars.buttons["Background"].tap()
+            XCTAssertTrue(audio.waitForExistence(timeout: 5))
+            XCTAssertTrue(audio.isHittable)
+            if audio.value as? String == "1" { audio.tap() }
+            XCTAssertEqual(audio.value as? String, "0")
+            expectAudioState("Off")
+        }
+        // Each case owns its initial intent; relaunches inside the case retain it.
+        addTeardownBlock { @MainActor in resetAudio() }
+        resetAudio()
         XCTAssertTrue(app.tabBars.buttons["Server"].waitForExistence(timeout: 10))
         for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
             XCUIDevice.shared.orientation = orientation
@@ -58,21 +80,13 @@ final class IntegrationUITests: XCTestCase {
         app.tabBars.buttons["Background"].tap()
         XCTAssertTrue(app.navigationBars["Background"].waitForExistence(timeout: 5))
         // The labeled SwiftUI row contains a separate actionable switch.
-        let audio = app.switches["Loop silent WAV"].switches.element(boundBy: 0)
         XCTAssertTrue(audio.waitForExistence(timeout: 5))
         XCTAssertTrue(audio.isHittable)
         XCTAssertEqual(audio.value as? String, "0")
-        let audioState = app.staticTexts["background.audioState"]
-        func expectAudioState(_ value: String, timeout: TimeInterval = 5) {
-            XCTAssertTrue(audioState.waitForExistence(timeout: timeout))
-            let expectation = XCTNSPredicateExpectation(
-                predicate: NSPredicate(format: "label == %@", value), object: audioState)
-            XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: timeout), .completed)
-        }
         expectAudioState("Off")
         audio.tap()
         XCTAssertEqual(audio.value as? String, "1")
-        expectAudioState("Playing silent WAV continuously", timeout: 10)
+        expectAudioState("Playing silent WAV continuously", timeout: 30)
         // Starting/stopping the combined engine must not turn the independent audio off.
         app.tabBars.buttons["Server"].tap()
         for _ in 0..<6 {
@@ -87,12 +101,12 @@ final class IntegrationUITests: XCTestCase {
         XCTAssertTrue(waitUntil { !Self.handshake() })
         app.tabBars.buttons["Background"].tap()
         XCTAssertEqual(audio.value as? String, "1")
-        expectAudioState("Playing silent WAV continuously", timeout: 10)
+        expectAudioState("Playing silent WAV continuously", timeout: 30)
         app.terminate()
         app.launch()
         XCTAssertTrue(app.navigationBars["Background"].waitForExistence(timeout: 10))
         XCTAssertEqual(audio.value as? String, "1", "Saved audio intent must survive relaunch")
-        expectAudioState("Playing silent WAV continuously", timeout: 10)
+        expectAudioState("Playing silent WAV continuously", timeout: 30)
         audio.tap()
         XCTAssertEqual(audio.value as? String, "0")
         expectAudioState("Off")

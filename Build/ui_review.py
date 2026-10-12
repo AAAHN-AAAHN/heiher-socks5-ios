@@ -63,14 +63,34 @@ def main():
         run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'ready.log', timeout=120)
         # Keep test failures, runtime warnings and explicit attachments; avoid the
         # optional bulk system-diagnostic collection that stalled after runner exit.
-        run(['xcodebuild', 'test', '-project', app / 'Socks5.xcodeproj', '-scheme', 'StatisticsUIAudit',
-             '-destination', 'platform=iOS Simulator,id=' + identifier, '-parallel-testing-enabled', 'NO',
-             '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
-             '-collect-test-diagnostics', 'never',
-             'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES',
-             'MARKETING_VERSION=3.0.0', 'CURRENT_PROJECT_VERSION=1'], 'ui-test.log', timeout=900)
-        run(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', OUT / 'UI.xcresult'], 'test-summary.json')
-        run(['xcrun', 'xcresulttool', 'get', 'object', '--legacy', '--format', 'json', '--path', OUT / 'UI.xcresult'], 'xcresult.json')
+        test_failure = None
+        try:
+            run(['xcodebuild', 'test', '-project', app / 'Socks5.xcodeproj', '-scheme', 'StatisticsUIAudit',
+                 '-destination', 'platform=iOS Simulator,id=' + identifier, '-parallel-testing-enabled', 'NO',
+                 '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
+                 '-collect-test-diagnostics', 'never',
+                 'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES',
+                 'MARKETING_VERSION=3.0.0', 'CURRENT_PROJECT_VERSION=1'], 'ui-test.log', timeout=900)
+        except Exception as exc:
+            test_failure = exc
+        diagnostic_failure = None
+        for command, log in [
+            (['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', OUT / 'UI.xcresult'],
+             'test-summary.json'),
+            (['xcrun', 'xcresulttool', 'get', 'object', '--legacy', '--format', 'json', '--path', OUT / 'UI.xcresult'],
+             'xcresult.json'),
+            (['xcrun', 'xcresulttool', 'export', 'attachments', '--path', OUT / 'UI.xcresult',
+              '--output-path', OUT / 'attachments'], 'attachments.log'),
+        ]:
+            try:
+                run(command, log)
+            except Exception as exc:
+                if diagnostic_failure is None:
+                    diagnostic_failure = exc
+        if test_failure is not None:
+            raise test_failure
+        if diagnostic_failure is not None:
+            raise diagnostic_failure
         console = (OUT / 'ui-test.log').read_text()
         result_text = (OUT / 'xcresult.json').read_text()
         for text in (console, result_text):
@@ -82,8 +102,6 @@ def main():
         (OUT / 'advisory-check.txt').write_text('PASS: targeted synchronous main-thread audio advisory absent from console and xcresult.\n')
         binary = WORK / 'DerivedData/Build/Products/Debug-iphonesimulator/Socks5.app/Socks5'
         (OUT / 'app-sha256.txt').write_text(hashlib.sha256(binary.read_bytes()).hexdigest() + '\n')
-        run(['xcrun', 'xcresulttool', 'export', 'attachments', '--path', OUT / 'UI.xcresult',
-             '--output-path', OUT / 'attachments'], 'attachments.log')
         container = Path(output('xcrun', 'simctl', 'get_app_container', identifier, 'hev.Socks5', 'data'))
         settings = json.loads((container / 'Library/Application Support/Socks5/settings.json').read_bytes())
         assert settings['serverRunning'] is False

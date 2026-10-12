@@ -38,7 +38,7 @@ Statistics owns all three meter patches: socket-result observation in `third-par
 
 Each worker updates private 64-bit counters and publishes C11 32-bit atomic words. Readers use sequence/epoch checks and retry until each worker part is coherent, then merge by IP and Total. Ordinary I/O updates have no global counter lock or shared Total update; identity registration and worker reuse still coordinate shared metadata. Separate Total and row calls are not one simultaneous instant. The endpoint API copies packed rows into caller-owned memory; stable IDs are independent of row positions.
 
-The UI test target combines integrated behavior, Background audio and the exact Statistics traffic test. Temporary test code is excluded from the application target; class names prevent test symbol collisions without changing assertions.
+The UI test target combines integrated behavior, Background audio and the exact Statistics traffic test. Temporary test code is excluded from the application target; class names prevent test symbol collisions without changing assertions. Each audio case establishes verified Off intent through normal UI setup and XCTest teardown, preserving intent during its relaunch scenarios. Exact Playing predicates use a 30-second wait after element lookup; Off checks retain their 5-second waits. The harness attempts result and attachment export even when xcodebuild fails and preserves that failure.
 
 ## Design rationale and resource cost
 
