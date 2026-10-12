@@ -34,13 +34,13 @@ final class AsyncAudioUITests: XCTestCase {
         for _ in 0..<3 {
             audio.tap()
             XCTAssertEqual(audio.value as? String, "1")
-            expectAudioState("Playing silent WAV continuously", timeout: 30)
+            expectAudioState("Playing silent WAV continuously", timeout: 10)
             audio.tap()
             XCTAssertEqual(audio.value as? String, "0")
             expectAudioState("Off")
         }
         audio.tap()
-        expectAudioState("Playing silent WAV continuously", timeout: 30)
+        expectAudioState("Playing silent WAV continuously", timeout: 10)
         // The old generic Off selector can match Location while audio is Playing.
         XCTAssertTrue(app.staticTexts["Off"].firstMatch.exists)
         XCTAssertNotEqual(audioState.label, "Off")
@@ -52,7 +52,7 @@ final class AsyncAudioUITests: XCTestCase {
         app.launch()
         app.tabBars.buttons["Background"].tap()
         XCTAssertEqual(audio.value as? String, "1")
-        expectAudioState("Playing silent WAV continuously", timeout: 30)
+        expectAudioState("Playing silent WAV continuously", timeout: 10)
         audio.tap()
         XCTAssertEqual(audio.value as? String, "0")
         // Rapid user intent changes must settle at the final explicit Off.
