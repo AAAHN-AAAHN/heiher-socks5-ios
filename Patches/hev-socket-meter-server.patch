@@ -94,7 +94,7 @@ index 37a3c8ce0db9f734f07bfc57b3b59df8559562e6..5c155d8c3f47ff210b7762bbb571d458
  }
  #endif
 diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
-index 5ec8473fd14b98efdc21a52f40fb1a92d1922fa1..bb6b8cc474a486462b09ff422e79b79e0a8d4261 100644
+index eee416859c7769f8d1c8dc5810c5d2a7877f18cb..1780cea8a59e838005d5230e2540ddcac6d0eb29 100644
 --- a/src/hev-socks5-proxy.c
 +++ b/src/hev-socks5-proxy.c
 @@ -20,6 +20,7 @@
