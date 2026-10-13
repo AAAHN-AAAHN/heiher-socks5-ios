@@ -17,7 +17,7 @@ if not __debug__:
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = json.loads((ROOT / 'Build/features.json').read_bytes())
 BASE = CONFIG['base_commit']
-assert BASE == 'ed0871b303813884fd17541c12a270c3f198b8d7'
+assert BASE == '6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7'
 
 
 def git(*args):
