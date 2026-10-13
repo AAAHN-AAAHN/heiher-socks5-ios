@@ -10,6 +10,8 @@ Main contains the upstream Socks5 application and Xcode project without applicat
 
 The upstream application exposes the server through its existing interface. The native engine supports IPv4/IPv6, SOCKS CONNECT, UDP ASSOCIATE, the supported UDP-over-TCP command and username/password authentication. The exact feature set and app resources for a checkout are declared in `Build/features.json`; the baseline declares no feature patches.
 
+On Linux with UDP segmentation support, the upstream engine can group equal-sized relay datagrams; truncated receives are not forwarded. Empty circular buffers reset their read position before subsequent writes.
+
 Domain destinations use the configured address family. UDP forwarding accepts empty payloads and continues past individual resolution or send failures; cancellation and association setup failures remain terminal.
 
 The feature relationships are one-way. UDP compatibility supplies transport behavior to traffic statistics. Server control supplies configuration and lifecycle management to settings persistence. Background services and the app icon are independent feature owners. The integrated release combines all six owners through its root view and ordered native-patch list.
