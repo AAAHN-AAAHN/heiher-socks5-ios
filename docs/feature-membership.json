@@ -6,7 +6,7 @@
     "feature/server-control": "76ea24405ab748e35652f82ea04cc201b22253de",
     "feature/settings-persistence": "0ff60ead99afb8f751dbf697f46048724fa18563",
     "feature/udp-compat": "c286fbb0871490fec03f0f22b74fcd605fc97394",
-    "feature/traffic-statistics": "8ba7c5fedbbc230bfa0bd30355f9f25f9a22dc20"
+    "feature/traffic-statistics": "d628b6453b32d33720bf75c6909d3265345e2d6f"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -464,8 +464,8 @@
       "sha256": "80e353fe0b88f3deffe0f3f9f48b62d59905fd7763f046aec41e69fcf46f26a2"
     },
     "Tests/SocketIO/socket_observer.c": {
-      "commit": "5fb84bb5877a0eb82a521f6b530ef40c4ec15ec1",
-      "sha256": "5609c93329da9468bc54684d9e69e97283e4984cb456d366e458d4fee0c69f86"
+      "commit": "2aa6d33fb57c3f2162fe2bab7ea3c5dbf923d40d",
+      "sha256": "af33a850c9051f7d7896ba976e2131f893d59992f9862cb6b27efaf88f1773d9"
     },
     "Tests/SocketIO/stream_matrix.c": {
       "commit": "36e7bca37ec8288488431a95581aded6c467d94e",
