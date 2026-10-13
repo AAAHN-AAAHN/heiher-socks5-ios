@@ -204,6 +204,10 @@ workspace_boundaries (void)
                   _Alignof (struct sockaddr_in6) },
                 { workspace.reply_addresses, n * 19, 1 },
                 { workspace.prefixes, n * 3, 1 },
+#if defined(__linux__) && defined(UDP_SEGMENT)
+                { workspace.controls, n * sizeof (*workspace.controls),
+                  _Alignof (UDPControl) },
+#endif
             };
             assert (sizeof (UDPPrefix) == 3 &&
                     (!managed || (void *)slots == base));
