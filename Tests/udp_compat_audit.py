@@ -52,6 +52,34 @@ def build():
     run(['make', '-j3', 'static', 'exec'], 'native-build.log', CORE)
 
 
+
+def prior_three_patch_server():
+    # Preserve the exact historical truncation oracle. New upstream deliberately
+    # drops MSG_TRUNC, so rebuilding the old control on new sources is invalid.
+    reference = 'c286fbb0871490fec03f0f22b74fcd605fc97394'
+    config = json.loads(subprocess.check_output(
+        ['git', 'show', reference + ':Build/features.json'], cwd=ROOT, text=True))
+    core = CORE.parent / 'prior-core'
+    for path, sha in config['sources'].items():
+        run(['git', 'worktree', 'add', '--detach', core / path, sha],
+            'prior-source.log', CORE / path)
+    for item in config['patches'][:3]:
+        data = subprocess.check_output(
+            ['git', 'show', reference + ':Patches/' + item['file']], cwd=ROOT)
+        source = OUT / ('prior-' + item['file'])
+        source.write_bytes(data)
+        for options in (['--check'], []):
+            run(['git', 'apply', '--index', '--whitespace=error-all', *options, source],
+                'prior-patches.log', core / item['repository'])
+    run(['make', '-j3', 'static', 'exec'], 'prior-build.log', core)
+    binary = OUT / 'three-patch-server'
+    shutil.copy2(core / 'bin/hev-socks5-server', binary)
+    (OUT / 'prior-input.json').write_text(json.dumps(
+        {'reference': reference, 'sources': config['sources'],
+         'patches': config['patches'][:3]}, indent=2) + '\n')
+    return binary
+
+
 def main():
     # A rejected or failed retry must not reuse an earlier success marker.
     (OUT / 'SUCCESS.txt').unlink(missing_ok=True)
@@ -114,8 +142,7 @@ def main():
     build()
     run([sys.executable, 'Tests/udp_peer_regression.py', CORE / 'bin/hev-socks5-server',
          '--output', OUT / 'peer-filtered.json'], 'peer-filtered.log', timeout=45)
-    old_binary = OUT / 'three-patch-server'
-    shutil.copy2(CORE / 'bin/hev-socks5-server', old_binary)
+    old_binary = prior_three_patch_server()
     if sys.platform == 'linux':
         run([sys.executable, 'Tests/udp_worker_resources.py', old_binary,
              '--old-control', '--output', OUT / 'worker-resource-old-control.json'],
