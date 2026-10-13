@@ -9,7 +9,7 @@ import subprocess
 import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE = 'ed0871b303813884fd17541c12a270c3f198b8d7'
+BASE = '6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7'
 INPUT = 'f88e8c8946b095c4d5551d413dee3b4a60943714'
 CATALOG = 'Socks5/Assets.xcassets/AppIcon.appiconset'
 IMAGE_HASH = '4a2f2a9384e8b6db351a9284232db56e719377e60f17123e4a6992cee1799cc2'
