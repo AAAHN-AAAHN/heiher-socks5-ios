@@ -5,8 +5,8 @@
     "feature/background": "618b3d2b413937aaad7373ee2af9e693ec81b84a",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
     "feature/settings-persistence": "a22bc4579a82e46b9e20389182bc1e63e6deedbf",
-    "feature/udp-compat": "7e05bf8439335b0ca7385eb1e5c0c2233520ce0e",
-    "feature/traffic-statistics": "5b4bb6ea5d5f981cfaf50e30141955e562e179d3"
+    "feature/udp-compat": "11d852767a033ad924d4d2c76374688933b5cf7d",
+    "feature/traffic-statistics": "31a5d78aedc38e6f59d9ad4784d9e4f107e3bd16"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -19,8 +19,8 @@
       "path": ".github/workflows/udp-compat-audit.yml"
     },
     "Build/inherited-workflows/traffic-statistics-verify-build.yml": {
-      "commit": "5b4bb6ea5d5f981cfaf50e30141955e562e179d3",
-      "sha256": "5af97500909a9047da4b4f0910a041998d4d2f923ddfa8314c8d8949a453c88d",
+      "commit": "31a5d78aedc38e6f59d9ad4784d9e4f107e3bd16",
+      "sha256": "0973b16cec77f998c4a15f3766b3195015e73e1b176b258eae91a40a58860c21",
       "path": ".github/workflows/verify-build.yml"
     },
     "Patches/hev-netaddr-result.patch": {
@@ -496,8 +496,8 @@
       "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "5b4bb6ea5d5f981cfaf50e30141955e562e179d3",
-      "sha256": "995ece09aca20639ff09929b5f569bc89d62cde8e205f2a0f62f08fdf08fca53"
+      "commit": "31a5d78aedc38e6f59d9ad4784d9e4f107e3bd16",
+      "sha256": "fd4869f3e9d72b49466f063c149c60a26e4e7b75c54ff1f623198a3afe262a83"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
@@ -568,8 +568,8 @@
       "sha256": "6f80bb0d9832068ac64adedd13872f4931d8a719c3b040606475e990519f80d5"
     },
     "Tests/udp_compat_audit.py": {
-      "commit": "7e05bf8439335b0ca7385eb1e5c0c2233520ce0e",
-      "sha256": "95cbe1a236461f53069f428d2ba8f3f7f2e5039ebfb501a84a28de13be677e6a"
+      "commit": "11d852767a033ad924d4d2c76374688933b5cf7d",
+      "sha256": "6b6ea887827f61ad17e40c2881e162d1497acb31c5232343690efeef4401ebf8"
     },
     "Tests/udp_header_regression.py": {
       "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
