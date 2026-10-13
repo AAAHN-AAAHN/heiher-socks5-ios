@@ -1,7 +1,7 @@
 {
-  "base_commit": "ed0871b303813884fd17541c12a270c3f198b8d7",
+  "base_commit": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7",
   "branches": {
-    "feature/server-control": "76ea24405ab748e35652f82ea04cc201b22253de"
+    "feature/server-control": "599f984a9b6d13d627dd73266b35bf2bea5b08ba"
   },
   "sources": {
     "Socks5/Server/ServerSettings.swift": {
