@@ -56,7 +56,7 @@ index ca122f8d009a5aef033d11a08226e3944bd9a262..3ba5c7fc03ddb281bbce729d17351784
          name[addr->domain.len] = '\0';
          memcpy (&port, addr->domain.addr + addr->domain.len, 2);
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index 5dcbea806dcda33c2974b72532e798ea3325e4a9..6127a5307d39bc2b8a41cd641da8e9853529cf41 100644
+index 723987c69955d3a3543d32e98027efce3ae40772..3445c57b22f04b0dfc7be9e149e395136f74d8e2 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -569,8 +569,8 @@ hev_socks5_udp_sendmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
@@ -70,12 +70,13 @@ index 5dcbea806dcda33c2974b72532e798ea3325e4a9..6127a5307d39bc2b8a41cd641da8e985
              expected > (size_t)SSIZE_MAX - (3 + addrlen + msgv[i].len)) {
              LOG_D ("%p socks5 udp addr", self);
              return -1;
-@@ -628,7 +628,7 @@ hev_socks5_udp_sendmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -628,7 +628,8 @@ hev_socks5_udp_sendmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          int addrlen;
  
          addrlen = hev_socks5_addr_len (msgv[i].addr);
--        if (addrlen <= 0) {
-+        if (addrlen <= 0 || hev_socks5_addr_name_invalid (msgv[i].addr)) {
+-        if (addrlen <= 0 || msgv[i].len > (size_t)SSIZE_MAX - (3 + addrlen)) {
++        if (addrlen <= 0 || hev_socks5_addr_name_invalid (msgv[i].addr) ||
++            msgv[i].len > (size_t)SSIZE_MAX - (3 + addrlen)) {
              LOG_D ("%p socks5 udp addr", self);
              return -1;
          }

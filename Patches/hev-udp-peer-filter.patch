@@ -1,5 +1,5 @@
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index 328f2b69526ca4f3f82e385ef02c82ddccbc17fb..125a1c575be6ed228bdfedb31223e1598ecff430 100644
+index d1e3e74205e86fa2f449678568f6bce21d3cc793..2903c747dec9aed5073d595f9abce2fe4872afbe 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -256,19 +256,21 @@ static int
@@ -80,7 +80,7 @@ index 328f2b69526ca4f3f82e385ef02c82ddccbc17fb..125a1c575be6ed228bdfedb31223e159
 +        }
 +
          msgv[i].len = mvec[i].msg_len;
-         if (msgv[i].len < 4) {
+         if ((msgv[i].len < 4) || (mvec[i].msg_hdr.msg_flags & MSG_TRUNC)) {
              msgv[i].addr = NULL;
              msgv[i].len = 0;
 +            msgv[count++] = msgv[i];

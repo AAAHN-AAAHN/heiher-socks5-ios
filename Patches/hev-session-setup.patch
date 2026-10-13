@@ -703,7 +703,7 @@ index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..eee416859c7769f8d1c8dc5810c5d2a7
 +    hev_socks5_proxy_stop_inner (1);
 +}
 diff --git a/Makefile b/Makefile
-index 3d5f50d416f37569bae5123deba9faa0349ec965..1fa7671c12c5249fda0a992a2399b0fb2b0e9d0f 100644
+index 7c03e3ed701b80ae97d18ef1bf607d2f477e8360..534d4966c1a84ca70cae3ff2f1336800741877b3 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -32,7 +32,7 @@ $(SHARED_TARGET) : LDFLAGS+=-shared -pthread
