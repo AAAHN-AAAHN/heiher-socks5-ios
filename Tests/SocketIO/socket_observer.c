@@ -137,6 +137,7 @@ main (void)
                 assert (n == (stop ? 4 : 7) && accounted == (size_t)n &&
                         yields == 1 && callbacks == (stop ? 1 : 2));
                 assert (writes == (wr ? callbacks : 0));
+                assert (errno == EAGAIN); /* Do not expose observer ERANGE. */
                 cases++;
             }
     reset (3, 0, 0, 0);
