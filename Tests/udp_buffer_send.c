@@ -21,6 +21,7 @@ int set_fixture (int fd, int level, int option, const void *value,
 #include <stdio.h>
 
 static int script[8], script_count, calls, get_calls, sets, capacity, refuse;
+static int cancel;
 static unsigned int expected_offset[8];
 static struct mmsghdr *origin;
 
@@ -30,7 +31,6 @@ send_fixture (int fd, void *messages, unsigned int count, int flags,
 {
     int result;
     (void)yielder;
-    (void)data;
     assert (fd == 19 && count && flags == MSG_WAITALL && calls < script_count);
     assert ((struct mmsghdr *)messages - origin == expected_offset[calls]);
     result = script[calls++];
@@ -42,6 +42,13 @@ send_fixture (int fd, void *messages, unsigned int count, int flags,
     for (int i = 0; i < result; i++) {
         struct mmsghdr *m = (struct mmsghdr *)messages + i;
         m->msg_len = m->msg_hdr.msg_iov[0].iov_len;
+    }
+    if (cancel && calls == 1) {
+        if (cancel == 2)
+            HEV_SOCKS5 (data)->timeout = 0;
+        /* Another task may leave this error during the wait. */
+        errno = EMSGSIZE;
+        return result ? result : -2;
     }
     if ((unsigned int)result < count)
         errno = EMSGSIZE;
@@ -77,7 +84,7 @@ static void
 reset (struct mmsghdr *messages)
 {
     origin = messages;
-    calls = get_calls = sets = refuse = 0;
+    calls = get_calls = sets = refuse = cancel = 0;
     capacity = 9216;
     memset (expected_offset, 0, sizeof (expected_offset));
     for (int i = 0; i < 2; i++)
@@ -104,6 +111,25 @@ main (void)
     script[0] = -EIO;
     assert (udp_sendmmsg (&self, 19, messages, 2) == -1);
     assert (calls == 1 && !get_calls && !sets);
+    /* Cancellation and a terminal successful prefix forbid even a size probe. */
+    for (int outcome = 0; outcome < 3; outcome++) {
+        int prefix = outcome == 2;
+        struct mmsghdr *first = prefix ? messages : &messages[1];
+        reset (messages);
+        self.timeout = 60000;
+        cancel = outcome ? 2 : 1;
+        origin = first;
+        script[0] = prefix;
+        script[1] = 1;
+        expected_offset[1] = prefix;
+        script_count = 2;
+        assert (udp_sendmmsg (&self, 19, first, prefix ? 2 : 1) ==
+                (prefix ? 1 : -2));
+        assert (calls == 1 && !get_calls && !sets);
+        assert (!prefix || messages[0].msg_len == 7);
+        assert (messages[1].msg_len == 0xdead);
+    }
+    self.timeout = 60000;
 #if defined(__APPLE__)
     reset (messages);
     script[0] = 1;
