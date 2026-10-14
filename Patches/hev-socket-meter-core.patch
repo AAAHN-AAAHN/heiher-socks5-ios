@@ -374,7 +374,7 @@ index c947402b4dcf215fa00ed25b46b069ddb3542e63..813ee773f1a1dbdfe9646b701f641565
      return 0;
  }
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index 3445c57b22f04b0dfc7be9e149e395136f74d8e2..e020418dd841f3f609274b12c3c9ec865f3d26bb 100644
+index 7b7d8ebbaba3d2c0ed39964b8c855a9192711979..2ec920a657c92275f70cb4a245862698077224b9 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -26,6 +26,7 @@
