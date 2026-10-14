@@ -56,7 +56,7 @@ index ca122f8d009a5aef033d11a08226e3944bd9a262..3ba5c7fc03ddb281bbce729d17351784
          name[addr->domain.len] = '\0';
          memcpy (&port, addr->domain.addr + addr->domain.len, 2);
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index 723987c69955d3a3543d32e98027efce3ae40772..3445c57b22f04b0dfc7be9e149e395136f74d8e2 100644
+index 24056a568bb66a09a2e887bef1d8bb5c7784d17f..7b7d8ebbaba3d2c0ed39964b8c855a9192711979 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -569,8 +569,8 @@ hev_socks5_udp_sendmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,

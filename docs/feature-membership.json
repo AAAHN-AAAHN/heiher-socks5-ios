@@ -5,8 +5,8 @@
     "feature/background": "618b3d2b413937aaad7373ee2af9e693ec81b84a",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
     "feature/settings-persistence": "a22bc4579a82e46b9e20389182bc1e63e6deedbf",
-    "feature/udp-compat": "11d852767a033ad924d4d2c76374688933b5cf7d",
-    "feature/traffic-statistics": "31a5d78aedc38e6f59d9ad4784d9e4f107e3bd16"
+    "feature/udp-compat": "55b4e2e9c683416e9f4523bbff02577e2cca2cfe",
+    "feature/traffic-statistics": "54c5b972e27996afdcd8ded87ec1123e90cf52da"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -19,8 +19,8 @@
       "path": ".github/workflows/udp-compat-audit.yml"
     },
     "Build/inherited-workflows/traffic-statistics-verify-build.yml": {
-      "commit": "31a5d78aedc38e6f59d9ad4784d9e4f107e3bd16",
-      "sha256": "0973b16cec77f998c4a15f3766b3195015e73e1b176b258eae91a40a58860c21",
+      "commit": "54c5b972e27996afdcd8ded87ec1123e90cf52da",
+      "sha256": "6364d52c5ab8d34fd58cf9c4c2df104b19ab85ec14fbd1ccc80bb4d703667f49",
       "path": ".github/workflows/verify-build.yml"
     },
     "Patches/hev-netaddr-result.patch": {
@@ -32,8 +32,8 @@
       "sha256": "77b46a0a4a58d1fdb219d11cde4a99a085799ccf7027e7309ee42ba53eb314db"
     },
     "Patches/hev-socket-meter-core.patch": {
-      "commit": "5b4bb6ea5d5f981cfaf50e30141955e562e179d3",
-      "sha256": "b665f70ef3f00d501c119243dcac53f8377beddb3d3f41a56a1bbd7ac4b28b76"
+      "commit": "54c5b972e27996afdcd8ded87ec1123e90cf52da",
+      "sha256": "9409fdd7b044d7e424ca74ba8dfa2bccaa2e25859da51535e6954157d1887c85"
     },
     "Patches/hev-socket-meter-server.patch": {
       "commit": "8ba7c5fedbbc230bfa0bd30355f9f25f9a22dc20",
@@ -44,8 +44,8 @@
       "sha256": "ae628fce483994c79d7ad0d82e9fbb980012c9d9900f1aaaddceaa7e38be88e0"
     },
     "Patches/hev-udp-dynamic-buffer.patch": {
-      "commit": "7e05bf8439335b0ca7385eb1e5c0c2233520ce0e",
-      "sha256": "8c8123d6f8deae7abf11090acf604d5ca38947fd4ebc2c032221020f9368237f"
+      "commit": "55b4e2e9c683416e9f4523bbff02577e2cca2cfe",
+      "sha256": "0278abc253605a8232fb079904a12c6bcbd862e2a606a8846bf50fa834a6ad4e"
     },
     "Patches/hev-udp-peer-filter.patch": {
       "commit": "7e05bf8439335b0ca7385eb1e5c0c2233520ce0e",
@@ -476,8 +476,8 @@
       "sha256": "3397126eacbaaffba105caf47e4ec238086436537b37ca42998f2fa86d39ed28"
     },
     "Tests/SocketIO/worker-native.json": {
-      "commit": "5b4bb6ea5d5f981cfaf50e30141955e562e179d3",
-      "sha256": "93230c457566c5e3bf566e7793dab98c10c5dd4ee528128fa1fd0b0c579daf65"
+      "commit": "54c5b972e27996afdcd8ded87ec1123e90cf52da",
+      "sha256": "b05e30d79a8829be9c0e15d87f9c59deb5150efba93eee2ad140744cae1a679a"
     },
     "Tests/SocketIO/worker_boundaries.c": {
       "commit": "8aa502780f9349bbc340fc43b84749d5cb2a1b1a",
@@ -496,8 +496,8 @@
       "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "31a5d78aedc38e6f59d9ad4784d9e4f107e3bd16",
-      "sha256": "fd4869f3e9d72b49466f063c149c60a26e4e7b75c54ff1f623198a3afe262a83"
+      "commit": "54c5b972e27996afdcd8ded87ec1123e90cf52da",
+      "sha256": "a61818309792ad35a1c6ec7c114959ef8e0bdb770438f074a6686272d960de8a"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
@@ -556,8 +556,8 @@
       "sha256": "f8502cb333641ba69e42b7023baeb20ab0921c0b1cfa3bf85f049c885b39149f"
     },
     "Tests/udp_buffer_send.c": {
-      "commit": "105d95770e18e13a491b23e0fb925f22843aa395",
-      "sha256": "77817bb3e186927152c4d00c5441d2fc542728c04be942399a1693c2a62f30c7"
+      "commit": "55b4e2e9c683416e9f4523bbff02577e2cca2cfe",
+      "sha256": "7c6c4cafa46333d909a10b9d69580ecfe142b35828b29f96c18d1ffec87d1f19"
     },
     "Tests/udp_buffer_timer.c": {
       "commit": "105d95770e18e13a491b23e0fb925f22843aa395",
@@ -608,8 +608,8 @@
       "sha256": "2099dcb40af077b99d937051d9202e04f32ea21d6dfd0a658227af6d08ac34fd"
     },
     "Patches/hev-udp-domain.patch": {
-      "commit": "7e05bf8439335b0ca7385eb1e5c0c2233520ce0e",
-      "sha256": "ed14f90609617802f11d327a4a1b80485c4a1934c7db3b5aa755c835382529eb"
+      "commit": "55b4e2e9c683416e9f4523bbff02577e2cca2cfe",
+      "sha256": "53f8b8e2aaddde0b8b789d40342c034c2d6f7173d7c6dfc90eee410ae191a861"
     },
     "Patches/hev-session-setup.patch": {
       "commit": "7e05bf8439335b0ca7385eb1e5c0c2233520ce0e",
