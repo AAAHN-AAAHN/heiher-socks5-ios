@@ -5,8 +5,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <hev-task.h>
+#include <hev-task-io.h>
+#include <hev-task-io-socket.h>
 
 static int fail_allocation, short_query, query_error;
+static int query_interrupts, receive_interrupts, control_interrupts;
+static int receive_cancel;
 void *io_malloc (size_t size);
 void io_free (void *ptr);
 ssize_t io_recv (int fd, void *buf, size_t len, int flags);
@@ -14,6 +19,10 @@ ssize_t io_recvmsg (int fd, struct msghdr *message, int flags);
 int io_getsockopt (int fd, int level, int option, void *value,
                    socklen_t *length);
 
+int io_recvmmsg (int fd, void *messages, unsigned int count, int flags,
+                 HevTaskIOYielder yielder, void *data);
+
+#define hev_task_io_socket_recvmmsg io_recvmmsg
 #define hev_malloc io_malloc
 #define hev_free io_free
 #define recv io_recv
@@ -25,6 +34,7 @@ int io_getsockopt (int fd, int level, int option, void *value,
 #undef recv
 #undef recvmsg
 #undef getsockopt
+#undef hev_task_io_socket_recvmmsg
 
 #include <stdio.h>
 
@@ -42,11 +52,38 @@ io_free (void *ptr)
     free (ptr);
 }
 
+static int
+interrupt_once (int *pending)
+{
+    if (!*pending)
+        return 0;
+    --*pending;
+    errno = EINTR;
+    return 1;
+}
+
+int
+io_recvmmsg (int fd, void *messages, unsigned int count, int flags,
+             HevTaskIOYielder yielder, void *data)
+{
+    if (receive_cancel) {
+        receive_cancel = 0;
+        errno = EINTR;
+        return -2;
+    }
+    if (interrupt_once (&receive_interrupts))
+        return -1;
+    return hev_task_io_socket_recvmmsg (fd, messages, count, flags, yielder,
+                                        data);
+}
+
 ssize_t
 io_recv (int fd, void *buf, size_t len, int flags)
 {
 #if defined(__linux__)
     if (flags & MSG_PEEK) {
+        if (interrupt_once (&query_interrupts))
+            return -1;
         if (query_error) {
             errno = query_error;
             return -1;
@@ -55,6 +92,8 @@ io_recv (int fd, void *buf, size_t len, int flags)
             return 1;
     }
 #endif
+    if (!flags && len == 1 && interrupt_once (&control_interrupts))
+        return -1;
     return recv (fd, buf, len, flags);
 }
 
@@ -62,6 +101,8 @@ ssize_t
 io_recvmsg (int fd, struct msghdr *message, int flags)
 {
     if (flags & MSG_PEEK) {
+        if (interrupt_once (&query_interrupts))
+            return -1;
         if (query_error) {
             errno = query_error;
             return -1;
@@ -78,6 +119,8 @@ int
 io_getsockopt (int fd, int level, int option, void *value, socklen_t *length)
 {
 #if defined(__APPLE__)
+    if (option == SO_NREAD && interrupt_once (&query_interrupts))
+        return -1;
     if (query_error && option == SO_NREAD) {
         errno = query_error;
         return -1;
@@ -227,7 +270,7 @@ family_test (int family)
     /* A portable size probe may grow storage before returning its length.
      * Resource failure there is terminal too; ordinary query errors retain
      * their existing state. Every rejected query leaves the datagram intact. */
-    const int query_errors[] = { ENOMEM, EOVERFLOW, EAGAIN, EINTR };
+    const int query_errors[] = { ENOMEM, EOVERFLOW, EAGAIN };
     for (size_t i = 0; i < sizeof (query_errors) / sizeof (*query_errors);
          i++) {
         self.timeout = 60000;
@@ -245,6 +288,31 @@ family_test (int family)
         assert (recv (input, received, sizeof (received), 0) == 2048);
         assert (!memcmp (received, payload, 2048));
     }
+    /* No-transfer interruption is retried before yielding or disabling a
+     * direction. The real queued datagram is consumed once, in full. */
+    int *interruptions[] = { &query_interrupts, &receive_interrupts };
+    for (size_t i = 0; i < 2; i++) {
+        self.timeout = 60000;
+        assert (send (output, payload, 2048, 0) == 2048);
+        *interruptions[i] = 3;
+        assert (receive_ready (&self, input, messages, 1, buffers) == 1);
+        assert (!*interruptions[i] && self.timeout == 60000);
+        assert (messages[0].msg_len == 2048);
+        assert (!(messages[0].msg_hdr.msg_flags & MSG_TRUNC));
+        assert (!memcmp (udp_buffer_data (&buffers[0]), payload, 2048));
+        assert (recv (input, received, sizeof (received), 0) == -1 &&
+                errno == EAGAIN);
+        assert (udp_buffer_resize (&buffers[0], UDP_BUF_SIZE) == 0);
+    }
+    self.timeout = 60000;
+    assert (send (output, payload, 7, 0) == 7);
+    wait_readable (input, udp_buffer_now () + 2 * UDP_NSEC_PER_SEC);
+    receive_cancel = 1;
+    assert (udp_buffer_recvmmsg (&self, input, messages, 1, MSG_DONTWAIT,
+                                 buffers) == -2);
+    assert (!receive_cancel);
+    assert (recv (input, received, sizeof (received), 0) == 7);
+    assert (!memcmp (received, payload, 7));
     close (input);
     close (output);
     puts (
@@ -253,9 +321,41 @@ family_test (int family)
             "PASS: actual IPv6 length/consume/empty/mixed queue, truncation and allocation failure");
 }
 
+static void
+control_test (void)
+{
+    int sockets[2];
+    char byte;
+    HevSocks5 self = { .type = HEV_SOCKS5_TYPE_UDP_IN_UDP, .timeout = 60000 };
+    assert (socketpair (AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
+    assert (fcntl (sockets[0], F_SETFL, O_NONBLOCK) == 0);
+    self.fd = sockets[0];
+    control_interrupts = 3;
+    assert (udp_control_check (&self) == 0 && self.timeout == 60000);
+    assert (!control_interrupts);
+    assert (send (sockets[1], "x", 1, 0) == 1);
+    control_interrupts = 3;
+    assert (udp_control_check (&self) == 0 && self.timeout == 60000);
+    assert (!control_interrupts);
+    assert (recv (sockets[0], &byte, 1, 0) == -1 && errno == EAGAIN);
+    assert (shutdown (sockets[1], SHUT_WR) == 0);
+    control_interrupts = 3;
+    assert (udp_control_check (&self) == -1 && self.timeout == 0);
+    assert (!control_interrupts);
+    control_interrupts = 3;
+    assert (task_io_yielder (HEV_TASK_YIELD, &self) == -1);
+    assert (control_interrupts == 3);
+    control_interrupts = 0;
+    close (sockets[0]);
+    close (sockets[1]);
+    puts (
+        "PASS: interrupted control check preserves live/data/EOF and terminal no-I/O boundaries");
+}
+
 int
 main (void)
 {
+    control_test ();
     family_test (AF_INET);
     family_test (AF_INET6);
     return 0;
