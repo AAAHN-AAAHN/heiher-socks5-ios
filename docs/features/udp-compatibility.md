@@ -48,6 +48,8 @@ The constants are `UDP_BUF_SIZE`, `UDP_BUFFER_GROW_STEP`, `UDP_BUFFER_HOLD_SECON
 
 On Linux with UDP segmentation support, runs of equal-length SOCKS datagrams may be submitted as GSO groups. Each group stays within 64 messages and 65,000 bytes; each original datagram remains a separate message on receipt. Successful group counts are translated back into the completed datagram prefix. A rejected group may retry once as ordinary datagrams only when no message succeeded and the association is still active; cancellation and successful prefixes never cause duplicate sends. Unsupported GSO falls back to the existing UDP path. Darwin retains its existing sender.
 
+Common task data-I/O helpers retry only a raw `-1/EINTR` without losing byte or message offsets. This also preserves partially transferred UDP-over-TCP frames and ordinary buffered/splice TCP forwarding across interruptions. No-progress retries add no successful bytes, do not turn `-2` cancellation into a retry, and retain existing EAGAIN waits, EOF and hard-error handling.
+
 ## Implementation and ownership
 
 The Swift application sources remain the upstream versions. The feature's existing `Socks5/Info.plist` and project settings also declare a single application scene and a local-network usage description. One scene keeps the interface aligned with the process-wide native server, and the description explains access by devices on the hotspot or local network. These application configuration declarations are separate from UDP framing, peer checks and buffer management.
@@ -129,6 +131,8 @@ Resource-failure fixtures exercise the actual socket factory, server, splicers a
 `Tests/udp_gso.c` checks real encoder descriptors and ancillary alignment across single, mixed, empty and large payloads, 64-message group boundaries, up to 1,025 datagrams, suspended pointer lifetime, accepted prefixes, errors and cancellation. It scripts only the final socket result and checks worker-local hint isolation. Its optimized task uses the existing 8KiB stack; the sanitizer task uses its separately recorded larger test stack. Statistics supplies an additional real-socket byte-accounting check.
 
 The feature's SDK checks compile the actual C files named by its patches and applicable Swift source for the configured target. They do not constitute a new device installation or an IPA produced by a native-only audit route. The documentation checker validates inherited prose without changing any of these functional test inputs or oracles.
+
+`Tests/udp_socket_interrupt.c` combines the actual task I/O implementations, TCP relay and UDP-over-TCP codec. Controlled raw syscall interruptions exercise preserved prefixes, empty messages, nonblocking EAGAIN, canceled waits and hard errors in native/fallback paths; Linux additionally tests splice. These are deterministic fault-injection checks, not claims of naturally occurring device signals.
 
 ## Operation and limitations
 
