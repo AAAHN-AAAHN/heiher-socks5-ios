@@ -14,7 +14,7 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 SOCKET_BASE = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
-UDP = '5069fdfd6ccb0841c234cfc0482a60e5556d3a4a'
+UDP = '0f380f19b6a5b69476a58fce0d9f59c9b25de729'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 SOCKET_PATCHES = [
     {'file': 'hev-socket-meter-task.patch', 'repository': 'third-part/hev-task-system'},
@@ -26,7 +26,7 @@ UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_
                         'udp_netaddr_errors.c', 'udp_session_setup.c', 'udp_address_conversion.c',
                         'udp_reactor_resources.c', 'udp_worker_failures.c',
                         'udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c',
-                        'udp_signal_lifecycle.c', 'udp_gso.c')
+                        'udp_signal_lifecycle.c', 'udp_gso.c', 'udp_socket_interrupt.c')
 # Keep inherited fixtures' substituted I/O boundaries; real meter tests use no aliases.
 UDP_FIXTURE_INIT = ['-include', str(ROOT / 'Tests/SocketIO/udp_fixture_main.h')]
 UDP_FIXTURE_FLAGS = UDP_FIXTURE_INIT + [
@@ -83,7 +83,7 @@ def check_udp_inheritance():
     for source in ('udp_stream_boundaries.c', 'udp_session_setup.c', 'udp_address_conversion.c',
                    'udp_reactor_resources.c', 'udp_worker_failures.c',
                    'udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c',
-                   'udp_signal_lifecycle.c', 'udp_gso.c'):
+                   'udp_signal_lifecycle.c', 'udp_gso.c', 'udp_socket_interrupt.c'):
         assert source in UDP_COMPOSED_SOURCES, 'Missing composed execution: ' + source
     entries = {}
     for record in git('ls-tree', '-rz', UDP).split(b'\0'):
@@ -231,11 +231,19 @@ def native_checks(mode):
             executable = OUT / ('composed-' + Path(source).stem + '-' + label)
             flags = [] if source in ('udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c',
                                      'udp_signal_lifecycle.c') else UDP_FIXTURE_FLAGS
-            run([*common, *extra, '-Wno-unused-function', *flags, *includes,
-                 ROOT / 'Tests' / source, *libs, '-o', executable],
-                mode + '-' + executable.name + '-build.log')
-            run([executable], mode + '-' + executable.name + '.log', env=env)
-            executable.unlink()
+            variants = [('', flags)]
+            if source == 'udp_socket_interrupt.c':
+                observed = flags + ['-DUDP_IO_OBSERVED']
+                if splice:
+                    observed += ['-DENABLE_IO_SPLICE_SYSCALL']
+                variants = [('', observed), ('-fallback', observed + ['-DFORCE_FALLBACK'])]
+            for suffix, fixture_flags in variants:
+                target = executable.with_name(executable.name + suffix)
+                run([*common, *extra, '-Wno-unused-function', *fixture_flags, *includes,
+                     ROOT / 'Tests' / source, *libs, '-o', target],
+                    mode + '-' + target.name + '-build.log')
+                run([target], mode + '-' + target.name + '.log', env=env)
+                target.unlink()
     if not splice:
         executable = OUT / 'udp-live-retention'
         run([*common, *UDP_FIXTURE_INIT, *includes, 'Tests/udp_buffer_live_hold.c', *libs, '-o', executable],

@@ -745,3 +745,169 @@ index 4d93ba720b0a06209a3a87bbf3fa15b4af74b3b2..326e755fae4472bd38943f28877a164d
      if (rc > 1)
          return;
  
+diff --git a/third-part/hev-task-system/src/lib/io/basic/hev-task-io.c b/third-part/hev-task-system/src/lib/io/basic/hev-task-io.c
+index af36b19f09b82a6a1f2a3ccc7c6938d2761cdaba..b62ade5fc7630cef792dcf1811a73067b3d501ae 100644
+--- a/third-part/hev-task-system/src/lib/io/basic/hev-task-io.c
++++ b/third-part/hev-task-system/src/lib/io/basic/hev-task-io.c
+@@ -130,6 +130,8 @@
+ 
+ retry:
+     s = read (fd, buf, count);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -151,6 +153,8 @@
+ 
+ retry:
+     s = readv (fd, iov, iovcnt);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -172,6 +176,8 @@
+ 
+ retry:
+     s = write (fd, buf, count);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -193,6 +199,8 @@
+ 
+ retry:
+     s = writev (fd, iov, iovcnt);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -255,8 +263,10 @@
+     int res;
+     ssize_t s;
+ 
+-    s = splice (fd_in, NULL, self->fd[1], NULL, self->blen,
+-                SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
++    do {
++        s = splice (fd_in, NULL, self->fd[1], NULL, self->blen,
++                    SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
++    } while (s == -1 && errno == EINTR);
+     if (0 >= s) {
+         if ((0 > s) && (EAGAIN == errno))
+             res = 0;
+@@ -268,8 +278,10 @@
+     }
+ 
+     if (self->wlen) {
+-        s = splice (self->fd[0], NULL, fd_out, NULL, self->blen,
+-                    SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
++        do {
++            s = splice (self->fd[0], NULL, fd_out, NULL, self->blen,
++                        SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
++        } while (s == -1 && errno == EINTR);
+         if (0 >= s) {
+             if ((0 > s) && (EAGAIN == errno))
+                 res = 0;
+@@ -313,7 +325,10 @@
+ 
+     iovc = hev_circular_buffer_writing (self->buf, iov);
+     if (iovc) {
+-        ssize_t s = readv (fd_in, iov, iovc);
++        ssize_t s;
++        do {
++            s = readv (fd_in, iov, iovc);
++        } while (s == -1 && errno == EINTR);
+         if (0 >= s) {
+             if ((0 > s) && (EAGAIN == errno))
+                 res = 0;
+@@ -326,7 +341,10 @@
+ 
+     iovc = hev_circular_buffer_reading (self->buf, iov);
+     if (iovc) {
+-        ssize_t s = writev (fd_out, iov, iovc);
++        ssize_t s;
++        do {
++            s = writev (fd_out, iov, iovc);
++        } while (s == -1 && errno == EINTR);
+         if (0 >= s) {
+             if ((0 > s) && (EAGAIN == errno))
+                 res = 0;
+diff --git a/third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.c b/third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.c
+index f6897cc0251013802a1df63798ee02105a379364..ecc1675440e1a2d49b9bfa1ab0fcd48664af2bdc 100644
+--- a/third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.c
++++ b/third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.c
+@@ -148,6 +148,8 @@
+ 
+ retry:
+     s = recv (fd, buf + size, len - size, flags & ~MSG_WAITALL);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -180,6 +182,8 @@
+ 
+ retry:
+     s = send (fd, buf + size, len - size, flags & ~MSG_WAITALL);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -214,6 +218,8 @@
+ retry:
+     s = recvfrom (fd, buf + size, len - size, flags & ~MSG_WAITALL, addr,
+                   addr_len);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -248,6 +254,8 @@
+ retry:
+     s = sendto (fd, buf + size, len - size, flags & ~MSG_WAITALL, addr,
+                 addr_len);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -295,6 +303,8 @@
+ 
+ retry:
+     s = recvmsg (fd, &mh, flags & ~MSG_WAITALL);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -356,6 +366,8 @@
+ 
+ retry:
+     s = sendmsg (fd, &mh, flags & ~MSG_WAITALL);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -410,6 +422,8 @@
+         r = 1;
+     }
+ #endif
++    if (r == -1 && errno == EINTR)
++        goto retry;
+     if (r < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -450,6 +464,8 @@
+         r = 1;
+     }
+ #endif
++    if (r == -1 && errno == EINTR)
++        goto retry;
+     if (r < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
