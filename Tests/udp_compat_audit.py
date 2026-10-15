@@ -174,7 +174,7 @@ def main():
                  'udp_session_setup.c', 'udp_address_conversion.c',
                  'udp_reactor_resources.c', 'udp_worker_failures.c',
                  'udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c',
-                 'udp_signal_lifecycle.c', 'udp_gso.c'):
+                 'udp_signal_lifecycle.c', 'udp_gso.c', 'udp_socket_interrupt.c'):
         run([formatter, '--style=file:' + str(CORE / '.clang-format'), ROOT / 'Tests' / name],
             'expected-' + name)
         if (OUT / ('expected-' + name)).read_bytes() != (ROOT / 'Tests' / name).read_bytes():
@@ -239,10 +239,17 @@ def main():
                  'udp_session_setup', 'udp_address_conversion',
                  'udp_reactor_resources', 'udp_worker_failures',
                  'udp_proxy_worker_cascade', 'udp_dns_lifecycle',
-                 'udp_signal_lifecycle', 'udp_gso'):
-        for mode, flags in [('asan', ['-O1', '-g', '-fsanitize=address,undefined',
-                                     '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']),
-                            ('optimized', ['-O3', '-fstrict-aliasing'])]:
+                 'udp_signal_lifecycle', 'udp_gso', 'udp_socket_interrupt'):
+        modes = [('asan', ['-O1', '-g', '-fsanitize=address,undefined',
+                           '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']),
+                 ('optimized', ['-O3', '-fstrict-aliasing'])]
+        if name == 'udp_socket_interrupt':
+            modes += [(label + '-fallback', flags + ['-DFORCE_FALLBACK'])
+                      for label, flags in modes[:2]]
+            if sys.platform == 'linux':
+                modes += [(label + '-splice', flags + ['-DENABLE_IO_SPLICE_SYSCALL'])
+                          for label, flags in modes[:2]]
+        for mode, flags in modes:
             executable = OUT / (name + '-' + mode)
             run([compiler, '-std=gnu11', '-Wall', '-Werror', '-pthread', *flags,
                  *includes, ROOT / 'Tests' / (name + '.c'), *libs, '-o', executable],
