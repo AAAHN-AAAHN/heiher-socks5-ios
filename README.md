@@ -35,8 +35,6 @@ The same visibility/scene condition gates row sorting and table formatting. Hidi
 
 Linux UDP GSO groups pass through the same socket observer as ordinary UDP sends. The OS-accepted length of each completed group is counted once for the actual relay peer; it is not multiplied by the group's datagram count. IP/UDP headers created by the kernel remain outside this socket boundary, and the counter/rate definitions are unchanged on Darwin.
 
-Common task data-I/O helpers retry only a raw `-1/EINTR` without losing byte or message offsets. This also preserves partially transferred UDP-over-TCP frames and ordinary buffered/splice TCP forwarding across interruptions. No-progress retries add no successful bytes, do not turn `-2` cancellation into a retry, and retain existing EAGAIN waits, EOF and hard-error handling.
-
 ## Implementation and ownership
 
 Statistics owns the native accounting, snapshot aggregation and display as separate responsibilities. The integrated release inherits the same implementation; `AppRoot` only connects the feature to the application's tabs. Other feature branches do not own or duplicate the meter.
@@ -74,8 +72,6 @@ The retained `traffic_statistics_model.swift` and per-IP model tests cover elaps
 `Tests/Statistics/ui_audit.py` retains the Simulator test builder and checks the preserved table, formatter and sample method while enforcing the visible/active display gate and next-boundary delay. Its XCTest exchanges real IPv4/IPv6 SOCKS/UDP traffic, derives expected peer directions from the independent client's wire buffers and destination echo, and checks Total/IP tables, scrolling, orientation and Stop/Start retention. The first measured greeting reuses the readiness connection because closing it without a greeting can produce a counted rejection reply. Simulator execution requires the actual Apple toolchain; source checks or Linux model passes do not substitute for it.
 
 `Tests/SocketIO/udp_gso_accounting.c` uses the actual native encoder and loopback sockets for IPv4 and IPv6. It verifies single and grouped sends, mixed lengths, empty payloads, the 64-message boundary, large ordinary datagrams, exact contents/order, no duplicates, per-IP totals and overall totals. Linux additionally traces actual successful sendmmsg lengths and segmentation control messages without replacing the syscall. The inherited UDP GSO fixture separately checks suspended descriptors, prefix/cancellation/error results and worker-local capability hints.
-
-`Tests/udp_socket_interrupt.c` combines the actual task I/O implementations, TCP relay and UDP-over-TCP codec. Controlled raw syscall interruptions exercise preserved prefixes, empty messages, nonblocking EAGAIN, canceled waits and hard errors in native/fallback paths; Linux additionally tests splice. These are deterministic fault-injection checks, not claims of naturally occurring device signals.
 
 ## Operation and limitations
 
