@@ -1,5 +1,5 @@
 import Foundation
-#if canImport(AVFAudio)
+#if canImport(AVFAudio) && canImport(UIKit)
 @preconcurrency import AVFAudio
 import UIKit
 #endif
@@ -62,6 +62,8 @@ final class LoopAudioService: @unchecked Sendable {
         let queuedAt: Double?
         let enteredAt: Double?
         let phaseAt: Double?
+        let resultAvailableAt: Double?
+        let resultConsumedAt: Double?
         let completedOperations: UInt64
         let maximumOutstanding: Int
         let scheduledIngress: Int
@@ -85,7 +87,6 @@ final class LoopAudioService: @unchecked Sendable {
         var available = false
         var invalidated = false
         var route = false
-        var lost = false
     }
     private struct Work: Sendable {
         let id: UInt64
@@ -98,6 +99,8 @@ final class LoopAudioService: @unchecked Sendable {
         var phase: Phase = .off
         var enteredAt: Double?
         var phaseAt: Double?
+        var resultAvailableAt: Double?
+        var resultConsumedAt: Double?
     }
 
     private let lock = NSLock()
@@ -122,6 +125,8 @@ final class LoopAudioService: @unchecked Sendable {
     private var work: Work?
     private var sequence: UInt64 = 0
     private var completed: UInt64 = 0
+    private var outstanding = 0
+    private var peakOutstanding = 0
     private var timerSequence: UInt64 = 0
     private var timer: DispatchSourceTimer?
     private var lastState = State()
@@ -148,7 +153,7 @@ final class LoopAudioService: @unchecked Sendable {
         factory = endpointFactory
     }
 
-    #if canImport(AVFAudio)
+    #if canImport(AVFAudio) && canImport(UIKit)
     @MainActor static let shared: LoopAudioService = {
         let provider = RecoveryExecutionLease.Provider.application(UIApplication.shared)
         let service = LoopAudioService(leaseProvider: { provider }) { queue, event in
@@ -215,7 +220,6 @@ final class LoopAudioService: @unchecked Sendable {
         case .interrupted, .decoderFailed, .mediaLost, .mediaReset:
             if !inbox.invalidated { bumpEpoch() }
             inbox.invalidated = true
-            if case .mediaLost = event { inbox.lost = true }
             if case .mediaReset = event { inbox.available = true }
         }
         let schedule = enqueueLocked()
@@ -324,6 +328,9 @@ final class LoopAudioService: @unchecked Sendable {
         sequence += 1
         let job = Work(id: sequence, command: command, ticket: input, queuedAt: Self.now)
         work = job
+        outstanding += 1
+        peakOutstanding = max(peakOutstanding, outstanding)
+        precondition(outstanding == 1)
         lock.lock()
         timing = Timing(id: job.id, phase: .queued)
         lock.unlock()
@@ -342,7 +349,7 @@ final class LoopAudioService: @unchecked Sendable {
             publish(State(text: "Off — stopping"))
         case .inspect: break
         }
-        record("Begin \(job.id): \(String(describing: command))")
+        if case .inspect = command {} else { record("Begin \(job.id): \(String(describing: command))") }
         if input.on { schedule(after: policy.interval) }
         io.async {
             self.mark(job.id, .queued, entered: true)
@@ -353,6 +360,9 @@ final class LoopAudioService: @unchecked Sendable {
                                   mayStart: { [weak self] in self?.valid(input) == true },
                                   phase: { [weak self] in self?.mark(job.id, $0) })
             self.endpoint?.perform(command, context: context) { [self] reply in
+                lock.lock()
+                if timing.id == job.id, timing.resultAvailableAt == nil { timing.resultAvailableAt = Self.now }
+                lock.unlock()
                 control.async { self.finish(job, reply) }
             }
         }
@@ -369,12 +379,18 @@ final class LoopAudioService: @unchecked Sendable {
     private func finish(_ job: Work, _ reply: Reply) {
         guard work?.id == job.id else { return } // Duplicate/stale completion.
         work = nil
+        outstanding -= 1
+        precondition(outstanding == 0)
         if completed < UInt64.max { completed += 1 }
-        lock.lock(); timing.phase = .off; lock.unlock()
+        lock.lock()
+        timing.phase = .off
+        timing.resultConsumedAt = Self.now
+        lock.unlock()
         current = latest()
         if current.stop != job.ticket.stop { releaseBarrier = true }
         if current.epoch != job.ticket.epoch { rebuild = true }
-        record("End \(job.id): \(reply.error ?? (reply.superseded ? "superseded" : "accepted"))")
+        if case .inspect = job.command, reply.error == nil {}
+        else { record("End \(job.id): \(reply.error ?? (reply.superseded ? "superseded" : "accepted"))") }
         switch job.command {
         case .stop:
             playing = false
@@ -524,13 +540,14 @@ final class LoopAudioService: @unchecked Sendable {
             self.lock.unlock()
             completion(Diagnostics(phase: timing.phase, operation: self.work?.id,
                 queuedAt: self.work?.queuedAt, enteredAt: timing.enteredAt, phaseAt: timing.phaseAt,
-                completedOperations: self.completed, maximumOutstanding: 1,
+                resultAvailableAt: timing.resultAvailableAt, resultConsumedAt: timing.resultConsumedAt,
+                completedOperations: self.completed, maximumOutstanding: self.peakOutstanding,
                 scheduledIngress: queued, timerActive: self.timer != nil, records: self.records))
         }
     }
 }
 
-#if canImport(AVFAudio)
+#if canImport(AVFAudio) && canImport(UIKit)
 /// Only the service I/O queue touches player/session. Delegate callbacks carry a
 /// weak object identity back to this queue; they never inspect the player elsewhere.
 private final class AudioEndpoint: NSObject, LoopAudioEndpoint, AVAudioPlayerDelegate, @unchecked Sendable {
