@@ -15,10 +15,14 @@ struct BackgroundKeepAliveView: View {
                     Toggle("Loop silent WAV", isOn: $audioEnabled)
                     Text(keepAlive.audioState).font(.footnote)
                         .accessibilityIdentifier("background.audioState")
+                    if !keepAlive.audioDetail.isEmpty {
+                        Text(keepAlive.audioDetail).font(.footnote)
+                            .accessibilityIdentifier("background.audioDetail")
+                    }
                 } header: {
                     Text("Audio")
                 } footer: {
-                    Text("Checks playback and retries every 0.5 seconds, including while audio services are unavailable. Attempts immediate recovery on new interruptions. Mixes with other audio.")
+                    Text("Checks playback and retries every 0.5 seconds. Uses finite execution protection during recovery; an unfinished system call is never treated as cancelled. Mixes with other audio.")
                 }
                 Section {
                     Toggle("Continuous location", isOn: $locationEnabled)
@@ -46,17 +50,13 @@ struct BackgroundKeepAliveView: View {
     }
 }
 
-/// Attach once to the app root, not to a tab that may be removed from the view tree.
+/// Root-only location/foreground restoration. Process-level audio notifications
+/// are coalesced by the service on the posting thread, not queued through the UI.
 @MainActor
 struct BackgroundKeepAliveEvents: ViewModifier {
     let keepAlive: BackgroundKeepAlive
-    private let audioEvents = Publishers.MergeMany(
-        BackgroundKeepAlive.audioNotifications.map { NotificationCenter.default.publisher(for: $0) }
-    ).receive(on: RunLoop.main)
-
     func body(content: Content) -> some View {
         content
-            .onReceive(audioEvents) { keepAlive.audioEvent($0) }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
                 .receive(on: RunLoop.main)) { _ in keepAlive.restore() }
     }

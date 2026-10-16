@@ -14,12 +14,15 @@ struct AppRoot: View {
                 .tag("server")
             BackgroundKeepAliveView(keepAlive: keepAlive,
                                     locationEnabled: $locationEnabled,
-                                    audioEnabled: $audioEnabled)
+                                    audioEnabled: Binding(get: { audioEnabled }, set: { value in
+                                        keepAlive.setAudio(value)
+                                        audioEnabled = value
+                                    }))
                 .tabItem { Label("Background", systemImage: "switch.2") }
                 .tag("background")
         }
         .onChange(of: locationEnabled, initial: true) { _, value in keepAlive.setLocation(value) }
-        .onChange(of: audioEnabled, initial: true) { _, value in keepAlive.setAudio(value) }
+        .onChange(of: audioEnabled, initial: true) { _, value in keepAlive.syncAudio(value) }
         .modifier(BackgroundKeepAliveEvents(keepAlive: keepAlive))
     }
 }
