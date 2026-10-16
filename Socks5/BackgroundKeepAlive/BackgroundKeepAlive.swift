@@ -188,7 +188,11 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         if name == AVAudioSession.mediaServicesWereLostNotification { return .mediaLost }
         if name == AVAudioSession.mediaServicesWereResetNotification { return .mediaReset }
         if name == AVAudioSession.interruptionNotification {
-            return notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt == 0 ? .available : .interrupted
+            guard let type = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt else { return .hint }
+            if type == AVAudioSession.InterruptionType.began.rawValue { return .interrupted }
+            guard type == AVAudioSession.InterruptionType.ended.rawValue else { return .hint }
+            let flags = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+            return AVAudioSession.InterruptionOptions(rawValue: flags).contains(.shouldResume) ? .available : .hint
         }
         if name == AVAudioSession.routeChangeNotification { return .routeChanged }
         if name == UIApplication.willEnterForegroundNotification ||
