@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   continue:
-    runs-on: xcode-27
-    timeout-minutes: 60
+    runs-on: macos-26-intel
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
