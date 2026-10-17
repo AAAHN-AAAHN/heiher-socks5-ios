@@ -1,6 +1,6 @@
 {
   "branch": "feature/settings-persistence",
-  "frozen_source": "f043012060626d4005ed7f95a8b9974a8f88c2e2",
+  "frozen_source": "def19e47e862d531b0ba327ae54d829e95ef9128",
   "parents": {
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2"
   },
@@ -12,7 +12,7 @@
   "validation_files": {
     "Build/check.py": "ece12b6d49cbb528d0af42e76d3059d047b60eda",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
-    "Build/check_ownership.py": "3f11ee85e1248ad3d891fd8867f21ef1e9f2a4c0",
+    "Build/check_ownership.py": "7b678170ad54f8caf105b3cdb06c34f889fe15b0",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }

@@ -65,6 +65,11 @@ def main():
         model_without_server = original[:original.index('struct ServerSettings:')] + original[original.index('enum SettingsError:'):]
         model_without_server = model_without_server.replace('Settings file exceeds 64 KB.',
                                                             'Settings file exceeds 65,536 bytes.')
+        # The asynchronous owner transports these value types between actors;
+        # Sendable changes no encoded field or validation behavior.
+        for declaration in ('struct AppSettings: Codable, Equatable',
+                            'enum Tab: String, Codable', 'struct Background: Codable, Equatable'):
+            model_without_server = model_without_server.replace(declaration + ' {', declaration + ', Sendable {')
         assert content('Socks5/Settings/AppSettings.swift') == model_without_server
         assert 'guard settings.loadState == .ready else { return }' in root
         assert 'guard settings.acceptsNewIntent else {' in root
