@@ -27,7 +27,6 @@ final class SettingsPersistenceUITests: XCTestCase {
         XCTAssertTrue(start.isEnabled && stop.isEnabled)
         XCTAssertFalse(Self.handshake())
         capture("invalid-draft-saved")
-        settingsTab.tap()
         waitForSavedSettings(in: app)
         app.terminate()
         app.launch()
@@ -120,6 +119,25 @@ final class SettingsPersistenceUITests: XCTestCase {
     }
 
     @MainActor private func waitForSavedSettings(in app: XCUIApplication) {
+        let tab = app.tabBars.buttons["Settings"]
+        if !tab.isSelected {
+            if app.keyboards.firstMatch.exists {
+                // The invalid numeric draft leaves its keyboard over the tab
+                // bar. Submit an existing plain-text field without editing it
+                // so the real Settings control can receive the next tap.
+                let values = app.textFields.allElementsBoundByIndex.map { $0.value as? String }
+                let passwords = app.secureTextFields.allElementsBoundByIndex.map { $0.value as? String }
+                let address = app.textFields.element(boundBy: 5)
+                XCTAssertTrue(address.exists && address.isHittable && address.isEnabled)
+                address.tap()
+                address.typeText("\n")
+                XCTAssertTrue(waitUntil { !app.keyboards.firstMatch.exists }, "Keyboard must close before tab navigation")
+                XCTAssertEqual(app.textFields.allElementsBoundByIndex.map { $0.value as? String }, values)
+                XCTAssertEqual(app.secureTextFields.allElementsBoundByIndex.map { $0.value as? String }, passwords)
+            }
+            XCTAssertTrue(waitUntil { tab.isHittable }, "Settings tab must be reachable before its screen is tested")
+            tab.tap()
+        }
         // Observe the real store's public UI before killing its process. This
         // durability wait does not extend any Start, Stop or listener deadline.
         // The outer audit separately reads and compares the actual settings file.

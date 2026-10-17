@@ -4,7 +4,7 @@
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
     "feature/background": "5e7897d63a85704ca56e079b8e6af26454c0fdec",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
-    "feature/settings-persistence": "d8786132affe0c51fd23d06be0e61bd478592b6f",
+    "feature/settings-persistence": "272ce294d1477d566c9cc04cf0a262b3b2cb9c4e",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
     "feature/traffic-statistics": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e"
   },
@@ -456,8 +456,8 @@
       "sha256": "00f8de3c4ed79476f087724ee0a20999c5e27184c90cad2f1ad614cdac9a6450"
     },
     "Tests/Settings/SettingsPersistenceUITests.swift": {
-      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
-      "sha256": "4789545335953bbf319552875fb2c010c3247f23b343f31f4326678c1c7c931e"
+      "commit": "438592ee44206d0056644021c3af0c750e91cc84",
+      "sha256": "35941d4d1fbafe280eae68ad732a10ae99fe56f3ec97c6386ac671953374d523"
     },
     "Tests/Settings/SettingsTests.swift": {
       "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
