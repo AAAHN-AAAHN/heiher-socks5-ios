@@ -8,11 +8,11 @@ struct AppRoot: View {
     @State private var appliedSettingsChange: SettingsStore.Change?
 
     private var audioEnabled: Binding<Bool> {
-        Binding(get: { self.settings.value.background.silentAudio }, set: applyAudioIntent)
+        Binding(get: { self.settings.value.background.silentAudio }, set: { enabled in self.applyAudioIntent(enabled) })
     }
 
     private var locationEnabled: Binding<Bool> {
-        Binding(get: { self.settings.value.background.continuousLocation }, set: applyLocationIntent)
+        Binding(get: { self.settings.value.background.continuousLocation }, set: { enabled in self.applyLocationIntent(enabled) })
     }
 
     private func applyLocationIntent(_ enabled: Bool) {

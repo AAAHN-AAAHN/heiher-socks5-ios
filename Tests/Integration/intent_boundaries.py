@@ -53,9 +53,9 @@ def root_contract(code):
         'statistics', 'server', 'background', 'settings'], 'Four-tab composition changed')
     require(code.count('.modifier(BackgroundKeepAliveEvents(keepAlive: keepAlive))') == 1,
             'Root event lifetime changed')
-    require('audioEnabled: audioEnabled)' in code and 'set: applyAudioIntent)' in code,
+    require('audioEnabled: audioEnabled)' in code and 'set: { enabled in self.applyAudioIntent(enabled) })' in code,
             'Audio toggle bypasses direct intent')
-    require('locationEnabled: locationEnabled,' in code and 'set: applyLocationIntent)' in code,
+    require('locationEnabled: locationEnabled,' in code and 'set: { enabled in self.applyLocationIntent(enabled) })' in code,
             'Location toggle bypasses immediate Off')
     require('.onChange(of: settings.change, initial: true)' in code,
             'Missing initial change observation')
