@@ -4,7 +4,7 @@
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
     "feature/background": "8db505411d6c167506ba1ff8dc815b43ed792896",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
-    "feature/settings-persistence": "f73f734025302a5479725f0aa2ecf8098604cf52",
+    "feature/settings-persistence": "d8786132affe0c51fd23d06be0e61bd478592b6f",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
     "feature/traffic-statistics": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e"
   },
@@ -116,8 +116,8 @@
       "sha256": "719d98606021c927450bfd586d8de925190aa6687f10eefcafa108145e028c56"
     },
     "Socks5/Settings/SettingsStore.swift": {
-      "commit": "673ccd46cb57303b7cf262061960db8c187e0d2b",
-      "sha256": "feacd3c8a53a70cad9ffc51356828018502fcbbf8ee27327aaff464b29aba9b9"
+      "commit": "11ffc688cc4a1b02db63ae9d7e062ae88f0568ab",
+      "sha256": "3884dc86adaf5269990f19da5756808ae7e11f065caa6cb7bbdd72b8865ab7c9"
     },
     "Socks5/Settings/SettingsView.swift": {
       "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
@@ -432,8 +432,8 @@
       "sha256": "6e20d953a63057453055040c961e56a6638e6592cc81679352087b61a2e58e73"
     },
     "Tests/Settings/HostUI.swift": {
-      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
-      "sha256": "4a50aea989e7fcba6d6b4a9ecc278ec82d3c68397dadc1a248902b95b2c3164e"
+      "commit": "11ffc688cc4a1b02db63ae9d7e062ae88f0568ab",
+      "sha256": "a59b526196e2bf54ff3b2391a193cd8dc5b81d7e3313d23933f3563e9bc2cd8d"
     },
     "Tests/Settings/ImportTests.swift": {
       "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
@@ -472,8 +472,8 @@
       "sha256": "ce5dd6508c34dfa96dcf55ac830872938633fc083b99cd000dd6f3398ca7903b"
     },
     "Tests/Settings/async_storage_check.py": {
-      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
-      "sha256": "4e78bbb8857e4fdd81c56eccdf15d523798a266ab2b1d343e29e57dbbc257a52"
+      "commit": "11ffc688cc4a1b02db63ae9d7e062ae88f0568ab",
+      "sha256": "b3ec5dae4483aa096a42ca8de5f2d569aa24a8fafb9b8815a19849c96d1dfac6"
     },
     "Tests/Settings/delayed_persistence_check.py": {
       "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
@@ -749,7 +749,7 @@
     }
   },
   "files": {
-    "Socks5/Settings/SettingsStore.swift": "feacd3c8a53a70cad9ffc51356828018502fcbbf8ee27327aaff464b29aba9b9",
+    "Socks5/Settings/SettingsStore.swift": "3884dc86adaf5269990f19da5756808ae7e11f065caa6cb7bbdd72b8865ab7c9",
     "Tests/udp_buffer_network.py": "66fb430ab26f7d69c8b5d22a78f8d1d50428919f83bf4b354ea10c90e5fc7703"
   }
 }

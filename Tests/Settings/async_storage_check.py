@@ -2,7 +2,8 @@
 """Actual async store, blocked I/O and synchronous reentry in both Swift modes.
 
 Linux substitutes UI/provider types only. Apple uses the actual Combine publisher.
-Negative controls must compile and fail at their named behavioral assertion.
+Behavioral negative controls must compile and fail at their named assertion.
+A separate compiler control verifies the nonisolated publisher requirement.
 """
 import hashlib
 import json
@@ -80,7 +81,8 @@ def main():
         if not passed:
             print(output[-16000:], file=sys.stderr, flush=True)
             raise RuntimeError('Async storage boundary failed: ' + label)
-        print('PASS:', label, 'behavioral negative control' if marker else '', flush=True)
+        detail = ('expected compiler rejection' if compile else 'behavioral negative control') if marker else ''
+        print('PASS:', label, detail, flush=True)
 
     store = (ROOT / 'Socks5/Settings/SettingsStore.swift').read_text()
     if sys.platform != 'darwin':
@@ -94,7 +96,7 @@ def main():
     with tempfile.TemporaryDirectory() as name:
         folder = Path(name)
         for mode in ('-Onone', '-O'):
-            def compile_store(label, text, flags=()):
+            def compile_store(label, text, flags=(), expected_error=None):
                 source = folder / (label + '.swift')
                 source.write_text(text)
                 executable = folder / (label + mode)
@@ -104,12 +106,17 @@ def main():
                         ROOT / names[0], ROOT / names[1], source,
                         HERE / 'HostUI.swift', HERE / 'HostProvider.swift',
                         HERE / 'AsyncStorageTests.swift', '-o', executable]
-                run(mode + '-' + label + '-compile', args, compile=True)
+                run(mode + '-' + label + '-compile', args, marker=expected_error, compile=True)
                 return executable
 
             executable = compile_store('current', store)
             for case in CASES:
                 run(mode + '-' + case, [executable, case])
+            declaration = 'final class SettingsStore: @MainActor ObservableObject {'
+            assert store.count(declaration) == 1, 'Checked observable conformance changed'
+            compile_store('unisolated-conformance', store.replace(declaration,
+                'final class SettingsStore: ObservableObject {', 1), expected_error=
+                "main actor-isolated property 'objectWillChange' cannot satisfy nonisolated requirement")
             boundary = store
             for before, after in [
                 ('private var revision: UInt64 = 0', 'private var revision: UInt64 = UInt64.max - 1'),
@@ -131,7 +138,8 @@ def main():
     results['passed'] = True
     (OUT / 'results.json').write_text(json.dumps(results, indent=2) + '\n')
     print(f'PASS: {(len(CASES) + len(REVISION_CASES)) * 2} async schedules and {len(MUTANTS) * 2} '
-          'compiled behavioral negative controls; no physical-device claim')
+          'compiled behavioral negative controls, plus 2 expected conformance compiler rejections; '
+          'no physical-device claim')
 
 
 if __name__ == '__main__':
