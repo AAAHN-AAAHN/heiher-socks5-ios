@@ -69,6 +69,33 @@ command('actual-sdk-preflight', ['xcrun', 'swiftc', '-typecheck', '-swift-versio
         cwd=product, timeout=300, required=False)
 command('source-archive', ['git', 'archive', '--format=zip', 'HEAD', '-o', str(OUT / 'source.zip')], cwd=product)
 
+# Query the actual deployment-target boundary for checked locked value metadata.
+lock_source = ROOT / 'Diagnostics/CheckedLockProbe.swift'
+command('checked-lock-sdk', ['xcrun', 'swiftc', '-typecheck', '-swift-version', '5',
+        '-strict-concurrency=complete', '-warnings-as-errors', '-sdk', sdk,
+        '-target', 'arm64-apple-ios17.2', str(lock_source)], timeout=120, required=False)
+interface_records = []
+sdk_root = Path(sdk)
+for base in (sdk_root / 'usr/lib/swift', sdk_root / 'System/Library/Frameworks/os.framework'):
+    if not base.exists():
+        continue
+    for path in sorted(base.rglob('*.swiftinterface')):
+        if 'os.swiftmodule' not in path.parts:
+            continue
+        content = path.read_text(errors='replace')
+        if 'OSAllocatedUnfairLock' not in content:
+            continue
+        destination = OUT / 'sdk-interfaces' / path.relative_to(sdk_root)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(path.read_bytes())
+        interface_records.append({'path': str(path), 'artifact_path': str(destination.relative_to(OUT)),
+                                  'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
+(OUT / 'checked-lock-inputs.json').write_text(json.dumps({
+    'source_sha256': hashlib.sha256(lock_source.read_bytes()).hexdigest(),
+    'deployment_target': 'arm64-apple-ios17.2', 'sdk': sdk,
+    'interfaces': interface_records,
+}, indent=2) + '\n')
+
 # Diagnostic costs do not exercise or alter the product policy.
 cost_source = ROOT / 'Diagnostics/FixtureCosts.swift'
 inputs['cost_probe_sha256'] = hashlib.sha256(cost_source.read_bytes()).hexdigest()
