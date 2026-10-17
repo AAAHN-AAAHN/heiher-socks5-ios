@@ -11,7 +11,6 @@ def git(*args, input=None, env=None, cwd=None):
 git('worktree', 'add', '--detach', str(P), '618b3d2b413937aaad7373ee2af9e693ec81b84a', cwd=ROOT)
 
 def artifact(number, digest):
-    # gh does not forward GitHub authorization to the signed artifact host.
     data = subprocess.check_output(['gh', 'api', f'repos/AAAHN-AAAHN/heiher-socks5-ios/actions/artifacts/{number}/zip'], timeout=120)
     assert hashlib.sha256(data).hexdigest() == digest, (number, len(data), hashlib.sha256(data).hexdigest())
     (OUT / f'{number}.zip').write_bytes(data)
@@ -29,20 +28,25 @@ git('fetch',str(bundle),'refs/heads/feature/background')
 z=artifact(12058113666,'16910d3c77a6dfe6a2dde3f56fdd6e514afb9feff629fdb0b0d1f324f1be6a28')
 source=z.read('provenance/source.zip');(OUT/'source.zip').write_bytes(source)
 source=zipfile.ZipFile(io.BytesIO(source)); assert source.testzip() is None
+base={}
+for line in git('ls-tree','-r','26e20692ac1c3336fb27c48d1e9b10846f646475').splitlines():
+    meta,name=line.split('\t');mode,kind,sha=meta.split();assert kind=='blob'
+    base[name]=(int(mode,8),sha)
 env=dict(os.environ,GIT_INDEX_FILE=str(Path(os.environ['RUNNER_TEMP'])/'candidate-index'))
 git('read-tree','--empty',env=env)
-names=set(); records=[]
+names=set(); records=[];changed=[]
 for info in source.infolist():
     if info.is_dir(): continue
     name=info.filename; parts=PurePosixPath(name).parts
     assert not name.startswith('/') and '..' not in parts and '.git' not in parts
-    assert name not in names; names.add(name)
-    data=source.read(info); mode=(info.external_attr>>16)&0o170777
-    # Git ZIPs may omit regular-file type bits. Executability still comes from the archive.
-    if mode in (0o644,0o755): mode |= 0o100000
+    assert name not in names and name in base; names.add(name)
+    data=source.read(info); mode=base[name][0]
     assert mode in (0o100644,0o100755,0o120000),(name,oct(mode))
     sha=git('hash-object','-w','--stdin',input=data)
+    if sha!=base[name][1]: changed.append(name)
     records.append(f'{mode:o} {sha}\t{name}\0')
+assert names==set(base)
+assert set(changed)=={'Socks5/BackgroundKeepAlive/LoopAudioService.swift','Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift'},changed
 git('update-index','-z','--index-info',input=''.join(records).encode(),env=env)
 tree=git('write-tree',env=env)
 assert tree=='661d825c814b9af8d8d0a1d8301be87bb12f5064', tree
@@ -59,9 +63,9 @@ ref='refs/heads/work/loop-background-candidate-20261017'
 existing=git('ls-remote','--heads','origin',ref)
 assert not existing or existing.split()[0]==sha
 if not existing: print(git('push','origin',sha+':'+ref))
-(OUT/'recovery.json').write_text(json.dumps({'commit':sha,'tree':tree,'source_files':len(names),'candidate_ref':ref},indent=2)+'\n')
+(OUT/'recovery.json').write_text(json.dumps({'commit':sha,'tree':tree,'source_files':len(names),'candidate_ref':ref,'mode_source':'26e2069 exact tree','changed_files':changed},indent=2)+'\n')
 (OUT/'after.txt').write_text(git('ls-remote','--heads','origin')+'\n')
-print('Recovered byte-identical candidate',sha,'files',len(names))
+print('Recovered byte-identical candidate',sha,'files',len(names),flush=True)
 (P/'artifacts').mkdir(exist_ok=True)
 for mode in ('-Onone','-O'):
     args=['swiftc',mode,'-swift-version','5','-strict-concurrency=complete','-warnings-as-errors','-parse-as-library']
