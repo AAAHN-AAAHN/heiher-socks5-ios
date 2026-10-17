@@ -59,9 +59,9 @@ private final class DiskProbe: @unchecked Sendable {
 @main
 struct AsyncStorageTests {
     @MainActor static var assertions=0
-    @MainActor static func check(_ condition: @autoclosure () -> Bool, _ message: String) {
+    @MainActor static func check(_ condition: Bool, _ message: String) {
         assertions += 1
-        if !condition() { fatalError(message) }
+        if !condition { fatalError(message) }
     }
     @MainActor static func waitFor(_ condition: () -> Bool) async throws {
         let end=ProcessInfo.processInfo.systemUptime+5
