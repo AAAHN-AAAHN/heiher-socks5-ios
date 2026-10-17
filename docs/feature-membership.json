@@ -4,7 +4,7 @@
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
     "feature/background": "8c2e3592a48a3d2fa67d0bd4cfe6ddcf4a874d0c",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
-    "feature/settings-persistence": "f67ac37391e19f4b6f997c91b90b1e07e4382c07",
+    "feature/settings-persistence": "f73f734025302a5479725f0aa2ecf8098604cf52",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
     "feature/traffic-statistics": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e"
   },
@@ -116,8 +116,8 @@
       "sha256": "719d98606021c927450bfd586d8de925190aa6687f10eefcafa108145e028c56"
     },
     "Socks5/Settings/SettingsStore.swift": {
-      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
-      "sha256": "78ec17d2fbbe7768177bddd9c95f52925210a1a0f7a780926f98f60ea7274d76"
+      "commit": "673ccd46cb57303b7cf262061960db8c187e0d2b",
+      "sha256": "feacd3c8a53a70cad9ffc51356828018502fcbbf8ee27327aaff464b29aba9b9"
     },
     "Socks5/Settings/SettingsView.swift": {
       "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
@@ -749,7 +749,7 @@
     }
   },
   "files": {
-    "Socks5/Settings/SettingsStore.swift": "78ec17d2fbbe7768177bddd9c95f52925210a1a0f7a780926f98f60ea7274d76",
+    "Socks5/Settings/SettingsStore.swift": "feacd3c8a53a70cad9ffc51356828018502fcbbf8ee27327aaff464b29aba9b9",
     "Tests/udp_buffer_network.py": "66fb430ab26f7d69c8b5d22a78f8d1d50428919f83bf4b354ea10c90e5fc7703"
   }
 }

@@ -5,7 +5,7 @@
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
     "feature/background": "8c2e3592a48a3d2fa67d0bd4cfe6ddcf4a874d0c",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
-    "feature/settings-persistence": "f67ac37391e19f4b6f997c91b90b1e07e4382c07",
+    "feature/settings-persistence": "f73f734025302a5479725f0aa2ecf8098604cf52",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
     "feature/traffic-statistics": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e"
   },

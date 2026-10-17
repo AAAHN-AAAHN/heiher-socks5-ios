@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(Combine)
+import Combine
+#endif
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
