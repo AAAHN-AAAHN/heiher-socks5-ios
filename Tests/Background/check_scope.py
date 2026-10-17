@@ -125,6 +125,26 @@ def main():
     assert 'queue: nil)' in service and 'self?.notify(normalize(note))' in service
     assert not re.search(r'\.sync\(', service)
     assert 'if records.count == 64 { records.removeFirst() }' in service
+    # One real, audio-specific queue boundary; the public handle and platform
+    # lock are checked, while the AV adapter cannot cross queues as Sendable.
+    swift_modules = list((ROOT / 'Socks5/BackgroundKeepAlive').glob('*.swift'))
+    unchecked = [p.name for p in swift_modules if '@unchecked Sendable' in p.read_text()]
+    assert unchecked == ['LoopAudioService.swift'], unchecked
+    assert service.count('@unchecked Sendable') == 1
+    assert 'final class LoopAudioService: Sendable {' in service
+    assert 'private final class LoopAudioQueueOwner: @unchecked Sendable {' in service
+    assert 'private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {' in service
+    assert 'private final class DelegateProxy: NSObject, AVAudioPlayerDelegate, Sendable {' in service
+    assert 'guard ioDelegateGeneration == receipt.generation else' in service
+    assert 'guard receipt.generation == generation, player != nil else' in service
+    assert 'guard !ioDeliveryQueued else { return false }' in service
+    receipt = service[service.index('    func receiveSession(_ receipt: LoopAudioService.SessionReceipt) {'):]
+    assert receipt.index('activationCompletion = nil') < receipt.index('completion?(')
+    lease = text('Socks5/BackgroundKeepAlive/RecoveryExecutionLease.swift')
+    assert 'private final class LeaseStorage<Value: Sendable>: Sendable {' in lease
+    assert 'OSAllocatedUnfairLock(initialState: value)' in lease and 'Mutex(value)' in lease
+    assert 'withValue<Result: Sendable>(_ body: @Sendable (inout Value) -> Result)' in lease
+    assert 'uncheckedState' not in lease and 'withLockUnchecked' not in lease
     # Actual target references, build-file membership, group membership and SDK
     # compiler input must all include each new module, not merely name a file.
     phase = project[project.index('/* Begin PBXSourcesBuildPhase section */'):project.index('/* End PBXSourcesBuildPhase section */')]

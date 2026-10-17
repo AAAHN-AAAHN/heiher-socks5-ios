@@ -34,6 +34,9 @@ final class AudioEndpointFixture: @unchecked Sendable {
     let queueKey = DispatchSpecificKey<Bool>()
     let release = DispatchSemaphore(value: 0)
     private let lock = NSLock()
+    // Environment configuration is fixed for a fixture process. Reading the
+    // whole environment on every simulated AV call adds unrelated host work.
+    private let traceEnabled = ProcessInfo.processInfo.environment["LOOP_ENDPOINT_TRACE"] == "1"
     private var trace = Trace()
 
     func use<T>(_ body: (inout Trace) -> T) -> T {
@@ -41,7 +44,7 @@ final class AudioEndpointFixture: @unchecked Sendable {
         return body(&trace)
     }
     @discardableResult func enter(_ name: String) -> Bool {
-        if ProcessInfo.processInfo.environment["LOOP_ENDPOINT_TRACE"] == "1" {
+        if traceEnabled {
             FileHandle.standardError.write(Data(("API: " + name + "\n").utf8))
         }
         let step = use { value -> (Bool, (@Sendable () -> Void)?, Bool) in

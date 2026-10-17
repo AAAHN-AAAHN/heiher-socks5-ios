@@ -2,7 +2,7 @@
   "base_commit": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7",
   "branches": {
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
-    "feature/background": "62b83d5aa9081795b2c08300b2762a4d39b11e20",
+    "feature/background": "5e7897d63a85704ca56e079b8e6af26454c0fdec",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
     "feature/settings-persistence": "d8786132affe0c51fd23d06be0e61bd478592b6f",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
@@ -84,16 +84,16 @@
       "sha256": "a9b55a62cb0172f6b0323bc471dfab90fa8f025aed4ba0f5023befa47204bed0"
     },
     "Socks5/BackgroundKeepAlive/LoopAudioService.swift": {
-      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
-      "sha256": "81ecb4dd8aa6ea367cade0d2308d758f105a1004f1175a8c1d61c892aa159751"
+      "commit": "b10ef498d9be5a23a14d62c9cbbf8a86de5f0248",
+      "sha256": "7a299c05f6706da0f589d4a5a2231b7b526a815230aa9e4dd75dcfe38c0522f3"
     },
     "Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
       "sha256": "5a16a22e981263be7f3ab0bed5fd2d2985558c82189150ebbb746b2cc05db68c"
     },
     "Socks5/BackgroundKeepAlive/RecoveryExecutionLease.swift": {
-      "commit": "44c53f247b1a8677d2b692003cc016f21303cb42",
-      "sha256": "1f11ced6959402c9dc1b551c1f22801f3f755fbe0ef26d9128280f33c385e3ce"
+      "commit": "b10ef498d9be5a23a14d62c9cbbf8a86de5f0248",
+      "sha256": "374cc1d170c3ba61fc7167042e0563076d09ebd54a842182bb27b09f666f4049"
     },
     "Socks5/BackgroundKeepAlive/Silence.wav": {
       "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
@@ -172,12 +172,12 @@
       "sha256": "9f9fd9fec39de5f52be0465f61c857c3fb34d49bdbff1450442a8e35ffe12dd1"
     },
     "Tests/Background/AudioEndpointBoundaryTests.swift": {
-      "commit": "44c53f247b1a8677d2b692003cc016f21303cb42",
-      "sha256": "4629abadfc6971060c0928f292d59d2ab14989f3e41ba7231ad9a6e838443a85"
+      "commit": "b10ef498d9be5a23a14d62c9cbbf8a86de5f0248",
+      "sha256": "97c3b83b656a4501ae4a3544ba88ecc2d10cefea1f391d041aabe2b6ea0029f0"
     },
     "Tests/Background/AudioEndpointMocks.swift": {
-      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
-      "sha256": "af507de1453b81642bd9d9ed17daffe008a22af9effa472ea7a6bf0c311e9d71"
+      "commit": "0f49def09325b424707068736063a60888782f51",
+      "sha256": "50b01819b5795a85aecc8ca4706440c15246134b6b362673caf9f62d6dacf0e8"
     },
     "Tests/Background/AuthorizationResetTests.swift": {
       "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
@@ -200,8 +200,8 @@
       "sha256": "af623c706d13fab14e74ce5b7841686d4e3178760c003e478713be9b11497d98"
     },
     "Tests/Background/FacadePlatformMocks.swift": {
-      "commit": "ccfadf1543c4cdfbefc778baa91ee7e22e6188e5",
-      "sha256": "36fdc3ef6ee55c684e15a3de7d904f5899254763c8d73688c9d0ae2f99f6e67a"
+      "commit": "0451530805b2f7fd8a318124603a444ca10678b4",
+      "sha256": "8fbfbd29378e8001958e0a395b6486b449f14f8b23dd0e5f1c14384798c3d567"
     },
     "Tests/Background/FinalRecoveryTests.swift": {
       "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
@@ -240,8 +240,8 @@
       "sha256": "31f5c4fbbfc45f342563e3ae5d540c56c74e72012871453684be224c96d8a587"
     },
     "Tests/Background/RecoveryAdmissionAccess.swift.inc": {
-      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
-      "sha256": "164533bff7672d57db7c4954b127c15d8a3579cccc6ab01ff3770f0f245e1c87"
+      "commit": "b10ef498d9be5a23a14d62c9cbbf8a86de5f0248",
+      "sha256": "b0b0af0bc70f1ba0938d25eac3fd83b2b85c9d5179c2550d0b93253bdc1f03e8"
     },
     "Tests/Background/RecoveryBoundaryTests.swift": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
@@ -292,16 +292,16 @@
       "sha256": "88ccb4b2f628d20d899277f85c7fb061e0f4ed1c6718312af1b0431dfa25e454"
     },
     "Tests/Background/check_loop_audio.py": {
-      "commit": "462f676c767441230755c288101a6ccaef041546",
-      "sha256": "09ba03afbde46c3a6a678d0f3ca1c27537b15cf0d7798a8aee908beb9d414568"
+      "commit": "b10ef498d9be5a23a14d62c9cbbf8a86de5f0248",
+      "sha256": "08af0cdf95f4411de7a0949cda90399f52ad2f77c6b28639ada6dd6caf2725d0"
     },
     "Tests/Background/check_mixed_notifications.py": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
       "sha256": "5e8cdf359c441c9bafe1589a07e4ae3c79534e2f8f453200ded8f70e838275fe"
     },
     "Tests/Background/check_scope.py": {
-      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
-      "sha256": "f5774aec939aee0a64df97187b986601f2489757dc584b8a5923ebdbcae27ef6"
+      "commit": "b10ef498d9be5a23a14d62c9cbbf8a86de5f0248",
+      "sha256": "3619f6eaf31f8b7420d86ce111d19693fae5b2b7f147fd550cacc638d6687077"
     },
     "Tests/Background/check_session_ownership.py": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",

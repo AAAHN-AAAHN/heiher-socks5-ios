@@ -1,4 +1,11 @@
 extension LoopAudioService {
+    // Test access remains a value-only method on the checked facade.
+    func auditStopAdmission(owner: UInt64, direct: Bool, result: @escaping @Sendable (Bool) -> Void) {
+        queueOwner.auditStopAdmission(owner: owner, direct: direct, result: result)
+    }
+}
+
+extension LoopAudioQueueOwner {
     // Test-only control-lane admission. Appended by the host test driver only.
     func auditStopAdmission(owner: UInt64, direct: Bool, result: @escaping @Sendable (Bool) -> Void) {
         control.async { [self] in

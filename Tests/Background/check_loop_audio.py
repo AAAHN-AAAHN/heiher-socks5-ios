@@ -32,8 +32,8 @@ API_BOUNDARIES = ('asset', 'session', 'category-get', 'mode-get', 'options-get',
 ADAPTER_CASES = ('healthy', 'preferences', 'category-failure', 'prepare-failure', 'play-failure',
                  'player-failure', 'silent-stop', 'configuration-drift', 'compatible-route', 'decoder',
                  'asset-missing', 'asset-invalid', 'cache', 'release-failure', 'duplicate-completion',
-                 'failure-1', 'failure-100', 'failure-1000', 'stale-delegate')
-ASYNC_CASES = ('pending-owner', 'pending-reset', 'pending-off-on', 'pending-deactivation')
+                 'failure-1', 'failure-100', 'failure-1000', 'stale-delegate', 'mixed-delegate')
+ASYNC_CASES = ('pending-owner', 'pending-reset', 'pending-off-on', 'pending-deactivation', 'pending-final-owner')
 
 
 def run(command, records, label, timeout=30, expected=None):
@@ -84,6 +84,26 @@ def adapter_source(service, legacy):
 extension LoopAudioService {
     static func auditEndpoint(queue: DispatchQueue, event: @escaping @Sendable (Event) -> Void) -> any LoopAudioEndpoint {
         AudioEndpoint(queue: queue, event: event)
+    }
+    func auditOwnerLifetime() -> @Sendable () -> Bool {
+        { [weak queueOwner] in queueOwner != nil }
+    }
+    func auditAfterQueueDrain(_ completion: @escaping @Sendable () -> Void) {
+        queueOwner.auditAfterQueueDrain(completion)
+    }
+    func auditEndpointQueueDepth() -> Int { queueOwner.auditEndpointQueueDepth() }
+}
+extension LoopAudioQueueOwner {
+    func auditAfterQueueDrain(_ completion: @escaping @Sendable () -> Void) {
+        // Capture the immutable queues only, so this barrier cannot retain the
+        // owner whose pending-receipt lifetime the test is trying to observe.
+        let control = self.control
+        let io = self.io
+        control.async { io.async { DispatchQueue.main.async(execute: completion) } }
+    }
+    func auditEndpointQueueDepth() -> Int {
+        lock.lock(); defer { lock.unlock() }
+        return ioDeliveryQueued ? 1 : 0
     }
 }
 '''
@@ -233,13 +253,30 @@ def main():
                                           'AudioEndpointBoundaryTests.swift', optimize, records, mocks='AudioEndpointMocks.swift')
                     run([exe, 'off-at-prepare', OWNED / 'Silence.wav', invalid], records,
                         suffix + '-bad-cancel', expected='NEW_PLAYBACK_API_AFTER_OFF')
-                    delegate_identity = 'guard delegateSource === source else'
-                    assert source.count(delegate_identity) == 1
-                    bad = source.replace(delegate_identity, 'guard delegateSource != nil else', 1)
+                    delegate_identity = 'guard ioDelegateGeneration == receipt.generation else'
+                    delegate_consume = 'guard receipt.generation == generation, player != nil else'
+                    assert source.count(delegate_identity) == source.count(delegate_consume) == 1
+                    bad = source.replace(delegate_identity, 'guard ioDelegateGeneration != nil else', 1)
+                    bad = bad.replace(delegate_consume, 'guard player != nil else', 1)
                     exe = compile_fixture(folder, 'bad-delegate-' + suffix, adapter_source(bad, False), monitor, lease,
                                           'AudioEndpointBoundaryTests.swift', optimize, records, mocks='AudioEndpointMocks.swift')
                     run([exe, 'stale-delegate', OWNED / 'Silence.wav', invalid], records,
                         suffix + '-bad-delegate', expected='STALE_DELEGATE_REBUILT_NEW_PLAYER')
+                    # Leaving the consumption check intact is insufficient if
+                    # stale ingress can erase a current pending decoder event.
+                    bad = source.replace(delegate_identity, 'guard ioDelegateGeneration != nil else', 1)
+                    exe = compile_fixture(folder, 'bad-mixed-delegate-' + suffix, adapter_source(bad, False), monitor, lease,
+                                          'AudioEndpointBoundaryTests.swift', optimize, records, mocks='AudioEndpointMocks.swift')
+                    run([exe, 'mixed-delegate', OWNED / 'Silence.wav', invalid], records,
+                        suffix + '-bad-mixed-delegate', expected='CURRENT_DELEGATE_RECEIPT_LOST')
+                    retained_completion = 'self.endpoint?.perform(command, context: context) { [self] reply in'
+                    assert source.count(retained_completion) == 1
+                    bad = source.replace(retained_completion, retained_completion.replace('[self]', '[weak self]') +
+                                         '\n                guard let self else { return }', 1)
+                    exe = compile_fixture(folder, 'bad-pending-owner-' + suffix, adapter_source(bad, False), monitor, lease,
+                                          'AudioEndpointBoundaryTests.swift', optimize, records, mocks='AudioEndpointMocks.swift')
+                    run([exe, 'pending-final-owner', OWNED / 'Silence.wav', invalid], records,
+                        suffix + '-bad-pending-owner', expected='PENDING_RECEIPT_LOST_OWNER')
                 if not args.case and args.group in ('all', 'facade'):
                     ordering = '        audio.setEnabled(enabled, owner: audioOwner)\n        showAudioIntent(enabled)'
                     assert facade.count(ordering) == 1

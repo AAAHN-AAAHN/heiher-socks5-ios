@@ -133,7 +133,7 @@ def composition():
             assert event in source, event
         service = (ROOT / 'Socks5/BackgroundKeepAlive/LoopAudioService.swift').read_text()
         assert 'service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,' in service
-        assert 'normalize: BackgroundKeepAlive.audioEventValue)' in service
+        assert 'normalize: { BackgroundKeepAlive.audioEventValue($0) })' in service
         assert 'BackgroundKeepAlive.audioNotifications' not in view
         assert 'var interval = 0.5' in service
         assert service.count('DispatchSource.makeTimerSource(queue: control)') == 1

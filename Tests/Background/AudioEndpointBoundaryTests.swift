@@ -31,10 +31,53 @@ private final class BoundaryValue<T>: @unchecked Sendable {
         }
         check(reached, message)
     }
+    @MainActor static func pendingFinalOwner(_ fixture: AudioEndpointFixture) async throws {
+        let claims = BoundaryValue((requested: 0, ended: [Int]()))
+        let provider = RecoveryExecutionLease.Provider(request: { _, receipt in
+            let id = claims.use { value -> Int in value.requested += 1; return value.requested }
+            receipt(id)
+        }, end: { id in claims.use { $0.ended.append(id) } })
+        var policy = LoopAudioService.Policy()
+        policy.interval = 0.005
+        policy.warning = 0.025
+        policy.stalled = 0.06
+        var service: LoopAudioService? = LoopAudioService(policy: policy, leaseProvider: { provider }) { queue, event in
+            queue.setSpecific(key: fixture.queueKey, value: true)
+            return LoopAudioService.auditEndpoint(queue: queue, event: event)
+        }
+        let facadeReleased = { [weak value = service] in value == nil }
+        let ownerAlive = service!.auditOwnerLifetime()
+        let owner = service!.register { _ in }
+        fixture.use { $0.holdCompletion = "activate" }
+        service!.setEnabled(true, owner: owner)
+        try await until({ fixture.use { !$0.pending.isEmpty } }, "ACTIVATION_COMPLETION_NOT_HELD")
+        service!.setEnabled(false, owner: owner)
+        service!.unregister(owner)
+        let stopped = await withCheckedContinuation { continuation in
+            service!.diagnostics { continuation.resume(returning: $0) }
+        }
+        check(stopped.operation != nil && !stopped.timerActive, "FINAL_OWNER_OFF_DID_NOT_REACH_CONTROL")
+        let drained = BoundaryValue(false)
+        service!.auditAfterQueueDrain { drained.use { $0 = true } }
+        service = nil
+        check(facadeReleased(), "TEST_RETAINED_EXTERNAL_FACADE")
+        try await until({ drained.use { $0 } }, "OWNER_RELEASE_BARRIER_DID_NOT_DRAIN")
+        check(ownerAlive(), "PENDING_RECEIPT_LOST_OWNER")
+        fixture.deliverPending()
+        try await until({ fixture.use { $0.calls.filter { $0 == "deactivate" }.count == 1 && !$0.active } },
+                        "RELEASED_OWNER_DID_NOT_DEACTIVATE")
+        try await until({ claims.use { $0.requested == $0.ended.count } }, "TOKEN_END_NOT_RETURNED")
+        try await until({ !ownerAlive() }, "COMPLETED_RECEIPT_RETAINED_OWNER")
+        check(fixture.use { $0.created == 0 && $0.livePlayers == 0 && $0.peakPlayers == 0 }, "RELEASED_OWNER_CREATED_PLAYER")
+        check(fixture.use { $0.peak <= 1 && $0.onWrongQueue == 0 }, "AV_API_OUTSIDE_EXCLUSIVE_IO_LANE")
+        check(claims.use { $0.requested == 1 && $0.ended == [1] }, "TOKEN_END_IDENTITY_OR_LEAK")
+        print("PASS actual-adapter pending-final-owner: \(assertions) assertions; real receipt outlives external facade")
+    }
     @MainActor static func main() async throws {
         let name = CommandLine.arguments[1]
         let fixture = AudioEndpointFixture.shared
         fixture.use { $0.resource = CommandLine.arguments[2] }
+        if name == "pending-final-owner" { try await pendingFinalOwner(fixture); return }
         if name.hasSuffix("rate-get") { fixture.use { $0.rateEnabled = true } }
         let state = BoundaryValue(LoopAudioService.State())
         let publications = BoundaryValue([String]())
@@ -199,6 +242,23 @@ private final class BoundaryValue<T>: @unchecked Sendable {
                 for _ in 0..<1000 { old(true) }
                 try await Task.sleep(nanoseconds: 50_000_000)
                 check(count("player-init") == 2, "STALE_DELEGATE_REBUILT_NEW_PLAYER")
+                try await stop()
+            case "mixed-delegate":
+                try await start()
+                let old = fixture.use { $0.callbacks.first! }
+                service.notify(.mediaReset)
+                try await until({ count("player-init") == 2 && playing() }, "RESET_DID_NOT_REPLACE_PLAYER")
+                let current = fixture.use { $0.callbacks.last! }
+                fixture.use { $0.blocked = "position-get" }
+                service.notify(.hint)
+                try await until({ fixture.use { $0.enteredBlock } }, "DELEGATE_IO_BARRIER_NOT_ENTERED")
+                current(true)
+                for _ in 0..<1000 { old(false) }
+                check(service.auditEndpointQueueDepth() == 1, "DELEGATE_DELIVERY_QUEUE_BOUND")
+                fixture.release.signal()
+                try await until({ count("player-init") == 3 && playing() }, "CURRENT_DELEGATE_RECEIPT_LOST")
+                try await Task.sleep(nanoseconds: 50_000_000)
+                check(count("player-init") == 3, "MIXED_DELEGATE_REBUILT_TWICE")
                 try await stop()
             case "asset-missing", "asset-invalid":
                 fixture.use { $0.resource = name == "asset-missing" ? nil : CommandLine.arguments[3] }
