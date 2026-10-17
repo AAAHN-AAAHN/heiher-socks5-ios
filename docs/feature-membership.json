@@ -2,7 +2,7 @@
   "base_commit": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7",
   "branches": {
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
-    "feature/background": "5e7897d63a85704ca56e079b8e6af26454c0fdec",
+    "feature/background": "a75cb4d7d7f8d40e1ac9d9ebeba377835ded49de",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
     "feature/settings-persistence": "272ce294d1477d566c9cc04cf0a262b3b2cb9c4e",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
@@ -84,8 +84,8 @@
       "sha256": "a9b55a62cb0172f6b0323bc471dfab90fa8f025aed4ba0f5023befa47204bed0"
     },
     "Socks5/BackgroundKeepAlive/LoopAudioService.swift": {
-      "commit": "b10ef498d9be5a23a14d62c9cbbf8a86de5f0248",
-      "sha256": "7a299c05f6706da0f589d4a5a2231b7b526a815230aa9e4dd75dcfe38c0522f3"
+      "commit": "fe9158e603613392a332587364c8cdc418786574",
+      "sha256": "653cb374ccb3a60c859001e3ea5f66145e0d7eadfd397c778bff2640a85ada56"
     },
     "Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
@@ -176,8 +176,8 @@
       "sha256": "97c3b83b656a4501ae4a3544ba88ecc2d10cefea1f391d041aabe2b6ea0029f0"
     },
     "Tests/Background/AudioEndpointMocks.swift": {
-      "commit": "0f49def09325b424707068736063a60888782f51",
-      "sha256": "50b01819b5795a85aecc8ca4706440c15246134b6b362673caf9f62d6dacf0e8"
+      "commit": "fe9158e603613392a332587364c8cdc418786574",
+      "sha256": "8037ce6255e312fc28545cb6673c820495c81556b8fc9b007afd34bf9e62262d"
     },
     "Tests/Background/AuthorizationResetTests.swift": {
       "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
@@ -300,8 +300,8 @@
       "sha256": "5e8cdf359c441c9bafe1589a07e4ae3c79534e2f8f453200ded8f70e838275fe"
     },
     "Tests/Background/check_scope.py": {
-      "commit": "b10ef498d9be5a23a14d62c9cbbf8a86de5f0248",
-      "sha256": "3619f6eaf31f8b7420d86ce111d19693fae5b2b7f147fd550cacc638d6687077"
+      "commit": "fe9158e603613392a332587364c8cdc418786574",
+      "sha256": "0b03435fb8460c28a5ac2ddfa971cfe25d1976f51c9d9b15a7f07b4597a8e8c5"
     },
     "Tests/Background/check_session_ownership.py": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
