@@ -7,16 +7,19 @@ protocol ObservableObject: AnyObject {
     var objectWillChange: ObjectWillChangePublisher { get }
 }
 @propertyWrapper struct Published<Value> { var wrappedValue: Value }
-@MainActor final class ObservableObjectPublisher {
-    private var next = 0
-    private var observers: [Int: (()) -> Void] = [:]
-    func sink(receiveValue: @escaping (()) -> Void) -> FacadeSubscription {
+// Keep the publisher type non-Sendable like Combine's actual declaration.
+// Only this fixture's subscriber state and operations belong to MainActor.
+final class ObservableObjectPublisher {
+    @MainActor private var next = 0
+    @MainActor private var observers: [Int: (()) -> Void] = [:]
+    @MainActor init() {}
+    @MainActor func sink(receiveValue: @escaping (()) -> Void) -> FacadeSubscription {
         next += 1
         let id = next
         observers[id] = receiveValue
         return FacadeSubscription { [weak self] in self?.observers.removeValue(forKey: id) }
     }
-    func send() { for callback in Array(observers.values) { callback(()) } }
+    @MainActor func send() { for callback in Array(observers.values) { callback(()) } }
 }
 @MainActor final class FacadeSubscription {
     private let end: () -> Void
