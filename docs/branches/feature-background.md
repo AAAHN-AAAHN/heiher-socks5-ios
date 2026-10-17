@@ -42,7 +42,7 @@ Playing is published after preparation, play success, `isPlaying`, matching sess
 
 ## Implementation and ownership
 
-`BackgroundKeepAlive` is the MainActor facade for location and displayed audio state. Each facade registers an audio owner token and asynchronously unregisters on destruction. The process audio service owns cleanup; an orphan view/controller closure never directly deactivates a shared session. Another enabled owner can retain an in-flight activation. The normal root creates one facade and does not tie its lifetime to the removable tab view.
+`BackgroundKeepAlive` is the MainActor facade for location and displayed audio state. Its ObservableObject conformance is explicitly MainActor-isolated, and its publisher uses an explicit Combine import. Each facade registers an audio owner token and asynchronously unregisters on destruction. The process audio service owns cleanup; an orphan view/controller closure never directly deactivates a shared session. Another enabled owner can retain an in-flight activation. The normal root creates one facade and does not tie its lifetime to the removable tab view.
 
 `LoopAudioService` has a short control queue and one exclusive I/O queue. The control queue owns the state machine, operation gate, failure episode, timer, monitor and diagnostic ring. The I/O queue alone creates and calls the endpoint. A short lock protects the latest aggregate intent, monotonic owner/revision/stop/resource identifiers, a fixed-bit inbox and publication/timing values. No AV operation, file access, platform wait, observer callback or dispatch sync executes inside that lock. Every control adoption preserves a pending Off-On stop barrier, including timer and admission paths.
 
@@ -64,9 +64,11 @@ The optional extension adapter uses a separate monotonic identity and semaphore 
 | --- | --- | --- |
 | `LoopAudioService: @unchecked Sendable` | Control-only policy state; I/O-only endpoint; lock-only ingress/publication/timing; notification tokens configured once on MainActor and removed at final destruction | Immutable command/reply/diagnostic values and short methods; no AV object returned |
 | Private `AudioEndpoint: @unchecked Sendable` | Player/session/data/generation accessed on its I/O queue; callback identity/receipt metadata under the delegate lock | Protocol operations on the supplied I/O queue; normalized events and value replies |
-| Private `LeaseStorage<Value: Sendable>: @unchecked Sendable` | Value-only lease metadata under one short NSLock; no platform function or wait inside its accessor | Used only within the lease file; checked Sendable lease, provider, end gate and holder surfaces |
+| Private `LeaseStorage<Value: Sendable>: @unchecked Sendable` | Value-only lease metadata under one short NSLock; no platform function or wait inside its accessor | File-private use with a Sendable result and closure; checked Sendable lease, provider, end gate and holder surfaces |
 
 The first two declarations reflect distinct existing queue/lock confinement domains; they are not broad permission to send AV objects to views or arbitrary closures. The lease refactor confines its unchecked synchronization to one private wrapper instead of adding unchecked annotations to each gate/holder. Strict-concurrency compilation and actual adapter queue assertions verify these boundaries. No diagnostic warning is hidden by disabling concurrency checks.
+
+There are three unchecked declarations across the module, so the approved single-private-wrapper target remains an explicit design variance. The private lease accessor requires a Sendable closure and result while preserving the existing lock and lifetime rules. This narrows that boundary but does not make the entire service compiler-checked.
 
 ## Design rationale and resource cost
 

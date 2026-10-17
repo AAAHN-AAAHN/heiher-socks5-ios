@@ -9,7 +9,7 @@ private final class LeaseStorage<Value: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
     private var value: Value
     init(_ value: Value) { self.value = value }
-    func withValue<Result>(_ body: (inout Value) -> Result) -> Result {
+    func withValue<Result: Sendable>(_ body: @Sendable (inout Value) -> Result) -> Result {
         lock.lock(); defer { lock.unlock() }
         return body(&value)
     }

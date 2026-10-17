@@ -76,8 +76,20 @@ struct AppSettings: Equatable {
     }
 }
 #else
-@MainActor protocol ObservableObject {}
-@MainActor final class ObservableObjectPublisher { func send() {} }
+#if canImport(Combine)
+import Combine
+#else
+protocol ObservableObject: AnyObject {
+    associatedtype ObjectWillChangePublisher = ObservableObjectPublisher
+    var objectWillChange: ObjectWillChangePublisher { get }
+}
+// A globally isolated class would be implicitly Sendable and hide the real
+// Combine publisher's nonisolated-witness boundary for a stored let property.
+final class ObservableObjectPublisher {
+    @MainActor init() {}
+    @MainActor func send() {}
+}
+#endif
 #if !canImport(Darwin)
 final class NSFileCoordinator {
     init(filePresenter: Any?) {}

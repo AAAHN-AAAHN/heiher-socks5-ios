@@ -20,12 +20,16 @@ private final class BoundaryValue<T>: @unchecked Sendable {
         }
     }
     @MainActor static func until(_ condition: () -> Bool, _ message: String,
-                                 timeout: Double = 3) async throws {
+                                 timeout: Double = 3, diagnostic: (() async -> String)? = nil) async throws {
         let end = ProcessInfo.processInfo.systemUptime + timeout
         while !condition() && ProcessInfo.processInfo.systemUptime < end {
             try await Task.sleep(nanoseconds: 1_000_000)
         }
-        check(condition(), message)
+        let reached = condition()
+        if !reached, let diagnostic {
+            FileHandle.standardError.write(Data((await diagnostic() + "\n").utf8))
+        }
+        check(reached, message)
     }
     @MainActor static func main() async throws {
         let name = CommandLine.arguments[1]
@@ -121,8 +125,16 @@ private final class BoundaryValue<T>: @unchecked Sendable {
         } else if name.hasPrefix("failure-") {
             let failures = Int(name.dropFirst(8))!
             fixture.use { $0.rejections["activate"] = failures }
+            let began = ProcessInfo.processInfo.systemUptime
             service.setEnabled(true, owner: owner)
-            try await until(playing, "FINITE_FAILURE_DID_NOT_RECOVER", timeout: 10)
+            try await until(playing, "FINITE_FAILURE_DID_NOT_RECOVER", timeout: 10, diagnostic: {
+                let observed = await snapshot()
+                let remaining = fixture.use { $0.rejections["activate", default: 0] }
+                let visible = state.use { $0 }
+                return "FINITE_FAILURE_DIAGNOSTIC elapsed=\(ProcessInfo.processInfo.systemUptime - began) " +
+                    "attempts=\(count("activate")) remaining=\(remaining) state=\(visible) control=\(observed)"
+            })
+            print("FINITE_FAILURE_ELAPSED rejections=\(failures) seconds=\(ProcessInfo.processInfo.systemUptime - began)")
             check(count("activate") == failures + 1, "FAILURE_ATTEMPT_COUNT")
             check(claims.use { $0.requested } == 1, "FAILED_EPISODE_REISSUED_TOKEN")
             try await stop()

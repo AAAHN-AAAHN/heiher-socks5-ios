@@ -2,7 +2,10 @@ import Foundation
 #if canImport(Combine)
 import Combine
 #else
-@MainActor protocol ObservableObject {}
+protocol ObservableObject: AnyObject {
+    associatedtype ObjectWillChangePublisher = ObservableObjectPublisher
+    var objectWillChange: ObjectWillChangePublisher { get }
+}
 @propertyWrapper struct Published<Value> { var wrappedValue: Value }
 @MainActor final class ObservableObjectPublisher {
     private var next = 0
