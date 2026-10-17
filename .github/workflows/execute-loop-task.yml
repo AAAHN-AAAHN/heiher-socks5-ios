@@ -1,0 +1,59 @@
+name: Loop implementation continuation
+on:
+  push:
+    branches: [work/loop-completion-20261017]
+    paths: [.github/workflows/execute-loop-task.yml, Diagnostics/task.json]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: loop-implementation-continuation
+  cancel-in-progress: false
+jobs:
+  continue:
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Execute selected immutable task
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          python3 - <<'PY'
+          import json,re,subprocess,sys
+          from pathlib import Path
+          task=json.loads(Path('Diagnostics/task.json').read_text())
+          name=task['script']
+          assert re.fullmatch(r'[a-z0-9_-]+\.py',name)
+          with Path('artifacts/task.log').open('w') as f:
+            p=subprocess.run([sys.executable,'Diagnostics/'+name],stdout=f,stderr=subprocess.STDOUT)
+          print(Path('artifacts/task.log').read_text())
+          Path('artifacts/task-result.json').write_text(json.dumps({'script':name,'exit_code':p.returncode})+'\n')
+          raise SystemExit(p.returncode)
+          PY
+      - name: Preserve working source and final process output
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          git rev-parse HEAD > artifacts/control-head.txt
+          git ls-remote --heads origin > artifacts/remote-heads.txt
+          if [ -d "$RUNNER_TEMP/product/artifacts" ]; then cp -R "$RUNNER_TEMP/product/artifacts" artifacts/product-artifacts; fi
+          if [ -e "$RUNNER_TEMP/product/.git" ]; then
+            git -C "$RUNNER_TEMP/product" status --porcelain=v1 > artifacts/product-status.txt
+            git -C "$RUNNER_TEMP/product" diff > artifacts/product-uncommitted.diff
+            git -C "$RUNNER_TEMP/product" diff --cached > artifacts/product-index.diff
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: loop-continuation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/
+          retention-days: 30
+          if-no-files-found: error
