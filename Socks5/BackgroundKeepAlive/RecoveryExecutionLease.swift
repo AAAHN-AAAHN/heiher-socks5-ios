@@ -3,15 +3,25 @@ import Foundation
 import UIKit
 #endif
 
-/// The only unchecked type in this file. It contains value-only lease metadata;
-/// no AV object, provider callback, system call or wait runs under this lock.
-private final class LeaseStorage<Value: Sendable>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value: Value
-    init(_ value: Value) { self.value = value }
+#if os(Linux)
+import Synchronization
+#else
+import os
+#endif
+
+/// Checked platform lock and Sendable metadata only. No AV object, provider
+/// callback, system call or wait runs in this accessor. The Darwin API is
+/// available from iOS 16; no iOS 18 Mutex or deployment-target change is needed.
+private final class LeaseStorage<Value: Sendable>: Sendable {
+    #if os(Linux)
+    private let value: Mutex<Value>
+    init(_ value: Value) { self.value = Mutex(value) }
+    #else
+    private let value: OSAllocatedUnfairLock<Value>
+    init(_ value: Value) { self.value = OSAllocatedUnfairLock(initialState: value) }
+    #endif
     func withValue<Result: Sendable>(_ body: @Sendable (inout Value) -> Result) -> Result {
-        lock.lock(); defer { lock.unlock() }
-        return body(&value)
+        value.withLock { body(&$0) }
     }
 }
 

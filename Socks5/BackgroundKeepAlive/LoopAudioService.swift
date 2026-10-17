@@ -7,14 +7,24 @@ import UIKit
 /// Implementations are exclusively entered on the supplied I/O queue. Async
 /// completions keep the single-flight gate closed until they actually arrive.
 protocol LoopAudioEndpoint: AnyObject {
+    func bind(_ relay: LoopAudioService.EndpointRelay)
     func perform(_ command: LoopAudioService.Command, context: LoopAudioService.Context,
                  completion: @escaping @Sendable (LoopAudioService.Reply) -> Void)
+    func receiveSession(_ receipt: LoopAudioService.SessionReceipt)
+    func receiveDelegate(_ receipt: LoopAudioService.DelegateReceipt)
 }
 
-/// Queue confinement: control owns policy; io owns the endpoint. The short lock
-/// protects only ingress, cancellation and published values. It never encloses AV
-/// calls, file I/O, client callbacks, or dispatch sync. No queue waits on another.
-final class LoopAudioService: @unchecked Sendable {
+// Injected endpoints without system callbacks need only implement perform.
+// The actual adapter binds its owner mailbox once before its first operation.
+extension LoopAudioEndpoint {
+    func bind(_ relay: LoopAudioService.EndpointRelay) {}
+    func receiveSession(_ receipt: LoopAudioService.SessionReceipt) {}
+    func receiveDelegate(_ receipt: LoopAudioService.DelegateReceipt) {}
+}
+
+/// Checked immutable API. The private queue owner confines all mutable service
+/// state and the non-Sendable adapter; no AV object crosses this surface.
+final class LoopAudioService: Sendable {
     enum Event: Sendable { case hint, available, interrupted, mediaLost, mediaReset, routeChanged, decoderFailed }
     enum Command: Sendable { case inspect, start(rebuild: Bool), stop }
     enum Phase: String, Sendable {
@@ -73,6 +83,80 @@ final class LoopAudioService: @unchecked Sendable {
     }
     typealias Observer = @MainActor @Sendable (State) -> Void
     typealias Factory = @Sendable (DispatchQueue, @escaping @Sendable (Event) -> Void) -> any LoopAudioEndpoint
+
+    /// System callbacks carry immutable receipts, never player/session objects.
+    struct SessionReceipt: Sendable {
+        let operation: UInt64
+        let success: Bool
+        let error: Error?
+    }
+    struct DelegateReceipt: Sendable {
+        let generation: UInt64
+        let decoder: Bool
+    }
+    struct EndpointRelay: Sendable {
+        let session: @Sendable (SessionReceipt) -> Void
+        let delegate: @Sendable (DelegateReceipt) -> Void
+        let generation: @Sendable (UInt64?) -> Void
+    }
+
+    private let queueOwner: LoopAudioQueueOwner
+
+    init(policy: Policy = Policy(),
+         leaseProvider: @escaping @Sendable () -> RecoveryExecutionLease.Provider = { .unavailable },
+         endpointFactory: @escaping Factory) {
+        queueOwner = LoopAudioQueueOwner(policy: policy, leaseProvider: leaseProvider,
+                                         endpointFactory: endpointFactory)
+    }
+
+    #if canImport(AVFAudio) && canImport(UIKit)
+    @MainActor static let shared: LoopAudioService = {
+        let provider = RecoveryExecutionLease.Provider.application(UIApplication.shared)
+        let service = LoopAudioService(leaseProvider: { provider }) { queue, event in
+            AudioEndpoint(queue: queue, event: event)
+        }
+        // Observe on the posting thread and coalesce immediately. A blocked main
+        // run loop must not accumulate an unbounded receive(on:) audio backlog.
+        service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,
+                                          normalize: { BackgroundKeepAlive.audioEventValue($0) })
+        return service
+    }()
+    #endif
+
+    @MainActor func observeAudioNotifications(_ names: [Notification.Name],
+                                             normalize: @escaping @Sendable (Notification) -> Event) {
+        queueOwner.observeAudioNotifications(names, normalize: normalize)
+    }
+    @discardableResult func register(_ observer: @escaping Observer) -> UInt64 {
+        queueOwner.register(observer)
+    }
+    func setEnabled(_ enabled: Bool, owner: UInt64, explicit: Bool = true) {
+        queueOwner.setEnabled(enabled, owner: owner, explicit: explicit)
+    }
+    func unregister(_ owner: UInt64) { queueOwner.unregister(owner) }
+    func notify(_ event: Event) { queueOwner.notify(event) }
+    func diagnostics(_ completion: @escaping @Sendable (Diagnostics) -> Void) {
+        queueOwner.diagnostics(completion)
+    }
+}
+
+/// The module's single private unchecked boundary. It owns both queues and
+/// enforces control-only policy, I/O-only endpoint access, and short lock-only
+/// ingress/publication/receipt metadata. No external call runs under that lock.
+private final class LoopAudioQueueOwner: @unchecked Sendable {
+    typealias Event = LoopAudioService.Event
+    typealias Command = LoopAudioService.Command
+    typealias Phase = LoopAudioService.Phase
+    typealias State = LoopAudioService.State
+    typealias Reply = LoopAudioService.Reply
+    typealias Context = LoopAudioService.Context
+    typealias Policy = LoopAudioService.Policy
+    typealias Diagnostics = LoopAudioService.Diagnostics
+    typealias Observer = LoopAudioService.Observer
+    typealias Factory = LoopAudioService.Factory
+    typealias SessionReceipt = LoopAudioService.SessionReceipt
+    typealias DelegateReceipt = LoopAudioService.DelegateReceipt
+    typealias EndpointRelay = LoopAudioService.EndpointRelay
 
     private struct Owner { var enabled: Bool; let observer: Observer }
     private struct Ticket: Sendable {
@@ -145,6 +229,13 @@ final class LoopAudioService: @unchecked Sendable {
     private var monitor = PlaybackProgressMonitor()
     private var records: [String] = []
     private var notificationTokens: [NSObjectProtocol] = []
+    // Callback ingress: a fixed session slot, fixed delegate slot and one drain.
+    // Only immutable receipts cross into I/O; the adapter is never captured.
+    private var ioSessionReceipt: SessionReceipt?
+    private var ioReceiptOperation: UInt64?
+    private var ioDelegateGeneration: UInt64?
+    private var ioDelegateReceipt: DelegateReceipt?
+    private var ioDeliveryQueued = false
 
     init(policy: Policy = Policy(),
          leaseProvider: @escaping @Sendable () -> RecoveryExecutionLease.Provider = { .unavailable },
@@ -154,20 +245,6 @@ final class LoopAudioService: @unchecked Sendable {
         self.leaseProvider = leaseProvider().serializingEnds()
         factory = endpointFactory
     }
-
-    #if canImport(AVFAudio) && canImport(UIKit)
-    @MainActor static let shared: LoopAudioService = {
-        let provider = RecoveryExecutionLease.Provider.application(UIApplication.shared)
-        let service = LoopAudioService(leaseProvider: { provider }) { queue, event in
-            AudioEndpoint(queue: queue, event: event)
-        }
-        // Observe on the posting thread and coalesce immediately. A blocked main
-        // run loop must not accumulate an unbounded receive(on:) audio backlog.
-        service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,
-                                          normalize: BackgroundKeepAlive.audioEventValue)
-        return service
-    }()
-    #endif
 
     /// Root setup only. Repeated view restoration does not add subscriptions.
     /// NotificationCenter invokes this mailbox on the posting thread.
@@ -391,6 +468,10 @@ final class LoopAudioService: @unchecked Sendable {
             }
             if self.endpoint == nil {
                 self.endpoint = self.factory(self.io) { [weak self] in self?.notify($0) }
+                self.endpoint?.bind(EndpointRelay(
+                    session: { [weak self] in self?.acceptSession($0) },
+                    delegate: { [weak self] in self?.acceptDelegate($0) },
+                    generation: { [weak self] in self?.setDelegateGeneration($0) }))
             }
             let context = Context(id: job.id, epoch: input.epoch,
                                   mayStart: { [weak self] in self?.valid(input) == true },
@@ -403,6 +484,51 @@ final class LoopAudioService: @unchecked Sendable {
                 control.async { self.finish(job, reply) }
             }
         }
+    }
+
+    private func acceptSession(_ receipt: SessionReceipt) {
+        lock.lock()
+        guard timing.id == receipt.operation, timing.resultAvailableAt == nil,
+              ioReceiptOperation != receipt.operation else { lock.unlock(); return }
+        ioReceiptOperation = receipt.operation
+        ioSessionReceipt = receipt
+        let enqueue = enqueueIOLocked()
+        lock.unlock()
+        if enqueue { io.async { self.drainIOReceipts() } }
+    }
+    private func acceptDelegate(_ receipt: DelegateReceipt) {
+        lock.lock()
+        guard ioDelegateGeneration == receipt.generation else { lock.unlock(); return }
+        ioDelegateReceipt = DelegateReceipt(generation: receipt.generation,
+            decoder: receipt.decoder || (ioDelegateReceipt?.decoder ?? false))
+        let enqueue = enqueueIOLocked()
+        lock.unlock()
+        if enqueue { io.async { self.drainIOReceipts() } }
+    }
+    private func setDelegateGeneration(_ generation: UInt64?) {
+        dispatchPrecondition(condition: .onQueue(io))
+        lock.lock()
+        ioDelegateGeneration = generation
+        ioDelegateReceipt = nil
+        // An already queued drain still owns its queued bit until it starts.
+        lock.unlock()
+    }
+    private func enqueueIOLocked() -> Bool {
+        guard !ioDeliveryQueued else { return false }
+        ioDeliveryQueued = true
+        return true
+    }
+    private func drainIOReceipts() {
+        dispatchPrecondition(condition: .onQueue(io))
+        lock.lock()
+        let session = ioSessionReceipt
+        let delegate = ioDelegateReceipt
+        ioSessionReceipt = nil
+        ioDelegateReceipt = nil
+        ioDeliveryQueued = false
+        lock.unlock()
+        if let session { endpoint?.receiveSession(session) }
+        if let delegate { endpoint?.receiveDelegate(delegate) }
     }
 
     private func mark(_ id: UInt64, _ phase: Phase, entered: Bool = false) {
@@ -596,9 +722,9 @@ final class LoopAudioService: @unchecked Sendable {
 }
 
 #if canImport(AVFAudio) && canImport(UIKit)
-/// Only the service I/O queue touches player/session. Delegate callbacks carry a
-/// weak object identity back to this queue; they never inspect the player elsewhere.
-private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint, AVAudioPlayerDelegate, @unchecked Sendable {
+/// Only the service I/O queue touches player/session. Delegate callbacks carry
+/// an immutable generation back to that queue without retaining any AV object.
+private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
     private let queue: DispatchQueue
     private let event: @Sendable (LoopAudioService.Event) -> Void
     private var player: AVAudioPlayer?
@@ -606,17 +732,36 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint, AVAu
     private var generation: UInt64 = 0
     private var activationPending: UInt64?
     private var sessionUsed = false
-    private let delegateLock = NSLock()
-    private weak var delegateSource: AVAudioPlayer?
-    private var delegateGeneration: UInt64 = 0
-    private var delegateQueued = false
-    private var delegateEvent: (generation: UInt64, decoder: Bool)?
-    private var sessionReceipt: UInt64?
-    private var sessionReceiptQueued = false
+    private var relay: LoopAudioService.EndpointRelay?
+    private var delegate: DelegateProxy?
+    // I/O-only plain closure. It retains the operation's service completion
+    // until the actual receipt, then is cleared before any callback/reentry.
+    private var activationCompletion: ((Bool, String?) -> Void)?
+
+    private final class DelegateProxy: NSObject, AVAudioPlayerDelegate, Sendable {
+        let generation: UInt64
+        let event: @Sendable (LoopAudioService.DelegateReceipt) -> Void
+        init(generation: UInt64, event: @escaping @Sendable (LoopAudioService.DelegateReceipt) -> Void) {
+            self.generation = generation
+            self.event = event
+            super.init()
+        }
+        func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+            event(.init(generation: generation, decoder: false))
+        }
+        func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+            event(.init(generation: generation, decoder: true))
+        }
+    }
 
     init(queue: DispatchQueue, event: @escaping @Sendable (LoopAudioService.Event) -> Void) {
         self.queue = queue
         self.event = event
+    }
+    func bind(_ relay: LoopAudioService.EndpointRelay) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        precondition(self.relay == nil, "Audio endpoint relay can bind only once")
+        self.relay = relay
     }
     private func error(_ message: String) -> NSError {
         NSError(domain: "LoopAudio", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
@@ -633,10 +778,8 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint, AVAu
     }
     private func discard(_ context: LoopAudioService.Context) {
         context.phase(.stopping)
-        delegateLock.lock()
-        delegateSource = nil
-        delegateEvent = nil
-        delegateLock.unlock()
+        relay?.generation(nil)
+        delegate = nil
         player?.delegate = nil
         player?.stop()
         player = nil
@@ -727,8 +870,11 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint, AVAu
                             guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
                             player?.numberOfLoops = -1
                             guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
-                            delegateLock.lock(); delegateSource = player; delegateGeneration = generation; delegateLock.unlock()
-                            player?.delegate = self
+                            guard let relay else { preconditionFailure("Audio endpoint relay is missing") }
+                            relay.generation(generation)
+                            let proxy = DelegateProxy(generation: generation, event: relay.delegate)
+                            delegate = proxy
+                            player?.delegate = proxy
                         }
                         guard let active = player else { throw error("Audio player unavailable") }
                         guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
@@ -751,28 +897,16 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint, AVAu
     }
 
     private func changeSession(_ active: Bool, context: LoopAudioService.Context,
-                               completion: @escaping @Sendable (Bool, String?) -> Void) {
+                               completion: @escaping (Bool, String?) -> Void) {
         let session = AVAudioSession.sharedInstance()
         guard !active || context.mayStart() else { completion(false, "Session activation superseded"); return }
         if active { sessionUsed = true } // A returned error can still have external effects.
         activationPending = context.id
         if #available(iOS 27.0, *) {
-            delegateLock.lock()
-            sessionReceipt = context.id
-            sessionReceiptQueued = false
-            delegateLock.unlock()
-            let receive: @Sendable (Bool, Error?) -> Void = { [self] success, error in
-                delegateLock.lock()
-                guard sessionReceipt == context.id, !sessionReceiptQueued else { delegateLock.unlock(); return }
-                sessionReceiptQueued = true
-                delegateLock.unlock()
-                queue.async { [self] in
-                    guard activationPending == context.id else { return }
-                    delegateLock.lock(); sessionReceipt = nil; delegateLock.unlock()
-                    activationPending = nil
-                    let message = error?.localizedDescription
-                    completion(success && error == nil, message ?? (success ? nil : "Session request was not accepted"))
-                }
+            guard let relay else { preconditionFailure("Audio endpoint relay is missing") }
+            activationCompletion = completion
+            let receive: @Sendable (Bool, Error?) -> Void = { [relay, operation = context.id] success, error in
+                relay.session(.init(operation: operation, success: success, error: error))
             }
             if active { session.activate(options: [], completionHandler: receive) }
             else { session.deactivate(options: [.notifyOthersOnDeactivation], completionHandler: receive) }
@@ -787,29 +921,20 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint, AVAu
             }
         }
     }
-    private func delegateStopped(_ source: AVAudioPlayer, decoder: Bool) {
-        delegateLock.lock()
-        guard delegateSource === source else { delegateLock.unlock(); return }
-        delegateEvent = (delegateGeneration, (delegateEvent?.decoder ?? false) || decoder)
-        let enqueue = !delegateQueued
-        delegateQueued = true
-        delegateLock.unlock()
-        guard enqueue else { return }
-        queue.async { [self] in
-            delegateLock.lock()
-            let pending = delegateEvent
-            delegateEvent = nil
-            delegateQueued = false
-            delegateLock.unlock()
-            guard let pending, pending.generation == generation, player != nil else { return }
-            event(pending.decoder ? .decoderFailed : .interrupted)
-        }
+    func receiveSession(_ receipt: LoopAudioService.SessionReceipt) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard activationPending == receipt.operation else { return }
+        let completion = activationCompletion
+        activationPending = nil
+        activationCompletion = nil
+        let message = receipt.error?.localizedDescription
+        completion?(receipt.success && receipt.error == nil,
+                    message ?? (receipt.success ? nil : "Session request was not accepted"))
     }
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        delegateStopped(player, decoder: false)
-    }
-    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
-        delegateStopped(player, decoder: true)
+    func receiveDelegate(_ receipt: LoopAudioService.DelegateReceipt) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard receipt.generation == generation, player != nil else { return }
+        event(receipt.decoder ? .decoderFailed : .interrupted)
     }
 }
 #endif
