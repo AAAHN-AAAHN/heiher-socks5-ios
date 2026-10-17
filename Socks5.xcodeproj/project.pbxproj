@@ -23,6 +23,9 @@
 		F01458C735412E0D383C0D64 /* TrafficStatistics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F2AD6594E2C498AD1D258B /* TrafficStatistics.swift */; };
 		F0304AB3D1EBB5612B39426F /* TrafficStatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F029B5868B1526CF1898650C /* TrafficStatisticsView.swift */; };
 		79C209175522815501263791 /* ServerSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C209175522815501263790 /* ServerSettings.swift */; };
+		D81EE6C89C4DD5403AC6713C /* LoopAudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F9B5CC12A9492842F7E1899 /* LoopAudioService.swift */; };
+		031A8B56E58245F7D9FF0A2C /* PlaybackProgressMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91A99E4054FF1E39D64D00F /* PlaybackProgressMonitor.swift */; };
+		32F0A970598CABE6B37F1DEF /* RecoveryExecutionLease.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A945561DFD684F00CE6B275 /* RecoveryExecutionLease.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,6 +47,9 @@
 		F0F2AD6594E2C498AD1D258B /* TrafficStatistics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrafficStatistics.swift"; sourceTree = "<group>"; };
 		F029B5868B1526CF1898650C /* TrafficStatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrafficStatisticsView.swift"; sourceTree = "<group>"; };
 		79C209175522815501263790 /* ServerSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSettings.swift; sourceTree = "<group>"; };
+		1F9B5CC12A9492842F7E1899 /* LoopAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LoopAudioService.swift"; sourceTree = "<group>"; };
+		C91A99E4054FF1E39D64D00F /* PlaybackProgressMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlaybackProgressMonitor.swift"; sourceTree = "<group>"; };
+		1A945561DFD684F00CE6B275 /* RecoveryExecutionLease.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoveryExecutionLease.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -104,6 +110,9 @@
 			isa = PBXGroup;
 			children = (
 				F09E6B82453D1079B3356F4A /* BackgroundKeepAlive.swift */,
+				1A945561DFD684F00CE6B275 /* RecoveryExecutionLease.swift */,
+				C91A99E4054FF1E39D64D00F /* PlaybackProgressMonitor.swift */,
+				1F9B5CC12A9492842F7E1899 /* LoopAudioService.swift */,
 				F047825098A1831435A0B452 /* BackgroundKeepAliveView.swift */,
 				F0A3C2B384BE8C1E7A3E7ECF /* Silence.wav */,
 			);
@@ -212,6 +221,9 @@
 				D30F96602C18058B002DB6BF /* ContentView.swift in Sources */,
 				F0B49EF432005E531F41803A /* AppRoot.swift in Sources */,
 				F0301EB5F2CF2B728DA9BA91 /* BackgroundKeepAlive.swift in Sources */,
+				32F0A970598CABE6B37F1DEF /* RecoveryExecutionLease.swift in Sources */,
+				031A8B56E58245F7D9FF0A2C /* PlaybackProgressMonitor.swift in Sources */,
+				D81EE6C89C4DD5403AC6713C /* LoopAudioService.swift in Sources */,
 				F024F5BAEE919A12B6FB1D80 /* BackgroundKeepAliveView.swift in Sources */,
 				F0D57C5237027ACBCE64F90B /* ServerController.swift in Sources */,
 				79C209175522815501263791 /* ServerSettings.swift in Sources */,

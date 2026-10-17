@@ -123,13 +123,24 @@ def composition():
         silence(ROOT / 'Socks5/BackgroundKeepAlive/Silence.wav')
         view = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift').read_text()
         source = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift').read_text()
+        for event in ('interruptionNotification', 'routeChangeNotification',
+                      'mediaServicesWereLostNotification', 'mediaServicesWereResetNotification',
+                      'didBecomeInactiveNotification', 'resumptionRecommendationNotification',
+                      'didBecomeActiveNotification', 'silenceSecondaryAudioHintNotification',
+                      'spatialPlaybackCapabilitiesChangedNotification', 'renderingModeChangeNotification',
+                      'renderingCapabilitiesChangeNotification', 'outputMuteStateChangeNotification',
+                      'userIntentToUnmuteOutputNotification'):
+            assert event in source, event
         service = (ROOT / 'Socks5/BackgroundKeepAlive/LoopAudioService.swift').read_text()
         assert 'service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,' in service
         assert 'normalize: BackgroundKeepAlive.audioEventValue)' in service
         assert 'BackgroundKeepAlive.audioNotifications' not in view
         assert 'var interval = 0.5' in service
         assert service.count('DispatchSource.makeTimerSource(queue: control)') == 1
+        assert 'precondition(outstanding == 1)' in service
+        assert 'if next.stop != current.stop { releaseBarrier = true }' in service
         assert 'Timer(timeInterval:' not in source + service
+        assert 'AVAudioPlayer' not in source and 'retryDelay' not in source
         assert 'UserDefaults' not in source + service
         assert 'private let audio: LoopAudioService' in source
     if 'server' in FEATURES:

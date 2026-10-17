@@ -94,6 +94,17 @@ def optimization_boundaries():
     # at its first external command; no fake successful Swift or Apple run occurs.
     class ExternalBoundary(Exception):
         pass
+    # Old entry bodies extract the old view's Combine publisher before invoking
+    # a compiler. Give those exact controls their exact historical local inputs;
+    # the current service intentionally no longer has that view-owned publisher.
+    baseline = '618b3d2b413937aaad7373ee2af9e693ec81b84a'
+    prior_inputs = {
+        ROOT / path: subprocess.check_output(['git', '-C', str(ROOT), 'show', baseline + ':' + path]).decode()
+        for path in ('Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift',
+                     'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift',
+                     'Tests/Background/PlatformMocks.swift')
+    }
+    actual_read = Path.read_text
     count = 0
     for name, blob in [
         ('check_async_session.py', '09a38bab32299a982f22a1af1843afb2dfc12029'),
@@ -104,8 +115,13 @@ def optimization_boundaries():
         for label, source in [('prior-control', original(blob)), ('current', path.read_bytes())]:
             for optimize in (0, 1):
                 reached = False
+                def input_read(path, *args, **kwargs):
+                    if label == 'prior-control' and path in prior_inputs:
+                        return prior_inputs[path]
+                    return actual_read(path, *args, **kwargs)
                 with mock.patch.object(subprocess, 'check_output', side_effect=ExternalBoundary), \
-                     mock.patch.object(subprocess, 'run', side_effect=ExternalBoundary):
+                     mock.patch.object(subprocess, 'run', side_effect=ExternalBoundary), \
+                     mock.patch.object(Path, 'read_text', autospec=True, side_effect=input_read):
                     try:
                         exec(compile(source, str(path), 'exec', optimize=optimize),
                              {'__name__': '__main__', '__file__': str(path)})

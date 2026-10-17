@@ -53,6 +53,9 @@ def main():
     additions = {'Socks5/AppRoot.swift', 'Socks5/Info.plist',
                  'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift',
                  'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift',
+                 'Socks5/BackgroundKeepAlive/LoopAudioService.swift',
+                 'Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift',
+                 'Socks5/BackgroundKeepAlive/RecoveryExecutionLease.swift',
                  'Socks5/BackgroundKeepAlive/Silence.wav', 'docs/features/background.md'}
     assert set(base_paths) <= set(current_paths), 'A main file was removed'
     for path in set(current_paths) - set(base_paths):
@@ -100,19 +103,42 @@ def main():
     assert 'ScrollView { ContentView() }' in root
     for name in ('location', 'audio'):
         assert '.onChange(of: ' + name + 'Enabled, initial: true)' in root
-        assert 'keepAlive.set' + name.title() + '(value)' in root
-        assert name + 'Enabled: $' + name + 'Enabled' in root
+    assert 'locationEnabled: $locationEnabled' in root
+    assert 'keepAlive.setLocation(value)' in root
+    assert 'keepAlive.syncAudio(value)' in root
+    binding = root[root.index('audioEnabled: Binding('):root.index('.tabItem { Label("Background"')]
+    assert binding.index('keepAlive.setAudio(value)') < binding.index('audioEnabled = value')
     controller = text('Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift')
     assert all(token not in controller for token in ('UserDefaults', 'AppStorage', 'HevSocks5Server',
                                                     'BGTaskScheduler', 'MPRemoteCommandCenter'))
-    assert controller.count('Timer(timeInterval:') == 1
-    assert 'private static let audioCheckInterval: TimeInterval = 0.5' in controller
-    assert 'Timer(timeInterval: Self.audioCheckInterval, repeats: false)' in controller
-    assert 'scheduleAudioCheck(after:' not in controller
-    assert 'serviceProbeInterval' not in controller
+    assert all(token not in controller for token in ('Timer(', 'AVAudioPlayer', 'AVAudioSession.sharedInstance'))
+    assert 'deinit { audio.unregister(audioOwner) }' in controller
+    assert 'audio.setEnabled(enabled, owner: audioOwner)' in controller
+    service = text('Socks5/BackgroundKeepAlive/LoopAudioService.swift')
+    assert service.count('DispatchSource.makeTimerSource(queue: control)') == 1
+    assert 'var interval = 0.5' in service and 'var warning = 2.0' in service and 'var stalled = 10.0' in service
+    assert 'var speculativeRecoveryCertified = false' in service
+    assert 'precondition(outstanding == 1)' in service
+    assert 'guard work == nil else { return }' in service
+    assert 'if next.stop != current.stop { releaseBarrier = true }' in service
+    assert 'guard !inbox.queued else { return false }' in service
+    assert 'queue: nil)' in service and 'self?.notify(normalize(note))' in service
+    assert not re.search(r'\.sync\(', service)
+    assert 'if records.count == 64 { records.removeFirst() }' in service
+    # Actual target references, build-file membership, group membership and SDK
+    # compiler input must all include each new module, not merely name a file.
+    phase = project[project.index('/* Begin PBXSourcesBuildPhase section */'):project.index('/* End PBXSourcesBuildPhase section */')]
+    sdk = text('Tests/Background/check_audio_sdk.sh')
+    for name in ('LoopAudioService.swift', 'PlaybackProgressMonitor.swift', 'RecoveryExecutionLease.swift'):
+        build = re.search(r'([A-F0-9]{24}) /\* ' + re.escape(name) + r' in Sources \*/ = \{isa = PBXBuildFile; fileRef = ([A-F0-9]{24})', project)
+        assert build and build[1] + ' /* ' + name + ' in Sources */' in phase, name
+        assert '/* ' + name + ' */ = {isa = PBXFileReference;' in project, name
+        assert 'Socks5/BackgroundKeepAlive/' + name in sdk, name
+    assert '-strict-concurrency=complete' in sdk and '-warnings-as-errors' in sdk
     view = text('Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift')
     assert view.index('Text("Audio")') < view.index('Text("Location")')
-    assert 'BackgroundKeepAlive.audioNotifications.map' in view
+    assert 'private let audioEvents' not in view
+    assert 'service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,' in service
     assert data('README.md') == data('docs/features/background.md')
     assert hashlib.sha256(data('Socks5/BackgroundKeepAlive/Silence.wav')).hexdigest() == (
         '26131825c935435301fb05d3549d815bc93b1e717d6228d890ee9578dd00025e')
