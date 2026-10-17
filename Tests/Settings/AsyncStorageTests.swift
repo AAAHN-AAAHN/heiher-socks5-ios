@@ -75,7 +75,7 @@ struct AsyncStorageTests {
         do { try await operation(); fatalError("operation unexpectedly accepted") }
         catch { assertions += 1 }
     }
-    @MainActor static func make(_ url: URL, _ defaults: UserDefaults, _ p: DiskProbe) -> SettingsStore {
+    @MainActor private static func make(_ url: URL, _ defaults: UserDefaults, _ p: DiskProbe) -> SettingsStore {
         SettingsStore(fileURL:url,legacy:defaults,
             storage:.init(read:{ try p.read($0) },write:{ try p.write($0,$1) },imported:{ try p.imported($0) }))
     }
