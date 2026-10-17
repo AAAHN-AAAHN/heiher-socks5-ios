@@ -10,16 +10,21 @@ struct AppRoot: View {
                 set: { settings.set(\.selectedTab, $0) })
     }
 
+    private func restoreServices() {
+        guard settings.loadState == .ready else { return }
+        server.apply(settings.value.server, running: settings.value.serverRunning)
+    }
+
     var body: some View {
         TabView(selection: selectedTab) {
             ScrollView {
                 ContentView(configuration: settings.binding(\.server), server: server,
                             start: {
-                                settings.set(\.serverRunning, true)
                                 server.apply(settings.value.server, running: true, retry: true)
+                                settings.set(\.serverRunning, true)
                             }, stop: {
-                                settings.set(\.serverRunning, false)
                                 server.apply(settings.value.server, running: false)
+                                settings.set(\.serverRunning, false)
                             }, stopEnabled: server.isRunning || settings.value.serverRunning,
                             errorMessage: settings.errorMessage)
             }
@@ -29,8 +34,7 @@ struct AppRoot: View {
                 .tabItem { Label("Settings", systemImage: "square.and.arrow.up") }
                 .tag(AppSettings.Tab.settings)
         }
-        .onChange(of: settings.value, initial: true) { _, value in
-            server.apply(value.server, running: value.serverRunning)
-        }
+        .onChange(of: settings.value, initial: true) { _, _ in restoreServices() }
+        .onChange(of: settings.loadState) { _, _ in restoreServices() }
     }
 }
