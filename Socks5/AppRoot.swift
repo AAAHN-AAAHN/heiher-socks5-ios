@@ -5,6 +5,56 @@ struct AppRoot: View {
     @StateObject private var settings = SettingsStore()
     @StateObject private var server = ServerController()
     @StateObject private var keepAlive = BackgroundKeepAlive()
+    @State private var appliedSettingsChange: SettingsStore.Change?
+
+    private var audioEnabled: Binding<Bool> {
+        Binding(get: { self.settings.value.background.silentAudio }, set: applyAudioIntent)
+    }
+
+    private func applyAudioIntent(_ enabled: Bool) {
+        let previous = settings.change
+        // Every explicit choice reaches the service before persistence, including
+        // an unchanged Off or On. Publication may synchronously accept a newer input.
+        keepAlive.setAudio(enabled)
+        guard settings.change == previous else { return }
+        settings.set(\.background.silentAudio, enabled, origin: .user)
+    }
+
+    private func startServer() {
+        let previous = settings.change
+        // A Start during initial loading is retained as intent, then applied with
+        // the loaded configuration rather than the temporary default fields.
+        if settings.loadState == .ready {
+            server.apply(settings.value.server, running: true, retry: true)
+        }
+        guard settings.change == previous else { return }
+        settings.set(\.serverRunning, true)
+    }
+
+    private func stopServer() {
+        let previous = settings.change
+        server.apply(settings.value.server, running: false)
+        guard settings.change == previous else { return }
+        settings.set(\.serverRunning, false)
+    }
+
+    private func restoreServices() {
+        guard settings.loadState == .ready else { return }
+        let change = settings.change
+        guard appliedSettingsChange != change else { return }
+        let value = settings.value
+        // Compare the whole change: a load and its queued import can share an
+        // intent revision while having distinct origins. A user change here is
+        // its persistence echo; load/import restoration is also non-explicit.
+        appliedSettingsChange = change
+        if keepAlive.locationEnabled != value.background.continuousLocation {
+            keepAlive.setLocation(value.background.continuousLocation)
+        }
+        guard settings.loadState == .ready, settings.change == change else { return }
+        keepAlive.syncAudio(value.background.silentAudio)
+        guard settings.loadState == .ready, settings.change == change else { return }
+        server.apply(value.server, running: value.serverRunning)
+    }
 
     var body: some View {
         TabView(selection: settings.binding(\.selectedTab)) {
@@ -13,35 +63,23 @@ struct AppRoot: View {
                 .tag(AppSettings.Tab.statistics)
             ScrollView {
                 ContentView(configuration: settings.binding(\.server), server: server,
-                            start: {
-                                settings.set(\.serverRunning, true)
-                                server.apply(settings.value.server, running: true, retry: true)
-                            }, stop: {
-                                settings.set(\.serverRunning, false)
-                                server.apply(settings.value.server, running: false)
-                            }, stopEnabled: server.isRunning || settings.value.serverRunning,
+                            start: startServer, stop: stopServer,
+                            stopEnabled: server.isRunning || settings.value.serverRunning,
                             errorMessage: settings.errorMessage)
             }
                 .tabItem { Label("Server", systemImage: "network") }
                 .tag(AppSettings.Tab.server)
             BackgroundKeepAliveView(keepAlive: keepAlive,
                                     locationEnabled: settings.binding(\.background.continuousLocation),
-                                    audioEnabled: settings.binding(\.background.silentAudio))
+                                    audioEnabled: audioEnabled)
                 .tabItem { Label("Background", systemImage: "switch.2") }
                 .tag(AppSettings.Tab.background)
             SettingsView(settings: settings)
                 .tabItem { Label("Settings", systemImage: "square.and.arrow.up") }
                 .tag(AppSettings.Tab.settings)
         }
-        .onChange(of: settings.value, initial: true) { _, value in
-            if keepAlive.locationEnabled != value.background.continuousLocation {
-                keepAlive.setLocation(value.background.continuousLocation)
-            }
-            if keepAlive.audioEnabled != value.background.silentAudio {
-                keepAlive.setAudio(value.background.silentAudio)
-            }
-            server.apply(value.server, running: value.serverRunning)
-        }
+        .onChange(of: settings.change, initial: true) { _, _ in restoreServices() }
+        .onChange(of: settings.loadState) { _, _ in restoreServices() }
         .modifier(BackgroundKeepAliveEvents(keepAlive: keepAlive))
     }
 }

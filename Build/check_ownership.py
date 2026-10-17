@@ -61,11 +61,19 @@ def main():
     assert root.count('@StateObject private var server = ServerController()') == 1
     if 'settings' in FEATURES:
         assert 'Socks5/Settings/SettingsStore.swift' in manifest.get('files', {}), 'Store changes must be explicitly hash-locked'
-        assert (ROOT / 'Socks5/Settings/SettingsView.swift').read_bytes() == show(INPUT, 'Socks5/Settings/SettingsView.swift')
-        model_without_server = original[:original.index('struct ServerSettings:')] + original[original.index('enum SettingsError:'):]
-        model_without_server = model_without_server.replace('Settings file exceeds 64 KB.',
-                                                            'Settings file exceeds 65,536 bytes.')
-        assert content('Socks5/Settings/AppSettings.swift') == model_without_server
+        if CONFIG['name'] == 'integrated':
+            # Settings owns its asynchronous API and Sendable value model. Exact
+            # owner bytes replace the former synchronous implementation boundary.
+            owner = manifest['branches']['feature/settings-persistence']
+            for path in ('Socks5/Settings/SettingsView.swift', 'Socks5/Settings/AppSettings.swift',
+                         'Socks5/Settings/SettingsStore.swift'):
+                assert (ROOT / path).read_bytes() == show(owner, path), path
+        else:
+            assert (ROOT / 'Socks5/Settings/SettingsView.swift').read_bytes() == show(INPUT, 'Socks5/Settings/SettingsView.swift')
+            model_without_server = original[:original.index('struct ServerSettings:')] + original[original.index('enum SettingsError:'):]
+            model_without_server = model_without_server.replace('Settings file exceeds 64 KB.',
+                                                                'Settings file exceeds 65,536 bytes.')
+            assert content('Socks5/Settings/AppSettings.swift') == model_without_server
         assert 'server.apply(value.server, running: value.serverRunning)' in root
         assert 'settings.binding(\\.server)' in root
     else:
@@ -73,7 +81,8 @@ def main():
         assert 'requestedRunning = false' in root and '@State private var configuration = ServerSettings()' in root
     if 'background' in FEATURES:
         assert root.count('.modifier(BackgroundKeepAliveEvents(keepAlive: keepAlive))') == 1
-        assert 'keepAlive.setAudio(value.background.silentAudio)' in root
+        assert 'keepAlive.syncAudio(value.background.silentAudio)' in root
+        assert 'keepAlive.setAudio(enabled)' in root
         assert 'keepAlive.setLocation(value.background.continuousLocation)' in root
     checked = 0
     for ref in manifest.get('branches', {}).values():

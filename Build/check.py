@@ -122,12 +122,15 @@ def composition():
     if 'background' in FEATURES:
         silence(ROOT / 'Socks5/BackgroundKeepAlive/Silence.wav')
         view = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift').read_text()
-        assert 'BackgroundKeepAlive.audioNotifications.map' in view
         source = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift').read_text()
-        assert 'private static let audioCheckInterval: TimeInterval = 0.5' in source
-        assert 'Timer(timeInterval: Self.audioCheckInterval, repeats: false)' in source
-        assert 'scheduleAudioCheck(after:' not in source
-        assert 'retryDelay' not in source and 'UserDefaults' not in source
+        service = (ROOT / 'Socks5/BackgroundKeepAlive/LoopAudioService.swift').read_text()
+        assert 'BackgroundKeepAlive.audioNotifications.map' in service
+        assert 'BackgroundKeepAlive.audioNotifications.map' not in view
+        assert 'var interval = 0.5' in service
+        assert service.count('DispatchSource.makeTimerSource(queue: control)') == 1
+        assert 'Timer(timeInterval:' not in source + service
+        assert 'UserDefaults' not in source + service
+        assert 'private let audio: LoopAudioService' in source
     if 'server' in FEATURES:
         content = (ROOT / 'Socks5/ContentView.swift').read_text()
         for field in ('workers', 'listenAddress', 'listenPort', 'udpListenAddress', 'udpListenPort',
@@ -143,6 +146,7 @@ def composition():
         members = json.loads((ROOT / 'docs/feature-membership.json').read_text())
         for name, expected in members['files'].items():
             assert hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == expected, name
+        subprocess.run([sys.executable, str(ROOT / 'Tests/Integration/intent_boundaries.py'), '--source-only'], check=True)
     subprocess.run([sys.executable, str(ROOT / 'Build/check_ownership.py')], check=True)
     print('PASS: declared patches, isolated modules, source format, wiring and assets')
 

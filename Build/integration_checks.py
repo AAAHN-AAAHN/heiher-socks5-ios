@@ -46,10 +46,12 @@ def main():
         entry = git('ls-tree', owner['commit'], '--', source).split()[0]
         mode = b'100755' if (ROOT / path).stat().st_mode & 0o111 else b'100644'
         assert entry == mode, ('executable mode', path)
-    # Preserve the former release's composition and platform declarations.
-    for path in ('Socks5/AppRoot.swift', 'Socks5/Socks5App.swift', 'Socks5/Info.plist',
-                 'Socks5.xcodeproj/project.pbxproj'):
+    # Entry point and platform declarations retain their exact prior bytes.
+    # The root now owns direct intent/load readiness, and the project adds only
+    # the three Background-owned files to the existing app source phase.
+    for path in ('Socks5/Socks5App.swift', 'Socks5/Info.plist'):
         assert (ROOT / path).read_bytes() == git('show', INPUT + ':' + path), path
+    subprocess.run([sys.executable, 'Tests/Integration/intent_boundaries.py', '--source-only'], check=True)
     root = (ROOT / 'Socks5/AppRoot.swift').read_text()
     for name, kind in (('settings', 'SettingsStore'), ('server', 'ServerController'), ('keepAlive', 'BackgroundKeepAlive')):
         assert root.count('@StateObject private var ' + name + ' = ' + kind + '()') == 1
@@ -124,7 +126,7 @@ def main():
                            ('Build/check_swift_sdk.sh', ['sdk-success.txt'])]:
         blob = git('rev-parse', '2dcfce074e288c942bd6582b3b77d4763c516a25:' + entry).decode().strip()
         driver.check(entry, markers, blob, 'integrated')
-    print(f'PASS: {len(members["sources"])} exact owner files, {len(config["patches"])} ordered patches, preserved root/platform and failure-marker controls')
+    print(f'PASS: {len(members["sources"])} exact owner files, {len(config["patches"])} ordered patches, direct root intent, exact 15-source target and preserved platform/failure controls')
 
 
 if __name__ == '__main__':

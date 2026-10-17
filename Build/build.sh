@@ -16,6 +16,7 @@ python3 Build/check.py baseline > "$OUT/baseline-audit.log"
 python3 Tests/baseline_audit.py > "$OUT/baseline-driver.log" 2>&1
 python3 Build/integration_checks.py > "$OUT/integration-source-checks.log" 2>&1
 python3 Build/owner_checks.py > "$OUT/owner-checks.log" 2>&1
+python3 Tests/Integration/intent_boundaries.py > "$OUT/intent-boundaries.log" 2>&1
 python3 Tests/Integration/input_boundaries.py > "$OUT/input-boundaries.log" 2>&1
 python3 Tests/Integration/package_boundaries.py > "$OUT/package-boundaries.log" 2>&1
 python3 Tests/Integration/package_metadata.py > "$OUT/package-metadata.log" 2>&1
