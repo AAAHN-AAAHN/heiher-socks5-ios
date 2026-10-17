@@ -6,6 +6,7 @@ on:
       - .github/workflows/resume-validation.yml
       - Diagnostics/resume_runner.py
       - Diagnostics/strict_sdk_check.sh
+      - Diagnostics/package_identity.py
       - Diagnostics/resume-manifest.json
       - Diagnostics/resume.bundle
 permissions:

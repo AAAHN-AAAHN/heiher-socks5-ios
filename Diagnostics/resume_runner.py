@@ -133,7 +133,7 @@ def verify(data):
     git('worktree', 'add', '--detach', str(product), head)
     assert git('rev-parse', 'HEAD', cwd=product) == head
     records = []
-    environment = dict(os.environ, BUILD_IPA='0' if profile == 'settings' else '1')
+    environment = dict(os.environ, BUILD_IPA='1')
     success = False
     started = time.time()
 
@@ -172,10 +172,12 @@ def verify(data):
             assert sdk.startswith('27.'), sdk
             if profile == 'background':
                 run('audio-sdk', ['bash', 'Tests/Background/check_audio_sdk.sh'], 900)
+                run('package-identity', ['python3', str(ROOT / 'Diagnostics/package_identity.py'), profile], 300)
                 run('audio-ui', ['python3', 'Tests/Background/check_async_ui.py'], 1200)
             elif profile == 'settings':
                 run('sdk', ['bash', 'Build/check_swift_sdk.sh'], 300)
                 run('strict-sdk', ['bash', str(ROOT / 'Diagnostics/strict_sdk_check.sh'), profile], 300)
+                run('package-identity', ['python3', str(ROOT / 'Diagnostics/package_identity.py'), profile], 300)
                 run('settings-ui', ['python3', 'Tests/Settings/ui_audit.py'], 1200)
             else:
                 run('sdk', ['bash', 'Build/check_swift_sdk.sh'], 300)
