@@ -17,9 +17,9 @@ final class SettingsStore: ObservableObject {
     let fileURL: URL
 
     struct Storage: Sendable {
-        var read: @Sendable (URL) throws -> Data = SettingsStore.read
-        var write: @Sendable (Data, URL) throws -> Void = SettingsStore.write
-        var imported: @Sendable (URL) throws -> Data = SettingsStore.readImported
+        var read: @Sendable (URL) throws -> Data = { try SettingsStore.read($0) }
+        var write: @Sendable (Data, URL) throws -> Void = { try SettingsStore.write($0, $1) }
+        var imported: @Sendable (URL) throws -> Data = { try SettingsStore.readImported($0) }
     }
     private enum Input: Sendable { case data(Data), file(URL) }
     private struct Import: Sendable {
@@ -113,7 +113,7 @@ final class SettingsStore: ObservableObject {
         if loadState == .failed { throw storageFailure ?? SettingsError.invalid("Settings are not loaded.") }
         if !busy, pending == nil, pendingImport == nil, !savePending { return }
         if pending == nil, savePending { pending = value }
-        try await withCheckedThrowingContinuation { receipt in
+        try await withCheckedThrowingContinuation { (receipt: CheckedContinuation<Void, Error>) in
             flushWaiters.append(receipt)
             pump()
         }
@@ -128,7 +128,7 @@ final class SettingsStore: ObservableObject {
         let cancellation = Cancellation()
         try await withTaskCancellationHandler {
             try Task.checkCancellation()
-            try await withCheckedThrowingContinuation { receipt in
+            try await withCheckedThrowingContinuation { (receipt: CheckedContinuation<Void, Error>) in
                 advanceRevision()
                 supersedeImports()
                 guard !revisionExhausted else {
