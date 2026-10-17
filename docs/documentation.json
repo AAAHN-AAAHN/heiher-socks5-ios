@@ -1,6 +1,6 @@
 {
   "branch": "feature/background",
-  "frozen_source": "0f49def09325b424707068736063a60888782f51",
+  "frozen_source": "b10ef498d9be5a23a14d62c9cbbf8a86de5f0248",
   "parents": {
     "main": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7"
   },
@@ -12,7 +12,7 @@
   "validation_files": {
     "Build/check.py": "cd56a988829185e0a53d494cf6e5595eb4a16fdf",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
-    "Tests/Background/check_scope.py": "f1281564b69898d96bc8dca074aa76e0b61a653f",
+    "Tests/Background/check_scope.py": "345f6443e09db94589880ef0b9c3162db133a70e",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }
