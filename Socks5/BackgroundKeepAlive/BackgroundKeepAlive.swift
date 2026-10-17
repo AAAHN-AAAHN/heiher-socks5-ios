@@ -8,7 +8,7 @@ import Combine
 /// MainActor facade: persisted intent and location callbacks; AV calls are owned
 /// exclusively by LoopAudioService's I/O lane, never by a view or a timer here.
 @MainActor
-final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
+final class BackgroundKeepAlive: NSObject, @MainActor ObservableObject, @preconcurrency CLLocationManagerDelegate {
     let objectWillChange = ObservableObjectPublisher()
     @Published private(set) var locationEnabled = false
     private(set) var audioEnabled = false

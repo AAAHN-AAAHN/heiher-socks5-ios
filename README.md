@@ -42,7 +42,7 @@ Playing is published after preparation, play success, `isPlaying`, matching sess
 
 ## Implementation and ownership
 
-`BackgroundKeepAlive` is the MainActor facade for location and displayed audio state. Each facade registers an audio owner token and asynchronously unregisters on destruction. The process audio service owns cleanup; an orphan view/controller closure never directly deactivates a shared session. Another enabled owner can retain an in-flight activation. The normal root creates one facade and does not tie its lifetime to the removable tab view.
+`BackgroundKeepAlive` is the MainActor facade for location and displayed audio state. Its ObservableObject conformance is explicitly MainActor-isolated, and its publisher uses an explicit Combine import. Each facade registers an audio owner token and asynchronously unregisters on destruction. The process audio service owns cleanup; an orphan view/controller closure never directly deactivates a shared session. Another enabled owner can retain an in-flight activation. The normal root creates one facade and does not tie its lifetime to the removable tab view.
 
 `LoopAudioService` has a short control queue and one exclusive I/O queue. The control queue owns the state machine, operation gate, failure episode, timer, monitor and diagnostic ring. The I/O queue alone creates and calls the endpoint. A short lock protects the latest aggregate intent, monotonic owner/revision/stop/resource identifiers, a fixed-bit inbox and publication/timing values. No AV operation, file access, platform wait, observer callback or dispatch sync executes inside that lock. Every control adoption preserves a pending Off-On stop barrier, including timer and admission paths.
 
