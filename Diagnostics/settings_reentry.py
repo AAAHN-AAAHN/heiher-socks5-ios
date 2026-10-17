@@ -2,17 +2,15 @@ from pathlib import Path
 path=Path('Diagnostics/settings_check.py');s=path.read_text()
 a=s.index("p=P/'Socks5/Settings/SettingsStore.swift';s=p.read_text()")
 b=s.index("head=git('rev-parse','HEAD')",a)
-preamble=r'''p=P/'Socks5/Settings/SettingsStore.swift'
+preamble=r"""p=P/'Socks5/Settings/SettingsStore.swift'
 v=p.read_text()
 assert v.count('@Published private(set)')==4
 v=v.replace('@Published private(set)','private(set)')
 anchor='    private var storageFailure: Error?'
 assert v.count(anchor)==1
 v=v.replace(anchor,anchor+'''
-    // A coherent state is committed before synchronous observer callbacks run.
-    // Published.willSet would otherwise let an outer assignment overwrite a
-    // newer reentrant edit. Notification coalescing keeps one unchanged state
-    // from being emitted again by nested completion/pump paths.
+    // Commit coherent state before synchronous observer callbacks. Published's
+    // willSet could let an outer assignment overwrite a newer reentrant edit.
     let objectWillChange = ObservableObjectPublisher()
     private struct ViewState: Equatable {
         var value = AppSettings()
@@ -42,6 +40,6 @@ env=dict(os.environ,GIT_AUTHOR_NAME='AAAHN-AAAHN',GIT_COMMITTER_NAME='AAAHN-AAAH
 subprocess.run(['git','commit','-m','fix(settings): publish coherent state after committing latest live intent'],cwd=P,env=env,check=True,timeout=120)
 assert git('ls-remote','--heads','origin','refs/heads/'+branch).split()[0]==sha
 print(git('push','--force-with-lease=refs/heads/'+branch+':'+sha,'origin','HEAD:refs/heads/'+branch))
-'''
+"""
 s=s[:a]+preamble+s[b:]
 exec(compile(s,str(path),'exec'))
