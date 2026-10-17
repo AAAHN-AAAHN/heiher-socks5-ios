@@ -84,6 +84,8 @@ Real file/store/controller/Hev tests connect persisted configurations to actual 
 
 Simulator tests verify controls, saved intent and tab/setting restoration through actual process relaunches, and separately probe IPv4/IPv6 SOCKS readiness and listener release. File-picker presentation/closing is checked independently from a successful end-to-end transfer through an external provider. SDK compilation, source ownership and the document/frozen-code contract remain separate checks.
 
+Before terminating a process to test durability, the fixture observes the actual Settings loading/saving and Retry Save controls. If an invalid numeric draft leaves its keyboard covering the tab bar, it submits the existing visible Bind IPv4 text field with Return, verifies that every text and secure-field value is unchanged, and requires the real Settings tab to be hittable before tapping it. The Export existence check and save-state wait retain their five-second limits; Start/Stop and native listener deadlines are unchanged. The fixture does not inject a production dismissal control or change a setting to hide the keyboard.
+
 ## Operation and limitations
 
 Use the settings-persistence branch for server configuration plus durable storage, or the integrated release for all six features. The feature workflow and `Build/features.json` identify its exact server dependency. Parent server documents are retained unchanged; the current document reference does not change the frozen executable dependency.
