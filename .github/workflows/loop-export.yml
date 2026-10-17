@@ -1,0 +1,30 @@
+name: Export exact loop implementation inputs
+on:
+  push:
+    branches: [work/loop-completion-20261017]
+    paths: [.github/workflows/loop-export.yml]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Preserve Git objects and refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          git bundle create artifacts/implementation.bundle --all
+          git bundle verify artifacts/implementation.bundle
+          git ls-remote --heads origin > artifacts/heads.txt
+          sha256sum artifacts/implementation.bundle > artifacts/SHA256SUMS.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: loop-implementation-inputs
+          path: artifacts/
+          retention-days: 30
+          if-no-files-found: error
