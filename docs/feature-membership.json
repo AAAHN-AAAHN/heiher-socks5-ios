@@ -2,7 +2,7 @@
   "base_commit": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7",
   "branches": {
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
-    "feature/background": "a75cb4d7d7f8d40e1ac9d9ebeba377835ded49de",
+    "feature/background": "e6e49802d2452d5c207ee2daa54e885e7cbdb62b",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
     "feature/settings-persistence": "272ce294d1477d566c9cc04cf0a262b3b2cb9c4e",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
@@ -196,8 +196,8 @@
       "sha256": "2bd51d070c552a5a4dc9afa9768df60d9f1c3611bead356b1abac5dad5971a44"
     },
     "Tests/Background/FacadeBoundaryTests.swift": {
-      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
-      "sha256": "af623c706d13fab14e74ce5b7841686d4e3178760c003e478713be9b11497d98"
+      "commit": "2689c8bdd0cb22d372e40366d5f87c8196445ea7",
+      "sha256": "b4ae18c7927822aff33f2f09e42597cf1e2f8d3ba6fce5bc532fe92e63535e83"
     },
     "Tests/Background/FacadePlatformMocks.swift": {
       "commit": "0451530805b2f7fd8a318124603a444ca10678b4",

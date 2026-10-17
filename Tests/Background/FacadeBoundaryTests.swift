@@ -59,6 +59,12 @@ extension LoopAudioService {
         }
         check(condition(), message)
     }
+    @MainActor private static func occupyMainExecutorForSchedulingBoundary() {
+        // Test-only synchronous blocking is deliberate: suspension with
+        // Task.sleep would free the executor and erase this boundary. Darwin
+        // forbids calling semaphore wait directly from an async function.
+        _ = DispatchSemaphore(value: 0).wait(timeout: .now() + 1.1)
+    }
     @MainActor static func main() async throws {
         let name = CommandLine.arguments[1]
         let endpoint = FacadeEndpoint()
@@ -152,7 +158,7 @@ extension LoopAudioService {
             endpoint.state.use { $0.failures = 100 }
             app!.setAudio(true)
             try await until({ endpoint.state.use { !$0.starts.isEmpty } }, "INITIAL_RETRY_NOT_ENTERED")
-            _ = DispatchSemaphore(value: 0).wait(timeout: .now() + 1.1)
+            occupyMainExecutorForSchedulingBoundary()
             let starts = endpoint.state.use { $0.starts }
             check(starts.count == 3, "CONTROL_TIMER_STOPPED_WITH_MAIN")
             check(starts[1] - starts[0] >= 0.45 && starts[2] - starts[1] >= 0.45,
