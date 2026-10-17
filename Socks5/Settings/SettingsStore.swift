@@ -11,7 +11,7 @@ import Glibc
 /// Live state belongs to MainActor. One storage operation and one latest pending
 /// snapshot are retained; no file operation or queue wait runs on MainActor.
 @MainActor
-final class SettingsStore: ObservableObject {
+final class SettingsStore: @MainActor ObservableObject {
     enum LoadState: Equatable { case loading, ready, failed }
     enum Origin: Equatable, Sendable { case user, load, imported }
     struct Change: Equatable, Sendable {
