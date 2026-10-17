@@ -1,1 +1,3 @@
-{"script":"background_close.py"}
+{
+  "script": "diagnose-macos-20261018.py"
+}
