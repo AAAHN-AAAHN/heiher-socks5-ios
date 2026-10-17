@@ -125,7 +125,8 @@ def main():
     facade = (OWNED / 'BackgroundKeepAlive.swift').read_text()
     imports = 'import AVFAudio\nimport CoreLocation\nimport SwiftUI\n'
     assert facade.startswith(imports)
-    facade = facade.replace(imports, 'import Foundation\n#if canImport(Combine)\nimport Combine\n#endif\n', 1)
+    assert '#if canImport(Combine)\nimport Combine\n#endif' in facade
+    facade = facade.replace(imports, 'import Foundation\n', 1)
     admission = (HERE / 'RecoveryAdmissionAccess.swift.inc').read_text()
     out = ROOT / 'artifacts/background-loop' / (args.group + '-' + args.mode + ('-' + args.case if args.case else ''))
     out.mkdir(parents=True, exist_ok=True)

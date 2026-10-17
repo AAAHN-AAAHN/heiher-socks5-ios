@@ -2,7 +2,7 @@
   "base_commit": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7",
   "branches": {
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
-    "feature/background": "8c2e3592a48a3d2fa67d0bd4cfe6ddcf4a874d0c",
+    "feature/background": "8db505411d6c167506ba1ff8dc815b43ed792896",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
     "feature/settings-persistence": "f73f734025302a5479725f0aa2ecf8098604cf52",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
@@ -76,8 +76,8 @@
       "sha256": "852920cb36e95beb53771138a4b8195a16fcce1cc31250632f246081cc638f9a"
     },
     "Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift": {
-      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
-      "sha256": "3c2de5fb55af4e8657d73b48d7c4cc9edd3727ba552447bee1ec120971e32950"
+      "commit": "462f676c767441230755c288101a6ccaef041546",
+      "sha256": "ec88bae65b7d677bcd0c00c7adec95a5e5bf505df395e3ffa4166149decd1688"
     },
     "Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift": {
       "commit": "6a4e46df0f436389572669230aa710d844339fe5",
@@ -292,8 +292,8 @@
       "sha256": "88ccb4b2f628d20d899277f85c7fb061e0f4ed1c6718312af1b0431dfa25e454"
     },
     "Tests/Background/check_loop_audio.py": {
-      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
-      "sha256": "920c927f2ec3fa0b22b9268e10114aa4cd7c57d5a9826d8bf5e69b91dd964425"
+      "commit": "462f676c767441230755c288101a6ccaef041546",
+      "sha256": "09ba03afbde46c3a6a678d0f3ca1c27537b15cf0d7798a8aee908beb9d414568"
     },
     "Tests/Background/check_mixed_notifications.py": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",

@@ -1,6 +1,9 @@
 import AVFAudio
 import CoreLocation
 import SwiftUI
+#if canImport(Combine)
+import Combine
+#endif
 
 /// MainActor facade: persisted intent and location callbacks; AV calls are owned
 /// exclusively by LoopAudioService's I/O lane, never by a view or a timer here.
