@@ -45,21 +45,40 @@ struct AppSettings: Equatable {
     var value = AppSettings()
     var loadState = LoadState.ready
     var change = Change(revision: 0, origin: .load)
+    var audioChange = Change(revision: 0, origin: .load)
+    var locationChange = Change(revision: 0, origin: .load)
+    var serverRunningChange = Change(revision: 0, origin: .load)
+    var acceptsNewIntent = true
     private(set) var audioWrites: [Bool] = []
     private(set) var runningWrites: [Bool] = []
 
     func set<Value>(_ path: WritableKeyPath<AppSettings, Value>, _ next: Value,
                     origin: Origin = .user) {
+        if !acceptsNewIntent, next as? Bool != false {
+            loadState = .failed
+            Trace.add("settings.rejected")
+            return
+        }
         value[keyPath: path] = next
-        change = Change(revision: change.revision + 1, origin: origin)
-        if path == \.background.silentAudio { audioWrites.append(value.background.silentAudio) }
-        if path == \.serverRunning { runningWrites.append(value.serverRunning) }
+        if acceptsNewIntent { change = Change(revision: change.revision + 1, origin: origin) }
+        if path == \AppSettings.self || path == \.background || path == \.background.silentAudio {
+            audioChange = change
+            audioWrites.append(value.background.silentAudio)
+        }
+        if path == \AppSettings.self || path == \.background || path == \.background.continuousLocation {
+            locationChange = change
+        }
+        if path == \AppSettings.self || path == \.serverRunning {
+            serverRunningChange = change
+            runningWrites.append(value.serverRunning)
+        }
         Trace.add("settings.\(change.revision)")
     }
 }
 #else
 @MainActor protocol ObservableObject {}
 @MainActor final class ObservableObjectPublisher { func send() {} }
+#if !canImport(Darwin)
 final class NSFileCoordinator {
     init(filePresenter: Any?) {}
     func coordinate(readingItemAt url: URL, options: [Int],
@@ -71,6 +90,7 @@ extension URL {
     func startAccessingSecurityScopedResource() -> Bool { true }
     func stopAccessingSecurityScopedResource() {}
 }
+#endif
 
 private final class AudioProbe: LoopAudioEndpoint, @unchecked Sendable {
     private let queue: DispatchQueue
@@ -256,6 +276,52 @@ private final class LeaseProbe: @unchecked Sendable {
             host.applyAudioIntent(true)
             Trace.check(!settings.value.background.silentAudio && !host.keepAlive.audioEnabled, "STALE_DIRECT_MEMORY")
             Trace.check(settings.audioWrites == [false], "STALE_DIRECT_WRITE")
+        case "direct-unrelated":
+            settings.value.background.silentAudio = true
+            host.keepAlive.setAudio(true)
+            host.keepAlive.onAudio = { _ in host.stopServer() }
+            host.applyAudioIntent(false)
+            host.restoreServices()
+            Trace.check(!settings.value.background.silentAudio && !host.keepAlive.audioEnabled, "UNRELATED_DROPPED_OFF")
+            Trace.check(settings.audioWrites == [false], "UNRELATED_DROPPED_OFF_WRITE")
+        case "direct-newer-unrelated":
+            host.keepAlive.onAudio = { _ in
+                host.applyAudioIntent(false)
+                settings.set(\.selectedTab, .server)
+            }
+            host.applyAudioIntent(true)
+            host.restoreServices()
+            Trace.check(!settings.value.background.silentAudio && !host.keepAlive.audioEnabled, "NEWER_THEN_UNRELATED_OFF")
+            Trace.check(settings.audioWrites == [false], "NEWER_THEN_UNRELATED_WRITE")
+        case "direct-identical-reentry":
+            host.keepAlive.onAudio = { _ in host.applyAudioIntent(true) }
+            host.applyAudioIntent(true)
+            Trace.check(settings.audioWrites == [true], "STALE_IDENTICAL_AUDIO_WRITE")
+            Trace.check(Trace.events.filter { $0 == "audio.explicit.true" }.count == 2, "IDENTICAL_AUDIO_LOST")
+        case "start-unrelated":
+            host.server.onApply = { settings.set(\.selectedTab, .background) }
+            host.startServer()
+            host.restoreServices()
+            Trace.check(settings.value.serverRunning && settings.runningWrites == [true], "UNRELATED_DROPPED_START")
+        case "stop-unrelated":
+            settings.value.serverRunning = true
+            host.server.onApply = { settings.set(\.selectedTab, .background) }
+            host.stopServer()
+            host.restoreServices()
+            Trace.check(!settings.value.serverRunning && settings.runningWrites == [false], "UNRELATED_DROPPED_STOP")
+            Trace.check(!Trace.events.contains("server.true.1080.false"), "UNRELATED_RESTARTED_SERVER")
+        case "stop-newer-unrelated":
+            settings.value.serverRunning = true
+            host.server.onApply = {
+                host.startServer()
+                settings.set(\.selectedTab, .background)
+            }
+            host.stopServer()
+            Trace.check(settings.value.serverRunning && settings.runningWrites == [true], "NEWER_THEN_UNRELATED_START")
+        case "start-identical-reentry":
+            host.server.onApply = { host.startServer() }
+            host.startServer()
+            Trace.check(settings.value.serverRunning && settings.runningWrites == [true], "STALE_IDENTICAL_START_WRITE")
         case "start-reentry":
             host.server.onApply = { host.stopServer() }
             host.startServer()
@@ -266,6 +332,26 @@ private final class LeaseProbe: @unchecked Sendable {
             host.keepAlive.onSync = { settings.loadState = .failed }
             host.restoreServices()
             Trace.check(!Trace.events.contains("server.true.1080.false"), "FAILED_AFTER_AUDIO")
+        case "terminal-on":
+            settings.change = .init(revision: .max, origin: .user)
+            settings.acceptsNewIntent = false
+            host.applyAudioIntent(true)
+            Trace.check(Trace.events == ["settings.rejected"] && !host.keepAlive.audioEnabled, "TERMINAL_AUDIO_ON")
+        case "terminal-start":
+            settings.change = .init(revision: .max, origin: .user)
+            settings.acceptsNewIntent = false
+            host.startServer()
+            Trace.check(Trace.events == ["settings.rejected"] && !settings.value.serverRunning, "TERMINAL_SERVER_START")
+        case "terminal-off":
+            settings.change = .init(revision: .max, origin: .user)
+            settings.value.background.silentAudio = true
+            settings.value.serverRunning = true
+            settings.acceptsNewIntent = false
+            host.applyAudioIntent(false)
+            host.stopServer()
+            Trace.check(Trace.events.first == "audio.explicit.false", "TERMINAL_OFF_GATED")
+            Trace.check(Trace.events.contains("server.false.1080.false"), "TERMINAL_STOP_GATED")
+            Trace.check(!settings.value.background.silentAudio && !settings.value.serverRunning, "TERMINAL_OFF_MEMORY")
         default: fatalError("Unknown routing case: " + name)
         }
         print("PASS: AppRoot routing " + name)
@@ -393,6 +479,52 @@ private final class DiskProbe: @unchecked Sendable {
                 host.restoreServices()
                 Trace.check(!settings.value.background.silentAudio && !host.keepAlive.audioEnabled, "LIVE_IMPORT_UNDID_OFF")
                 Trace.check(settings.value.server == saved.server, "LIVE_STALE_IMPORT_FIELDS")
+            } else if name == "unrelated-reentry" {
+                host.keepAlive.onAudio = { _ in
+                    host.stopServer()
+                    settings.set(\.selectedTab, .background)
+                }
+                host.applyAudioIntent(false)
+                host.restoreServices()
+                Trace.check(!settings.value.background.silentAudio && !host.keepAlive.audioEnabled,
+                    "LIVE_UNRELATED_DROPPED_OFF")
+                Trace.check(!settings.value.serverRunning, "LIVE_UNRELATED_STOP")
+                try await settings.flush()
+            } else if name == "same-field-reentry" {
+                host.keepAlive.onAudio = { _ in
+                    host.applyAudioIntent(true)
+                    settings.set(\.selectedTab, .background)
+                }
+                host.applyAudioIntent(false)
+                host.restoreServices()
+                Trace.check(settings.value.background.silentAudio && host.keepAlive.audioEnabled,
+                    "LIVE_NEWER_THEN_UNRELATED_ON")
+                host.applyAudioIntent(false)
+                try await settings.flush()
+            } else if name == "whole-field-reentry" {
+                host.keepAlive.onAudio = { _ in
+                    var replacement = settings.value.background
+                    replacement.silentAudio = true
+                    settings.set(\.background, replacement)
+                    settings.set(\.selectedTab, .background)
+                }
+                host.applyAudioIntent(false)
+                host.restoreServices()
+                Trace.check(settings.value.background.silentAudio && host.keepAlive.audioEnabled,
+                    "LIVE_WHOLE_FIELD_LOST")
+                host.applyAudioIntent(false)
+                try await settings.flush()
+            } else if name == "import-intent" {
+                var replacement = saved
+                replacement.background.silentAudio = false
+                replacement.server.listenPort = "34567"
+                replacement.selectedTab = .background
+                try await settings.importData(replacement.encoded())
+                host.restoreServices()
+                Trace.check(settings.value == replacement && !host.keepAlive.audioEnabled, "LIVE_IMPORT_INTENT")
+                Trace.check(settings.change.origin == .imported && settings.audioChange == settings.change &&
+                    settings.locationChange == settings.change && settings.serverRunningChange == settings.change,
+                    "LIVE_IMPORT_STAMPS")
             } else if name == "invalid-import" {
                 let before = try Data(contentsOf: target)
                 let change = settings.change

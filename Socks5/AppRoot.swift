@@ -12,29 +12,37 @@ struct AppRoot: View {
     }
 
     private func applyAudioIntent(_ enabled: Bool) {
-        let previous = settings.change
+        guard !enabled || settings.acceptsNewIntent else {
+            settings.set(\.background.silentAudio, enabled, origin: .user)
+            return
+        }
+        let previous = settings.audioChange
         // Every explicit choice reaches the service before persistence, including
         // an unchanged Off or On. Publication may synchronously accept a newer input.
         keepAlive.setAudio(enabled)
-        guard settings.change == previous else { return }
+        guard settings.audioChange == previous else { return }
         settings.set(\.background.silentAudio, enabled, origin: .user)
     }
 
     private func startServer() {
-        let previous = settings.change
+        guard settings.acceptsNewIntent else {
+            settings.set(\.serverRunning, true)
+            return
+        }
+        let previous = settings.serverRunningChange
         // A Start during initial loading is retained as intent, then applied with
         // the loaded configuration rather than the temporary default fields.
         if settings.loadState == .ready {
             server.apply(settings.value.server, running: true, retry: true)
         }
-        guard settings.change == previous else { return }
+        guard settings.serverRunningChange == previous else { return }
         settings.set(\.serverRunning, true)
     }
 
     private func stopServer() {
-        let previous = settings.change
+        let previous = settings.serverRunningChange
         server.apply(settings.value.server, running: false)
-        guard settings.change == previous else { return }
+        guard settings.serverRunningChange == previous else { return }
         settings.set(\.serverRunning, false)
     }
 

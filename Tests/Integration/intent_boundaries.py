@@ -30,8 +30,12 @@ EXPECTED_SOURCES = {
     *('Socks5/BackgroundKeepAlive/' + name for name in NEW_AUDIO),
 }
 ROUTING = ('direct', 'repeated', 'echo', 'off-on', 'loading', 'failed-stop', 'origin',
-           'location-reentry', 'audio-reentry', 'direct-reentry', 'start-reentry', 'readiness-reentry')
-LIVE = ('blocked-load', 'blocked-save', 'stale-import', 'invalid-import')
+           'location-reentry', 'audio-reentry', 'direct-reentry', 'start-reentry', 'readiness-reentry',
+           'direct-unrelated', 'direct-newer-unrelated', 'direct-identical-reentry',
+           'start-unrelated', 'stop-unrelated', 'stop-newer-unrelated', 'start-identical-reentry',
+           'terminal-on', 'terminal-start', 'terminal-off')
+LIVE = ('blocked-load', 'blocked-save', 'stale-import', 'invalid-import',
+        'unrelated-reentry', 'same-field-reentry', 'whole-field-reentry', 'import-intent')
 
 
 def require(condition, reason):
@@ -190,12 +194,19 @@ def main():
              '        keepAlive.setAudio(value.background.silentAudio)\n', 'echo', 'ECHO_EXPLICIT'),
             ('stale-location', '        guard settings.loadState == .ready, settings.change == change else { return }\n',
              '', 'location-reentry', 'STALE_AUDIO_AFTER_LOCATION'),
-            ('stale-direct', '        guard settings.change == previous else { return }\n',
+            ('stale-direct', '        guard settings.audioChange == previous else { return }\n',
              '        _ = previous\n', 'direct-reentry', 'STALE_DIRECT_MEMORY'),
+            ('global-audio-stamp', 'settings.audioChange', 'settings.change',
+             'direct-unrelated', 'UNRELATED_DROPPED_OFF'),
+            ('global-server-stamp', 'settings.serverRunningChange', 'settings.change',
+             'stop-unrelated', 'UNRELATED_DROPPED_STOP'),
+            ('terminal-on', '        guard !enabled || settings.acceptsNewIntent else {\n'
+             '            settings.set(\\.background.silentAudio, enabled, origin: .user)\n'
+             '            return\n        }\n', '', 'terminal-on', 'TERMINAL_AUDIO_ON'),
         ]
         for label, before, after, case, rejection in mutations:
             require(before in methods, 'Mutation boundary missing: ' + label)
-            changed = methods.replace(before, after, 1)
+            changed = methods.replace(before, after) if label.startswith('global-') else methods.replace(before, after, 1)
             if label == 'no-ready-gate':
                 changed = changed.replace('guard settings.loadState == .ready, settings.change == change else',
                                           'guard settings.change == change else')
