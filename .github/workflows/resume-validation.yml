@@ -1,0 +1,76 @@
+name: Verify exact resumed loop candidates
+on:
+  push:
+    branches: [work/loop-completion-20261017]
+    paths:
+      - .github/workflows/resume-validation.yml
+      - Diagnostics/resume_runner.py
+      - Diagnostics/strict_sdk_check.sh
+      - Diagnostics/resume-manifest.json
+      - Diagnostics/resume.bundle
+permissions:
+  contents: read
+concurrency:
+  group: exact-resumed-loop-candidates
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      matrix: ${{ steps.import.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Import exact Git objects into review candidates
+        id: import
+        run: python3 Diagnostics/resume_runner.py import
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: resumed-import-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/
+          retention-days: 30
+          if-no-files-found: error
+  verify:
+    needs: import
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.import.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install the pinned formatter without replacing the compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y clang-format-18
+          else
+            brew install llvm@18
+            mkdir -p "$RUNNER_TEMP/format-only"
+            ln -s "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
+            echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
+          fi
+      - name: Validate the immutable candidate and preserve its products
+        env:
+          RESUME_PROFILE: ${{ matrix.profile }}
+          RESUME_HEAD: ${{ matrix.head }}
+        run: python3 Diagnostics/resume_runner.py verify
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: resumed-${{ matrix.profile }}-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/
+          retention-days: 30
+          if-no-files-found: error

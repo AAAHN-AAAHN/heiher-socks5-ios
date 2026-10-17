@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "repository": "AAAHN-AAAHN/heiher-socks5-ios",
+  "bundle": {
+    "path": "Diagnostics/resume.bundle",
+    "sha256": "571b4de30b3970f0729446dc578a8ead3deba92ba65989473fa3ec23701b006d"
+  },
+  "candidates": [
+    {
+      "profile": "settings",
+      "product_branch": "feature/settings-persistence",
+      "baseline": "a22bc4579a82e46b9e20389182bc1e63e6deedbf",
+      "candidate_branch": "work/loop-settings-candidate-20261017",
+      "head": "f67ac37391e19f4b6f997c91b90b1e07e4382c07",
+      "bundle_ref": "refs/heads/resume/settings-20261018",
+      "expected_candidate": "c64faec0ca5ed14edfec2774bd5a2fad3bbaf4d9"
+    }
+  ]
+}
