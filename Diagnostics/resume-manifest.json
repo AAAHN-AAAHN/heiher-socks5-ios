@@ -3,17 +3,26 @@
   "repository": "AAAHN-AAAHN/heiher-socks5-ios",
   "bundle": {
     "path": "Diagnostics/resume.bundle",
-    "sha256": "31ab36f49b95b77a7ec6abf64328e2df4ca59a0ff4c381f2adc71a81c13f335f"
+    "sha256": "56b33ad2127ea51ff14af08a6118e2e45c70e5c99901fec70819833aec1e2df6"
   },
   "candidates": [
     {
-      "profile": "settings",
-      "product_branch": "feature/settings-persistence",
-      "baseline": "a22bc4579a82e46b9e20389182bc1e63e6deedbf",
-      "candidate_branch": "work/loop-settings-candidate-20261017",
-      "head": "272ce294d1477d566c9cc04cf0a262b3b2cb9c4e",
-      "bundle_ref": "refs/heads/resume/settings-20261018",
-      "expected_candidate": "d8786132affe0c51fd23d06be0e61bd478592b6f"
+      "profile": "background",
+      "product_branch": "feature/background",
+      "baseline": "618b3d2b413937aaad7373ee2af9e693ec81b84a",
+      "candidate_branch": "work/loop-background-candidate-20261017",
+      "head": "a75cb4d7d7f8d40e1ac9d9ebeba377835ded49de",
+      "bundle_ref": "refs/heads/resume/background-20261018",
+      "expected_candidate": "8c2e3592a48a3d2fa67d0bd4cfe6ddcf4a874d0c"
+    },
+    {
+      "profile": "integrated",
+      "product_branch": "release/integrated",
+      "baseline": "ed6b920cee4f3e5f0469807e521f19bf6f92f92e",
+      "candidate_branch": "work/loop-release-candidate-20261018",
+      "head": "c067a6e9aecb8431d5a6825afc29c3702aa8bc27",
+      "bundle_ref": "refs/heads/resume/release-20261018",
+      "expected_candidate": null
     }
   ]
 }
