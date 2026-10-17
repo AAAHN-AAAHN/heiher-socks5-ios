@@ -134,7 +134,7 @@ def main():
     assert 'final class LoopAudioService: Sendable {' in service
     assert 'private final class LoopAudioQueueOwner: @unchecked Sendable {' in service
     assert 'private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {' in service
-    assert 'private final class DelegateProxy: NSObject, AVAudioPlayerDelegate, Sendable {' in service
+    assert 'private nonisolated final class DelegateProxy: NSObject, AVAudioPlayerDelegate, Sendable {' in service
     assert 'guard ioDelegateGeneration == receipt.generation else' in service
     assert 'guard receipt.generation == generation, player != nil else' in service
     assert 'guard !ioDeliveryQueued else { return false }' in service

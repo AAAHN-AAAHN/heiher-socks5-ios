@@ -738,7 +738,7 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
     // until the actual receipt, then is cleared before any callback/reentry.
     private var activationCompletion: ((Bool, String?) -> Void)?
 
-    private final class DelegateProxy: NSObject, AVAudioPlayerDelegate, Sendable {
+    private nonisolated final class DelegateProxy: NSObject, AVAudioPlayerDelegate, Sendable {
         let generation: UInt64
         let event: @Sendable (LoopAudioService.DelegateReceipt) -> Void
         init(generation: UInt64, event: @escaping @Sendable (LoopAudioService.DelegateReceipt) -> Void) {
@@ -746,10 +746,10 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
             self.event = event
             super.init()
         }
-        func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
             event(.init(generation: generation, decoder: false))
         }
-        func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
             event(.init(generation: generation, decoder: true))
         }
     }

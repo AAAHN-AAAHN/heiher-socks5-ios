@@ -28,7 +28,7 @@ final class AudioEndpointFixture: @unchecked Sendable {
         var peakPlayers = 0
         var resource: String?
         var assetReads = 0
-        var callbacks: [@Sendable (Bool) -> Void] = []
+        var callbacks: [@MainActor @Sendable (Bool) -> Void] = []
     }
     static let shared = AudioEndpointFixture()
     let queueKey = DispatchSpecificKey<Bool>()
@@ -169,7 +169,9 @@ final class AVAudioSession: @unchecked Sendable {
     }
 }
 
-protocol AVAudioPlayerDelegate: AnyObject {
+// The actual iOS SDK infers MainActor isolation from this protocol. Retain that
+// constraint so an omitted nonisolated proxy initializer fails host compilation.
+@MainActor protocol AVAudioPlayerDelegate: AnyObject {
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool)
     func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?)
 }
