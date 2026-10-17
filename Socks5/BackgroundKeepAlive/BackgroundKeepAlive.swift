@@ -6,13 +6,14 @@ import SwiftUI
 /// exclusively by LoopAudioService's I/O lane, never by a view or a timer here.
 @MainActor
 final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
+    let objectWillChange = ObservableObjectPublisher()
     @Published private(set) var locationEnabled = false
-    @Published private(set) var audioEnabled = false
+    private(set) var audioEnabled = false
     @Published private(set) var locationState = "Off"
     @Published private(set) var readCount = 0
     @Published private(set) var lastRead: Date?
-    @Published private(set) var audioState = "Off"
-    @Published private(set) var audioDetail = ""
+    private(set) var audioState = "Off"
+    private(set) var audioDetail = ""
 
     private var locationManager: CLLocationManager?
     private var updating = false
@@ -25,8 +26,12 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
         super.init()
         audioOwner = audio.register { [weak self] state in
             guard let self else { return }
-            if audioState != state.text { audioState = state.text }
-            if audioDetail != state.detail { audioDetail = state.detail }
+            guard audioState != state.text || audioDetail != state.detail else { return }
+            audioState = state.text
+            audioDetail = state.detail
+            // Publish only after both fields agree. A synchronous observer may
+            // accept a newer Off, which this callback must never overwrite.
+            objectWillChange.send()
         }
     }
 
@@ -166,15 +171,28 @@ final class BackgroundKeepAlive: NSObject, ObservableObject, @preconcurrency CLL
     }
 
     func setAudio(_ enabled: Bool) {
-        audioEnabled = enabled
         // Explicit intent precedes any root persistence. Echoes use syncAudio.
         audio.setEnabled(enabled, owner: audioOwner)
+        showAudioIntent(enabled)
     }
 
     func syncAudio(_ enabled: Bool) {
         guard audioEnabled != enabled else { return }
-        audioEnabled = enabled
         audio.setEnabled(enabled, owner: audioOwner, explicit: false)
+        showAudioIntent(enabled)
+    }
+
+    private func showAudioIntent(_ enabled: Bool) {
+        let changed = audioEnabled != enabled
+        audioEnabled = enabled
+        let stopping = !enabled && !audioState.hasPrefix("Off")
+        if stopping {
+            audioState = "Off \u{2014} stopping"
+            audioDetail = ""
+        }
+        // @Published willSet would allow an observer's newer intent to be
+        // overwritten by this setter after reentry. No write follows this send.
+        if changed || stopping { objectWillChange.send() }
     }
 
     func audioEvent(_ notification: Notification) {

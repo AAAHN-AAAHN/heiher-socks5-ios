@@ -117,7 +117,7 @@ def composition():
     if 'background' in FEATURES:
         silence(ROOT / 'Socks5/BackgroundKeepAlive/Silence.wav')
         view = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift').read_text()
-        assert 'BackgroundKeepAlive.audioNotifications.map' in view
+        assert 'private let audioEvents' not in view
         source = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift').read_text()
         for event in ('interruptionNotification', 'routeChangeNotification',
                       'mediaServicesWereLostNotification', 'mediaServicesWereResetNotification',
@@ -127,10 +127,13 @@ def composition():
                       'renderingCapabilitiesChangeNotification', 'outputMuteStateChangeNotification',
                       'userIntentToUnmuteOutputNotification'):
             assert event in source, event
-        assert 'private static let audioCheckInterval: TimeInterval = 0.5' in source
-        assert source.count('Timer(timeInterval:') == 1
-        assert 'Timer(timeInterval: Self.audioCheckInterval, repeats: false)' in source
-        assert 'scheduleAudioCheck(after:' not in source and 'serviceProbeInterval' not in source
+        service = (ROOT / 'Socks5/BackgroundKeepAlive/LoopAudioService.swift').read_text()
+        assert 'service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,' in service
+        assert 'var interval = 0.5' in service
+        assert service.count('DispatchSource.makeTimerSource(queue: control)') == 1
+        assert 'precondition(outstanding == 1)' in service
+        assert 'if next.stop != current.stop { releaseBarrier = true }' in service
+        assert 'Timer(' not in source and 'AVAudioPlayer' not in source
         assert 'retryDelay' not in source and 'UserDefaults' not in source
     if 'settings' in FEATURES:
         content = (ROOT / 'Socks5/ContentView.swift').read_text()

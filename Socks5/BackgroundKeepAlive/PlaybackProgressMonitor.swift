@@ -71,6 +71,9 @@ struct PlaybackProgressMonitor {
             && abs(a.duration - b.duration) < 0.000001 && a.rate == b.rate
             && b.startedAt >= a.finishedAt && b.finishedAt - a.finishedAt <= 1
             && b.deviceTime >= a.deviceTime
+            && abs((b.deviceTime - a.deviceTime) - (b.finishedAt - a.finishedAt))
+                <= max(0.01, max(a.bufferDuration, b.bufferDuration) * 4)
+                    + (a.finishedAt - a.startedAt) + (b.finishedAt - b.startedAt)
     }
 
     private func distance(_ x: Double, period: Double) -> Double {
@@ -102,7 +105,11 @@ struct PlaybackProgressMonitor {
             return Assessment(health: .inconclusive, nextDelay: 0.5, mayRebuild: false)
         }
         previous = s
-        let moved = distance(s.position - p.position, period: s.duration) > tolerance(p, s)
+        let observed = s.position - p.position
+        let expected = (s.deviceTime - p.deviceTime) * s.rate
+        let uncertainty = tolerance(p, s)
+        let moved = distance(observed, period: s.duration) > uncertainty
+            && distance(observed - expected, period: s.duration) <= uncertainty
         if moved {
             lastEvidence = now
             suspectWindows = 0
