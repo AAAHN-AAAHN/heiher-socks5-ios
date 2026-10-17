@@ -11,6 +11,20 @@ struct AppRoot: View {
         Binding(get: { self.settings.value.background.silentAudio }, set: applyAudioIntent)
     }
 
+    private var locationEnabled: Binding<Bool> {
+        Binding(get: { self.settings.value.background.continuousLocation }, set: applyLocationIntent)
+    }
+
+    private func applyLocationIntent(_ enabled: Bool) {
+        if !enabled {
+            let previous = settings.locationChange
+            keepAlive.setLocation(false)
+            guard settings.locationChange == previous else { return }
+        }
+        // On retains the existing loaded-settings and location authorization path.
+        settings.set(\.background.continuousLocation, enabled)
+    }
+
     private func applyAudioIntent(_ enabled: Bool) {
         guard !enabled || settings.acceptsNewIntent else {
             settings.set(\.background.silentAudio, enabled, origin: .user)
@@ -78,7 +92,7 @@ struct AppRoot: View {
                 .tabItem { Label("Server", systemImage: "network") }
                 .tag(AppSettings.Tab.server)
             BackgroundKeepAliveView(keepAlive: keepAlive,
-                                    locationEnabled: settings.binding(\.background.continuousLocation),
+                                    locationEnabled: locationEnabled,
                                     audioEnabled: audioEnabled)
                 .tabItem { Label("Background", systemImage: "switch.2") }
                 .tag(AppSettings.Tab.background)

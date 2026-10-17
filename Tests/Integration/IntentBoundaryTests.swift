@@ -352,6 +352,55 @@ private final class LeaseProbe: @unchecked Sendable {
             Trace.check(Trace.events.first == "audio.explicit.false", "TERMINAL_OFF_GATED")
             Trace.check(Trace.events.contains("server.false.1080.false"), "TERMINAL_STOP_GATED")
             Trace.check(!settings.value.background.silentAudio && !settings.value.serverRunning, "TERMINAL_OFF_MEMORY")
+        case "location-loading":
+            settings.loadState = .loading
+            host.locationEnabled.wrappedValue = true
+            host.restoreServices()
+            Trace.check(settings.value.background.continuousLocation && !host.keepAlive.locationEnabled,
+                "LOCATION_ON_BYPASSED_READY")
+            settings.loadState = .ready
+            host.restoreServices()
+            Trace.check(host.keepAlive.locationEnabled, "LOCATION_READY_NOT_APPLIED")
+        case "location-failed-off":
+            settings.value.background.continuousLocation = true
+            host.keepAlive.setLocation(true)
+            settings.loadState = .failed
+            Trace.events = []
+            host.locationEnabled.wrappedValue = false
+            host.restoreServices()
+            Trace.check(Trace.events.first == "location.false" && !host.keepAlive.locationEnabled,
+                "LOCATION_FAILED_OFF_GATED")
+            Trace.check(!settings.value.background.continuousLocation, "LOCATION_OFF_NOT_STORED")
+        case "location-unrelated":
+            settings.value.background.continuousLocation = true
+            host.keepAlive.setLocation(true)
+            host.keepAlive.onLocation = { settings.set(\.selectedTab, .server) }
+            host.applyLocationIntent(false)
+            host.restoreServices()
+            Trace.check(!settings.value.background.continuousLocation && !host.keepAlive.locationEnabled,
+                "LOCATION_UNRELATED_DROPPED_OFF")
+        case "location-newer-unrelated":
+            settings.value.background.continuousLocation = true
+            host.keepAlive.setLocation(true)
+            host.keepAlive.onLocation = {
+                host.applyLocationIntent(true)
+                settings.set(\.selectedTab, .server)
+            }
+            host.applyLocationIntent(false)
+            host.restoreServices()
+            Trace.check(settings.value.background.continuousLocation && host.keepAlive.locationEnabled,
+                "LOCATION_NEWER_THEN_UNRELATED_ON")
+        case "terminal-location":
+            settings.change = .init(revision: .max, origin: .user)
+            settings.value.background.continuousLocation = true
+            host.keepAlive.setLocation(true)
+            settings.loadState = .failed
+            settings.acceptsNewIntent = false
+            host.applyLocationIntent(false)
+            host.applyLocationIntent(true)
+            host.restoreServices()
+            Trace.check(!settings.value.background.continuousLocation && !host.keepAlive.locationEnabled,
+                "TERMINAL_LOCATION_OFF")
         default: fatalError("Unknown routing case: " + name)
         }
         print("PASS: AppRoot routing " + name)
@@ -427,6 +476,7 @@ private final class DiskProbe: @unchecked Sendable {
         var saved = AppSettings()
         saved.server.listenPort = "23456"
         saved.background.silentAudio = true
+        saved.background.continuousLocation = name == "location-reentry"
         try saved.encoded().write(to: target)
         let disk = DiskProbe()
         if name == "blocked-load" { disk.arm("read") }
@@ -479,6 +529,15 @@ private final class DiskProbe: @unchecked Sendable {
                 host.restoreServices()
                 Trace.check(!settings.value.background.silentAudio && !host.keepAlive.audioEnabled, "LIVE_IMPORT_UNDID_OFF")
                 Trace.check(settings.value.server == saved.server, "LIVE_STALE_IMPORT_FIELDS")
+            } else if name == "location-reentry" {
+                host.keepAlive.onLocation = { settings.set(\.selectedTab, .server) }
+                host.applyLocationIntent(false)
+                host.restoreServices()
+                Trace.check(!settings.value.background.continuousLocation && !host.keepAlive.locationEnabled,
+                    "LIVE_LOCATION_OFF")
+                Trace.check(settings.value.background.silentAudio && host.keepAlive.audioEnabled,
+                    "LIVE_LOCATION_CHANGED_AUDIO")
+                try await settings.flush()
             } else if name == "unrelated-reentry" {
                 host.keepAlive.onAudio = { _ in
                     host.stopServer()

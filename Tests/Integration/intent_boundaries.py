@@ -33,9 +33,10 @@ ROUTING = ('direct', 'repeated', 'echo', 'off-on', 'loading', 'failed-stop', 'or
            'location-reentry', 'audio-reentry', 'direct-reentry', 'start-reentry', 'readiness-reentry',
            'direct-unrelated', 'direct-newer-unrelated', 'direct-identical-reentry',
            'start-unrelated', 'stop-unrelated', 'stop-newer-unrelated', 'start-identical-reentry',
-           'terminal-on', 'terminal-start', 'terminal-off')
+           'terminal-on', 'terminal-start', 'terminal-off', 'location-loading', 'location-failed-off',
+           'location-unrelated', 'location-newer-unrelated', 'terminal-location')
 LIVE = ('blocked-load', 'blocked-save', 'stale-import', 'invalid-import',
-        'unrelated-reentry', 'same-field-reentry', 'whole-field-reentry', 'import-intent')
+        'unrelated-reentry', 'same-field-reentry', 'whole-field-reentry', 'import-intent', 'location-reentry')
 
 
 def require(condition, reason):
@@ -54,6 +55,8 @@ def root_contract(code):
             'Root event lifetime changed')
     require('audioEnabled: audioEnabled)' in code and 'set: applyAudioIntent)' in code,
             'Audio toggle bypasses direct intent')
+    require('locationEnabled: locationEnabled,' in code and 'set: applyLocationIntent)' in code,
+            'Location toggle bypasses immediate Off')
     require('.onChange(of: settings.change, initial: true)' in code,
             'Missing initial change observation')
     require('.onChange(of: settings.loadState)' in code, 'Missing load readiness observation')
@@ -101,6 +104,8 @@ def source_contract():
     for label, changed in (
         ('direct-binding', code.replace('audioEnabled: audioEnabled)',
                                        'audioEnabled: settings.binding(\\.background.silentAudio))', 1)),
+        ('location-binding', code.replace('locationEnabled: locationEnabled,',
+                                         'locationEnabled: settings.binding(\\.background.continuousLocation),', 1)),
         ('load-observer', code.replace('.onChange(of: settings.loadState)', '.onChange(of: settings.value)', 1)),
         ('duplicate-owner', code.replace('@StateObject private var keepAlive', '@State private var keepAlive', 1)),
     ):
@@ -118,7 +123,7 @@ def source_contract():
         pass
     else:
         raise RuntimeError('Removed app target input accepted')
-    return {'swift_sources': len(paths), 'source_rejection_controls': 4}
+    return {'swift_sources': len(paths), 'source_rejection_controls': 5}
 
 
 def routing_methods():
@@ -200,6 +205,10 @@ def main():
              'direct-unrelated', 'UNRELATED_DROPPED_OFF'),
             ('global-server-stamp', 'settings.serverRunningChange', 'settings.change',
              'stop-unrelated', 'UNRELATED_DROPPED_STOP'),
+            ('global-location-stamp', 'settings.locationChange', 'settings.change',
+             'location-unrelated', 'LOCATION_UNRELATED_DROPPED_OFF'),
+            ('no-location-off', '            keepAlive.setLocation(false)\n', '',
+             'location-failed-off', 'LOCATION_FAILED_OFF_GATED'),
             ('terminal-on', '        guard !enabled || settings.acceptsNewIntent else {\n'
              '            settings.set(\\.background.silentAudio, enabled, origin: .user)\n'
              '            return\n        }\n', '', 'terminal-on', 'TERMINAL_AUDIO_ON'),
