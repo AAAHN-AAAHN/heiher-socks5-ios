@@ -124,8 +124,9 @@ def composition():
         view = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift').read_text()
         source = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift').read_text()
         service = (ROOT / 'Socks5/BackgroundKeepAlive/LoopAudioService.swift').read_text()
-        assert 'BackgroundKeepAlive.audioNotifications.map' in service
-        assert 'BackgroundKeepAlive.audioNotifications.map' not in view
+        assert 'service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,' in service
+        assert 'normalize: BackgroundKeepAlive.audioEventValue)' in service
+        assert 'BackgroundKeepAlive.audioNotifications' not in view
         assert 'var interval = 0.5' in service
         assert service.count('DispatchSource.makeTimerSource(queue: control)') == 1
         assert 'Timer(timeInterval:' not in source + service
