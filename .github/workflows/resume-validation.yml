@@ -11,7 +11,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: exact-resumed-loop-candidates
+  group: exact-resumed-loop-candidates-${{ github.sha }}
   cancel-in-progress: false
 jobs:
   import:
