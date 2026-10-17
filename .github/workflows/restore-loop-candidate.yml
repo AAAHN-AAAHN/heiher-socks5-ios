@@ -1,0 +1,113 @@
+name: Recover and validate exact loop candidate
+on:
+  push:
+    branches: [work/loop-completion-20261017]
+    paths: [.github/workflows/restore-loop-candidate.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  restore:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 618b3d2b413937aaad7373ee2af9e693ec81b84a
+          fetch-depth: 0
+      - name: Recover immutable candidate and preserve it without changing product heads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/provenance
+          python3 - <<'PY'
+          import hashlib, io, json, os, subprocess, urllib.request, zipfile
+          from pathlib import Path, PurePosixPath
+          repo='AAAHN-AAAHN/heiher-socks5-ios'
+          out=Path('artifacts/provenance')
+          def git(*args,input=None,env=None):
+              return subprocess.check_output(['git',*args],input=input,env=env,timeout=120).decode().strip()
+          def artifact(number,digest):
+              req=urllib.request.Request(f'https://api.github.com/repos/{repo}/actions/artifacts/{number}/zip',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+              with urllib.request.urlopen(req,timeout=90) as r: data=r.read()
+              assert hashlib.sha256(data).hexdigest()==digest
+              (out/f'{number}.zip').write_bytes(data)
+              z=zipfile.ZipFile(io.BytesIO(data));assert z.testzip() is None
+              return z
+          before=git('ls-remote','--heads','origin')
+          (out/'before.txt').write_text(before+'\n')
+          z=artifact(12051994151,'eb41049a302bc7b641e3ec0a074d1a95235498a6f9509f2524b38bbf34b705d5')
+          data=z.read('provenance/candidate.bundle')
+          assert hashlib.sha256(data).hexdigest()=='bc184957bf0883cea9d1607fc838073e63495e1ca218c7502db890400abd1f6c'
+          bundle=out/'candidate.bundle';bundle.write_bytes(data)
+          git('bundle','verify',str(bundle))
+          git('fetch',str(bundle),'refs/heads/feature/background')
+          z=artifact(12058113666,'16910d3c77a6dfe6a2dde3f56fdd6e514afb9feff629fdb0b0d1f324f1be6a28')
+          source=z.read('provenance/source.zip');(out/'source.zip').write_bytes(source)
+          source=zipfile.ZipFile(io.BytesIO(source));assert source.testzip() is None
+          env=dict(os.environ,GIT_INDEX_FILE=str(Path(os.environ['RUNNER_TEMP'])/'candidate-index'))
+          git('read-tree','--empty',env=env)
+          names=[];records=[]
+          for info in source.infolist():
+              if info.is_dir():continue
+              name=info.filename;parts=PurePosixPath(name).parts
+              assert not name.startswith('/') and '..' not in parts and '.git' not in parts
+              assert name not in names;names.append(name)
+              data=source.read(info);mode=(info.external_attr>>16)&0o170777
+              assert mode in (0o100644,0o100755,0o120000),(name,oct(mode))
+              sha=git('hash-object','-w','--stdin',input=data)
+              records.append(f'{mode:o} {sha}\t{name}\0')
+          git('update-index','-z','--index-info',input=''.join(records).encode(),env=env)
+          tree=git('write-tree',env=env)
+          assert tree=='661d825c814b9af8d8d0a1d8301be87bb12f5064'
+          raw=('tree '+tree+'\nparent 26e20692ac1c3336fb27c48d1e9b10846f646475\n'
+            'author AAAHN-AAAHN <101960409+AAAHN-AAAHN@users.noreply.github.com> 1792166798 +0000\n'
+            'committer AAAHN-AAAHN <101960409+AAAHN-AAAHN@users.noreply.github.com> 1792166798 +0000\n\n'
+            'fix(background): enforce queue isolation and reject stale playback events\n').encode()
+          sha=git('hash-object','-t','commit','-w','--stdin',input=raw)
+          assert sha=='3c2901f57a2bdfc76aaf248dedd9d0cdd64f3157'
+          git('merge-base','--is-ancestor','618b3d2b413937aaad7373ee2af9e693ec81b84a',sha)
+          git('checkout','--detach',sha)
+          git('fsck','--full','--strict')
+          ref='refs/heads/work/loop-background-candidate-20261017'
+          existing=git('ls-remote','--heads','origin',ref)
+          assert not existing or existing.split()[0]==sha
+          if not existing:print(git('push','origin',sha+':'+ref))
+          (out/'recovery.json').write_text(json.dumps({'commit':sha,'tree':tree,'source_files':len(names),'candidate_ref':ref,'product_heads_unchanged':True},indent=2)+'\n')
+          (out/'after.txt').write_text(git('ls-remote','--heads','origin')+'\n')
+          print('Recovered exact candidate:',sha,'files:',len(names))
+          PY
+      - name: SDK and state-machine tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version > artifacts/provenance/toolchain.txt
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          xcrun --sdk iphoneos --show-sdk-version | tee -a artifacts/provenance/toolchain.txt | grep -E '^27\.'
+          xcrun swiftc -typecheck -swift-version 5 -strict-concurrency=complete -warnings-as-errors -sdk "$SDK" -target arm64-apple-ios17.2 Socks5/BackgroundKeepAlive/*.swift > artifacts/provenance/owned-sdk.log 2>&1
+          xcrun swiftc -typecheck -swift-version 5 -warnings-as-errors -sdk "$SDK" -target arm64-apple-ios17.2 -I HevSocks5Server.xcframework/ios-arm64/Headers Socks5/*.swift Socks5/BackgroundKeepAlive/*.swift > artifacts/provenance/app-sdk.log 2>&1
+          for mode in -Onone -O; do
+            swiftc "$mode" -swift-version 5 -strict-concurrency=complete -warnings-as-errors -parse-as-library Socks5/BackgroundKeepAlive/LoopAudioService.swift Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift Socks5/BackgroundKeepAlive/RecoveryExecutionLease.swift Tests/Background/LoopAudioServiceTests.swift -o "$RUNNER_TEMP/loop-tests"
+            for case in normal finite-failure pending-off-on pending-reset pending-owner pending-deactivation pending-inspection storm stopped-player duplicate-completion; do "$RUNNER_TEMP/loop-tests" "$case"; done
+          done > artifacts/provenance/service-tests.log 2>&1
+      - name: Original unchanged audio UI assertions
+        run: python3 Tests/Background/check_async_ui.py
+      - name: Preserve exact evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts/provenance
+          git status --porcelain=v1 > artifacts/provenance/status.txt
+          git diff --exit-code HEAD --
+          git diff --cached --exit-code HEAD --
+          git rev-parse HEAD > artifacts/provenance/final-head.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: loop-recovered-candidate-${{ github.run_attempt }}
+          path: artifacts/
+          retention-days: 30
+          if-no-files-found: error
