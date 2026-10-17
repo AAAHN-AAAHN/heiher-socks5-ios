@@ -15,7 +15,8 @@ import Foundation
         let legacy = UserDefaults(suiteName: suite)!
         defer { try? FileManager.default.removeItem(at: root); legacy.removePersistentDomain(forName: suite) }
         let file = root.appendingPathComponent("settings.json")
-        let store = SettingsStore(fileURL: file, legacy: legacy)
+        let store = await loadedSettings(fileURL: file, legacy: legacy)
+        try await store.flush()
         var document = AppSettings()
         document.serverRunning = true
         document.server.listenPort = "12345"
@@ -28,12 +29,12 @@ import Foundation
         do { try await preCancelled.value } catch {}
         check(store.value == initial, "Cancelled-before-start import leaves live state unchanged")
         check(try AppSettings.decoded(Data(contentsOf: file)) == initial, "Cancelled-before-start import leaves disk unchanged")
-        try store.importData(initial.encoded())
+        try await store.importData(initial.encoded())
 
         for action in 0..<4 {
             var running = initial
             running.serverRunning = true
-            try store.importData(running.encoded())
+            try await store.importData(running.encoded())
             CoordinationProbe.block(input.path)
             let pending = Task { @MainActor in try await store.importFile(input) }
             await waitFor(input.path)
@@ -44,14 +45,15 @@ import Foundation
             default: pending.cancel()
             }
             let chosen = store.value
-            let before = try Data(contentsOf: file)
+            let before = try chosen.encoded()
             CoordinationProbe.release(input.path)
             var rejected = false
             do { try await pending.value } catch { rejected = true }
+            try await store.flush()
             check(rejected && store.value == chosen, "In-flight import respects newer action/cancel \(action) in memory")
             check(try Data(contentsOf: file) == before, "In-flight import respects newer action/cancel \(action) on disk")
         }
-        try store.importData(initial.encoded())
+        try await store.importData(initial.encoded())
         CoordinationProbe.block(input.path)
         let first = Task { @MainActor in try await store.importFile(input) }
         await waitFor(input.path)
@@ -59,9 +61,13 @@ import Foundation
         later.server.listenPort = "23456"
         let secondInput = root.appendingPathComponent("second.json")
         try later.encoded().write(to: secondInput)
-        try await store.importFile(secondInput)
+        // The provider owns the single storage lane until it returns. Accept the
+        // newer import now, then release that real boundary before awaiting it.
+        let second = Task { @MainActor in try await store.importFile(secondInput) }
+        await Task.yield()
         CoordinationProbe.release(input.path)
         do { try await first.value } catch {}
+        try await second.value
         check(store.value == later, "A slower earlier import cannot replace a later successful import")
         check(try AppSettings.decoded(Data(contentsOf: file)) == later, "Latest import wins on disk as well as memory")
 
@@ -70,11 +76,13 @@ import Foundation
         try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: blockedParent.path)
         legacy.set(true, forKey: "background.silentAudio")
         legacy.set(true, forKey: "background.continuousLocation")
-        let migrated = SettingsStore(fileURL: blockedParent.appendingPathComponent("settings.json"), legacy: legacy)
+        let migrated = await loadedSettings(fileURL: blockedParent.appendingPathComponent("settings.json"), legacy: legacy)
+        do { try await migrated.flush() } catch {}
         check(migrated.errorMessage != nil && legacy.object(forKey: "background.silentAudio") != nil,
               "Failed initial migration keeps both legacy keys")
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: blockedParent.path)
         migrated.set(\.server.listenPort, "12346")
+        try await migrated.flush()
         check(migrated.errorMessage == nil && migrated.value.background.silentAudio,
               "Recovered storage persists the migrated values")
         check(legacy.object(forKey: "background.silentAudio") == nil && legacy.object(forKey: "background.continuousLocation") == nil,

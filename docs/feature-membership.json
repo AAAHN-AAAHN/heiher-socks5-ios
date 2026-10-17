@@ -122,7 +122,9 @@
     }
   },
   "files": {
-    "Socks5/Settings/SettingsStore.swift": "e13d64e5dda6923f105d93b2145733e94286339a370419699a48f3c432b0a7ef"
+    "Socks5/Settings/SettingsStore.swift": "78ec17d2fbbe7768177bddd9c95f52925210a1a0f7a780926f98f60ea7274d76",
+    "Socks5/Settings/SettingsView.swift": "6b6f9d45d803ac8cb77929033c9c5f18fcd42e1633bf19b1ccbc8d0931ccaa25",
+    "Socks5/AppRoot.swift": "31317abed92503f5855ce077104baf945b02833d08490822bd7307e92aec48a0"
   },
   "responsibility": "Persistence owns durable options and file handling; the listed server-owned inputs are inherited byte-identically from the pinned latest server-control ancestor."
 }

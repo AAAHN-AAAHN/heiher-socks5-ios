@@ -11,18 +11,19 @@ import Foundation
         defer { try? fm.removeItem(at: root); legacy.removePersistentDomain(forName: suite) }
         let file = root.appendingPathComponent("local/settings.json")
         let input = root.appendingPathComponent("import.json")
-        let store = SettingsStore(fileURL: file, legacy: legacy)
+        let store = await loadedSettings(fileURL: file, legacy: legacy)
+        try await store.flush()
         var checks = 0
         func check(_ condition: Bool, _ label: String) {
             checks += 1
             precondition(condition, label)
         }
         func durable() throws -> AppSettings { try AppSettings.decoded(Data(contentsOf: file)) }
-        func reject(_ data: Data, _ label: String) throws {
+        func reject(_ data: Data, _ label: String) async throws {
             let before = store.value
             let bytes = try Data(contentsOf: file)
             var failed = false
-            do { try store.importData(data) } catch { failed = true }
+            do { try await store.importData(data) } catch { failed = true }
             check(failed, label + " rejected")
             check(store.value == before, label + " preserves live state")
             check(try Data(contentsOf: file) == bytes, label + " preserves exact disk bytes")
@@ -38,7 +39,7 @@ import Foundation
         settings.background.continuousLocation = true
         settings.background.silentAudio = true
         settings.selectedTab = .background
-        try store.importData(settings.encoded())
+        try await store.importData(settings.encoded())
         let ordinary = try settings.encoded()
         for count in [ordinary.count, 65_535, 65_536] {
             var padded = ordinary
@@ -50,7 +51,7 @@ import Foundation
         }
         var tooLarge = ordinary
         tooLarge.append(Data(repeating: 0x20, count: 65_537 - tooLarge.count))
-        try reject(tooLarge, "65537-byte direct import")
+        try await reject(tooLarge, "65537-byte direct import")
         try tooLarge.write(to: input)
         let initialBytes = try Data(contentsOf: file)
         var failed = false
@@ -60,20 +61,20 @@ import Foundation
         let document = try JSONSerialization.jsonObject(with: ordinary) as! [String: Any]
         for key in ["version", "server", "serverRunning", "background", "selectedTab"] {
             var missing = document; missing.removeValue(forKey: key)
-            try reject(JSONSerialization.data(withJSONObject: missing), "Missing \(key)")
+            try await reject(JSONSerialization.data(withJSONObject: missing), "Missing \(key)")
             var null = document; null[key] = NSNull()
-            try reject(JSONSerialization.data(withJSONObject: null), "Null \(key)")
+            try await reject(JSONSerialization.data(withJSONObject: null), "Null \(key)")
         }
         for version in [0, 2, -1, Int.max] {
             var next = document; next["version"] = version
-            try reject(JSONSerialization.data(withJSONObject: next), "Version \(version)")
+            try await reject(JSONSerialization.data(withJSONObject: next), "Version \(version)")
         }
         for invalid in [Data(), Data("[]".utf8), Data("null".utf8), Data("true".utf8),
                         ordinary + Data("x".utf8)] {
-            try reject(invalid, "Invalid root or trailing bytes")
+            try await reject(invalid, "Invalid root or trailing bytes")
         }
         var future = document; future["unrecognized"] = ["ignored": true]
-        try store.importData(JSONSerialization.data(withJSONObject: future))
+        try await store.importData(JSONSerialization.data(withJSONObject: future))
         check(try store.value == settings && durable() == settings, "Unknown fields do not change schema1 fields")
 
         // A clean unchanged setter/binding performs no writes or inode replacement.
@@ -86,6 +87,7 @@ import Foundation
             store.binding(\.server.authPassword).wrappedValue = settings.server.authPassword
         }
         let elapsed = ProcessInfo.processInfo.systemUptime - began
+        try await store.flush()
         let after = try fm.attributesOfItem(atPath: file.path)
         check(after[.modificationDate] as? Date == attributes[.modificationDate] as? Date, "20000 equal requests do not write")
         check(after[.systemFileNumber] as? NSNumber == attributes[.systemFileNumber] as? NSNumber, "20000 equal requests do not replace inode")
@@ -103,13 +105,17 @@ import Foundation
             var server = store.value.server; server[keyPath: path] = text
             store.set(\.server, server)
             check(store.value.server[keyPath: path].utf8.elementsEqual(text.utf8), "Field bytes live")
+            try await store.flush()
             check(try durable() == store.value, "Field durable")
-            check(SettingsStore(fileURL: file, legacy: legacy).value == store.value, "Field recreated")
+            let restored = await loadedSettings(fileURL: file, legacy: legacy)
+            check(restored.value == store.value, "Field recreated")
         }
         store.set(\.server.listenIPv6Only, true)
+        try await store.flush()
         check(try durable().server.listenIPv6Only, "Boolean field durable")
         for tab in [AppSettings.Tab.statistics, .server, .background, .settings] {
             store.set(\.selectedTab, tab)
+            try await store.flush()
             check(try durable().selectedTab == tab, "All portable tabs remain stored")
         }
         var seed: UInt64 = 20260930
@@ -123,17 +129,20 @@ import Foundation
             next.background.silentAudio = seed & 2 == 0
             next.background.continuousLocation = seed & 4 == 0
             next.selectedTab = [.statistics, .server, .background, .settings][Int(seed % 4)]
-            try store.importData(next.encoded())
+            try await store.importData(next.encoded())
             check(try durable() == next && store.value == next, "Sequence snapshot")
-            check(SettingsStore(fileURL: file, legacy: legacy).value == next, "Sequence recreation")
+            let restored = await loadedSettings(fileURL: file, legacy: legacy)
+            check(restored.value == next, "Sequence recreation")
         }
         // A stopped invalid draft is intentionally portable only as local state.
         store.set(\.serverRunning, false)
         store.set(\.server.workers, "")
         let draft = store.value
+        try await store.flush()
         check(try durable() == draft, "Stopped invalid draft is saved")
-        check(SettingsStore(fileURL: file, legacy: legacy).value == draft, "Stopped draft reloads unchanged")
-        try reject(draft.encoded(), "Import of non-executable draft")
+        let restored = await loadedSettings(fileURL: file, legacy: legacy)
+        check(restored.value == draft, "Stopped draft reloads unchanged")
+        try await reject(draft.encoded(), "Import of non-executable draft")
         print("SUMMARY: \(checks) final persistence assertions; 0 failed; real model and Foundation files")
     }
 }

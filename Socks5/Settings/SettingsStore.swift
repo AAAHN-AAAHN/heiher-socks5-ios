@@ -10,10 +10,23 @@ import Glibc
 @MainActor
 final class SettingsStore: ObservableObject {
     enum LoadState: Equatable { case loading, ready, failed }
-    @Published private(set) var value = AppSettings()
-    @Published private(set) var errorMessage: String?
-    @Published private(set) var loadState = LoadState.loading
-    @Published private(set) var savePending = false
+    enum Origin: Equatable, Sendable { case user, load, imported }
+    struct Change: Equatable, Sendable {
+        let revision: UInt64
+        let origin: Origin
+    }
+    private(set) var value = AppSettings()
+    private(set) var errorMessage: String?
+    private(set) var loadState = LoadState.loading
+    private(set) var savePending = false
+    private(set) var change = Change(revision: 0, origin: .load)
+    // Reuse accepted Change identities for the three direct service intents. A
+    // synchronous callback may edit an unrelated field without superseding Off.
+    private(set) var audioChange = Change(revision: 0, origin: .load)
+    private(set) var locationChange = Change(revision: 0, origin: .load)
+    private(set) var serverRunningChange = Change(revision: 0, origin: .load)
+    private(set) var revisionExhausted = false
+    var acceptsNewIntent: Bool { revision != UInt64.max && !revisionExhausted }
     let fileURL: URL
 
     struct Storage: Sendable {
@@ -63,15 +76,46 @@ final class SettingsStore: ObservableObject {
     private var migrationPending = false
     private var busy = false
     private var revision: UInt64 = 0
-    private var revisionExhausted = false
     private var durable: AppSettings?
+    private var saving: AppSettings?
     private var pending: AppSettings?
     private var pendingImport: Import?
     private var activeImport: Import?
-    private var earlyEdits: [PartialKeyPath<AppSettings>: (inout AppSettings) -> Void] = [:]
+    // Keep the latest edit per path in acceptance order. Whole-value and nested
+    // paths can overlap, so unordered dictionary traversal would lose newer input.
+    private var earlyEdits: [(path: PartialKeyPath<AppSettings>, apply: (inout AppSettings) -> Void)] = []
     private var loadedWaiters: [CheckedContinuation<Void, Never>] = []
     private var flushWaiters: [CheckedContinuation<Void, Error>] = []
     private var storageFailure: Error?
+
+    // @Published sends from willSet: a subscriber's newer edit could be overwritten
+    // when the outer assignment resumes. Commit all fields before notifying, and
+    // advance this comparison before callbacks so synchronous reentry stays current.
+    let objectWillChange = ObservableObjectPublisher()
+    private struct ViewState: Equatable {
+        let value: AppSettings
+        let error: String?
+        let load: LoadState
+        let pending: Bool
+        let change: Change
+        let audio: Change
+        let location: Change
+        let serverRunning: Change
+        let exhausted: Bool
+    }
+    private var lastPublished = ViewState(value: AppSettings(), error: nil, load: .loading,
+        pending: false, change: Change(revision: 0, origin: .load),
+        audio: Change(revision: 0, origin: .load), location: Change(revision: 0, origin: .load),
+        serverRunning: Change(revision: 0, origin: .load), exhausted: false)
+
+    private func publishChanges() {
+        let next = ViewState(value: value, error: errorMessage, load: loadState,
+            pending: savePending, change: change, audio: audioChange, location: locationChange,
+            serverRunning: serverRunningChange, exhausted: revisionExhausted)
+        guard next != lastPublished else { return }
+        lastPublished = next
+        objectWillChange.send()
+    }
 
     init(fileURL: URL? = nil, legacy: UserDefaults = .standard, storage: Storage = Storage()) {
         self.fileURL = fileURL ?? FileManager.default.urls(for: .applicationSupportDirectory,
@@ -90,17 +134,38 @@ final class SettingsStore: ObservableObject {
         Binding(get: { self.value[keyPath: path] }, set: { self.set(path, $0) })
     }
 
-    func set<Value>(_ path: WritableKeyPath<AppSettings, Value>, _ newValue: Value) {
+    func set<Value>(_ path: WritableKeyPath<AppSettings, Value>, _ newValue: Value,
+                    origin: Origin = .user) {
         // Even an unchanged explicit Off invalidates a delayed import.
-        advanceRevision()
+        guard advanceRevision() else {
+            // Exhaustion cannot allocate new work or another identity. Direct
+            // service Off still remains reflected in memory, never a later On.
+            if let enabled = newValue as? Bool, !enabled,
+               path == \AppSettings.serverRunning || path == \AppSettings.background.silentAudio ||
+               path == \AppSettings.background.continuousLocation {
+                value[keyPath: path] = newValue
+                savePending = value != durable || saving != nil
+            }
+            pump()
+            return
+        }
         supersedeImports()
         var next = value
         next[keyPath: path] = newValue
-        if loadState != .ready { earlyEdits[path] = { $0[keyPath: path] = newValue } }
-        if next != value || savePending {
-            pending = next // Reserve before publication: a reentrant newer edit wins.
+        value = next
+        change = Change(revision: revision, origin: origin)
+        markIntent(path)
+        if loadState == .ready {
+            // Coalesce into the running snapshot too. A repeated choice/flush must
+            // not enqueue a duplicate write; returning to an older durable value
+            // still requires a write if a different snapshot is already in flight.
+            pending = next == saving || (saving == nil && next == durable &&
+                storageFailure == nil && !migrationPending) ? nil : next
+            savePending = saving != nil || pending != nil
+        } else {
+            earlyEdits.removeAll { $0.path == path }
+            earlyEdits.append((path, { $0[keyPath: path] = newValue }))
             savePending = true
-            value = next
         }
         if loadState == .failed, !busy { load() }
         else { pump() }
@@ -109,10 +174,15 @@ final class SettingsStore: ObservableObject {
     /// Explicit durability boundary, never a synchronous wait. Normal edits do not
     /// wait for it; a caller that must close/relaunch after saving can await it.
     func flush() async throws {
+        if revisionExhausted { throw storageFailure ?? revisionError }
+        if loadState == .failed, !busy { load() }
         await whenLoaded()
         if loadState == .failed { throw storageFailure ?? SettingsError.invalid("Settings are not loaded.") }
-        if !busy, pending == nil, pendingImport == nil, !savePending { return }
-        if pending == nil, savePending { pending = value }
+        if !busy, pending == nil, pendingImport == nil, !savePending {
+            if let failure = storageFailure { throw failure }
+            return
+        }
+        if !busy, pending == nil, savePending { pending = value }
         try await withCheckedThrowingContinuation { (receipt: CheckedContinuation<Void, Error>) in
             flushWaiters.append(receipt)
             pump()
@@ -129,12 +199,12 @@ final class SettingsStore: ObservableObject {
         try await withTaskCancellationHandler {
             try Task.checkCancellation()
             try await withCheckedThrowingContinuation { (receipt: CheckedContinuation<Void, Error>) in
-                advanceRevision()
-                supersedeImports()
-                guard !revisionExhausted else {
-                    receipt.resume(throwing: SettingsError.invalid("Settings revision limit reached."))
+                guard advanceRevision() else {
+                    receipt.resume(throwing: revisionError)
+                    pump()
                     return
                 }
+                supersedeImports()
                 pendingImport = Import(revision: revision, input: input,
                     cancellation: cancellation, receipt: receipt)
                 pump()
@@ -142,9 +212,32 @@ final class SettingsStore: ObservableObject {
         } onCancel: { cancellation.cancel() }
     }
 
-    private func advanceRevision() {
-        if revision == UInt64.max { revisionExhausted = true }
-        else { revision += 1 }
+    private var revisionError: SettingsError {
+        .invalid("Settings revision limit reached. New settings operations are unavailable.")
+    }
+    private func markIntent(_ path: PartialKeyPath<AppSettings>) {
+        let whole = path == \AppSettings.self
+        let background = whole || path == \AppSettings.background
+        if background || path == \AppSettings.background.silentAudio { audioChange = change }
+        if background || path == \AppSettings.background.continuousLocation { locationChange = change }
+        if whole || path == \AppSettings.serverRunning { serverRunningChange = change }
+    }
+    private func advanceRevision() -> Bool {
+        guard revision != UInt64.max, !revisionExhausted else {
+            revisionExhausted = true
+            supersedeImports()
+            pending = nil
+            earlyEdits.removeAll(keepingCapacity: false)
+            storageFailure = revisionError
+            errorMessage = revisionError.localizedDescription
+            loadState = .failed
+            savePending = value != durable || saving != nil
+            let waiters = loadedWaiters; loadedWaiters.removeAll()
+            for waiter in waiters { waiter.resume() }
+            return false
+        }
+        revision += 1
+        return true
     }
     private func supersedeImports() {
         activeImport?.cancellation.cancel()
@@ -156,7 +249,8 @@ final class SettingsStore: ObservableObject {
     }
 
     private func load() {
-        guard !busy else { return }
+        defer { publishChanges() }
+        guard !busy, !revisionExhausted else { return }
         busy = true
         loadState = .loading
         let target = fileURL, source = storage, legacy = legacy
@@ -169,15 +263,21 @@ final class SettingsStore: ObservableObject {
             }
             DispatchQueue.main.async { [self] in
                 busy = false
+                guard !revisionExhausted else { pump(); return }
                 switch result {
                 case .success(let loaded):
                     var next = loaded.value
-                    for edit in earlyEdits.values { edit(&next) }
+                    for edit in earlyEdits { edit.apply(&next) }
                     earlyEdits.removeAll(keepingCapacity: true)
                     durable = loaded.migrated ? nil : loaded.value
                     migrationPending = loaded.migrated
-                    if next != durable { pending = next; savePending = true }
+                    // Always replace the provisional pending state. An early edit
+                    // may equal the file and need no write at all after this merge.
+                    pending = next != durable ? next : nil
+                    savePending = pending != nil
                     value = next
+                    change = Change(revision: revision, origin: .load)
+                    markIntent(\AppSettings.self)
                     storageFailure = nil
                     errorMessage = nil
                     loadState = .ready
@@ -195,25 +295,35 @@ final class SettingsStore: ObservableObject {
     }
 
     private func pump() {
+        defer { publishChanges() }
+        if revisionExhausted {
+            let waiters = flushWaiters; flushWaiters.removeAll()
+            for waiter in waiters { waiter.resume(throwing: revisionError) }
+            return
+        }
         guard !busy, loadState != .loading else { return }
         if loadState == .ready, let next = pending {
             pending = nil
+            saving = next
             busy = true
             let target = fileURL, source = storage, cleanup = migrationPending ? legacy : nil
             io.async { [self] in
                 let result = Result { try source.write(next.encoded(), target); cleanup?.clear() }
                 DispatchQueue.main.async { [self] in
                     busy = false
+                    saving = nil
                     switch result {
                     case .success:
                         durable = next
                         if cleanup != nil { migrationPending = false }
                         savePending = value != durable || pending != nil
-                        if !savePending { storageFailure = nil; errorMessage = nil }
+                        if !savePending && !revisionExhausted { storageFailure = nil; errorMessage = nil }
                     case .failure(let error):
-                        storageFailure = error
                         savePending = true
-                        errorMessage = "Settings could not be saved: \(error.localizedDescription)"
+                        if !revisionExhausted {
+                            storageFailure = error
+                            errorMessage = "Settings could not be saved: \(error.localizedDescription)"
+                        }
                     }
                     pump()
                 }
@@ -240,6 +350,7 @@ final class SettingsStore: ObservableObject {
     }
 
     private func finishImport(_ request: Import, _ result: Result<Prepared, Error>) {
+        defer { publishChanges() }
         switch result {
         case .failure(let error):
             busy = false
@@ -263,6 +374,8 @@ final class SettingsStore: ObservableObject {
                 storageFailure = nil
                 errorMessage = nil
                 value = prepared.value
+                change = Change(revision: request.revision, origin: .imported)
+                markIntent(\AppSettings.self)
                 loadState = .ready
             }
             let target = fileURL, legacy = legacy

@@ -26,7 +26,10 @@ import Glibc
         let settings = SettingsStore(fileURL: URL(fileURLWithPath: path), legacy: legacy)
         let server = ServerController()
         // Match root initial application; this is not a SwiftUI rendering test.
-        server.apply(settings.value.server, running: settings.value.serverRunning)
+        await settings.whenLoaded()
+        if settings.loadState == .ready {
+            server.apply(settings.value.server, running: settings.value.serverRunning)
+        }
         while let line = await Task.detached(operation: { readLine() }).value {
             let command = try JSONDecoder().decode(Command.self, from: Data(line.utf8))
             let before = settings.value
@@ -37,9 +40,10 @@ import Glibc
                     guard let value = command.settings, let running = command.running else {
                         fatalError("Missing server inputs")
                     }
+                    // Direct Stop/Start reaches the service before storage work.
+                    server.apply(value, running: running, retry: running)
                     settings.set(\.server, value)
                     settings.set(\.serverRunning, running)
-                    server.apply(settings.value.server, running: running, retry: running)
                 case "set-password":
                     guard let password = command.password else { fatalError("Missing password") }
                     settings.binding(\.server.authPassword).wrappedValue = password
@@ -48,7 +52,7 @@ import Glibc
                     try await settings.importFile(URL(fileURLWithPath: path))
                 case "import-data":
                     guard let payload = command.payload else { fatalError("Missing import data") }
-                    try settings.importData(Data(payload.utf8))
+                    try await settings.importData(Data(payload.utf8))
                 case "state": break
                 case "exit":
                     // End this test process without changing durable running intent.
@@ -63,6 +67,12 @@ import Glibc
             } catch let failure { error = failure.localizedDescription }
             if command.operation != "exit", before != settings.value {
                 server.apply(settings.value.server, running: settings.value.serverRunning)
+            }
+            // Protocol replies delimit durability for the real-file assertions.
+            // Service application above remains immediate even when this fails.
+            if command.operation != "state" {
+                do { try await settings.flush() }
+                catch let failure { if error.isEmpty { error = failure.localizedDescription } }
             }
             let reply: [String: Any] = ["id": command.id, "running": server.isRunning,
                 "status": server.status, "savedRunning": settings.value.serverRunning,

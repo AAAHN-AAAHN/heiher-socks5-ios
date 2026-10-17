@@ -21,6 +21,7 @@ struct SettingsView: View {
     @ObservedObject var settings: SettingsStore
     @State private var importing = false
     @State private var exporting = false
+    @State private var preparingExport = false
     @State private var document = SettingsDocument(data: Data())
     @State private var message: String?
 
@@ -29,16 +30,25 @@ struct SettingsView: View {
             Form {
                 Section {
                     Button("Export JSON") {
-                        do {
-                            document = SettingsDocument(data: try settings.value.encoded())
-                            exporting = true
-                        } catch { message = error.localizedDescription }
+                        let snapshot = settings.value
+                        preparingExport = true
+                        Task { @MainActor in
+                            defer { preparingExport = false }
+                            do {
+                                let data = try await Task.detached(priority: .utility) {
+                                    try snapshot.encoded()
+                                }.value
+                                document = SettingsDocument(data: data)
+                                exporting = true
+                            } catch { message = error.localizedDescription }
+                        }
                     }
+                    .disabled(preparingExport || settings.loadState == .loading)
                     Button("Import JSON") { importing = true }
                 } header: {
                     Text("Configuration")
                 } footer: {
-                    Text("All Server and Background settings, the Start/Stop choice and the last tab are saved automatically in one settings.json file. Import replaces them and applies the saved services immediately, restarting the server if needed.")
+                    Text("Server and Background settings, the Start/Stop choice and the last tab are saved automatically. Changes take effect before saving finishes. Import applies the complete configuration after it is saved, restarting the server if needed.")
                 }
                 Section {
                     Text("Exported JSON includes the authentication password in plain text. Keep the file private and only import trusted configurations.")
@@ -46,7 +56,19 @@ struct SettingsView: View {
                 }
                 .font(.footnote)
                 if let error = settings.errorMessage {
-                    Section("Storage error") { Text(error) }
+                    Section("Storage error") {
+                        Text(error)
+                        Button("Retry Save") {
+                            Task { @MainActor in
+                                do { try await settings.flush() }
+                                catch { message = error.localizedDescription }
+                            }
+                        }
+                    }
+                } else if settings.loadState == .loading {
+                    Section { Text("Loading saved settings...") }
+                } else if settings.savePending {
+                    Section { Text("Saving changes...") }
                 }
             }
             .navigationTitle("Settings")

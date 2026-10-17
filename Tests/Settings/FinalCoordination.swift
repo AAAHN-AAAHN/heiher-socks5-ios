@@ -77,7 +77,8 @@ final class NSFileCoordinator {
         let input = root.appendingPathComponent("original.json")
         let accessor = root.appendingPathComponent("accessor.json")
         let missing = root.appendingPathComponent("missing.json")
-        let store = SettingsStore(fileURL: file, legacy: legacy)
+        let store = await loadedSettings(fileURL: file, legacy: legacy)
+        try await store.flush()
         let initial = store.value
         var imported = initial
         imported.server.listenPort = "24680"; imported.serverRunning = true
@@ -97,7 +98,7 @@ final class NSFileCoordinator {
         check(try AppSettings.decoded(Data(contentsOf: file)) == imported, "Redirected contents persisted")
         balanced(input)
         balanced(accessor, 0, 0)
-        try store.importData(initial.encoded())
+        try await store.importData(initial.encoded())
         for rule in [ProviderBoundary.Rule(target: accessor, beforeError: true),
                      .init(target: accessor, afterError: true), .init(omitAccessor: true),
                      .init(target: missing), .init()] {
@@ -113,7 +114,7 @@ final class NSFileCoordinator {
         try await store.importFile(input)
         check(store.value == imported, "False security-scope return does not forbid readable local file")
         balanced(input, 1, 0)
-        try store.importData(initial.encoded())
+        try await store.importData(initial.encoded())
         ProviderBoundary.configure(input, .init(target: accessor))
         let cancelled = Task { @MainActor in try await store.importFile(input) }
         cancelled.cancel()
@@ -122,7 +123,7 @@ final class NSFileCoordinator {
         balanced(input, 0, 0)
 
         for action in 0..<8 {
-            try store.importData(initial.encoded())
+            try await store.importData(initial.encoded())
             ProviderBoundary.configure(input, .init(target: accessor), held: true)
             let task = Task { @MainActor in try await store.importFile(input) }
             for _ in 0..<1000 {
@@ -130,21 +131,25 @@ final class NSFileCoordinator {
                 try await Task.sleep(for: .milliseconds(2))
             }
             check(ProviderBoundary.hasEntered(input), "Detached provider entered without blocking actor")
+            var newer: Task<Void, Error>?
             switch action {
             case 0: store.set(\.serverRunning, false) // unchanged Stop still supersedes
             case 1: store.set(\.server.authPassword, "edited")
             case 2: store.set(\.selectedTab, .settings)
-            case 3: do { try store.importData(Data("invalid".utf8)) } catch {}
-            case 4: do { try await store.importFile(missing) } catch {}
+            case 3: newer = Task { @MainActor in try await store.importData(Data("invalid".utf8)) }
+            case 4: newer = Task { @MainActor in try await store.importFile(missing) }
             case 5: task.cancel()
-            case 6: try store.importData(initial.encoded())
+            case 6: newer = Task { @MainActor in try await store.importData(initial.encoded()) }
             default: store.set(\.serverRunning, true); store.set(\.serverRunning, false)
             }
+            if newer != nil { await Task.yield() }
             let live = store.value
-            let bytes = try Data(contentsOf: file)
+            let bytes = try live.encoded()
             ProviderBoundary.release(input)
             var rejected = false
             do { try await task.value } catch { rejected = true }
+            if let newer { do { try await newer.value } catch {} }
+            try await store.flush()
             check(rejected && store.value == live, "Slow import cannot reverse newer intent \(action)")
             check(try Data(contentsOf: file) == bytes, "Slow import cannot rewrite newer disk \(action)")
             balanced(input)
