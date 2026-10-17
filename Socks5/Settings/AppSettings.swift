@@ -1,9 +1,9 @@
 import Foundation
 
 /// The complete, portable configuration. Runtime counters and errors are not settings.
-struct AppSettings: Codable, Equatable {
-    enum Tab: String, Codable { case statistics, server, background, settings }
-    struct Background: Codable, Equatable {
+struct AppSettings: Codable, Equatable, Sendable {
+    enum Tab: String, Codable, Sendable { case statistics, server, background, settings }
+    struct Background: Codable, Equatable, Sendable {
         var continuousLocation = false
         var silentAudio = false
     }

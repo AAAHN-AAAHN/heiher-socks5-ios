@@ -27,8 +27,12 @@ final class SettingsPersistenceUITests: XCTestCase {
         XCTAssertTrue(start.isEnabled && stop.isEnabled)
         XCTAssertFalse(Self.handshake())
         capture("invalid-draft-saved")
+        settingsTab.tap()
+        waitForSavedSettings(in: app)
         app.terminate()
         app.launch()
+        XCTAssertTrue(app.buttons["Export JSON"].waitForExistence(timeout: 10))
+        serverTab.tap()
         XCTAssertTrue(workers.waitForExistence(timeout: 10))
         XCTAssertEqual(workers.value as? String, "0", "Invalid stopped draft must survive recreation")
         reveal(stop, in: app, upward: true)
@@ -50,6 +54,7 @@ final class SettingsPersistenceUITests: XCTestCase {
             XCTAssertTrue(app.buttons["Export JSON"].waitForExistence(timeout: 5))
             XCTAssertTrue(app.buttons["Import JSON"].exists)
             capture("settings-running-\(orientation.rawValue)")
+            waitForSavedSettings(in: app)
             app.terminate()
             XCTAssertTrue(waitUntil { !Self.handshake() && !Self.handshake(ipv6: true) },
                           "The old process must release its listener before restoration is credited")
@@ -106,11 +111,26 @@ final class SettingsPersistenceUITests: XCTestCase {
             }
             XCTAssertFalse(Self.handshake() || Self.handshake(ipv6: true), "Cancelling a file dialog must preserve Stop")
         }
+        waitForSavedSettings(in: app)
         app.terminate()
         app.launch()
         XCTAssertTrue(app.buttons["Export JSON"].waitForExistence(timeout: 10))
         XCTAssertFalse(Self.handshake(), "Saved Stop persists across process restart")
         capture("relaunched-settings-stopped")
+    }
+
+    @MainActor private func waitForSavedSettings(in app: XCUIApplication) {
+        // Observe the real store's public UI before killing its process. This
+        // durability wait does not extend any Start, Stop or listener deadline.
+        // The outer audit separately reads and compares the actual settings file.
+        let export = app.buttons["Export JSON"]
+        XCTAssertTrue(export.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitUntil {
+            export.isHittable && export.isEnabled &&
+                !app.staticTexts["Loading saved settings..."].exists &&
+                !app.staticTexts["Saving changes..."].exists &&
+                !app.buttons["Retry Save"].exists
+        }, "Accepted settings must finish saving before process termination is tested")
     }
 
     @MainActor private func presented(_ element: XCUIElement, since began: TimeInterval, title: String) -> Bool {

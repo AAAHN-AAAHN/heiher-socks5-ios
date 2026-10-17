@@ -2,13 +2,17 @@ import Foundation
 
 /// Boundary checks use real JSON and files; they do not grant device permissions.
 @main struct ValidationTests {
-    @MainActor static func main() throws {
+    @MainActor static func main() async throws {
         var checks = 0
         func check(_ condition: Bool, _ name: String) {
             precondition(condition, name); checks += 1; print("PASS: \(name)")
         }
         func rejects(_ work: () throws -> Void, _ name: String) {
             do { try work(); preconditionFailure(name) } catch {}
+            check(true, name)
+        }
+        func rejectsAsync(_ work: () async throws -> Void, _ name: String) async {
+            do { try await work(); preconditionFailure(name) } catch {}
             check(true, name)
         }
         let defaults = AppSettings()
@@ -98,9 +102,12 @@ import Foundation
         let legacy = UserDefaults(suiteName: suite)!
         defer { try? FileManager.default.removeItem(at: root); legacy.removePersistentDomain(forName: suite) }
         let store = SettingsStore(fileURL: file, legacy: legacy)
+        await store.whenLoaded()
+        try await store.flush()
         try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1)], ofItemAtPath: file.path)
         let stamp = try FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as! Date
         store.set(\.serverRunning, false)
+        try await store.flush()
         check(try FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as? Date == stamp,
               "Identical setter leaves file timestamp unchanged, not merely equal JSON bytes")
         let initialBytes = try Data(contentsOf: file)
@@ -110,7 +117,7 @@ import Foundation
                 invalid.server.authUsername = "user"; invalid.server.authPassword = "password"
                 invalid.server[keyPath: path] = "a" + scalar + "b"
                 invalid.serverRunning = true
-                rejects({ try store.importData(invalid.encoded()) }, "Non-printable YAML import rejected")
+                await rejectsAsync({ try await store.importData(invalid.encoded()) }, "Non-printable YAML import rejected")
                 let disk = try Data(contentsOf: file)
                 check(store.value == defaults && disk == initialBytes,
                       "Invalid YAML import preserves live and stored settings")
@@ -121,7 +128,7 @@ import Foundation
         let parked = root.appendingPathComponent("previous.json")
         try FileManager.default.moveItem(at: file, to: parked)
         try FileManager.default.createDirectory(at: file, withIntermediateDirectories: false)
-        rejects({ try store.importData(incoming.encoded()) }, "A failed import write does not commit live state")
+        await rejectsAsync({ try await store.importData(incoming.encoded()) }, "A failed import write does not commit live state")
         let preserved = try Data(contentsOf: parked)
         check(store.value == defaults && preserved == previous,
               "Write-failed import preserves prior state and parked bytes")
@@ -129,6 +136,7 @@ import Foundation
         store.set(\.background.silentAudio, true)
         store.set(\.serverRunning, false)
         store.set(\.background.silentAudio, false)
+        await rejectsAsync({ try await store.flush() }, "Ordinary save failure reaches the durability waiter")
         check(!store.value.serverRunning && !store.value.background.silentAudio && store.errorMessage != nil,
               "Storage failure never blocks Stop or background Off")
         try FileManager.default.removeItem(at: file)
@@ -136,21 +144,21 @@ import Foundation
         for bad in [Data("broken".utf8), exact + Data([32])] {
             try bad.write(to: file)
             legacy.set(true, forKey: "background.silentAudio")
-            let failed = SettingsStore(fileURL: file, legacy: legacy)
+            let failed = await loadedSettings(fileURL: file, legacy: legacy)
             check(failed.errorMessage != nil && !failed.value.serverRunning && !failed.value.background.silentAudio,
                   "Corrupt/oversized existing files fail closed instead of migrating enabled services")
             let disk = try Data(contentsOf: file)
             check(disk == bad && legacy.object(forKey: "background.silentAudio") != nil,
                   "Failed load preserves original file and legacy keys")
         }
-        try store.importData(defaults.encoded())
+        try await store.importData(defaults.encoded())
         for i in 0..<250 {
             var value = defaults
             value.server.listenPort = String(10000 + i)
             value.server.authUsername = "u'\(i)"; value.server.authPassword = "p\\\(i)"
             value.serverRunning = i % 2 == 0
             value.background.silentAudio = i % 3 == 0
-            try store.importData(value.encoded())
+            try await store.importData(value.encoded())
             let restored = try AppSettings.decoded(Data(contentsOf: file))
             precondition(restored == value)
         }

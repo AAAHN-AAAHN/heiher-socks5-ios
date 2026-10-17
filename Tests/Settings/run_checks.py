@@ -7,6 +7,9 @@ import subprocess
 import sys
 import tempfile
 
+if not __debug__:
+    raise SystemExit('Assertions must be enabled')
+
 root = Path(__file__).resolve().parents[2]
 mode = sys.argv[1] if len(sys.argv) == 2 else ''
 if len(sys.argv) > 2 or mode not in ('', '--baseline-import', '--previous-store'):
@@ -15,6 +18,10 @@ baseline = mode == '--baseline-import'
 previous = mode == '--previous-store'
 reference = '9c2e76afcde7a20ff1bbdcf2a1f7e9092e1a98fd'
 previous_ref = '633c04905ed7ca4acd7272fb040c8d1c66cb38e3'
+# These tests describe the synchronous API of both historical controls. Keep
+# their exact source with those old stores instead of weakening their assertions
+# to accommodate the current asynchronous API.
+historical_tests = 'a22bc4579a82e46b9e20389182bc1e63e6deedbf'
 
 
 def drop_privileges():
@@ -42,25 +49,8 @@ with tempfile.TemporaryDirectory() as name:
         (temp / Path(path).name).write_text(code)
     ui, provider = [], []
     if sys.platform != 'darwin':
-        (temp / 'UIMocks.swift').write_text('''import Foundation
-protocol ObservableObject {}
-@propertyWrapper struct Published<T> { var wrappedValue: T }
-struct Binding<T> {
-    let get: () -> T; let set: (T) -> Void
-    init(get: @escaping () -> T, set: @escaping (T) -> Void) { self.get = get; self.set = set }
-    var wrappedValue: T { get { get() } nonmutating set { set(newValue) } }
-}
-''')
-        (temp / 'ProviderMocks.swift').write_text('''import Foundation
-class NSFileCoordinator {
-    init(filePresenter: Any?) {}
-    func coordinate(readingItemAt url: URL, options: [Int], error: UnsafeMutablePointer<NSError?>?, byAccessor: (URL) -> Void) { byAccessor(url) }
-}
-extension URL {
-    func startAccessingSecurityScopedResource() -> Bool { true }
-    func stopAccessingSecurityScopedResource() {}
-}
-''')
+        (temp / 'UIMocks.swift').write_bytes(Path(__file__).with_name('HostUI.swift').read_bytes())
+        (temp / 'ProviderMocks.swift').write_bytes(Path(__file__).with_name('HostProvider.swift').read_bytes())
         ui = [str(temp / 'UIMocks.swift')]
         provider = [str(temp / 'ProviderMocks.swift')]
     groups = [(['SettingsTests.swift'], provider, None),
@@ -94,10 +84,20 @@ extension URL {
                 body = body.replace(original_name + '()', test_name + '()')
             store = temp / 'SettingsStore-scope-boundary.swift'
             store.write_text(body)
+        test_sources = []
+        for test in tests:
+            raw = (subprocess.check_output(['git', '-C', str(root), 'show',
+                       historical_tests + ':Tests/Settings/' + test])
+                   if baseline or previous else Path(__file__).with_name(test).read_bytes())
+            destination = temp / test
+            destination.write_bytes(raw)
+            print('TEST_SOURCE', test, hashlib.sha256(raw).hexdigest(), flush=True)
+            test_sources.append(str(destination))
+        support = [] if baseline or previous else [str(Path(__file__).with_name('StorageTestSupport.swift'))]
         subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
                         *ui, *platform, *([] if baseline else [str(temp / 'ServerSettings.swift')]),
                         str(temp / 'AppSettings.swift'), str(store),
-                        *[str(Path(__file__).with_name(p)) for p in tests],
+                        *support, *test_sources,
                         '-o', str(executable)], check=True, timeout=120)
         result = subprocess.run([str(executable)], text=True, capture_output=True, timeout=45,
                                 env=env, preexec_fn=preexec)
@@ -110,3 +110,6 @@ extension URL {
             print('NEGATIVE CONTROL CONFIRMED:', expected)
         else:
             result.check_returncode()
+
+if not baseline and not previous:
+    subprocess.run([sys.executable, str(Path(__file__).with_name('async_storage_check.py'))], check=True)

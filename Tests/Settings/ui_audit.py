@@ -46,8 +46,23 @@ def verify_production():
                     upstream_app=shared['upstream_app'])
     if config != expected:
         raise RuntimeError('Settings configuration differs beyond the exact inherited source baseline')
-    run(['git', 'diff', '--exit-code', baseline, 'HEAD', '--',
-         'Socks5', 'Socks5.xcodeproj', 'Patches'], 'preserved-production.log')
+    # Current owner changes are approved by the committed frozen-code contract;
+    # inherited server/native/project behavior remains exact. An old UI audit's
+    # entire-product equality check cannot describe the asynchronous store owner.
+    run([sys.executable, 'Build/check_ownership.py'], 'ownership-contract.log')
+    production_base = 'c64faec0ca5ed14edfec2774bd5a2fad3bbaf4d9'
+    allowed = {'Socks5/AppRoot.swift', 'Socks5/Settings/SettingsStore.swift',
+               'Socks5/Settings/SettingsView.swift'}
+    changed = set(output('git', 'diff', '--name-only', production_base, 'HEAD', '--',
+                         'Socks5', 'Socks5.xcodeproj', 'Patches').splitlines())
+    if not changed <= allowed:
+        raise RuntimeError('Unexpected inherited production change: ' + repr(sorted(changed - allowed)))
+    membership = json.loads((ROOT / 'docs/feature-membership.json').read_bytes())
+    hashes = {path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest() for path in sorted(allowed)}
+    if any(membership['files'].get(path) != digest for path, digest in hashes.items()):
+        raise RuntimeError('Settings owner source does not match the frozen membership')
+    (OUT / 'preserved-production.log').write_text(json.dumps(dict(
+        production_base=production_base, changed=sorted(changed), owned=hashes), indent=2) + '\n')
     run(['git', 'diff', '--exit-code', source_base, 'HEAD', '--',
          'Build/upstream.json', 'Build/baseline-framework.json',
          'HevSocks5Server.xcframework'], 'preserved-native-source.log')

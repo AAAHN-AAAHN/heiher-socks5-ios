@@ -5,7 +5,7 @@
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
     "feature/background": "618b3d2b413937aaad7373ee2af9e693ec81b84a",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
-    "feature/settings-persistence": "a22bc4579a82e46b9e20389182bc1e63e6deedbf",
+    "feature/settings-persistence": "f67ac37391e19f4b6f997c91b90b1e07e4382c07",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
     "feature/traffic-statistics": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e"
   },
@@ -15,9 +15,9 @@
   ],
   "readme_mirror": "docs/features/integrated.md",
   "validation_files": {
-    "Build/check.py": "6a637432fa1adaa22a6f2542c810d119b1596ed4",
+    "Build/check.py": "2ba8af13ec04237ab76b4918e9b8009b5f2a1b3d",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
-    "Build/check_ownership.py": "3f11ee85e1248ad3d891fd8867f21ef1e9f2a4c0",
+    "Build/check_ownership.py": "3b234c9cc2c49647c9b9f0cad852f992a7194ce4",
     "Tests/AppIcon/check_icon.py": "df9748bbb27f5e71cccc647a9fd1cc9c03fc73ab",
     "Tests/Background/check_scope.py": "01804a97d2ad0ca64dd99add11a3752875ac92db",
     "Tests/Statistics/audit.py": "62c0fc22ce1cf714dbec4c9bb3071a75ec167b06",

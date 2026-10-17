@@ -37,24 +37,15 @@ def main():
                          'Socks5/Settings/AppSettings.swift', 'Socks5/Settings/SettingsStore.swift'):
                 data = old if label == 'original-controller' and path.endswith('/ServerController.swift') else (ROOT / path).read_bytes()
                 text = data.decode()
+                if path.endswith('/ServerController.swift'):
+                    boundary = 'Task { @MainActor in self.finished(result) }'
+                    assert text.count(boundary) == 1, 'Native completion boundary changed'
+                    text = text.replace(boundary, 'PersistenceCompletionGate.wait()\n                ' + boundary, 1)
                 if sys.platform != 'darwin': text = text.replace('import SwiftUI\n', 'import Foundation\n', 1)
                 dest = part / Path(path).name; dest.write_text(text); sources.append(str(dest))
             if sys.platform != 'darwin':
-                mock = part / 'Platform.swift'
-                mock.write_text('''import Foundation
-protocol ObservableObject {}
-@propertyWrapper struct Published<T> { var wrappedValue: T }
-struct Binding<T> { init(get: @escaping () -> T, set: @escaping (T) -> Void) {} }
-class NSFileCoordinator {
-    init(filePresenter: Any?) {}
-    func coordinate(readingItemAt url: URL, options: [Int], error: UnsafeMutablePointer<NSError?>?, byAccessor: (URL) -> Void) { byAccessor(url) }
-}
-extension URL {
-    func startAccessingSecurityScopedResource() -> Bool { true }
-    func stopAccessingSecurityScopedResource() {}
-}
-''')
-                sources.append(str(mock))
+                sources.extend(str(Path(__file__).with_name(name))
+                               for name in ('HostUI.swift', 'HostProvider.swift'))
             executable = part / 'host'
             with (output / (label + '-compile.log')).open('w') as log:
                 subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors', '-I', str(include),

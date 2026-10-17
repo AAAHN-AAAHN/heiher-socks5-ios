@@ -29,25 +29,8 @@ def compile_host(core, folder, output):
             text = text.replace('import SwiftUI\n', 'import Foundation\n', 1)
         dest = folder / Path(path).name; dest.write_text(text); sources.append(str(dest))
     if sys.platform != 'darwin':
-        ui = folder / 'Platform.swift'
-        ui.write_text('''import Foundation
-protocol ObservableObject {}
-@propertyWrapper struct Published<T> { var wrappedValue: T }
-struct Binding<T> {
-    let get: () -> T; let set: (T) -> Void
-    init(get: @escaping () -> T, set: @escaping (T) -> Void) { self.get = get; self.set = set }
-    var wrappedValue: T { get { get() } nonmutating set { set(newValue) } }
-}
-class NSFileCoordinator {
-    init(filePresenter: Any?) {}
-    func coordinate(readingItemAt url: URL, options: [Int], error: UnsafeMutablePointer<NSError?>?, byAccessor: (URL) -> Void) { byAccessor(url) }
-}
-extension URL {
-    func startAccessingSecurityScopedResource() -> Bool { true }
-    func stopAccessingSecurityScopedResource() {}
-}
-''')
-        sources.append(str(ui))
+        sources.extend(str(Path(__file__).with_name(name))
+                       for name in ('HostUI.swift', 'HostProvider.swift'))
     libraries = [core / 'bin/libhev-socks5-server.a', core / 'third-part/yaml/bin/libyaml.a',
                  core / 'third-part/hev-task-system/bin/libhev-task-system.a']
     executable = folder / 'persistence-host'

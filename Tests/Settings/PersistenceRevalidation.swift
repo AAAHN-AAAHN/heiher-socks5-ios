@@ -31,41 +31,50 @@ import Foundation
                       "Direct missing-file read uses an explicit Cocoa absence code")
             }
         }
-        let store = SettingsStore(fileURL: url, legacy: legacy)
+        let store = await loadedSettings(fileURL: url, legacy: legacy)
+        try await store.flush()
         check(store.errorMessage == nil && store.value == AppSettings(), "Missing file initializes the unchanged default schema")
         let binding = store.binding(\.server.authPassword)
         store.set(\.server.authUsername, "user")
         for pair in [("\u{00e9}", "e\u{0301}"), ("\u{ac00}", "\u{1100}\u{1161}")] {
             check(pair.0 == pair.1 && !same(pair.0, pair.1), "Fixture has canonical equality but distinct UTF-8")
             binding.wrappedValue = pair.0
+            try await store.flush()
             let before = try Data(contentsOf: url)
             binding.wrappedValue = pair.1
+            try await store.flush()
             let after = try Data(contentsOf: url)
             check(same(store.value.server.authPassword, pair.1), "Binding preserves changed credential bytes in memory")
-            check(before != after && same(SettingsStore(fileURL: url, legacy: legacy).value.server.authPassword, pair.1),
+            let restored = await loadedSettings(fileURL: url, legacy: legacy)
+            check(before != after && same(restored.value.server.authPassword, pair.1),
                   "Inherited byte equality propagates through save and reconstruction")
             var next = store.value; next.server.authPassword = pair.0
-            try store.importData(next.encoded())
+            try await store.importData(next.encoded())
             check(same(store.value.server.authPassword, pair.0), "Full-document import replaces exact credential bytes")
             let decoded = try AppSettings.decoded(store.value.encoded())
             check(same(decoded.server.authPassword, pair.0), "Export/JSON decode retains the exact imported bytes")
         }
         store.set(\.serverRunning, true)
+        try await store.flush()
         let savedRunning = try Data(contentsOf: url)
         let parked = root.appendingPathComponent("parked.json")
         try FileManager.default.moveItem(at: url, to: parked)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
         store.set(\.serverRunning, false)
+        do { try await store.flush() } catch {}
         check(!store.value.serverRunning && store.errorMessage != nil, "Write failure applies Stop in memory and reports failure")
         check(try Data(contentsOf: parked) == savedRunning, "Failed Stop does not modify the last durable bytes")
         try FileManager.default.removeItem(at: url)
         try FileManager.default.moveItem(at: parked, to: url)
         store.set(\.serverRunning, false)
+        try await store.flush()
         check(store.errorMessage == nil, "Explicit identical Stop retries a previously failed save")
-        check(!SettingsStore(fileURL: url, legacy: legacy).value.serverRunning, "Retried Stop survives store recreation")
+        let stopped = await loadedSettings(fileURL: url, legacy: legacy)
+        check(!stopped.value.serverRunning, "Retried Stop survives store recreation")
         try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1)], ofItemAtPath: url.path)
         let stamp = try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as! Date
         store.set(\.serverRunning, false)
+        try await store.flush()
         check(try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date == stamp,
               "Clean identical choice still suppresses writes after save recovery")
 
@@ -73,11 +82,13 @@ import Foundation
         try FileManager.default.createDirectory(at: missingParent, withIntermediateDirectories: true)
         try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: missingParent.path)
         legacy.set(true, forKey: "background.silentAudio")
-        let pendingMigration = SettingsStore(fileURL: missingParent.appendingPathComponent("settings.json"), legacy: legacy)
+        let pendingMigration = await loadedSettings(fileURL: missingParent.appendingPathComponent("settings.json"), legacy: legacy)
+        do { try await pendingMigration.flush() } catch {}
         check(pendingMigration.value.background.silentAudio && pendingMigration.errorMessage != nil,
               "Confirmed absence may migrate in memory when first write fails")
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: missingParent.path)
         pendingMigration.set(\.background.silentAudio, true)
+        try await pendingMigration.flush()
         check(pendingMigration.errorMessage == nil && FileManager.default.fileExists(atPath: pendingMigration.fileURL.path),
               "An identical explicit choice completes a pending initial save after access returns")
         check(legacy.object(forKey: "background.silentAudio") == nil,
@@ -87,11 +98,12 @@ import Foundation
         try Data([1]).write(to: blockedParent)
         legacy.set(true, forKey: "background.silentAudio")
         legacy.set(true, forKey: "background.continuousLocation")
-        let migration = SettingsStore(fileURL: blockedParent.appendingPathComponent("settings.json"), legacy: legacy)
+        let migration = await loadedSettings(fileURL: blockedParent.appendingPathComponent("settings.json"), legacy: legacy)
         check(migration.errorMessage != nil, "Unreadable startup path is reported rather than silently replaced")
         // A real missing writable directory is a separate first-launch migration.
         let migrationURL = root.appendingPathComponent("migration/settings.json")
-        let migrated = SettingsStore(fileURL: migrationURL, legacy: legacy)
+        let migrated = await loadedSettings(fileURL: migrationURL, legacy: legacy)
+        try await migrated.flush()
         check(migrated.value.background.silentAudio && migrated.value.background.continuousLocation,
               "Successful first-file creation still migrates the same two choices")
         check(legacy.object(forKey: "background.silentAudio") == nil && legacy.object(forKey: "background.continuousLocation") == nil,
@@ -104,13 +116,14 @@ import Foundation
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
         var incoming = clean; incoming.serverRunning = true
         var rejected = false
-        do { try store.importData(incoming.encoded()) } catch { rejected = true }
+        do { try await store.importData(incoming.encoded()) } catch { rejected = true }
         check(rejected && store.value == clean, "Failed import commit never changes the live snapshot")
         try FileManager.default.removeItem(at: url)
         try FileManager.default.moveItem(at: parked, to: url)
         try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 2)], ofItemAtPath: url.path)
         let cleanStamp = try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as! Date
         store.set(\.serverRunning, clean.serverRunning)
+        try await store.flush()
         check(try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date == cleanStamp,
               "A rejected import does not schedule an unrelated rewrite of a clean snapshot")
         check(try Data(contentsOf: url) == durable, "Rejected import keeps exact original file bytes")
@@ -118,13 +131,15 @@ import Foundation
         let corrupt = Data("not JSON".utf8)
         try corrupt.write(to: url)
         legacy.set(true, forKey: "background.silentAudio")
-        let broken = SettingsStore(fileURL: url, legacy: legacy)
+        let broken = await loadedSettings(fileURL: url, legacy: legacy)
         broken.set(\.serverRunning, false)
+        await broken.whenLoaded()
         check(!broken.value.serverRunning && !broken.value.background.silentAudio && broken.errorMessage != nil,
               "Corrupt existing file fails closed even with legacy On and unchanged Stop")
         check(try Data(contentsOf: url) == corrupt, "Unchanged setter after load failure does not erase unreadable original")
-        try broken.importData(AppSettings().encoded())
-        check(broken.errorMessage == nil && SettingsStore(fileURL: url, legacy: legacy).value == AppSettings(),
+        try await broken.importData(AppSettings().encoded())
+        let repaired = await loadedSettings(fileURL: url, legacy: legacy)
+        check(broken.errorMessage == nil && repaired.value == AppSettings(),
               "Explicit valid import repairs a corrupt store transactionally")
         check(legacy.object(forKey: "background.silentAudio") != nil,
               "Repairing existing JSON never starts legacy migration cleanup")
@@ -142,8 +157,8 @@ import Foundation
             next.serverRunning = seed % 2 != 0
             next.background.continuousLocation = seed % 3 == 0
             next.selectedTab = [.server, .statistics, .background, .settings][Int(seed % 4)]
-            try broken.importData(next.encoded())
-            let loaded = SettingsStore(fileURL: url, legacy: legacy)
+            try await broken.importData(next.encoded())
+            let loaded = await loadedSettings(fileURL: url, legacy: legacy)
             precondition(loaded.value == next)
             precondition(same(loaded.value.server.authUsername, next.server.authUsername))
             precondition(same(loaded.value.server.authPassword, next.server.authPassword))
