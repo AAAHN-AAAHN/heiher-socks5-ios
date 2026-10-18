@@ -42,6 +42,35 @@ final class LoopAudioService: Sendable {
         case stopping = "Stopping silent WAV"
         case deactivating = "Releasing audio session"
     }
+    /// A fixed current boundary, not a per-call log. Grouped UI phases remain
+    /// independent from the exact API whose invocation has not returned.
+    enum Step: String, Sendable {
+        case executionClaim = "execution-claim"
+        case assetLookup = "asset"
+        case assetRead = "asset-read"
+        case session = "session"
+        case categoryGet = "category-get"
+        case modeGet = "mode-get"
+        case optionsGet = "options-get"
+        case categorySet = "category-set"
+        case alerts = "alerts"
+        case disconnect = "disconnect"
+        case activate = "activate"
+        case deactivate = "deactivate"
+        case playerCreate = "player-init"
+        case loops = "loops"
+        case delegate = "delegate"
+        case prepare = "prepare"
+        case play = "play"
+        case stop = "stop"
+        case playingGet = "playing-get"
+        case positionGet = "position-get"
+        case clockGet = "clock-get"
+        case durationGet = "duration-get"
+        case rateEnabledGet = "rate-enabled-get"
+        case rateGet = "rate-get"
+        case bufferGet = "buffer-get"
+    }
 
     struct State: Sendable, Equatable {
         var text = "Off"
@@ -59,6 +88,17 @@ final class LoopAudioService: Sendable {
         let epoch: UInt64
         let mayStart: @Sendable () -> Bool
         let phase: @Sendable (Phase) -> Void
+        let step: @Sendable (Step, Bool) -> Void
+
+        init(id: UInt64, epoch: UInt64, mayStart: @escaping @Sendable () -> Bool,
+             phase: @escaping @Sendable (Phase) -> Void,
+             step: @escaping @Sendable (Step, Bool) -> Void = { _, _ in }) {
+            self.id = id
+            self.epoch = epoch
+            self.mayStart = mayStart
+            self.phase = phase
+            self.step = step
+        }
     }
     struct Policy: Sendable {
         var interval = 0.5
@@ -75,6 +115,11 @@ final class LoopAudioService: Sendable {
         let phaseAt: Double?
         let resultAvailableAt: Double?
         let resultConsumedAt: Double?
+        let step: Step?
+        let stepEnteredAt: Double?
+        let stepReturnedAt: Double?
+        let sessionResultAvailableAt: Double?
+        let sessionResultConsumedAt: Double?
         let completedOperations: UInt64
         let maximumOutstanding: Int
         let scheduledIngress: Int
@@ -147,6 +192,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
     typealias Event = LoopAudioService.Event
     typealias Command = LoopAudioService.Command
     typealias Phase = LoopAudioService.Phase
+    typealias Step = LoopAudioService.Step
     typealias State = LoopAudioService.State
     typealias Reply = LoopAudioService.Reply
     typealias Context = LoopAudioService.Context
@@ -186,6 +232,11 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         var phaseAt: Double?
         var resultAvailableAt: Double?
         var resultConsumedAt: Double?
+        var step: Step?
+        var stepEnteredAt: Double?
+        var stepReturnedAt: Double?
+        var sessionResultAvailableAt: Double?
+        var sessionResultConsumedAt: Double?
     }
 
     private let lock = NSLock()
@@ -200,6 +251,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
     private var deliveryQueued = false
     private let control = DispatchQueue(label: "Socks5.loop-audio.control")
     private let io = DispatchQueue(label: "Socks5.loop-audio.io", qos: .userInitiated)
+    private let ioIdentity = DispatchSpecificKey<Bool>()
     private let factory: Factory
     private let leaseProvider: RecoveryExecutionLease.Provider
     private let policy: Policy
@@ -214,6 +266,8 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
     private var peakOutstanding = 0
     private var timerSequence: UInt64 = 0
     private var timer: DispatchSourceTimer?
+    private var timerDeadline: Double?
+    private var timerOperation: UInt64?
     private var lastState = State()
     private var lastPublishedRevision: UInt64?
     private var playing = false
@@ -244,6 +298,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         self.policy = policy
         self.leaseProvider = leaseProvider().serializingEnds()
         factory = endpointFactory
+        io.setSpecific(key: ioIdentity, value: true)
     }
 
     /// Root setup only. Repeated view restoration does not add subscriptions.
@@ -412,11 +467,11 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         if releaseBarrier { begin(.stop); return }
         if assetBlocked { return }
         let remaining = retryAt - Self.now
-        if remaining > 0 { schedule(after: remaining); return }
+        if remaining > 0 { schedule(at: retryAt); return }
         if playing && !rebuild {
             let remaining = inspectAt - Self.now
             if inspect && remaining <= 0 { begin(.inspect) }
-            else { schedule(after: max(0.001, remaining)) }
+            else { schedule(at: max(Self.now + 0.001, inspectAt)) }
         } else {
             begin(.start(rebuild: rebuild))
         }
@@ -464,25 +519,50 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             self.mark(job.id, .queued, entered: true)
             if let executionClaim {
                 self.mark(job.id, .protecting)
-                executionClaim.start()
+                self.markStep(job.id, .executionClaim, returned: false)
+                let admitted = executionClaim.start(mayIssue: { [weak self] in self?.valid(job.ticket) == true }) { [self] in
+                    // This means the actual provider request returned (or was
+                    // skipped before entry), not that an execution grant arrived.
+                    self.markStep(job.id, .executionClaim, returned: true)
+                    if DispatchQueue.getSpecific(key: self.ioIdentity) == true {
+                        self.perform(job)
+                    } else {
+                        self.io.async { self.perform(job) }
+                    }
+                }
+                if !admitted {
+                    // Single flight cannot normally encounter a second pending
+                    // start. Preserve the outstanding gate instead of inventing
+                    // a request return or entering unprotected preparation.
+                    self.control.async { self.record("Finite execution request is already pending") }
+                }
+            } else {
+                self.perform(job)
             }
-            if self.endpoint == nil {
-                self.endpoint = self.factory(self.io) { [weak self] in self?.notify($0) }
-                self.endpoint?.bind(EndpointRelay(
-                    session: { [weak self] in self?.acceptSession($0) },
-                    delegate: { [weak self] in self?.acceptDelegate($0) },
-                    generation: { [weak self] in self?.setDelegateGeneration($0) }))
-            }
-            let context = Context(id: job.id, epoch: input.epoch,
-                                  mayStart: { [weak self] in self?.valid(input) == true },
-                                  phase: { [weak self] in self?.mark(job.id, $0) })
-            self.endpoint?.perform(command, context: context) { [self] reply in
-                lock.lock()
-                guard timing.id == job.id, timing.resultAvailableAt == nil else { lock.unlock(); return }
-                timing.resultAvailableAt = Self.now
-                lock.unlock()
-                control.async { self.finish(job, reply) }
-            }
+        }
+    }
+
+    private func perform(_ job: Work) {
+        dispatchPrecondition(condition: .onQueue(io))
+        let input = job.ticket
+        let command = job.command
+        if self.endpoint == nil {
+            self.endpoint = self.factory(self.io) { [weak self] in self?.notify($0) }
+            self.endpoint?.bind(EndpointRelay(
+                session: { [weak self] in self?.acceptSession($0) },
+                delegate: { [weak self] in self?.acceptDelegate($0) },
+                generation: { [weak self] in self?.setDelegateGeneration($0) }))
+        }
+        let context = Context(id: job.id, epoch: input.epoch,
+                              mayStart: { [weak self] in self?.valid(input) == true },
+                              phase: { [weak self] in self?.mark(job.id, $0) },
+                              step: { [weak self] in self?.markStep(job.id, $0, returned: $1) })
+        self.endpoint?.perform(command, context: context) { [self] reply in
+            lock.lock()
+            guard timing.id == job.id, timing.resultAvailableAt == nil else { lock.unlock(); return }
+            timing.resultAvailableAt = Self.now
+            lock.unlock()
+            control.async { self.finish(job, reply) }
         }
     }
 
@@ -491,6 +571,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         guard timing.id == receipt.operation, timing.resultAvailableAt == nil,
               ioReceiptOperation != receipt.operation else { lock.unlock(); return }
         ioReceiptOperation = receipt.operation
+        timing.sessionResultAvailableAt = Self.now
         ioSessionReceipt = receipt
         let enqueue = enqueueIOLocked()
         lock.unlock()
@@ -527,7 +608,12 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         ioDelegateReceipt = nil
         ioDeliveryQueued = false
         lock.unlock()
-        if let session { endpoint?.receiveSession(session) }
+        if let session {
+            lock.lock()
+            if timing.id == session.operation { timing.sessionResultConsumedAt = Self.now }
+            lock.unlock()
+            endpoint?.receiveSession(session)
+        }
         if let delegate { endpoint?.receiveDelegate(delegate) }
     }
 
@@ -539,6 +625,19 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         if entered { timing.enteredAt = timing.phaseAt }
     }
 
+    private func markStep(_ id: UInt64, _ step: Step, returned: Bool) {
+        lock.lock(); defer { lock.unlock() }
+        guard timing.id == id else { return }
+        if returned {
+            guard timing.step == step, timing.stepReturnedAt == nil else { return }
+            timing.stepReturnedAt = Self.now
+        } else {
+            timing.step = step
+            timing.stepEnteredAt = Self.now
+            timing.stepReturnedAt = nil
+        }
+    }
+
     private func finish(_ job: Work, _ reply: Reply) {
         guard work?.id == job.id else { return } // Duplicate/stale completion.
         work = nil
@@ -548,6 +647,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         lock.lock()
         timing.phase = .off
         timing.resultConsumedAt = Self.now
+        let returnedAt = timing.resultAvailableAt ?? timing.resultConsumedAt!
         lock.unlock()
         adopt(latest())
         if current.stop != job.ticket.stop { releaseBarrier = true }
@@ -581,7 +681,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             if reply.superseded || current.epoch != job.ticket.epoch {
                 playing = false
                 rebuild = true
-                retryAt = Self.now + policy.interval
+                retryAt = returnedAt + policy.interval
                 publish(State(text: Phase.retry.rawValue, detail: "Audio resources changed during recovery"))
             } else if let sample = reply.sample, sample.playing && sample.configured {
                 let wasInspect: Bool
@@ -608,7 +708,9 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
                 playing = false
                 rebuild = reply.error != nil || reply.sample?.configured != true
                 assetBlocked = reply.invalidAsset
-                retryAt = Self.now + policy.interval
+                // Keep the actual completed-failure deadline. A delayed control
+                // consumer must not add another full cooldown after it elapsed.
+                retryAt = returnedAt + policy.interval
                 monitor.knownFailure(now: Self.now)
                 publish(State(text: "Waiting to resume: \(String((reply.error ?? "Audio playback stopped").prefix(256)))"))
                 if assetBlocked { cancelTimer(); finishLease(); return }
@@ -618,7 +720,14 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
     }
 
     private func schedule(after delay: Double) {
+        schedule(at: Self.now + max(0.001, delay))
+    }
+    private func schedule(at deadline: Double) {
         guard latest().on else { cancelTimer(); return }
+        // Within the same work/wait context, hints cannot postpone an already
+        // armed earlier deadline. A completed/replaced work invalidates its old
+        // watchdog target, so the next active deadline may legitimately differ.
+        if let armed = timerDeadline, timerOperation == work?.id, armed <= deadline { return }
         if timer == nil {
             guard timerSequence < UInt64.max else {
                 publish(State(text: "Waiting \u{2014} audio timer identifier limit reached"))
@@ -630,12 +739,16 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             let source = DispatchSource.makeTimerSource(queue: control)
             source.setEventHandler { [weak self] in
                 guard let self, timer != nil, timerSequence == epoch else { return }
+                timerDeadline = nil
+                timerOperation = nil
                 tick()
             }
             timer = source
             source.resume()
         }
-        timer?.schedule(deadline: .now() + max(0.001, delay), leeway: .milliseconds(1))
+        timerDeadline = deadline
+        timerOperation = work?.id
+        timer?.schedule(deadline: .now() + max(0.001, deadline - Self.now), leeway: .milliseconds(1))
     }
     private func tick() {
         adopt(latest())
@@ -652,7 +765,12 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             reconcile(inspect: true)
         }
     }
-    private func cancelTimer() { timer?.cancel(); timer = nil }
+    private func cancelTimer() {
+        timer?.cancel()
+        timer = nil
+        timerDeadline = nil
+        timerOperation = nil
+    }
     private func makeLease() -> RecoveryExecutionLease {
         RecoveryExecutionLease(provider: leaseProvider, granted: { [weak self] granted in
             self?.control.async { [weak self] in
@@ -715,6 +833,9 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             completion(Diagnostics(phase: timing.phase, operation: self.work?.id,
                 queuedAt: self.work?.queuedAt, enteredAt: timing.enteredAt, phaseAt: timing.phaseAt,
                 resultAvailableAt: timing.resultAvailableAt, resultConsumedAt: timing.resultConsumedAt,
+                step: timing.step, stepEnteredAt: timing.stepEnteredAt, stepReturnedAt: timing.stepReturnedAt,
+                sessionResultAvailableAt: timing.sessionResultAvailableAt,
+                sessionResultConsumedAt: timing.sessionResultConsumedAt,
                 completedOperations: self.completed, maximumOutstanding: self.peakOutstanding,
                 scheduledIngress: queued, timerActive: self.timer != nil, records: self.records))
         }
@@ -766,13 +887,20 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
     private func error(_ message: String) -> NSError {
         NSError(domain: "LoopAudio", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
     }
+    @discardableResult
+    private func atStep<Value>(_ step: LoopAudioService.Step, context: LoopAudioService.Context,
+                               _ body: () throws -> Value) rethrows -> Value {
+        context.step(step, false)
+        defer { context.step(step, true) }
+        return try body()
+    }
     private func matches(_ session: AVAudioSession, context: LoopAudioService.Context) -> Bool? {
         guard context.mayStart() else { return nil }
-        let category = session.category
+        let category = atStep(.categoryGet, context: context) { session.category }
         guard context.mayStart() else { return nil }
-        let mode = session.mode
+        let mode = atStep(.modeGet, context: context) { session.mode }
         guard context.mayStart() else { return nil }
-        let options = session.categoryOptions
+        let options = atStep(.optionsGet, context: context) { session.categoryOptions }
         guard context.mayStart() else { return nil }
         return category == .playback && mode == .default && options == [.mixWithOthers]
     }
@@ -780,29 +908,31 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
         context.phase(.stopping)
         relay?.generation(nil)
         delegate = nil
-        player?.delegate = nil
-        player?.stop()
+        if player != nil {
+            atStep(.delegate, context: context) { player?.delegate = nil }
+            atStep(.stop, context: context) { player?.stop() }
+        }
         player = nil
     }
     private func snapshot(_ context: LoopAudioService.Context) -> PlaybackProgressMonitor.Sample? {
         guard let player, context.mayStart() else { return nil }
         context.phase(.inspecting)
         let begin = ProcessInfo.processInfo.systemUptime
-        let session = AVAudioSession.sharedInstance()
+        let session = atStep(.session, context: context) { AVAudioSession.sharedInstance() }
         guard context.mayStart() else { return nil }
-        let playing = player.isPlaying
+        let playing = atStep(.playingGet, context: context) { player.isPlaying }
         guard let configured = matches(session, context: context) else { return nil }
-        let position = player.currentTime
+        let position = atStep(.positionGet, context: context) { player.currentTime }
         guard context.mayStart() else { return nil }
-        let clock = player.deviceCurrentTime
+        let clock = atStep(.clockGet, context: context) { player.deviceCurrentTime }
         guard context.mayStart() else { return nil }
-        let duration = player.duration
+        let duration = atStep(.durationGet, context: context) { player.duration }
         guard context.mayStart() else { return nil }
-        let enableRate = player.enableRate
+        let enableRate = atStep(.rateEnabledGet, context: context) { player.enableRate }
         guard context.mayStart() else { return nil }
-        let rate = enableRate ? Double(player.rate) : 1
+        let rate = enableRate ? atStep(.rateGet, context: context) { Double(player.rate) } : 1
         guard context.mayStart() else { return nil }
-        let buffer = session.ioBufferDuration
+        let buffer = atStep(.bufferGet, context: context) { session.ioBufferDuration }
         guard context.mayStart() else { return nil }
         return .init(generation: generation, epoch: context.epoch, playing: playing, configured: configured,
                      position: position, deviceTime: clock, duration: duration, rate: rate,
@@ -830,11 +960,13 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
             do {
                 if data == nil {
                     context.phase(.loading)
-                    guard let url = Bundle.main.url(forResource: "Silence", withExtension: "wav") else {
+                    guard let url = atStep(.assetLookup, context: context, {
+                        Bundle.main.url(forResource: "Silence", withExtension: "wav")
+                    }) else {
                         completion(.init(error: "Silence.wav is missing", invalidAsset: true)); return
                     }
                     guard context.mayStart() else { completion(.init(superseded: true)); return }
-                    let bytes = try Data(contentsOf: url)
+                    let bytes = try atStep(.assetRead, context: context) { try Data(contentsOf: url) }
                     // The original canonical 44-byte PCM header and all-zero frames.
                     let header: [UInt8] = [82,73,70,70,68,3,0,0,87,65,86,69,102,109,116,32,
                         16,0,0,0,1,0,1,0,64,31,0,0,128,62,0,0,2,0,16,0,100,97,116,97,32,3,0,0]
@@ -846,16 +978,20 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
                 }
                 guard context.mayStart() else { completion(.init(superseded: true)); return }
                 context.phase(.configuring)
-                let session = AVAudioSession.sharedInstance()
+                let session = atStep(.session, context: context) { AVAudioSession.sharedInstance() }
                 guard let configured = matches(session, context: context) else {
                     completion(.init(superseded: true)); return
                 }
-                if !configured { try session.setCategory(.playback, mode: .default, options: [.mixWithOthers]) }
+                if !configured {
+                    try atStep(.categorySet, context: context) {
+                        try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+                    }
+                }
                 guard context.mayStart() else { completion(.init(superseded: true)); return }
                 if player == nil {
-                    try? session.setPrefersNoInterruptionsFromSystemAlerts(true)
+                    try? atStep(.alerts, context: context) { try session.setPrefersNoInterruptionsFromSystemAlerts(true) }
                     guard context.mayStart() else { completion(.init(superseded: true)); return }
-                    try? session.setPrefersInterruptionOnRouteDisconnect(false)
+                    try? atStep(.disconnect, context: context) { try session.setPrefersInterruptionOnRouteDisconnect(false) }
                 }
                 guard context.mayStart() else { completion(.init(superseded: true)); return }
                 context.phase(.activating)
@@ -865,24 +1001,30 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
                     do {
                         if player == nil {
                             guard generation < UInt64.max else { throw error("Player generation limit reached") }
-                            player = try AVAudioPlayer(data: data!, fileTypeHint: "wav")
+                            player = try atStep(.playerCreate, context: context) {
+                                try AVAudioPlayer(data: data!, fileTypeHint: "wav")
+                            }
                             generation += 1
                             guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
-                            player?.numberOfLoops = -1
+                            atStep(.loops, context: context) { player?.numberOfLoops = -1 }
                             guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
                             guard let relay else { preconditionFailure("Audio endpoint relay is missing") }
                             relay.generation(generation)
                             let proxy = DelegateProxy(generation: generation, event: relay.delegate)
                             delegate = proxy
-                            player?.delegate = proxy
+                            atStep(.delegate, context: context) { player?.delegate = proxy }
                         }
                         guard let active = player else { throw error("Audio player unavailable") }
                         guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
                         context.phase(.preparing)
-                        guard active.prepareToPlay() else { throw error("Audio preparation failed") }
+                        guard atStep(.prepare, context: context, { active.prepareToPlay() }) else {
+                            throw error("Audio preparation failed")
+                        }
                         guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
                         context.phase(.starting)
-                        guard active.play() else { throw error("Audio playback could not start") }
+                        guard atStep(.play, context: context, { active.play() }) else {
+                            throw error("Audio playback could not start")
+                        }
                         guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
                         completion(.init(sample: snapshot(context)))
                     } catch {
@@ -898,7 +1040,7 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
 
     private func changeSession(_ active: Bool, context: LoopAudioService.Context,
                                completion: @escaping (Bool, String?) -> Void) {
-        let session = AVAudioSession.sharedInstance()
+        let session = atStep(.session, context: context) { AVAudioSession.sharedInstance() }
         guard !active || context.mayStart() else { completion(false, "Session activation superseded"); return }
         if active { sessionUsed = true } // A returned error can still have external effects.
         activationPending = context.id
@@ -908,11 +1050,18 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
             let receive: @Sendable (Bool, Error?) -> Void = { [relay, operation = context.id] success, error in
                 relay.session(.init(operation: operation, success: success, error: error))
             }
-            if active { session.activate(options: [], completionHandler: receive) }
-            else { session.deactivate(options: [.notifyOthersOnDeactivation], completionHandler: receive) }
+            if active {
+                atStep(.activate, context: context) { session.activate(options: [], completionHandler: receive) }
+            } else {
+                atStep(.deactivate, context: context) {
+                    session.deactivate(options: [.notifyOthersOnDeactivation], completionHandler: receive)
+                }
+            }
         } else {
             do {
-                try session.setActive(active, options: active ? [] : [.notifyOthersOnDeactivation])
+                try atStep(active ? .activate : .deactivate, context: context) {
+                    try session.setActive(active, options: active ? [] : [.notifyOthersOnDeactivation])
+                }
                 activationPending = nil
                 completion(true, nil)
             } catch {

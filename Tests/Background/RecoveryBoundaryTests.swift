@@ -9,6 +9,8 @@ final class Locked<T>: @unchecked Sendable {
 final class ControlledEndpoint: LoopAudioEndpoint, @unchecked Sendable {
     let commands = Locked([String]())
     private var playing = false
+    private let onStart: @Sendable () -> Void
+    init(onStart: @escaping @Sendable () -> Void = {}) { self.onStart = onStart }
     func perform(_ command: LoopAudioService.Command, context: LoopAudioService.Context,
                  completion: @escaping @Sendable (LoopAudioService.Reply) -> Void) {
         switch command {
@@ -16,6 +18,7 @@ final class ControlledEndpoint: LoopAudioEndpoint, @unchecked Sendable {
         case .start:
             commands.use { $0.append("start") }
             guard context.mayStart() else { completion(.init(superseded: true)); return }
+            onStart()
             playing = true
         case .inspect: commands.use { $0.append("inspect") }
         }
@@ -41,9 +44,61 @@ final class ControlledEndpoint: LoopAudioEndpoint, @unchecked Sendable {
         }
         return condition()
     }
+    @MainActor static func holdMainThroughWorkerTurn(_ service: LoopAudioService, owner: UInt64,
+                                                    events: Locked<[String]>, cancel: Bool) -> DispatchSemaphore? {
+        // Synchronous by design: main cannot execute the portable application
+        // begin, while the real control and I/O queues must remain responsive.
+        service.setEnabled(true, owner: owner)
+        let drained = DispatchSemaphore(value: 0)
+        service.auditAfterWorkerTurn { drained.signal() }
+        check(drained.wait(timeout: .now() + 3) == .success, "LEASE_MAIN_ISSUE_BLOCKED_AUDIO_LANES")
+        check(events.use { $0.isEmpty }, "AV_PREPARATION_BEFORE_MAIN_REQUEST_RETURN")
+        if cancel {
+            // Force main's already queued issue to observe the accepted Off
+            // before control can call lease.finish(). This checks the ticket,
+            // not a favorable scheduler race between the two queues.
+            let held = DispatchSemaphore(value: 0)
+            let release = DispatchSemaphore(value: 0)
+            service.auditHoldControl(entered: { held.signal() }, release: release)
+            check(held.wait(timeout: .now() + 3) == .success, "CONTROL_HOLD_NOT_ENTERED")
+            service.setEnabled(false, owner: owner)
+            return release
+        }
+        return nil
+    }
     @MainActor static func main() async throws {
         let name = CommandLine.arguments[1]
-        if name == "lease-matrix" {
+        if name == "lease-main-issued" || name == "lease-main-cancelled" {
+            let events = Locked([String]())
+            let ended = Locked([Int]())
+            let endpoint = ControlledEndpoint(onStart: { events.use { $0.append("start") } })
+            let provider = RecoveryExecutionLease.Provider.application(begin: { _ in
+                events.use { $0.append("request") }
+                return 7
+            }, end: { id in ended.use { $0.append(id) } })
+            let state = Locked(LoopAudioService.State())
+            let service = LoopAudioService(leaseProvider: { provider }) { _, _ in endpoint }
+            let owner = service.register { next in state.use { $0 = next } }
+            let cancel = name == "lease-main-cancelled"
+            let release = holdMainThroughWorkerTurn(service, owner: owner, events: events, cancel: cancel)
+            if cancel {
+                let mainDrained = Locked(false)
+                DispatchQueue.main.async { mainDrained.use { $0 = true } }
+                let passedIssue = try await wait { mainDrained.use { $0 } }
+                release?.signal()
+                check(passedIssue, "MAIN_ISSUE_QUEUE_NOT_DRAINED")
+                check(try await wait { state.use { $0.text == "Off" } }, "QUEUED_CLAIM_OFF_DID_NOT_DRAIN")
+                check(events.use { $0.isEmpty } && ended.use { $0.isEmpty }, "QUEUED_OFF_ISSUED_AUDIO_OR_CLAIM")
+            } else {
+                check(try await wait { state.use { $0.text == "Playing silent WAV continuously" } },
+                      "MAIN_REQUEST_RETURN_DID_NOT_RESUME_AUDIO")
+                check(events.use { $0 == ["request", "start"] }, "MAIN_REQUEST_AUDIO_ORDER_CHANGED")
+                service.setEnabled(false, owner: owner)
+                check(try await wait { state.use { $0.text == "Off" } }, "MAIN_CLAIM_FINAL_OFF")
+                check(try await wait { ended.use { $0 == [7] } }, "MAIN_CLAIM_ACTUAL_END_MISSING")
+            }
+            service.unregister(owner)
+        } else if name == "lease-matrix" {
             for order in 0..<6 {
                 let callbacks = Locked((expire: Optional<@Sendable () -> Void>.none,
                     receipt: Optional<@Sendable (Int?) -> Void>.none))

@@ -90,6 +90,7 @@ private final class BoundaryValue<T>: @unchecked Sendable {
         policy.interval = 0.005
         policy.warning = 0.025
         policy.stalled = 0.06
+        if name == "delayed-consumption" { policy = LoopAudioService.Policy() }
         let service = LoopAudioService(policy: policy, leaseProvider: { provider }) { queue, event in
             queue.setSpecific(key: fixture.queueKey, value: true)
             return LoopAudioService.auditEndpoint(queue: queue, event: event)
@@ -113,6 +114,20 @@ private final class BoundaryValue<T>: @unchecked Sendable {
         func stop() async throws {
             service.setEnabled(false, owner: owner)
             try await until(off, "ACTUAL_ADAPTER_OFF_FAILED")
+        }
+        func checkReturnedRequestAwaitingCallback(_ step: LoopAudioService.Step) async {
+            // The controlled callback remains held, while this queue barrier
+            // proves the API invocation itself has returned on the I/O lane.
+            await withCheckedContinuation { continuation in
+                service.auditAfterQueueDrain { continuation.resume() }
+            }
+            let pending = await snapshot()
+            check(pending.operation != nil && pending.step == step, "PENDING_REQUEST_STEP_IDENTITY_MISSING")
+            check(pending.stepEnteredAt != nil && pending.stepReturnedAt != nil &&
+                  pending.stepReturnedAt! >= pending.stepEnteredAt!,
+                  "RETURNED_REQUEST_NOT_DISTINGUISHED_FROM_PENDING_CALLBACK")
+            check(pending.sessionResultAvailableAt == nil && pending.sessionResultConsumedAt == nil,
+                  "REQUEST_RETURN_FABRICATED_SESSION_COMPLETION")
         }
 
         if name.hasPrefix("off-at-") {
@@ -155,6 +170,9 @@ private final class BoundaryValue<T>: @unchecked Sendable {
             let before = await snapshot()
             check(before.operation != nil && before.maximumOutstanding == 1, "PENDING_GATE_WAS_RELEASED")
             check(before.completedOperations == completed, "INFLIGHT_API_WAS_FAKE_COMPLETED")
+            check(before.step?.rawValue == boundary, "API_STEP_IDENTITY_MISSING")
+            check(before.stepEnteredAt != nil && before.stepReturnedAt == nil,
+                  "BLOCKED_API_WAS_MARKED_RETURNED")
             if boundary != "stop" && boundary != "deactivate" {
                 check(state.use { $0.text == "Waiting for system audio completion" }, "CONTROL_DID_NOT_OBSERVE_DELAY")
             }
@@ -183,6 +201,33 @@ private final class BoundaryValue<T>: @unchecked Sendable {
             try await stop()
         } else {
             switch name {
+            case "delayed-consumption":
+                // This separate boundary uses the unchanged default policy.
+                // The API returns a real controlled rejection while only its
+                // control consumer is held beyond that retry deadline.
+                check(policy.interval == 0.5, "DEFAULT_RETRY_POLICY_CHANGED")
+                let held = BoundaryValue(false)
+                let releaseControl = DispatchSemaphore(value: 0)
+                fixture.use { $0.rejections["activate"] = 1; $0.blocked = "activate" }
+                service.setEnabled(true, owner: owner)
+                try await until({ fixture.use { $0.enteredBlock } }, "API_BARRIER_NOT_ENTERED")
+                service.auditHoldControl(entered: { held.use { $0 = true } }, release: releaseControl)
+                try await until({ held.use { $0 } }, "CONTROL_HOLD_NOT_ENTERED")
+                fixture.release.signal()
+                try await until({ service.auditAvailableResult() != nil }, "RETURNED_API_RESULT_NOT_OBSERVED")
+                let available = service.auditAvailableResult()!
+                while ProcessInfo.processInfo.systemUptime < available + policy.interval + 0.05 {
+                    try await Task.sleep(nanoseconds: 1_000_000)
+                }
+                let releasedAt = ProcessInfo.processInfo.systemUptime
+                releaseControl.signal()
+                let deadline = await withCheckedContinuation { continuation in
+                    service.auditRetryDeadline { continuation.resume(returning: $0) }
+                }
+                check(deadline <= releasedAt, "CONSUMPTION_DELAY_ADDED_ANOTHER_COOLDOWN")
+                try await until(playing, "DELAYED_CONSUMER_DID_NOT_RECOVER")
+                check(count("activate") == 2, "DELAYED_CONSUMER_CHANGED_SINGLE_RETRY")
+                try await stop()
             case "healthy":
                 try await start()
                 for i in 0..<10_000 { service.notify(i % 2 == 0 ? .hint : .available) }
@@ -290,6 +335,7 @@ private final class BoundaryValue<T>: @unchecked Sendable {
                 fixture.use { $0.holdCompletion = "activate" }
                 service.setEnabled(true, owner: owner)
                 try await until({ fixture.use { !$0.pending.isEmpty } }, "ACTIVATION_COMPLETION_NOT_HELD")
+                await checkReturnedRequestAwaitingCallback(.activate)
                 if name == "pending-owner" {
                     let next = service.register { value in state.use { $0 = value } }
                     service.setEnabled(true, owner: next)
@@ -314,6 +360,7 @@ private final class BoundaryValue<T>: @unchecked Sendable {
                 fixture.use { $0.holdCompletion = "deactivate" }
                 service.setEnabled(false, owner: owner)
                 try await until({ fixture.use { !$0.pending.isEmpty } }, "DEACTIVATION_COMPLETION_NOT_HELD")
+                await checkReturnedRequestAwaitingCallback(.deactivate)
                 service.setEnabled(true, owner: owner)
                 try await Task.sleep(nanoseconds: 40_000_000)
                 check(count("activate") == 1, "ACTIVATED_BEFORE_OLD_RELEASE")
