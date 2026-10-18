@@ -400,6 +400,13 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return !exhausted && ticket.on && ticket.stop == input.stop && ticket.epoch == input.epoch
     }
+    private func mayRequestClaim(_ input: Ticket) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        // A resource reset cancels this AV generation, not the surviving
+        // On/Stop recovery episode. Do not consume its sole protection request
+        // merely because a newer resource generation is awaiting recovery.
+        return !exhausted && ticket.on && ticket.stop == input.stop
+    }
     private static var now: Double { ProcessInfo.processInfo.systemUptime }
 
     /// Every control-lane observation preserves stop/resource transitions. A
@@ -520,7 +527,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             if let executionClaim {
                 self.mark(job.id, .protecting)
                 self.markStep(job.id, .executionClaim, returned: false)
-                let admitted = executionClaim.start(mayIssue: { [weak self] in self?.valid(job.ticket) == true }) { [self] in
+                let admitted = executionClaim.start(mayIssue: { [weak self] in self?.mayRequestClaim(job.ticket) == true }) { [self] in
                     // This means the actual provider request returned (or was
                     // skipped before entry), not that an execution grant arrived.
                     self.markStep(job.id, .executionClaim, returned: true)
