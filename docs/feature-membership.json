@@ -2,7 +2,7 @@
   "base_commit": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7",
   "branches": {
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
-    "feature/background": "1225a9c419c93dd33ed7ec450e8b070b60eea78f",
+    "feature/background": "d9fc175bc87d8553a7734e7eb71aa1e0371f4034",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
     "feature/settings-persistence": "272ce294d1477d566c9cc04cf0a262b3b2cb9c4e",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
@@ -84,8 +84,8 @@
       "sha256": "a9b55a62cb0172f6b0323bc471dfab90fa8f025aed4ba0f5023befa47204bed0"
     },
     "Socks5/BackgroundKeepAlive/LoopAudioService.swift": {
-      "commit": "d9ebfbedd856c964c6c236a4a3af48b32d631dea",
-      "sha256": "1e4101c61e77d5fdc7b7195d4d27aa8a217009c25117c6c59418c8ac05920063"
+      "commit": "e9d404e9205e3dcb6ab3053bfcae2d36032f9903",
+      "sha256": "b349acd43d5142099865e7afa66c27962ec0e9d27e9d78dbdb0e5c3060a26b2f"
     },
     "Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift": {
       "commit": "5126196fbd3d5f457eae2cd7be954aca5b7ecf95",
@@ -292,8 +292,8 @@
       "sha256": "88ccb4b2f628d20d899277f85c7fb061e0f4ed1c6718312af1b0431dfa25e454"
     },
     "Tests/Background/check_loop_audio.py": {
-      "commit": "d9ebfbedd856c964c6c236a4a3af48b32d631dea",
-      "sha256": "2187c50eb44173b0a83244175cf3ef6bb274410c854b9eb952e4691fca1bc051"
+      "commit": "e9d404e9205e3dcb6ab3053bfcae2d36032f9903",
+      "sha256": "1ba9c9fab50b3f09bf3a50b95dcdaf8d2405c0e2262bd003b12b5bc1a2ed9a93"
     },
     "Tests/Background/check_mixed_notifications.py": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
@@ -746,6 +746,10 @@
     "Tests/udp_worker_resources.py": {
       "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
       "sha256": "0d6d66b9f943396b7cdaaa994213a2043b99800db655381bde468cb291c49f61"
+    },
+    "Tests/Background/EarlyRelapseTests.swift": {
+      "commit": "e9d404e9205e3dcb6ab3053bfcae2d36032f9903",
+      "sha256": "5b8db0c7598954d9cb297b92749a727aa29df94370a0e22dac15de1087b2ee91"
     }
   },
   "files": {

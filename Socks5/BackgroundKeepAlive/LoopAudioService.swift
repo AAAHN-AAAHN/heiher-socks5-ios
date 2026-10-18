@@ -691,16 +691,16 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
                 retryAt = returnedAt + policy.interval
                 publish(State(text: Phase.retry.rawValue, detail: "Audio resources changed during recovery"))
             } else if let sample = reply.sample, sample.playing && sample.configured {
-                let wasInspect: Bool
-                if case .inspect = job.command { wasInspect = true } else { wasInspect = false }
                 playing = true
                 rebuild = false
                 releaseFailed = false
                 assetBlocked = false
                 retryAt = 0
                 finishLease()
-                // Only a subsequent healthy observation closes a failed episode.
-                if wasInspect { episode = false; expedited = false }
+                // The same accepted healthy result ends protection and its episode.
+                // A real relapse before the next inspection needs a new recovery claim.
+                episode = false
+                expedited = false
                 let result = monitor.inspect(sample, speculativeRecoveryCertified: policy.speculativeRecoveryCertified)
                 if result.mayRebuild {
                     playing = false; rebuild = true
