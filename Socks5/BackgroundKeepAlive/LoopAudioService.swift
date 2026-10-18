@@ -484,7 +484,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         }
     }
 
-    private func begin(_ command: Command) {
+    private func begin(_ requested: Command) {
         guard work == nil else { return }
         guard sequence < UInt64.max else {
             cancelTimer(); finishLease()
@@ -492,6 +492,12 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             return
         }
         adopt(latest())
+        let command: Command
+        switch requested {
+        case .inspect where rebuild: command = .start(rebuild: true)
+        case .start(let recreate): command = .start(rebuild: recreate || rebuild)
+        default: command = requested
+        }
         if releaseBarrier {
             if case .stop = command {} else { begin(.stop); return }
         }
@@ -504,6 +510,11 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         peakOutstanding = max(peakOutstanding, outstanding)
         precondition(outstanding == 1)
         lock.lock()
+        // This start incorporates the pending invalidation into its resources.
+        // A later event must revoke it even if an earlier drain is still queued.
+        if case .start = command, ticket.on, ticket.stop == input.stop, ticket.epoch == input.epoch {
+            inbox.invalidated = false
+        }
         timing = Timing(id: job.id, phase: .queued)
         lock.unlock()
         switch command {

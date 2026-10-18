@@ -103,6 +103,12 @@ enum AVAudioSession {
     static let userIntentToUnmuteOutputNotification = Notification.Name("UnmuteIntent")
     static let didBecomeActiveNotification = Notification.Name("SessionActive")
     static let didBecomeInactiveNotification = Notification.Name("SessionInactive")
+    enum DeactivationSource: Sendable { case app, system }
+    final class DeactivationContext: Sendable {
+        let source: DeactivationSource
+        init(_ source: DeactivationSource) { self.source = source }
+    }
+    static let deactivationContextKey = "DeactivationContext"
     enum ResumptionRecommendation: Sendable { case shouldResume, shouldNotResume }
     final class ResumptionContext: Sendable {
         let recommendation: ResumptionRecommendation

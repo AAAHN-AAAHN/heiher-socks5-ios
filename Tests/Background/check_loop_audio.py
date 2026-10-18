@@ -27,7 +27,21 @@ BOUNDARY_CASES = ('race-tick', 'race-admit', 'lease-blocked', 'progress-clock', 
                   'lease-main-issued', 'lease-main-cancelled', 'lease-main-resource-reset', 'lease-main-off-on')
 RELAPSE_CASES = ('early-relapse', 'healthy-inspection-relapse', 'continuous-granted',
                  'continuous-denied', 'continuous-expired', 'continuous-missing', 'stale-success')
-FACADE_CASES = ('reentry-intent', 'reentry-publication', 'echo', 'owner', 'notifications', 'scheduling', 'location')
+INGRESS_CASES = ('recovered-interrupted', 'recovered-media-reset', 'pending-interrupted',
+                 'pending-media-reset', 'pending-inspection', 'off-before-drain', 'off-on-before-drain',
+                 'second-during-replacement', 'second-after-recovery',
+                 'admit-inspect-invalidated', 'admit-reuse-invalidated')
+INGRESS_NEGATIVES = {
+    'recovered-interrupted': 'ACCEPTED_HEALTHY_REPLACEMENT_INVALIDATION_REPLAYED',
+    'recovered-media-reset': 'ACCEPTED_HEALTHY_REPLACEMENT_INVALIDATION_REPLAYED',
+    'off-on-before-drain': 'ACCEPTED_HEALTHY_REPLACEMENT_INVALIDATION_REPLAYED',
+    'second-during-replacement': 'SECOND_INVALIDATION_DID_NOT_REVOKE_REPLACEMENT',
+    'second-after-recovery': 'SECOND_INVALIDATION_COALESCED_WITH_RECOVERED_EPOCH',
+    'admit-inspect-invalidated': 'INVALIDATED_RESOURCE_ADMITTED_WITHOUT_REBUILD',
+    'admit-reuse-invalidated': 'INVALIDATED_RESOURCE_ADMITTED_WITHOUT_REBUILD',
+}
+FACADE_CASES = ('reentry-intent', 'reentry-publication', 'echo', 'owner', 'notifications', 'inactive-source',
+                'scheduling', 'location')
 API_BOUNDARIES = ('asset', 'session', 'category-get', 'mode-get', 'options-get', 'category-set',
                   'alerts', 'disconnect', 'activate', 'player-init', 'loops', 'delegate',
                   'prepare', 'play', 'playing-get', 'position-get', 'clock-get',
@@ -101,7 +115,7 @@ def relapse_was_inspect_only(source):
         '                if wasInspect { episode = false; expedited = false }', 1)
 
 
-def run_relapse(command, records, label, expected=None):
+def run_checked_cleanup(command, records, label, expected=None):
     run(command, records, label, expected=expected)
     record = records[-1]
     result = json.loads(record['stdout'])
@@ -112,6 +126,81 @@ def run_relapse(command, records, label, expected=None):
         # A wrong signal, extra failure, failed cleanup or a timeout is not this
         # state-machine regression's accepted intended failure.
         assert record['exit'] == 74 and result['status'] == 'FAIL' and result['failures'] == [expected], (label, result)
+
+
+def ingress_source(source):
+    # Identical copied-input holds expose the real posting-thread dispatch and
+    # admission boundaries. Product queues, locks and timing remain unchanged.
+    marker = '    func notify(_ event: Event) {\n        lock.lock()'
+    start = source.index(marker)
+    end = source.index('    // Called only with lock held.', start)
+    body = source[start:end]
+    before = '        lock.unlock()\n        if schedule { control.async { self.drain() } }'
+    assert body.count(before) == 1
+    changed = body.replace(before, '        lock.unlock()\n'
+        '        IngressObservation.beforeDrainEnqueue(event, scheduled: schedule)\n'
+        '        if schedule { control.async { self.drain() } }', 1)
+    source = source[:start] + changed + source[end:]
+    parameter = 'requested' if '    private func begin(_ requested: Command) {' in source else 'command'
+    before = '    private func begin(_ ' + parameter + ': Command) {\n'
+    assert source.count(before) == 1
+    source = source.replace(before, before + '        IngressObservation.beforeAdmission(' + parameter + ')\n', 1)
+    return source + '\n' + (HERE / 'IngressReplayAccess.swift.inc').read_text()
+
+
+def ingress_previous_admission(source):
+    # Restore the exact previous admission and invalidation-consumption behavior.
+    replacements = [
+        (
+            '''    private func begin(_ requested: Command) {
+''',
+            '''    private func begin(_ command: Command) {
+''',
+        ),
+        (
+            '''        adopt(latest())
+        let command: Command
+        switch requested {
+        case .inspect where rebuild: command = .start(rebuild: true)
+        case .start(let recreate): command = .start(rebuild: recreate || rebuild)
+        default: command = requested
+        }
+        if releaseBarrier {
+            if case .stop = command {} else { begin(.stop); return }
+        }
+''',
+            '''        adopt(latest())
+        if releaseBarrier {
+            if case .stop = command {} else { begin(.stop); return }
+        }
+''',
+        ),
+        (
+            '''        lock.lock()
+        // This start incorporates the pending invalidation into its resources.
+        // A later event must revoke it even if an earlier drain is still queued.
+        if case .start = command, ticket.on, ticket.stop == input.stop, ticket.epoch == input.epoch {
+            inbox.invalidated = false
+        }
+        timing = Timing(id: job.id, phase: .queued)
+        lock.unlock()
+''',
+            '''        lock.lock()
+        timing = Timing(id: job.id, phase: .queued)
+        lock.unlock()
+''',
+        ),
+    ]
+    for before, after in replacements:
+        assert source.count(before) == 1
+        source = source.replace(before, after, 1)
+    return source
+
+
+def ingress_lease(lease):
+    before = '                provider.end(id)\n                state.withValue { $0 = State() }'
+    assert lease.count(before) == 1
+    return lease.replace(before, before + '\n                IngressObservation.endGateDidClear(id)', 1)
 
 
 def adapter_source(service, legacy):
@@ -248,7 +337,11 @@ def main():
                     exe = compile_fixture(folder, 'early-relapse-' + suffix, source, monitor, relapse_lease(lease),
                                           'EarlyRelapseTests.swift', optimize, records)
                     for case in RELAPSE_CASES:
-                        run_relapse([exe, case], records, suffix + '-early-relapse-' + case)
+                        run_checked_cleanup([exe, case], records, suffix + '-early-relapse-' + case)
+                    exe = compile_fixture(folder, 'ingress-' + suffix, ingress_source(source), monitor,
+                                          ingress_lease(lease), 'IngressReplayTests.swift', optimize, records)
+                    for case in INGRESS_CASES:
+                        run_checked_cleanup([exe, case], records, suffix + '-ingress-' + case)
                 if not args.negative_only and args.group in ('all', 'adapter'):
                     for legacy in (False, True):
                         label = ('legacy-' if legacy else 'async-') + suffix
@@ -268,9 +361,15 @@ def main():
                     for case in ([args.case] if args.case else FACADE_CASES):
                         run([exe, case], records, suffix + '-facade-' + case)
                 if args.group in ('all', 'boundary'):
+                    exe = compile_fixture(folder, 'previous-ingress-' + suffix,
+                                          ingress_source(ingress_previous_admission(source)), monitor,
+                                          ingress_lease(lease), 'IngressReplayTests.swift', optimize, records)
+                    for case in INGRESS_CASES:
+                        run_checked_cleanup([exe, case], records, suffix + '-previous-ingress-' + case,
+                                            expected=INGRESS_NEGATIVES.get(case))
                     exe = compile_fixture(folder, 'bad-early-relapse-' + suffix, relapse_was_inspect_only(source),
                                           monitor, relapse_lease(lease), 'EarlyRelapseTests.swift', optimize, records)
-                    run_relapse([exe, 'early-relapse'], records, suffix + '-bad-early-relapse',
+                    run_checked_cleanup([exe, 'early-relapse'], records, suffix + '-bad-early-relapse',
                                 expected='ACCEPTED_HEALTHY_RELAPSE_DID_NOT_REQUEST_NEW_CLAIM')
                     claim_continuation = '                let admitted = executionClaim.start(mayIssue: { [weak self] in self?.mayRequestClaim(job.ticket) == true }) { [self] in'
                     assert source.count(claim_continuation) == 1
@@ -455,6 +554,21 @@ def main():
                     run([exe, 'pending-final-owner', OWNED / 'Silence.wav', invalid], records,
                         suffix + '-bad-pending-owner', expected='PENDING_RECEIPT_LOST_OWNER')
                 if not args.case and args.group in ('all', 'facade'):
+                    inactive_source = '''        if #available(iOS 27.0, *), name == AVAudioSession.didBecomeInactiveNotification {
+            let context = notification.userInfo?[AVAudioSession.deactivationContextKey] as? AVAudioSession.DeactivationContext
+            // Our completed release may be reported after a newer On. Inspect
+            // app-requested deactivation without invalidating healthy new work.
+            // A real stopped player still recovers through the ordinary check.
+            return context?.source == .app ? .hint : .interrupted
+        }'''
+                    assert facade.count(inactive_source) == 1
+                    bad = facade.replace(inactive_source,
+                        '        if #available(iOS 27.0, *), name == AVAudioSession.didBecomeInactiveNotification { return .interrupted }', 1)
+                    exe = compile_fixture(folder, 'bad-inactive-source-' + suffix, source, monitor, lease,
+                                          'FacadeBoundaryTests.swift', optimize, records,
+                                          mocks='FacadePlatformMocks.swift', facade=bad)
+                    run([exe, 'inactive-source'], records, suffix + '-bad-inactive-source',
+                        expected='APP_DEACTIVATION_INVALIDATED_RENEWED_PLAYBACK')
                     ordering = '        audio.setEnabled(enabled, owner: audioOwner)\n        showAudioIntent(enabled)'
                     assert facade.count(ordering) == 1
                     bad = facade.replace(ordering, '        showAudioIntent(enabled)\n        audio.setEnabled(enabled, owner: audioOwner)', 1)

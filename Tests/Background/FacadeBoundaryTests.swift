@@ -15,6 +15,7 @@ private final class FacadeEndpoint: LoopAudioEndpoint, Sendable {
         var failures = 0
         var starts: [Double] = []
         var stops = 0
+        var inspections = 0
     }
     let state = FacadeValue(State())
     func perform(_ command: LoopAudioService.Command, context: LoopAudioService.Context,
@@ -28,7 +29,7 @@ private final class FacadeEndpoint: LoopAudioEndpoint, Sendable {
                 value.starts.append(now)
                 if value.failures > 0 { value.failures -= 1; return .init(error: "Controlled activation rejection") }
                 value.playing = true
-            case .inspect: break
+            case .inspect: value.inspections += 1
             }
             return .init(sample: .init(generation: 1, epoch: context.epoch, playing: value.playing,
                 configured: true, position: now.truncatingRemainder(dividingBy: 0.05), deviceTime: now,
@@ -154,6 +155,87 @@ extension LoopAudioService {
             for name in names { NotificationCenter.default.post(name: name, object: nil) }
             try await Task.sleep(nanoseconds: 30_000_000)
             check(endpoint.state.use { $0.starts.count } == starts && off(), "NOTIFICATION_RESTARTED_OFF")
+        case "inactive-source":
+            service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,
+                                              normalize: { BackgroundKeepAlive.audioEventValue($0) })
+            func postInactive(_ context: Any?) {
+                NotificationCenter.default.post(name: AVAudioSession.didBecomeInactiveNotification, object: nil,
+                    userInfo: context.map { [AVAudioSession.deactivationContextKey: $0] })
+            }
+            func settled(_ starts: Int, _ message: String) async throws {
+                let deadline = ProcessInfo.processInfo.systemUptime + 3
+                var ready = false
+                repeat {
+                    let observed = await diagnostics()
+                    ready = observed.operation == nil && playing() &&
+                        endpoint.state.use { $0.playing && $0.starts.count == starts }
+                    if !ready { try await Task.sleep(nanoseconds: 1_000_000) }
+                } while !ready && ProcessInfo.processInfo.systemUptime < deadline
+                check(ready, message)
+            }
+            app!.setAudio(true)
+            try await settled(1, "INACTIVE_SOURCE_INITIAL_START")
+            try await stop()
+            app!.setAudio(true)
+            try await settled(2, "INACTIVE_SOURCE_RENEWED_START")
+            // Model a completed Off's application-deactivation notification
+            // arriving after renewed playback. This is a controlled order,
+            // not a claim about an observed device's notification timing.
+            postInactive(AVAudioSession.DeactivationContext(.app))
+            // Cross the notification's control drain before counting a later
+            // inspection. An old in-flight sample is not a positive result.
+            _ = await diagnostics()
+            let inspections = endpoint.state.use { $0.inspections }
+            let deadline = ProcessInfo.processInfo.systemUptime + 3
+            var inspected = false
+            repeat {
+                let observedInspections = endpoint.state.use { $0.inspections }
+                let observed = await diagnostics()
+                let unchanged = endpoint.state.use { $0.starts.count == 2 && $0.playing }
+                if !unchanged { check(false, "APP_DEACTIVATION_INVALIDATED_RENEWED_PLAYBACK") }
+                inspected = observedInspections > inspections && observed.operation == nil && playing()
+                if !inspected { try await Task.sleep(nanoseconds: 1_000_000) }
+            } while !inspected && ProcessInfo.processInfo.systemUptime < deadline
+            check(inspected, "APP_DEACTIVATION_NOT_INSPECTED")
+
+            // The same-process host case is observable only through the actual
+            // player's state; an application hint must still recover a stop.
+            endpoint.state.use { $0.playing = false }
+            postInactive(AVAudioSession.DeactivationContext(.app))
+            try await settled(3, "APP_DEACTIVATION_STOP_NOT_RECOVERED")
+            postInactive(AVAudioSession.DeactivationContext(.system))
+            try await settled(4, "SYSTEM_DEACTIVATION_NOT_RECOVERED")
+            postInactive(nil)
+            try await settled(5, "MISSING_DEACTIVATION_CONTEXT_NOT_RECOVERED")
+            postInactive("malformed")
+            try await settled(6, "MALFORMED_DEACTIVATION_CONTEXT_NOT_RECOVERED")
+
+            let legacy = Notification(name: AVAudioSession.interruptionNotification,
+                userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue])
+            NotificationCenter.default.post(legacy)
+            try await settled(7, "LEGACY_BEGIN_NOT_RECOVERED")
+            let ended = Notification(name: AVAudioSession.interruptionNotification,
+                userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.ended.rawValue,
+                           AVAudioSessionInterruptionOptionKey: AVAudioSession.InterruptionOptions.shouldResume.rawValue])
+            if case .available = BackgroundKeepAlive.audioEventValue(ended) {} else {
+                check(false, "LEGACY_RESUME_ADVICE_CHANGED")
+            }
+            let noResume = Notification(name: AVAudioSession.interruptionNotification,
+                userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.ended.rawValue])
+            if case .hint = BackgroundKeepAlive.audioEventValue(noResume) {} else {
+                check(false, "LEGACY_NEGATIVE_ADVICE_CHANGED")
+            }
+            if case .hint = BackgroundKeepAlive.audioEventValue(Notification(name: AVAudioSession.interruptionNotification)) {} else {
+                check(false, "LEGACY_MISSING_METADATA_CHANGED")
+            }
+            try await stop()
+            let starts = endpoint.state.use { $0.starts.count }
+            postInactive(AVAudioSession.DeactivationContext(.app))
+            postInactive(AVAudioSession.DeactivationContext(.system))
+            postInactive(nil)
+            postInactive("malformed")
+            _ = await diagnostics()
+            check(endpoint.state.use { $0.starts.count == starts } && off(), "INACTIVE_SOURCE_RESTARTED_OFF")
         case "scheduling":
             endpoint.state.use { $0.failures = 100 }
             app!.setAudio(true)
