@@ -25,6 +25,8 @@ SERVICE_CASES = ('normal', 'finite-failure', 'pending-off-on', 'pending-reset', 
                  'pending-deactivation', 'pending-inspection', 'storm', 'stopped-player', 'duplicate-completion')
 BOUNDARY_CASES = ('race-tick', 'race-admit', 'lease-blocked', 'progress-clock', 'lease-matrix',
                   'lease-main-issued', 'lease-main-cancelled', 'lease-main-resource-reset', 'lease-main-off-on')
+RELAPSE_CASES = ('early-relapse', 'healthy-inspection-relapse', 'continuous-granted',
+                 'continuous-denied', 'continuous-expired', 'continuous-missing', 'stale-success')
 FACADE_CASES = ('reentry-intent', 'reentry-publication', 'echo', 'owner', 'notifications', 'scheduling', 'location')
 API_BOUNDARIES = ('asset', 'session', 'category-get', 'mode-get', 'options-get', 'category-set',
                   'alerts', 'disconnect', 'activate', 'player-init', 'loops', 'delegate',
@@ -71,6 +73,45 @@ def run(command, records, label, timeout=30, expected=None):
     else:
         assert result.returncode != 0 and expected in result.stdout + result.stderr, (label, record)
         print('EXPECTED INVALID-VARIANT REJECTION:', expected, flush=True)
+
+
+
+def relapse_lease(lease):
+    # Both normal and invalid copied inputs use this one observation. It runs
+    # after the original gate clear, outside the lock. Product lease stays exact.
+    before = '                provider.end(id)\n                state.withValue { $0 = State() }'
+    assert lease.count(before) == 1
+    return lease.replace(before, before + '\n                RelapseObservation.endGateDidClear(id)', 1)
+
+
+def relapse_was_inspect_only(source):
+    # Restore the exact old episode condition as a compiled runtime negative.
+    accepted = '            } else if let sample = reply.sample, sample.playing && sample.configured {\n'
+    assert source.count(accepted) == 1
+    source = source.replace(accepted, accepted +
+        '                let wasInspect: Bool\n'
+        '                if case .inspect = job.command { wasInspect = true } else { wasInspect = false }\n', 1)
+    before = ('                // The same accepted healthy result ends protection and its episode.\n'
+              '                // A real relapse before the next inspection needs a new recovery claim.\n'
+              '                episode = false\n'
+              '                expedited = false')
+    assert source.count(before) == 1
+    return source.replace(before,
+        '                // Only a subsequent healthy observation closes a failed episode.\n'
+        '                if wasInspect { episode = false; expedited = false }', 1)
+
+
+def run_relapse(command, records, label, expected=None):
+    run(command, records, label, expected=expected)
+    record = records[-1]
+    result = json.loads(record['stdout'])
+    assert result['case'] == command[1] and result['cleanup_passed'] is True, (label, result)
+    if expected is None:
+        assert record['exit'] == 0 and result['status'] == 'PASS' and result['failures'] == [], (label, result)
+    else:
+        # A wrong signal, extra failure, failed cleanup or a timeout is not this
+        # state-machine regression's accepted intended failure.
+        assert record['exit'] == 74 and result['status'] == 'FAIL' and result['failures'] == [expected], (label, result)
 
 
 def adapter_source(service, legacy):
@@ -204,6 +245,10 @@ def main():
                         exe = compile_fixture(folder, label + '-' + suffix, source, monitor, lease,
                                               fixture, optimize, records)
                         run([exe], records, suffix + '-' + label)
+                    exe = compile_fixture(folder, 'early-relapse-' + suffix, source, monitor, relapse_lease(lease),
+                                          'EarlyRelapseTests.swift', optimize, records)
+                    for case in RELAPSE_CASES:
+                        run_relapse([exe, case], records, suffix + '-early-relapse-' + case)
                 if not args.negative_only and args.group in ('all', 'adapter'):
                     for legacy in (False, True):
                         label = ('legacy-' if legacy else 'async-') + suffix
@@ -223,6 +268,10 @@ def main():
                     for case in ([args.case] if args.case else FACADE_CASES):
                         run([exe, case], records, suffix + '-facade-' + case)
                 if args.group in ('all', 'boundary'):
+                    exe = compile_fixture(folder, 'bad-early-relapse-' + suffix, relapse_was_inspect_only(source),
+                                          monitor, relapse_lease(lease), 'EarlyRelapseTests.swift', optimize, records)
+                    run_relapse([exe, 'early-relapse'], records, suffix + '-bad-early-relapse',
+                                expected='ACCEPTED_HEALTHY_RELAPSE_DID_NOT_REQUEST_NEW_CLAIM')
                     claim_continuation = '                let admitted = executionClaim.start(mayIssue: { [weak self] in self?.mayRequestClaim(job.ticket) == true }) { [self] in'
                     assert source.count(claim_continuation) == 1
                     premature = source.replace(claim_continuation, '                self.perform(job)\n' + claim_continuation, 1)
