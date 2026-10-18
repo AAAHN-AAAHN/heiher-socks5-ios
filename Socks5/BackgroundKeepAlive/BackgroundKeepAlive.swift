@@ -218,7 +218,13 @@ final class BackgroundKeepAlive: NSObject, @MainActor ObservableObject, @preconc
         if name == AVAudioSession.routeChangeNotification { return .routeChanged }
         if name == UIApplication.willEnterForegroundNotification ||
             name == UIApplication.protectedDataDidBecomeAvailableNotification { return .available }
-        if #available(iOS 27.0, *), name == AVAudioSession.didBecomeInactiveNotification { return .interrupted }
+        if #available(iOS 27.0, *), name == AVAudioSession.didBecomeInactiveNotification {
+            let context = notification.userInfo?[AVAudioSession.deactivationContextKey] as? AVAudioSession.DeactivationContext
+            // Our completed release may be reported after a newer On. Inspect
+            // app-requested deactivation without invalidating healthy new work.
+            // A real stopped player still recovers through the ordinary check.
+            return context?.source == .app ? .hint : .interrupted
+        }
         if #available(iOS 27.0, *), name == AVAudioSession.resumptionRecommendationNotification {
             let context = notification.userInfo?[AVAudioSession.resumptionContextKey] as? AVAudioSession.ResumptionContext
             return context?.recommendation == .shouldNotResume ? .hint : .available
