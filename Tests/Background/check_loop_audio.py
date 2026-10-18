@@ -23,7 +23,8 @@ HERE = Path(__file__).resolve().parent
 OWNED = ROOT / 'Socks5/BackgroundKeepAlive'
 SERVICE_CASES = ('normal', 'finite-failure', 'pending-off-on', 'pending-reset', 'pending-owner',
                  'pending-deactivation', 'pending-inspection', 'storm', 'stopped-player', 'duplicate-completion')
-BOUNDARY_CASES = ('race-tick', 'race-admit', 'lease-blocked', 'progress-clock', 'lease-matrix')
+BOUNDARY_CASES = ('race-tick', 'race-admit', 'lease-blocked', 'progress-clock', 'lease-matrix',
+                  'lease-main-issued', 'lease-main-cancelled')
 FACADE_CASES = ('reentry-intent', 'reentry-publication', 'echo', 'owner', 'notifications', 'scheduling', 'location')
 API_BOUNDARIES = ('asset', 'session', 'category-get', 'mode-get', 'options-get', 'category-set',
                   'alerts', 'disconnect', 'activate', 'player-init', 'loops', 'delegate',
@@ -32,7 +33,8 @@ API_BOUNDARIES = ('asset', 'session', 'category-get', 'mode-get', 'options-get',
 ADAPTER_CASES = ('healthy', 'preferences', 'category-failure', 'prepare-failure', 'play-failure',
                  'player-failure', 'silent-stop', 'configuration-drift', 'compatible-route', 'decoder',
                  'asset-missing', 'asset-invalid', 'cache', 'release-failure', 'duplicate-completion',
-                 'failure-1', 'failure-100', 'failure-1000', 'stale-delegate', 'mixed-delegate')
+                 'failure-1', 'failure-100', 'failure-1000', 'stale-delegate', 'mixed-delegate',
+                 'delayed-consumption')
 ASYNC_CASES = ('pending-owner', 'pending-reset', 'pending-off-on', 'pending-deactivation', 'pending-final-owner')
 
 
@@ -92,6 +94,13 @@ extension LoopAudioService {
         queueOwner.auditAfterQueueDrain(completion)
     }
     func auditEndpointQueueDepth() -> Int { queueOwner.auditEndpointQueueDepth() }
+    func auditHoldControl(entered: @escaping @Sendable () -> Void, release: DispatchSemaphore) {
+        queueOwner.auditHoldControl(entered: entered, release: release)
+    }
+    func auditAvailableResult() -> Double? { queueOwner.auditAvailableResult() }
+    func auditRetryDeadline(_ completion: @escaping @Sendable (Double) -> Void) {
+        queueOwner.auditRetryDeadline(completion)
+    }
 }
 extension LoopAudioQueueOwner {
     func auditAfterQueueDrain(_ completion: @escaping @Sendable () -> Void) {
@@ -104,6 +113,19 @@ extension LoopAudioQueueOwner {
     func auditEndpointQueueDepth() -> Int {
         lock.lock(); defer { lock.unlock() }
         return ioDeliveryQueued ? 1 : 0
+    }
+    func auditHoldControl(entered: @escaping @Sendable () -> Void, release: DispatchSemaphore) {
+        control.async {
+            entered()
+            precondition(release.wait(timeout: .now() + 3) == .success, "TEST_CONTROL_HOLD_NOT_RELEASED")
+        }
+    }
+    func auditAvailableResult() -> Double? {
+        lock.lock(); defer { lock.unlock() }
+        return timing.resultAvailableAt
+    }
+    func auditRetryDeadline(_ completion: @escaping @Sendable (Double) -> Void) {
+        control.async { completion(self.retryAt) }
     }
 }
 '''
@@ -201,6 +223,19 @@ def main():
                     for case in ([args.case] if args.case else FACADE_CASES):
                         run([exe, case], records, suffix + '-facade-' + case)
                 if args.group in ('all', 'boundary'):
+                    claim_continuation = '                let admitted = executionClaim.start(mayIssue: { [weak self] in self?.valid(job.ticket) == true }) { [self] in'
+                    assert source.count(claim_continuation) == 1
+                    premature = source.replace(claim_continuation, '                self.perform(job)\n' + claim_continuation, 1)
+                    exe = compile_fixture(folder, 'bad-before-claim-return-' + suffix, premature + admission, monitor, lease,
+                                          'RecoveryBoundaryTests.swift', optimize, records)
+                    run([exe, 'lease-main-issued'], records, suffix + '-bad-before-claim-return',
+                        expected='AV_PREPARATION_BEFORE_MAIN_REQUEST_RETURN')
+                    unchecked_issue = source.replace(claim_continuation,
+                        '                let admitted = executionClaim.start { [self] in', 1)
+                    exe = compile_fixture(folder, 'bad-claim-ticket-' + suffix, unchecked_issue + admission, monitor, lease,
+                                          'RecoveryBoundaryTests.swift', optimize, records)
+                    run([exe, 'lease-main-cancelled'], records, suffix + '-bad-claim-ticket',
+                        expected='QUEUED_OFF_ISSUED_AUDIO_OR_CLAIM')
                     stop_guard = '        if next.stop != current.stop { releaseBarrier = true }'
                     assert source.count(stop_guard) == 1
                     bad_stop = source.replace(stop_guard, '        // Deliberate invalid control: discard stop admission.', 1)
@@ -239,13 +274,91 @@ def main():
                                           lease.replace(holder_identity, 'guard let holder = value.current else', 1),
                                           'LeaseLifecycleTests.swift', optimize, records)
                     run([exe], records, suffix + '-bad-holder', expected='EXTENSION_OLD_SIGNAL_RELEASED_NEW_HOLDER')
+                    application_variants = [
+                        ('expiry-end-deferred',
+                         '            finish(request)\n            request.expire()',
+                         '            DispatchQueue.main.async { self.finish(request) }\n            request.expire()',
+                         'APPLICATION_EXPIRY_RETURNED_BEFORE_ACTUAL_END'),
+                        ('continuation-before-begin',
+                         '                    holder.request(allowed: allowed, expire: expire, receipt: receipt)\n                    returned()',
+                         '                    returned()\n                    holder.request(allowed: allowed, expire: expire, receipt: receipt)',
+                         'APPLICATION_CONTINUATION_BEFORE_BEGIN_RETURN'),
+                        ('queued-off-still-begins',
+                         '            guard allowed(), current == nil, sequence < Int.max else { receipt(nil); return }',
+                         '            guard current == nil, sequence < Int.max else { receipt(nil); return }',
+                         'APPLICATION_QUEUED_OFF_ISSUED_PLATFORM_BEGIN'),
+                        ('early-expiry-loses-id',
+                         '                finish(request)\n            } else if id == nil {',
+                         '                // Invalid variant: omit the first safe end after begin.\n            } else if id == nil {',
+                         'APPLICATION_EARLY_EXPIRY_LEAKED_RETURNED_ID'),
+                        ('generic-return-waits-receipt',
+                         '                if allowed() { request(expire, receipt) } else { receipt(nil) }\n'
+                         '                // A provider may return before its receipt, or never deliver a\n'
+                         '                // receipt. This boundary does not wait for a grant.\n'
+                         '                returned()',
+                         '                if allowed() {\n'
+                         '                    request(expire, { id in receipt(id); returned() })\n'
+                         '                } else { receipt(nil); returned() }',
+                         'GENERIC_REQUEST_RETURN_WAITED_FOR_RECEIPT'),
+                        ('latest-issue-ticket-ignored',
+                         '            return mayIssue()',
+                         '            return true',
+                         'APPLICATION_LATEST_OFF_BEFORE_CONTROL_DRAIN_ISSUED_BEGIN'),
+                    ]
+                    for label, before, after, expected in application_variants:
+                        assert lease.count(before) == 1, label
+                        exe = compile_fixture(folder, 'bad-' + label + '-' + suffix, source, monitor,
+                                              lease.replace(before, after, 1), 'LeaseLifecycleTests.swift', optimize, records)
+                        run([exe], records, suffix + '-bad-' + label, expected=expected)
                     sample_span = ' && s.finishedAt - s.startedAt <= 0.1'
                     assert monitor.count(sample_span) == 1
                     exe = compile_fixture(folder, 'bad-sample-' + suffix, source,
                                           monitor.replace(sample_span, '', 1), lease,
                                           'PlaybackProgressTests.swift', optimize, records)
                     run([exe], records, suffix + '-bad-sample', expected='INVALID_PROGRESS_WAS_TRUSTED')
+                    precision_guard = ', a.positionQuantum != nil, s.positionQuantum != nil'
+                    assert monitor.count(precision_guard) == 1
+                    exe = compile_fixture(folder, 'bad-unknown-precision-' + suffix, source,
+                                          monitor.replace(precision_guard, '', 1), lease,
+                                          'PlaybackProgressTests.swift', optimize, records)
+                    run([exe], records, suffix + '-bad-unknown-precision',
+                        expected='NORMAL_INDEPENDENT_QUANTIZATION_REBUILT')
+                    position_error = '            + max(a.positionQuantum ?? 0, b.positionQuantum ?? 0)'
+                    assert monitor.count(position_error) == 1
+                    exe = compile_fixture(folder, 'bad-position-bound-' + suffix, source,
+                                          monitor.replace(position_error, '', 1), lease,
+                                          'PlaybackProgressTests.swift', optimize, records)
+                    run([exe], records, suffix + '-bad-position-bound',
+                        expected='NORMAL_INDEPENDENT_QUANTIZATION_REBUILT')
                 if args.group in ('all', 'adapter'):
+                    step_entry = '        context.step(step, false)'
+                    assert source.count(step_entry) == 1
+                    bad = source.replace(step_entry, '        // Deliberately omit exact API entry.', 1)
+                    exe = compile_fixture(folder, 'bad-step-entry-' + suffix, adapter_source(bad, False), monitor, lease,
+                                          'AudioEndpointBoundaryTests.swift', optimize, records, mocks='AudioEndpointMocks.swift')
+                    run([exe, 'blocked-category-get', OWNED / 'Silence.wav', invalid], records,
+                        suffix + '-bad-step-entry', expected='API_STEP_IDENTITY_MISSING')
+                    step_return = '        defer { context.step(step, true) }'
+                    assert source.count(step_return) == 1
+                    bad = source.replace(step_return, '        // Deliberately hide the request return.', 1)
+                    exe = compile_fixture(folder, 'bad-step-return-' + suffix, adapter_source(bad, False), monitor, lease,
+                                          'AudioEndpointBoundaryTests.swift', optimize, records, mocks='AudioEndpointMocks.swift')
+                    run([exe, 'pending-owner', OWNED / 'Silence.wav', invalid], records,
+                        suffix + '-bad-step-return', expected='RETURNED_REQUEST_NOT_DISTINGUISHED_FROM_PENDING_CALLBACK')
+                    retry_origin = 'retryAt = returnedAt + policy.interval'
+                    assert source.count(retry_origin) == 2
+                    bad = source.replace(retry_origin, 'retryAt = max(returnedAt, Self.now) + policy.interval')
+                    exe = compile_fixture(folder, 'bad-retry-origin-' + suffix, adapter_source(bad, False), monitor, lease,
+                                          'AudioEndpointBoundaryTests.swift', optimize, records, mocks='AudioEndpointMocks.swift')
+                    run([exe, 'delayed-consumption', OWNED / 'Silence.wav', invalid], records,
+                        suffix + '-bad-retry-origin', expected='CONSUMPTION_DELAY_ADDED_ANOTHER_COOLDOWN')
+                    fired_state = '                timerDeadline = nil\n                timerOperation = nil\n                tick()'
+                    assert source.count(fired_state) == 1
+                    bad = source.replace(fired_state, '                tick()', 1)
+                    exe = compile_fixture(folder, 'bad-fired-deadline-' + suffix, adapter_source(bad, False), monitor, lease,
+                                          'AudioEndpointBoundaryTests.swift', optimize, records, mocks='AudioEndpointMocks.swift')
+                    run([exe, 'blocked-prepare', OWNED / 'Silence.wav', invalid], records,
+                        suffix + '-bad-fired-deadline', expected='CONTROL_DID_NOT_OBSERVE_DELAY')
                     cancellation = 'mayStart: { [weak self] in self?.valid(input) == true }'
                     assert source.count(cancellation) == 1
                     bad = source.replace(cancellation, 'mayStart: { true }', 1)

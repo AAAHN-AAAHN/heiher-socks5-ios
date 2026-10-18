@@ -121,6 +121,11 @@ def main():
     assert 'precondition(outstanding == 1)' in service
     assert 'guard work == nil else { return }' in service
     assert 'if next.stop != current.stop { releaseBarrier = true }' in service
+    assert 'executionClaim.start(mayIssue: { [weak self] in self?.valid(job.ticket) == true })' in service
+    assert 'retryAt = returnedAt + policy.interval' in service
+    assert 'timerOperation == work?.id, armed <= deadline' in service
+    assert 'enum Step: String, Sendable {' in service
+    assert 'defer { context.step(step, true) }' in service
     assert 'guard !inbox.queued else { return false }' in service
     assert 'queue: nil)' in service and 'self?.notify(normalize(note))' in service
     assert not re.search(r'\.sync\(', service)
@@ -145,6 +150,13 @@ def main():
     assert 'OSAllocatedUnfairLock(initialState: value)' in lease and 'Mutex(value)' in lease
     assert 'withValue<Result: Sendable>(_ body: @Sendable (inout Value) -> Result)' in lease
     assert 'uncheckedState' not in lease and 'withLockUnchecked' not in lease
+    assert '@MainActor private final class ApplicationHolder' in lease
+    assert 'return mayIssue()' in lease
+    monitor = text('Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift')
+    assert 'let positionQuantum: Double?' in monitor
+    assert 'a.positionQuantum != nil, s.positionQuantum != nil' in monitor
+    # The unchanged adapter has no device-qualified property-precision bound.
+    assert 'positionQuantum:' not in service
     # Actual target references, build-file membership, group membership and SDK
     # compiler input must all include each new module, not merely name a file.
     phase = project[project.index('/* Begin PBXSourcesBuildPhase section */'):project.index('/* End PBXSourcesBuildPhase section */')]

@@ -23,6 +23,28 @@ struct PlaybackProgressMonitor {
         let finishedAt: Double
         /// The actual I/O buffer interval, not assumed sample-accurate precision.
         let bufferDuration: Double
+        /// An independently established upper bound on reported file-position
+        /// quantization, in file seconds. The application has no such bound yet.
+        /// A small I/O buffer does not establish currentTime reporting precision.
+        let positionQuantum: Double?
+
+        init(generation: UInt64, epoch: UInt64, playing: Bool, configured: Bool,
+             position: Double, deviceTime: Double, duration: Double, rate: Double,
+             startedAt: Double, finishedAt: Double, bufferDuration: Double,
+             positionQuantum: Double? = nil) {
+            self.generation = generation
+            self.epoch = epoch
+            self.playing = playing
+            self.configured = configured
+            self.position = position
+            self.deviceTime = deviceTime
+            self.duration = duration
+            self.rate = rate
+            self.startedAt = startedAt
+            self.finishedAt = finishedAt
+            self.bufferDuration = bufferDuration
+            self.positionQuantum = positionQuantum
+        }
     }
 
     struct Assessment: Sendable {
@@ -64,11 +86,13 @@ struct PlaybackProgressMonitor {
             && s.deviceTime >= 0 && s.startedAt >= 0
             && s.finishedAt >= s.startedAt && s.finishedAt - s.startedAt <= 0.1
             && s.playing && s.configured
+            && (s.positionQuantum.map { $0.isFinite && $0 >= 0 } ?? true)
     }
 
     private func compatible(_ a: Sample, _ b: Sample) -> Bool {
         a.generation == b.generation && a.epoch == b.epoch
             && abs(a.duration - b.duration) < 0.000001 && a.rate == b.rate
+            && a.positionQuantum == b.positionQuantum
             && b.startedAt >= a.finishedAt && b.finishedAt - a.finishedAt <= 1
             && b.deviceTime >= a.deviceTime
             && abs((b.deviceTime - a.deviceTime) - (b.finishedAt - a.finishedAt))
@@ -84,6 +108,7 @@ struct PlaybackProgressMonitor {
     private func tolerance(_ a: Sample, _ b: Sample) -> Double {
         max(0.00025, max(a.bufferDuration, b.bufferDuration)
             + (a.finishedAt - a.startedAt) + (b.finishedAt - b.startedAt)) * max(a.rate, b.rate)
+            + max(a.positionQuantum ?? 0, b.positionQuantum ?? 0)
     }
 
     mutating func inspect(_ s: Sample, speculativeRecoveryCertified: Bool = false) -> Assessment {
@@ -135,7 +160,9 @@ struct PlaybackProgressMonitor {
         }
         var informative = 0
         for a in burst.dropLast() {
-            guard compatible(a, s) else { continue }
+            // Unknown property precision cannot turn a stationary report into
+            // failure evidence, even if a caller enables speculative recovery.
+            guard compatible(a, s), a.positionQuantum != nil, s.positionQuantum != nil else { continue }
             let uncertainty = tolerance(a, s)
             let expected = distance((s.deviceTime - a.deviceTime) * s.rate, period: s.duration)
             let observed = distance(s.position - a.position, period: s.duration)

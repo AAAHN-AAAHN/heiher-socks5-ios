@@ -29,9 +29,37 @@ private final class LeaseStorage<Value: Sendable>: Sendable {
 /// by LeaseStorage; callbacks and platform operations always run outside it.
 final class RecoveryExecutionLease: Sendable {
     struct Provider: Sendable {
-        let request: @Sendable (@escaping @Sendable () -> Void,
-                                @escaping @Sendable (Int?) -> Void) -> Void
+        fileprivate let issue: @Sendable (@escaping @Sendable () -> Bool,
+                                      @escaping @Sendable () -> Void,
+                                      @escaping @Sendable (Int?) -> Void,
+                                      @escaping @Sendable () -> Void) -> Void
         let end: @Sendable (Int) -> Void
+
+        init(request: @escaping @Sendable (@escaping @Sendable () -> Void,
+                                           @escaping @Sendable (Int?) -> Void) -> Void,
+             end: @escaping @Sendable (Int) -> Void) {
+            issue = { allowed, expire, receipt, returned in
+                if allowed() { request(expire, receipt) } else { receipt(nil) }
+                // A provider may return before its receipt, or never deliver a
+                // receipt. This boundary does not wait for a grant.
+                returned()
+            }
+            self.end = end
+        }
+
+        private init(issue: @escaping @Sendable (@escaping @Sendable () -> Bool,
+                                                  @escaping @Sendable () -> Void,
+                                                  @escaping @Sendable (Int?) -> Void,
+                                                  @escaping @Sendable () -> Void) -> Void,
+                     end: @escaping @Sendable (Int) -> Void) {
+            self.issue = issue
+            self.end = end
+        }
+
+        func request(_ expire: @escaping @Sendable () -> Void,
+                     _ receipt: @escaping @Sendable (Int?) -> Void) {
+            issue({ true }, expire, receipt, {})
+        }
 
         static let unavailable = Provider(request: { _, receipt in receipt(nil) }, end: { _ in })
 
@@ -39,18 +67,41 @@ final class RecoveryExecutionLease: Sendable {
         /// end refuses new claims instead of accumulating tokens or cleanup jobs.
         func serializingEnds() -> Provider {
             let gate = EndGate(provider: self)
-            return Provider(request: { gate.request(expire: $0, receipt: $1) }, end: { gate.end($0) })
+            return Provider(issue: { gate.request(allowed: $0, expire: $1, receipt: $2, returned: $3) },
+                            end: { gate.end($0) })
         }
 
         #if canImport(UIKit)
         /// Supplied by an actual UIApplication root, not inferred from a bundle ID.
         @MainActor static func application(_ app: UIApplication) -> Provider {
-            Provider(request: { expire, receipt in
-                let id = app.beginBackgroundTask(withName: "Loop sound recovery", expirationHandler: expire)
-                receipt(id == .invalid ? nil : id.rawValue)
+            application(begin: { expire in
+                let id = app.beginBackgroundTask(withName: "Loop sound recovery", expirationHandler: {
+                    // UIKit delivers expiration on main. Do not enqueue the
+                    // actual end behind the handler's return.
+                    MainActor.assumeIsolated { expire() }
+                })
+                return id == .invalid ? nil : id.rawValue
             }, end: { app.endBackgroundTask(UIBackgroundTaskIdentifier(rawValue: $0)) })
         }
         #endif
+
+        /// The portable application policy owns begin/end/expiration on main.
+        /// Only application(_:) supplies UIKit operations. No audio, file or
+        /// worker wait is performed by this holder or its platform callbacks.
+        @MainActor static func application(
+            begin: @escaping @MainActor @Sendable (@escaping @MainActor @Sendable () -> Void) -> Int?,
+            end: @escaping @MainActor @Sendable (Int) -> Void
+        ) -> Provider {
+            let holder = ApplicationHolder(begin: begin, end: end)
+            return Provider(issue: { allowed, expire, receipt, returned in
+                DispatchQueue.main.async {
+                    holder.request(allowed: allowed, expire: expire, receipt: receipt)
+                    returned()
+                }
+            }, end: { id in
+                DispatchQueue.main.async { holder.end(id) }
+            })
+        }
 
         #if os(iOS)
         /// Inject only after verifying this deployment's actual extension context.
@@ -84,6 +135,75 @@ final class RecoveryExecutionLease: Sendable {
         }
     }
 
+    /// One platform identifier is owned on main. A monotonically increasing
+    /// logical identity prevents old callbacks/ends from closing a reused raw
+    /// UIKit identifier. Refuse new claims instead of wrapping that identity.
+    @MainActor private final class ApplicationHolder {
+        private final class Request {
+            let id: Int
+            let expire: @Sendable () -> Void
+            var received = false
+            var ended = false
+            var platformID: Int?
+            init(id: Int, expire: @escaping @Sendable () -> Void) {
+                self.id = id
+                self.expire = expire
+            }
+        }
+        private let begin: @MainActor @Sendable (@escaping @MainActor @Sendable () -> Void) -> Int?
+        private let platformEnd: @MainActor @Sendable (Int) -> Void
+        private var sequence = 0
+        private var current: Request?
+
+        init(begin: @escaping @MainActor @Sendable (@escaping @MainActor @Sendable () -> Void) -> Int?,
+             end: @escaping @MainActor @Sendable (Int) -> Void) {
+            self.begin = begin
+            platformEnd = end
+        }
+
+        func request(allowed: @Sendable () -> Bool, expire: @escaping @Sendable () -> Void,
+                     receipt: @escaping @Sendable (Int?) -> Void) {
+            guard allowed(), current == nil, sequence < Int.max else { receipt(nil); return }
+            sequence += 1
+            let request = Request(id: sequence, expire: expire)
+            current = request
+            let id = begin { [weak self, request] in self?.expire(request) }
+            request.received = true
+            request.platformID = id
+            if request.ended {
+                // If expiration reentered begin before it returned an ID, end
+                // that ID at the first safe point, before receipt/AV continuation.
+                finish(request)
+            } else if id == nil {
+                current = nil
+            }
+            receipt(id == nil ? nil : request.id)
+        }
+
+        func end(_ id: Int) {
+            guard let request = current, request.id == id else { return }
+            finish(request)
+        }
+
+        private func expire(_ request: Request) {
+            guard current === request, !request.ended else { return }
+            finish(request)
+            request.expire()
+        }
+
+        private func finish(_ request: Request) {
+            guard current === request else { return }
+            request.ended = true
+            guard request.received else { return }
+            if let id = request.platformID {
+                request.platformID = nil
+                platformEnd(id)
+            }
+            // Keep ownership through the platform call, including reentrancy.
+            if current === request { current = nil }
+        }
+    }
+
     /// Immutable handles plus locked value state. A never-returning platform end
     /// occupies one serial job and prevents replacement grants, not audio policy.
     private final class EndGate: Sendable {
@@ -100,8 +220,10 @@ final class RecoveryExecutionLease: Sendable {
 
         init(provider: Provider) { self.provider = provider }
 
-        func request(expire: @escaping @Sendable () -> Void,
-                     receipt: @escaping @Sendable (Int?) -> Void) {
+        func request(allowed: @escaping @Sendable () -> Bool,
+                     expire: @escaping @Sendable () -> Void,
+                     receipt: @escaping @Sendable (Int?) -> Void,
+                     returned: @escaping @Sendable () -> Void) {
             let request = Request()
             let admitted = state.withValue { value -> Bool in
                 guard value.current == nil else { return false }
@@ -109,8 +231,8 @@ final class RecoveryExecutionLease: Sendable {
                 value.received = false
                 return true
             }
-            guard admitted else { receipt(nil); return }
-            provider.request(expire, { [self, request] id in
+            guard admitted else { receipt(nil); returned(); return }
+            provider.issue(allowed, expire, { [self, request] id in
                 let accepted = state.withValue { value -> Bool in
                     guard value.current === request, !value.received else { return false }
                     value.received = true
@@ -119,7 +241,7 @@ final class RecoveryExecutionLease: Sendable {
                     return true
                 }
                 if accepted { receipt(id) }
-            })
+            }, returned)
         }
 
         func end(_ id: Int) {
@@ -172,6 +294,7 @@ final class RecoveryExecutionLease: Sendable {
 
     private struct State: Sendable {
         var started = false
+        var issued = false
         var received = false
         var ended = false
         var identifier: Int?
@@ -188,14 +311,36 @@ final class RecoveryExecutionLease: Sendable {
         self.expired = expired
     }
 
-    func start() {
-        let begin = state.withValue { value -> Bool in
-            let first = !value.started && !value.ended
+    /// Completion means the request call returned (not that a grant arrived),
+    /// or that it was cancelled before issue. A duplicate start while the first
+    /// issue is pending returns false and stores no second continuation.
+    @discardableResult
+    func start(completion: @escaping @Sendable () -> Void = {}) -> Bool {
+        start(mayIssue: { true }, completion: completion)
+    }
+
+    @discardableResult
+    func start(mayIssue: @escaping @Sendable () -> Bool,
+               completion: @escaping @Sendable () -> Void) -> Bool {
+        let action = state.withValue { value -> Int in
+            if value.started { return value.issued ? 1 : 0 }
             value.started = true
-            return first
+            if value.ended { value.issued = true; return 1 }
+            return 2
         }
-        guard begin else { return }
-        provider.request({ [weak self] in self?.expire() }, { [self] in receive($0) })
+        guard action != 0 else { return false }
+        if action == 1 { completion(); return true }
+        provider.issue({ [self] in
+            guard state.withValue({ !$0.ended }) else { return false }
+            // The service accepts Off before its control drain can finish this
+            // lease. Read that latest ticket here, outside the lease lock.
+            return mayIssue()
+        },
+                       { [weak self] in self?.expire() }, { [self] in receive($0) }, { [self] in
+            state.withValue { $0.issued = true }
+            completion()
+        })
+        return true
     }
 
     private func receive(_ id: Int?) {
