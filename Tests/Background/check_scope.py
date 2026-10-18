@@ -121,7 +121,9 @@ def main():
     assert 'precondition(outstanding == 1)' in service
     assert 'guard work == nil else { return }' in service
     assert 'if next.stop != current.stop { releaseBarrier = true }' in service
-    assert 'executionClaim.start(mayIssue: { [weak self] in self?.valid(job.ticket) == true })' in service
+    assert 'executionClaim.start(mayIssue: { [weak self] in self?.mayRequestClaim(job.ticket) == true })' in service
+    assert 'return !exhausted && ticket.on && ticket.stop == input.stop\n' in service
+    assert 'return !exhausted && ticket.on && ticket.stop == input.stop && ticket.epoch == input.epoch' in service
     assert 'retryAt = returnedAt + policy.interval' in service
     assert 'timerOperation == work?.id, armed <= deadline' in service
     assert 'enum Step: String, Sendable {' in service

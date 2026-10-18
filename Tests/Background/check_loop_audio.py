@@ -24,7 +24,7 @@ OWNED = ROOT / 'Socks5/BackgroundKeepAlive'
 SERVICE_CASES = ('normal', 'finite-failure', 'pending-off-on', 'pending-reset', 'pending-owner',
                  'pending-deactivation', 'pending-inspection', 'storm', 'stopped-player', 'duplicate-completion')
 BOUNDARY_CASES = ('race-tick', 'race-admit', 'lease-blocked', 'progress-clock', 'lease-matrix',
-                  'lease-main-issued', 'lease-main-cancelled')
+                  'lease-main-issued', 'lease-main-cancelled', 'lease-main-resource-reset', 'lease-main-off-on')
 FACADE_CASES = ('reentry-intent', 'reentry-publication', 'echo', 'owner', 'notifications', 'scheduling', 'location')
 API_BOUNDARIES = ('asset', 'session', 'category-get', 'mode-get', 'options-get', 'category-set',
                   'alerts', 'disconnect', 'activate', 'player-init', 'loops', 'delegate',
@@ -223,7 +223,7 @@ def main():
                     for case in ([args.case] if args.case else FACADE_CASES):
                         run([exe, case], records, suffix + '-facade-' + case)
                 if args.group in ('all', 'boundary'):
-                    claim_continuation = '                let admitted = executionClaim.start(mayIssue: { [weak self] in self?.valid(job.ticket) == true }) { [self] in'
+                    claim_continuation = '                let admitted = executionClaim.start(mayIssue: { [weak self] in self?.mayRequestClaim(job.ticket) == true }) { [self] in'
                     assert source.count(claim_continuation) == 1
                     premature = source.replace(claim_continuation, '                self.perform(job)\n' + claim_continuation, 1)
                     exe = compile_fixture(folder, 'bad-before-claim-return-' + suffix, premature + admission, monitor, lease,
@@ -236,6 +236,21 @@ def main():
                                           'RecoveryBoundaryTests.swift', optimize, records)
                     run([exe, 'lease-main-cancelled'], records, suffix + '-bad-claim-ticket',
                         expected='QUEUED_OFF_ISSUED_AUDIO_OR_CLAIM')
+                    # A claim protects the surviving On/Stop episode, while AV
+                    # preparation must retain its narrower resource epoch guard.
+                    epoch_bound_claim = source.replace(claim_continuation,
+                        claim_continuation.replace('mayRequestClaim(job.ticket)', 'valid(job.ticket)'), 1)
+                    exe = compile_fixture(folder, 'bad-claim-resource-epoch-' + suffix, epoch_bound_claim + admission,
+                                          monitor, lease, 'RecoveryBoundaryTests.swift', optimize, records)
+                    run([exe, 'lease-main-resource-reset'], records, suffix + '-bad-claim-resource-epoch',
+                        expected='RESOURCE_RESET_DROPPED_EPISODE_CLAIM')
+                    claim_stop_guard = '        return !exhausted && ticket.on && ticket.stop == input.stop\n'
+                    assert source.count(claim_stop_guard) == 1
+                    claim_without_stop = source.replace(claim_stop_guard, '        return !exhausted && ticket.on\n', 1)
+                    exe = compile_fixture(folder, 'bad-claim-stop-' + suffix, claim_without_stop + admission,
+                                          monitor, lease, 'RecoveryBoundaryTests.swift', optimize, records)
+                    run([exe, 'lease-main-off-on'], records, suffix + '-bad-claim-stop',
+                        expected='QUEUED_CLAIM_OFF_ON_BARRIER_LOST')
                     stop_guard = '        if next.stop != current.stop { releaseBarrier = true }'
                     assert source.count(stop_guard) == 1
                     bad_stop = source.replace(stop_guard, '        // Deliberate invalid control: discard stop admission.', 1)
