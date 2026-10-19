@@ -78,7 +78,9 @@ final class LoopAudioService: Sendable {
         var health = PlaybackProgressMonitor.Health.inconclusive
     }
     struct Reply: Sendable {
+        enum KnownFailure: Sendable { case stopped, configurationMismatch }
         var sample: PlaybackProgressMonitor.Sample?
+        var knownFailure: KnownFailure?
         var error: String?
         var superseded = false
         var invalidAsset = false
@@ -725,7 +727,11 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
                 return
             } else {
                 playing = false
-                rebuild = reply.error != nil || reply.sample?.configured != true
+                switch reply.knownFailure {
+                case .stopped: rebuild = reply.error != nil
+                case .configurationMismatch: rebuild = true
+                case nil: rebuild = reply.error != nil || reply.sample?.configured != true
+                }
                 assetBlocked = reply.invalidAsset
                 // Keep the actual completed-failure deadline. A delayed control
                 // consumer must not add another full cooldown after it elapsed.
@@ -733,8 +739,9 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
                 // A first observed stop is not a failed recovery attempt.
                 // Start that new episode now; actual failed starts keep pacing.
                 if case .inspect = job.command, !episode, reply.error == nil, !reply.invalidAsset,
-                   let sample = reply.sample, sample.epoch == job.ticket.epoch,
-                   !sample.playing || !sample.configured {
+                   reply.knownFailure != nil || (reply.sample.map {
+                       $0.epoch == job.ticket.epoch && (!$0.playing || !$0.configured)
+                   } ?? false) {
                     retryAt = returnedAt
                 }
                 monitor.knownFailure(now: Self.now)
@@ -932,11 +939,13 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
         guard context.mayStart() else { return nil }
         let category = atStep(.categoryGet, context: context) { session.category }
         guard context.mayStart() else { return nil }
+        guard category == .playback else { return false }
         let mode = atStep(.modeGet, context: context) { session.mode }
         guard context.mayStart() else { return nil }
+        guard mode == .default else { return false }
         let options = atStep(.optionsGet, context: context) { session.categoryOptions }
         guard context.mayStart() else { return nil }
-        return category == .playback && mode == .default && options == [.mixWithOthers]
+        return options == [.mixWithOthers]
     }
     private func discard(_ context: LoopAudioService.Context) {
         context.phase(.stopping)
@@ -948,29 +957,35 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
         }
         player = nil
     }
-    private func snapshot(_ context: LoopAudioService.Context) -> PlaybackProgressMonitor.Sample? {
-        guard let player, context.mayStart() else { return nil }
+    private func snapshot(_ context: LoopAudioService.Context) -> LoopAudioService.Reply {
+        guard let player, context.mayStart() else { return .init() }
         context.phase(.inspecting)
         let begin = ProcessInfo.processInfo.systemUptime
-        let session = atStep(.session, context: context) { AVAudioSession.sharedInstance() }
-        guard context.mayStart() else { return nil }
         let playing = atStep(.playingGet, context: context) { player.isPlaying }
-        guard let configured = matches(session, context: context) else { return nil }
+        guard context.mayStart() else { return .init() }
+        // A known stop starts recovery before any session or progress getter.
+        // Configuration remains unobserved; start checks it under the recovery
+        // claim and promotes a valid-player resume to a rebuild when required.
+        if !playing { return .init(knownFailure: .stopped) }
+        let session = atStep(.session, context: context) { AVAudioSession.sharedInstance() }
+        guard context.mayStart() else { return .init() }
+        guard let configured = matches(session, context: context) else { return .init() }
+        if !configured { return .init(knownFailure: .configurationMismatch) }
         let position = atStep(.positionGet, context: context) { player.currentTime }
-        guard context.mayStart() else { return nil }
+        guard context.mayStart() else { return .init() }
         let clock = atStep(.clockGet, context: context) { player.deviceCurrentTime }
-        guard context.mayStart() else { return nil }
+        guard context.mayStart() else { return .init() }
         let duration = atStep(.durationGet, context: context) { player.duration }
-        guard context.mayStart() else { return nil }
+        guard context.mayStart() else { return .init() }
         let enableRate = atStep(.rateEnabledGet, context: context) { player.enableRate }
-        guard context.mayStart() else { return nil }
+        guard context.mayStart() else { return .init() }
         let rate = enableRate ? atStep(.rateGet, context: context) { Double(player.rate) } : 1
-        guard context.mayStart() else { return nil }
+        guard context.mayStart() else { return .init() }
         let buffer = atStep(.bufferGet, context: context) { session.ioBufferDuration }
-        guard context.mayStart() else { return nil }
-        return .init(generation: generation, epoch: context.epoch, playing: playing, configured: configured,
+        guard context.mayStart() else { return .init() }
+        return .init(sample: .init(generation: generation, epoch: context.epoch, playing: playing, configured: configured,
                      position: position, deviceTime: clock, duration: duration, rate: rate,
-                     startedAt: begin, finishedAt: ProcessInfo.processInfo.systemUptime, bufferDuration: buffer)
+                     startedAt: begin, finishedAt: ProcessInfo.processInfo.systemUptime, bufferDuration: buffer))
     }
 
     func perform(_ command: LoopAudioService.Command, context: LoopAudioService.Context,
@@ -979,7 +994,7 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
         switch command {
         case .inspect:
             guard context.mayStart() else { completion(.init(superseded: true)); return }
-            completion(.init(sample: snapshot(context)))
+            completion(snapshot(context))
         case .stop:
             discard(context)
             guard sessionUsed else { completion(.init()); return }
@@ -1017,6 +1032,11 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
                     completion(.init(superseded: true)); return
                 }
                 if !configured {
+                    // A stopped player's configuration was intentionally not
+                    // read during failure detection. Preserve L3 when this
+                    // recovery check discovers that its resources are invalid.
+                    if player != nil { discard(context) }
+                    guard context.mayStart() else { completion(.init(superseded: true)); return }
                     try atStep(.categorySet, context: context) {
                         try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
                     }
@@ -1061,7 +1081,7 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
                             throw error("Audio playback could not start")
                         }
                         guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
-                        completion(.init(sample: snapshot(context)))
+                        completion(snapshot(context))
                     } catch {
                         discard(context)
                         completion(.init(error: error.localizedDescription))

@@ -73,6 +73,12 @@ FINALIZATION_NEGATIVES = {
     'inspect-stopped': 'FIRST_OBSERVED_STOP_ADDED_RETRY_COOLDOWN',
     'inspect-misconfigured': 'FIRST_OBSERVED_STOP_ADDED_RETRY_COOLDOWN',
 }
+PRECEDENCE_CASES = ('stopped-before-progress', 'misconfigured-before-progress',
+                    'stopped-misconfigured-before-progress', 'stopped-before-category',
+                    'misconfigured-before-mode', 'mode-misconfigured-before-options',
+                    'healthy-progress-preserved')
+PRECEDENCE_BASELINE_COMMIT = 'dd8c2b25688a3e59c22b2755fa0bccce6de32261'
+PRECEDENCE_BASELINE_SERVICE_SHA256 = 'c9f317de58c90e985082b4374ebf04e27306f0c59ed48cbc9059a0df48f46c1b'
 
 
 def run(command, records, label, timeout=30, expected=None):
@@ -235,8 +241,9 @@ def finalization_previous_source(source):
         ('''                // A first observed stop is not a failed recovery attempt.
                 // Start that new episode now; actual failed starts keep pacing.
                 if case .inspect = job.command, !episode, reply.error == nil, !reply.invalidAsset,
-                   let sample = reply.sample, sample.epoch == job.ticket.epoch,
-                   !sample.playing || !sample.configured {
+                   reply.knownFailure != nil || (reply.sample.map {
+                       $0.epoch == job.ticket.epoch && (!$0.playing || !$0.configured)
+                   } ?? false) {
                     retryAt = returnedAt
                 }
 ''', ''),
@@ -389,7 +396,7 @@ def compile_fixture(folder, label, source, monitor, lease, fixture, optimize, re
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--group', choices=('all', 'service', 'boundary', 'adapter', 'facade', 'finalization'), default='all')
+    parser.add_argument('--group', choices=('all', 'service', 'boundary', 'adapter', 'facade', 'finalization', 'precedence'), default='all')
     parser.add_argument('--mode', choices=('all', 'debug', 'optimized'), default='all')
     parser.add_argument('--negative-only', action='store_true')
     parser.add_argument('--case', choices=FACADE_CASES)
@@ -422,6 +429,30 @@ def main():
             modes = [False, True] if args.mode == 'all' else [args.mode == 'optimized']
             for optimize in modes:
                 suffix = 'optimized' if optimize else 'debug'
+                if args.group in ('all', 'adapter', 'precedence'):
+                    # The actual pre-fix product, not a synthetic whole-source
+                    # "previous" reconstruction. Its identity is fixed and
+                    # tested with the same fixture, mocks, compiler and limits.
+                    previous = subprocess.check_output(['git', 'show', PRECEDENCE_BASELINE_COMMIT +
+                        ':Socks5/BackgroundKeepAlive/LoopAudioService.swift'], cwd=ROOT).decode()
+                    previous_sha = hashlib.sha256(previous.encode()).hexdigest()
+                    assert previous_sha == PRECEDENCE_BASELINE_SERVICE_SHA256
+                    report['precedence_baseline_commit'] = PRECEDENCE_BASELINE_COMMIT
+                    report['precedence_previous_source_sha256'] = previous_sha
+                    for legacy in (False, True):
+                        label = 'precedence-' + ('legacy-' if legacy else 'async-') + suffix
+                        for old in (False, True):
+                            if not old and args.negative_only:
+                                continue
+                            prefix = 'previous-' + label if old else label
+                            exe = compile_fixture(folder, prefix, adapter_source(previous if old else source, legacy),
+                                                  monitor, lease, 'KnownFailurePrecedenceTests.swift', optimize, records,
+                                                  mocks='AudioEndpointMocks.swift')
+                            for case in PRECEDENCE_CASES:
+                                expected = ('KNOWN_FAILURE_NOT_ADMITTED_BEFORE_UNNECESSARY_GETTER'
+                                            if old and case != 'healthy-progress-preserved' else None)
+                                run_checked_cleanup([exe, case, OWNED / 'Silence.wav'], records,
+                                                    prefix + '-' + case, expected=expected)
                 if args.group in ('all', 'finalization'):
                     previous = finalization_previous_source(source)
                     report['finalization_previous_source_sha256'] = hashlib.sha256(previous.encode()).hexdigest()
