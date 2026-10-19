@@ -21,6 +21,7 @@ final class AudioEndpointFixture: @unchecked Sendable {
         var rateEnabled = false
         var active = false
         var configured = false
+        var modeConfigured = true
         var physicalPlaying = false
         var created = 0
         var discarded = 0
@@ -132,7 +133,7 @@ final class AVAudioSession: @unchecked Sendable {
     }
     var mode: Mode {
         AudioEndpointFixture.shared.enter("mode-get")
-        return .default
+        return AudioEndpointFixture.shared.use { $0.modeConfigured ? .default : .other }
     }
     var categoryOptions: CategoryOptions {
         AudioEndpointFixture.shared.enter("options-get")
@@ -142,7 +143,7 @@ final class AVAudioSession: @unchecked Sendable {
     func setCategory(_ category: Category, mode: Mode, options: CategoryOptions) throws {
         precondition(category == .playback && mode == .default && options == [.mixWithOthers])
         if AudioEndpointFixture.shared.enter("category-set") { throw AudioEndpointFixture.failure }
-        AudioEndpointFixture.shared.use { $0.configured = true }
+        AudioEndpointFixture.shared.use { $0.configured = true; $0.modeConfigured = true }
     }
     func setPrefersNoInterruptionsFromSystemAlerts(_ value: Bool) throws {
         precondition(value)
