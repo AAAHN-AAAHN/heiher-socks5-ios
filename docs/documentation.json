@@ -12,7 +12,7 @@
   "validation_files": {
     "Build/check.py": "cd56a988829185e0a53d494cf6e5595eb4a16fdf",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
-    "Tests/Background/check_scope.py": "220c8bf387b412f1e7d647c0712f019e45ca611e",
+    "Tests/Background/check_scope.py": "d6f594293506b974e0bd0fe6ed546f7272a69511",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }

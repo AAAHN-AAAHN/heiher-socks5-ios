@@ -152,7 +152,8 @@ def main():
     assert 'OSAllocatedUnfairLock(initialState: value)' in lease and 'Mutex(value)' in lease
     assert 'withValue<Result: Sendable>(_ body: @Sendable (inout Value) -> Result)' in lease
     assert 'uncheckedState' not in lease and 'withLockUnchecked' not in lease
-    assert '@MainActor private final class ApplicationHolder' in lease
+    assert 'private final class ApplicationHolder: Sendable' in lease
+    assert '@MainActor private func finish(_ request: Request)' in lease
     assert 'return mayIssue()' in lease
     monitor = text('Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift')
     assert 'let positionQuantum: Double?' in monitor

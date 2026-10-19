@@ -85,21 +85,18 @@ final class RecoveryExecutionLease: Sendable {
         }
         #endif
 
-        /// The portable application policy owns begin/end/expiration on main.
-        /// Only application(_:) supplies UIKit operations. No audio, file or
-        /// worker wait is performed by this holder or its platform callbacks.
+        /// UIKit begin is thread-safe. Admit and issue it on the caller's lane;
+        /// a delayed main executor must not delay a fresh recovery episode.
+        /// End and expiration still serialize on main, outside metadata locks.
         @MainActor static func application(
-            begin: @escaping @MainActor @Sendable (@escaping @MainActor @Sendable () -> Void) -> Int?,
+            begin: @escaping @Sendable (@escaping @MainActor @Sendable () -> Void) -> Int?,
             end: @escaping @MainActor @Sendable (Int) -> Void
         ) -> Provider {
             let holder = ApplicationHolder(begin: begin, end: end)
             return Provider(issue: { allowed, expire, receipt, returned in
-                DispatchQueue.main.async {
-                    holder.request(allowed: allowed, expire: expire, receipt: receipt)
-                    returned()
-                }
+                holder.request(allowed: allowed, expire: expire, receipt: receipt, returned: returned)
             }, end: { id in
-                DispatchQueue.main.async { holder.end(id) }
+                holder.enqueueEnd(id)
             })
         }
 
@@ -135,72 +132,150 @@ final class RecoveryExecutionLease: Sendable {
         }
     }
 
-    /// One platform identifier is owned on main. A monotonically increasing
-    /// logical identity prevents old callbacks/ends from closing a reused raw
-    /// UIKit identifier. Refuse new claims instead of wrapping that identity.
-    @MainActor private final class ApplicationHolder {
-        private final class Request {
+    /// Begin publishes one immutable request's result under a short lock. Only
+    /// main can claim its actual end, retaining ownership until that call returns.
+    /// An old logical identity can never close a reused UIKit identifier.
+    private final class ApplicationHolder: Sendable {
+        private final class Request: Sendable {
             let id: Int
             let expire: @Sendable () -> Void
-            var received = false
-            var ended = false
-            var platformID: Int?
             init(id: Int, expire: @escaping @Sendable () -> Void) {
                 self.id = id
                 self.expire = expire
             }
         }
-        private let begin: @MainActor @Sendable (@escaping @MainActor @Sendable () -> Void) -> Int?
+        private struct IssueCompletion: Sendable {
+            let receipt: @Sendable (Int?) -> Void
+            let returned: @Sendable () -> Void
+        }
+        private struct State: Sendable {
+            var sequence = 0
+            var current: Request?
+            var queuedEnd: Request?
+            var received = false
+            var ended = false
+            var ending = false
+            var expired = false
+            var expiryNotified = false
+            var platformID: Int?
+            var completion: IssueCompletion?
+        }
+        private let state = LeaseStorage(State())
+        private let begin: @Sendable (@escaping @MainActor @Sendable () -> Void) -> Int?
         private let platformEnd: @MainActor @Sendable (Int) -> Void
-        private var sequence = 0
-        private var current: Request?
 
-        init(begin: @escaping @MainActor @Sendable (@escaping @MainActor @Sendable () -> Void) -> Int?,
+        init(begin: @escaping @Sendable (@escaping @MainActor @Sendable () -> Void) -> Int?,
              end: @escaping @MainActor @Sendable (Int) -> Void) {
             self.begin = begin
             platformEnd = end
         }
 
         func request(allowed: @Sendable () -> Bool, expire: @escaping @Sendable () -> Void,
-                     receipt: @escaping @Sendable (Int?) -> Void) {
-            guard allowed(), current == nil, sequence < Int.max else { receipt(nil); return }
-            sequence += 1
-            let request = Request(id: sequence, expire: expire)
-            current = request
+                     receipt: @escaping @Sendable (Int?) -> Void,
+                     returned: @escaping @Sendable () -> Void) {
+            let request = state.withValue { value -> Request? in
+                guard value.current == nil, value.queuedEnd == nil, value.sequence < Int.max else { return nil }
+                let request = Request(id: value.sequence + 1, expire: expire)
+                value = State(sequence: request.id, current: request,
+                              completion: IssueCompletion(receipt: receipt, returned: returned))
+                return request
+            }
+            guard let request else { receipt(nil); returned(); return }
+            // Consult the latest Off admission outside the holder's lock, at
+            // the actual API boundary rather than an earlier queue submission.
+            guard allowed() else {
+                state.withValue {
+                    if $0.current === request { $0.current = nil; $0.completion = nil }
+                }
+                receipt(nil); returned(); return
+            }
             let id = begin { [weak self, request] in self?.expire(request) }
-            request.received = true
-            request.platformID = id
-            if request.ended {
-                // If expiration reentered begin before it returned an ID, end
-                // that ID at the first safe point, before receipt/AV continuation.
-                finish(request)
-            } else if id == nil {
-                current = nil
+            let needsEnd = state.withValue { value -> Bool in
+                precondition(value.current === request)
+                value.received = true
+                value.platformID = id
+                if value.ended { return true }
+                value.completion = nil
+                if id == nil { value.current = nil }
+                return false
             }
-            receipt(id == nil ? nil : request.id)
-        }
-
-        func end(_ id: Int) {
-            guard let request = current, request.id == id else { return }
-            finish(request)
-        }
-
-        private func expire(_ request: Request) {
-            guard current === request, !request.ended else { return }
-            finish(request)
-            request.expire()
-        }
-
-        private func finish(_ request: Request) {
-            guard current === request else { return }
-            request.ended = true
-            guard request.received else { return }
-            if let id = request.platformID {
-                request.platformID = nil
-                platformEnd(id)
+            if needsEnd {
+                // An already expired begin must release its returned ID before
+                // issuing the receipt/AV continuation. Never block a worker or
+                // main while waiting for that single main cleanup job.
+                if Thread.isMainThread {
+                    MainActor.assumeIsolated { finish(request) }
+                } else {
+                    DispatchQueue.main.async { self.finish(request) }
+                }
+            } else {
+                receipt(id == nil ? nil : request.id)
+                returned()
             }
-            // Keep ownership through the platform call, including reentrancy.
-            if current === request { current = nil }
+        }
+
+        func enqueueEnd(_ id: Int) {
+            let request = state.withValue { value -> Request? in
+                guard let request = value.current, request.id == id, value.queuedEnd == nil else { return nil }
+                value.queuedEnd = request
+                return request
+            }
+            guard let request else { return }
+            DispatchQueue.main.async {
+                self.state.withValue { value in
+                    precondition(value.queuedEnd === request,
+                                 "Execution claim end reservation changed before cleanup")
+                    value.queuedEnd = nil
+                }
+                // Expiry may already have ended this claim inline. Its queued
+                // reservation still prevents another claim until this job runs.
+                self.finish(request)
+            }
+        }
+
+        @MainActor private func expire(_ request: Request) {
+            let action = state.withValue { value -> Int in
+                guard value.current === request, !value.expired else { return 0 }
+                value.expired = true
+                value.ended = true
+                if !value.received {
+                    value.expiryNotified = true
+                    return 2
+                }
+                return 1
+            }
+            // An unknown ID cannot be ended yet, but its real expiration must
+            // be reported even if begin never returns. Publication owns cleanup.
+            if action == 2 { request.expire() }
+            if action == 1 { finish(request) }
+        }
+
+        @MainActor private func finish(_ request: Request) {
+            let action = state.withValue { value -> (Bool, Int?, IssueCompletion?) in
+                guard value.current === request else { return (false, nil, nil) }
+                value.ended = true
+                guard value.received, !value.ending else { return (false, nil, nil) }
+                value.ending = true
+                let pending = value.completion
+                value.completion = nil
+                return (true, value.platformID, pending)
+            }
+            guard action.0 else { return }
+            if let id = action.1 { platformEnd(id) }
+            // Reentrant expiry cannot complete an end API still on its stack.
+            // Keep the claim occupied and defer logical expiry until it returns.
+            let expired = state.withValue { value -> Bool in
+                precondition(value.current === request && value.ending)
+                value.current = nil
+                guard value.expired, !value.expiryNotified else { return false }
+                value.expiryNotified = true
+                return true
+            }
+            if expired { request.expire() }
+            if let pending = action.2 {
+                pending.receipt(action.1 == nil ? nil : request.id)
+                pending.returned()
+            }
         }
     }
 

@@ -46,37 +46,52 @@ final class ControlledEndpoint: LoopAudioEndpoint, @unchecked Sendable {
     }
     @MainActor static func holdMainThroughWorkerTurn(_ service: LoopAudioService, owner: UInt64,
                                                     events: Locked<[String]>, cancel: Bool,
-                                                    invalidate: Bool = false, restart: Bool = false) -> DispatchSemaphore? {
-        // Synchronous by design: main cannot execute the portable application
-        // begin, while the real control and I/O queues must remain responsive.
+                                                    invalidate: Bool = false, restart: Bool = false,
+                                                    relapse: Bool = false) -> DispatchSemaphore? {
+        // Main remains synchronously occupied. An ordinary application begin
+        // and its audio continuation must now finish on the real worker lane.
+        if !cancel && !invalidate {
+            service.setEnabled(true, owner: owner)
+            let drained = DispatchSemaphore(value: 0)
+            service.auditAfterWorkerTurn { drained.signal() }
+            check(drained.wait(timeout: .now() + 3) == .success, "LEASE_MAIN_ISSUE_BLOCKED_AUDIO_LANES")
+            check(events.use { !$0.isEmpty }, "APPLICATION_BEGIN_WAITED_FOR_MAIN")
+            check(events.use { $0 == ["request", "start"] }, "AV_PREPARATION_BEFORE_MAIN_REQUEST_RETURN")
+            if relapse {
+                // The preceding I/O turn queued its healthy completion. Drain
+                // control so its normal end is pending on still-occupied main.
+                service.auditAfterWorkerTurn { drained.signal() }
+                check(drained.wait(timeout: .now() + 3) == .success, "HEALTHY_CLAIM_BOUNDARY_NOT_DRAINED")
+                service.notify(.interrupted)
+                service.auditAfterWorkerTurn { drained.signal() }
+                check(drained.wait(timeout: .now() + 3) == .success, "RELAPSE_WORKER_BOUNDARY_NOT_DRAINED")
+                check(events.use { $0 == ["request", "start", "start"] }, "APPLICATION_RELAPSE_WAITED_FOR_MAIN")
+            }
+            return nil
+        }
+        // Hold I/O before claim admission, then hold control after it queued
+        // that work. This fixes the event order without relying on a main hop.
+        let ioEntered = DispatchSemaphore(value: 0)
+        let ioRelease = DispatchSemaphore(value: 0)
+        service.auditHoldIO(entered: { ioEntered.signal() }, release: ioRelease)
+        check(ioEntered.wait(timeout: .now() + 3) == .success, "IO_HOLD_NOT_ENTERED")
         service.setEnabled(true, owner: owner)
+        let controlEntered = DispatchSemaphore(value: 0)
+        let controlRelease = DispatchSemaphore(value: 0)
+        service.auditHoldControl(entered: { controlEntered.signal() }, release: controlRelease)
+        check(controlEntered.wait(timeout: .now() + 3) == .success, "CONTROL_HOLD_NOT_ENTERED")
+        if invalidate { service.notify(.interrupted) }
+        if cancel { service.setEnabled(false, owner: owner) }
+        if restart { service.setEnabled(true, owner: owner) }
+        ioRelease.signal()
         let drained = DispatchSemaphore(value: 0)
-        service.auditAfterWorkerTurn { drained.signal() }
-        check(drained.wait(timeout: .now() + 3) == .success, "LEASE_MAIN_ISSUE_BLOCKED_AUDIO_LANES")
-        check(events.use { $0.isEmpty }, "AV_PREPARATION_BEFORE_MAIN_REQUEST_RETURN")
-        if invalidate {
-            // The first application request is already queued on held main.
-            // Cancel that AV resource generation while preserving its On/Stop
-            // episode, so protection must still cover the surviving recovery.
-            service.notify(.interrupted)
-        }
-        if cancel {
-            // Force main's already queued issue to observe the accepted Off
-            // before control can call lease.finish(). This checks the ticket,
-            // not a favorable scheduler race between the two queues.
-            let held = DispatchSemaphore(value: 0)
-            let release = DispatchSemaphore(value: 0)
-            service.auditHoldControl(entered: { held.signal() }, release: release)
-            check(held.wait(timeout: .now() + 3) == .success, "CONTROL_HOLD_NOT_ENTERED")
-            service.setEnabled(false, owner: owner)
-            if restart { service.setEnabled(true, owner: owner) }
-            return release
-        }
-        return nil
+        service.auditAfterIO { drained.signal() }
+        check(drained.wait(timeout: .now() + 3) == .success, "CLAIM_ISSUE_DID_NOT_RETURN")
+        return controlRelease
     }
     @MainActor static func main() async throws {
         let name = CommandLine.arguments[1]
-        if ["lease-main-issued", "lease-main-cancelled", "lease-main-resource-reset", "lease-main-off-on"].contains(name) {
+        if ["lease-main-issued", "lease-main-relapse", "lease-main-cancelled", "lease-main-resource-reset", "lease-main-off-on"].contains(name) {
             let events = Locked([String]())
             let ended = Locked([Int]())
             let endpoint = ControlledEndpoint(onStart: { events.use { $0.append("start") } })
@@ -90,15 +105,12 @@ final class ControlledEndpoint: LoopAudioEndpoint, @unchecked Sendable {
             let cancel = name == "lease-main-cancelled"
             let reset = name == "lease-main-resource-reset"
             let restart = name == "lease-main-off-on"
+            let relapse = name == "lease-main-relapse"
             let release = holdMainThroughWorkerTurn(service, owner: owner, events: events,
-                cancel: cancel || restart, invalidate: reset, restart: restart)
-            if cancel || restart {
-                let mainDrained = Locked(false)
-                DispatchQueue.main.async { mainDrained.use { $0 = true } }
-                let passedIssue = try await wait { mainDrained.use { $0 } }
+                cancel: cancel || restart, invalidate: reset, restart: restart, relapse: relapse)
+            if cancel || restart || reset {
                 let obsoleteRequestSkipped = events.use { $0.isEmpty }
                 release?.signal()
-                check(passedIssue, "MAIN_ISSUE_QUEUE_NOT_DRAINED")
                 if restart { check(obsoleteRequestSkipped, "QUEUED_CLAIM_OFF_ON_BARRIER_LOST") }
             }
             if cancel {
@@ -112,7 +124,8 @@ final class ControlledEndpoint: LoopAudioEndpoint, @unchecked Sendable {
                     check(endpoint.commands.use { $0.filter { $0 == "start" }.count == 2 },
                           "RESOURCE_RESET_OLD_AV_WORK_NOT_SUPERSEDED")
                 }
-                check(events.use { $0 == ["request", "start"] }, "MAIN_REQUEST_AUDIO_ORDER_CHANGED")
+                check(events.use { $0 == (relapse ? ["request", "start", "start"] : ["request", "start"]) },
+                      "MAIN_REQUEST_AUDIO_ORDER_CHANGED")
                 service.setEnabled(false, owner: owner)
                 check(try await wait { state.use { $0.text == "Off" } }, "MAIN_CLAIM_FINAL_OFF")
                 check(try await wait { ended.use { $0 == [7] } }, "MAIN_CLAIM_ACTUAL_END_MISSING")

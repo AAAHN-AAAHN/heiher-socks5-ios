@@ -9,27 +9,43 @@ private final class LeaseValue<T>: @unchecked Sendable {
     }
 }
 
-@MainActor private final class ApplicationClaimTrace {
-    var callbacks = [@MainActor @Sendable () -> Void]()
-    var rawID: Int? = 71
-    var begins = 0
-    var ends = [Int]()
-    var duringBegin: (@MainActor () -> Void)?
+private final class ApplicationClaimTrace: Sendable {
+    private struct State {
+        var callbacks = [@MainActor @Sendable () -> Void]()
+        var rawID: Int? = 71
+        var begins = 0
+        var ends = [Int]()
+        var duringBegin: (@Sendable () -> Void)?
+    }
+    private let state = LeaseValue(State())
+    var callbacks: [@MainActor @Sendable () -> Void] { state.use { $0.callbacks } }
+    var rawID: Int? {
+        get { state.use { $0.rawID } }
+        set { state.use { $0.rawID = newValue } }
+    }
+    var begins: Int { state.use { $0.begins } }
+    var ends: [Int] { state.use { $0.ends } }
+    var duringBegin: (@Sendable () -> Void)? {
+        get { state.use { $0.duringBegin } }
+        set { state.use { $0.duringBegin = newValue } }
+    }
     let observedEnds = LeaseValue(0)
 
     func begin(_ expire: @escaping @MainActor @Sendable () -> Void) -> Int? {
-        dispatchPrecondition(condition: .onQueue(.main))
-        begins += 1
-        callbacks.append(expire)
-        duringBegin?()
-        return rawID
+        let action = state.use { value -> (Int?, (@Sendable () -> Void)?) in
+            value.begins += 1
+            value.callbacks.append(expire)
+            return (value.rawID, value.duringBegin)
+        }
+        action.1?()
+        return action.0
     }
-    func end(_ id: Int) {
+    @MainActor func end(_ id: Int) {
         dispatchPrecondition(condition: .onQueue(.main))
-        ends.append(id)
+        state.use { $0.ends.append(id) }
         observedEnds.use { $0 += 1 }
     }
-    func provider() -> RecoveryExecutionLease.Provider {
+    @MainActor func provider() -> RecoveryExecutionLease.Provider {
         .application(begin: { self.begin($0) }, end: { self.end($0) }).serializingEnds()
     }
 }
@@ -70,15 +86,25 @@ private final class LeaseValue<T>: @unchecked Sendable {
         let issued = LeaseValue(0)
         let expired = LeaseValue((count: 0, actualEndObserved: false))
         let observedEnds = trace.observedEnds
-        trace.duringBegin = { check(issued.use { $0 == 0 }, "APPLICATION_CONTINUATION_BEFORE_BEGIN_RETURN") }
+        let beginEntered = LeaseValue(false)
+        let beginRelease = DispatchSemaphore(value: 0)
+        trace.duringBegin = {
+            check(issued.use { $0 == 0 }, "APPLICATION_CONTINUATION_BEFORE_BEGIN_RETURN")
+            beginEntered.use { $0 = true }
+            check(beginRelease.wait(timeout: .now() + 3) == .success, "APPLICATION_BEGIN_HOLD_NOT_RELEASED")
+        }
         let first = RecoveryExecutionLease(provider: provider, expired: {
             expired.use { $0.count += 1; $0.actualEndObserved = observedEnds.use { $0 == 1 } }
         })
-        check(first.start { issued.use { $0 += 1 } }, "APPLICATION_INITIAL_START_REFUSED")
-        check(trace.begins == 0 && issued.use { $0 == 0 }, "APPLICATION_BEGIN_NOT_MAIN_QUEUED")
+        DispatchQueue.global().async {
+            check(first.start { issued.use { $0 += 1 } }, "APPLICATION_INITIAL_START_REFUSED")
+        }
+        try await until { beginEntered.use { $0 } }
+        check(trace.begins == 1 && issued.use { $0 == 0 }, "APPLICATION_REQUEST_RETURN_WAS_INVENTED")
         for _ in 0..<1000 {
             check(!first.start { issued.use { $0 += 1000 } }, "PENDING_START_ACCUMULATED_CONTINUATIONS")
         }
+        beginRelease.signal()
         try await until { issued.use { $0 == 1 } }
         check(trace.begins == 1, "APPLICATION_DUPLICATE_BEGIN")
         trace.duringBegin = nil
@@ -111,7 +137,7 @@ private final class LeaseValue<T>: @unchecked Sendable {
         let earlyIssued = LeaseValue(false)
         let earlyExpired = LeaseValue(0)
         early.duringBegin = {
-            early.callbacks.last!()
+            MainActor.assumeIsolated { early.callbacks.last!() }
             check(early.ends.isEmpty, "APPLICATION_EARLY_EXPIRY_INVENTED_PLATFORM_ID")
             check(!earlyIssued.use { $0 }, "APPLICATION_EARLY_EXPIRY_COMPLETED_UNRETURNED_BEGIN")
         }
@@ -138,11 +164,19 @@ private final class LeaseValue<T>: @unchecked Sendable {
 
         let cancelled = ApplicationClaimTrace()
         let cancelState = LeaseValue((issued: 0, noGrant: 0))
-        let cancelledLease = RecoveryExecutionLease(provider: cancelled.provider(), granted: { value in
+        let cancelEntered = LeaseValue(false)
+        let cancelRelease = DispatchSemaphore(value: 0)
+        let cancelProvider = cancelled.provider().auditBeforeIssue {
+            cancelEntered.use { $0 = true }
+            check(cancelRelease.wait(timeout: .now() + 3) == .success, "APPLICATION_ISSUE_HOLD_NOT_RELEASED")
+        }
+        let cancelledLease = RecoveryExecutionLease(provider: cancelProvider, granted: { value in
             if !value { cancelState.use { $0.noGrant += 1 } }
         })
-        cancelledLease.start { cancelState.use { $0.issued += 1 } }
-        cancelledLease.finish() // Main's queued begin has not entered yet.
+        DispatchQueue.global().async { cancelledLease.start { cancelState.use { $0.issued += 1 } } }
+        try await until { cancelEntered.use { $0 } }
+        cancelledLease.finish() // The actual provider has not checked admission.
+        cancelRelease.signal()
         try await until { cancelState.use { $0.issued == 1 } }
         check(cancelled.begins == 0 && cancelled.ends.isEmpty, "APPLICATION_QUEUED_OFF_ISSUED_PLATFORM_BEGIN")
         check(cancelState.use { $0.noGrant == 1 }, "APPLICATION_CANCELLED_ISSUE_NOT_SETTLED")
@@ -152,13 +186,23 @@ private final class LeaseValue<T>: @unchecked Sendable {
         check(cancelState.use { $0.issued == 2 } && cancelled.begins == 0, "OFF_BEFORE_FIRST_START_ISSUED_BEGIN")
 
         // Synchronous service intent can precede its control-lane lease.finish.
-        // Main must consult that intent when its queued begin actually enters.
+        // The actual provider entry must consult that latest intent.
         let intentOnly = ApplicationClaimTrace()
         let intent = LeaseValue(true)
         let intentIssued = LeaseValue(false)
-        let intentLease = RecoveryExecutionLease(provider: intentOnly.provider())
-        intentLease.start(mayIssue: { intent.use { $0 } }) { intentIssued.use { $0 = true } }
+        let intentEntered = LeaseValue(false)
+        let intentRelease = DispatchSemaphore(value: 0)
+        let intentProvider = intentOnly.provider().auditBeforeIssue {
+            intentEntered.use { $0 = true }
+            check(intentRelease.wait(timeout: .now() + 3) == .success, "APPLICATION_INTENT_HOLD_NOT_RELEASED")
+        }
+        let intentLease = RecoveryExecutionLease(provider: intentProvider)
+        DispatchQueue.global().async {
+            intentLease.start(mayIssue: { intent.use { $0 } }) { intentIssued.use { $0 = true } }
+        }
+        try await until { intentEntered.use { $0 } }
         intent.use { $0 = false } // Deliberately do not call lease.finish yet.
+        intentRelease.signal()
         try await until { intentIssued.use { $0 } }
         check(intentOnly.begins == 0 && intentOnly.ends.isEmpty, "APPLICATION_LATEST_OFF_BEFORE_CONTROL_DRAIN_ISSUED_BEGIN")
         intentLease.finish()
@@ -296,6 +340,6 @@ private final class LeaseValue<T>: @unchecked Sendable {
             }
         }
         try await applicationAndIssueBoundaries()
-        print("PASS: blocked token end, no-grant cap, stale identity, extension acquisition/expiration/reuse order; application main ownership, synchronous expiry end, issue/receipt separation and cancellation")
+        print("PASS: blocked token end, no-grant cap, stale identity, extension acquisition/expiration/reuse order; worker application begin, main end ownership, synchronous expiry end, issue/receipt separation and cancellation")
     }
 }

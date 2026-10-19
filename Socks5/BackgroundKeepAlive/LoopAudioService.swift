@@ -338,7 +338,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         ticket.on = !exhausted && owners.values.contains(where: \.enabled)
         if old && !ticket.on { bumpStop() }
         bumpRevision()
-        inbox.explicit = inbox.explicit || explicit
+        inbox.explicit = inbox.explicit || (explicit && enabled)
         let schedule = enqueueLocked()
         lock.unlock()
         if schedule { control.async { self.drain() } }
@@ -351,7 +351,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         ticket.on = !exhausted && owners.values.contains(where: \.enabled)
         if old && !ticket.on { bumpStop() }
         bumpRevision()
-        inbox.explicit = true
+        // Owner cleanup preserves any already accepted explicit On signal.
         let schedule = enqueueLocked()
         lock.unlock()
         if schedule { control.async { self.drain() } }
@@ -729,6 +729,13 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
                 // Keep the actual completed-failure deadline. A delayed control
                 // consumer must not add another full cooldown after it elapsed.
                 retryAt = returnedAt + policy.interval
+                // A first observed stop is not a failed recovery attempt.
+                // Start that new episode now; actual failed starts keep pacing.
+                if case .inspect = job.command, !episode, reply.error == nil, !reply.invalidAsset,
+                   let sample = reply.sample, sample.epoch == job.ticket.epoch,
+                   !sample.playing || !sample.configured {
+                    retryAt = returnedAt
+                }
                 monitor.knownFailure(now: Self.now)
                 publish(State(text: "Waiting to resume: \(String((reply.error ?? "Audio playback stopped").prefix(256)))"))
                 if assetBlocked { cancelTimer(); finishLease(); return }
@@ -1017,21 +1024,22 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
                     guard success else { completion(.init(error: message ?? "Audio activation failed")); return }
                     guard context.mayStart() else { completion(.init(superseded: true)); return }
                     do {
+                        guard generation < UInt64.max else { throw error("Player generation limit reached") }
                         if player == nil {
-                            guard generation < UInt64.max else { throw error("Player generation limit reached") }
                             player = try atStep(.playerCreate, context: context) {
                                 try AVAudioPlayer(data: data!, fileTypeHint: "wav")
                             }
-                            generation += 1
                             guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
                             atStep(.loops, context: context) { player?.numberOfLoops = -1 }
-                            guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
-                            guard let relay else { preconditionFailure("Audio endpoint relay is missing") }
-                            relay.generation(generation)
-                            let proxy = DelegateProxy(generation: generation, event: relay.delegate)
-                            delegate = proxy
-                            atStep(.delegate, context: context) { player?.delegate = proxy }
                         }
+                        guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
+                        // Reusing a stopped player begins a new callback lifetime.
+                        generation += 1
+                        guard let relay else { preconditionFailure("Audio endpoint relay is missing") }
+                        relay.generation(generation)
+                        let proxy = DelegateProxy(generation: generation, event: relay.delegate)
+                        delegate = proxy
+                        atStep(.delegate, context: context) { player?.delegate = proxy }
                         guard let active = player else { throw error("Audio player unavailable") }
                         guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
                         context.phase(.preparing)

@@ -9,6 +9,12 @@ extension LoopAudioService {
     func auditHoldControl(entered: @escaping @Sendable () -> Void, release: DispatchSemaphore) {
         queueOwner.auditHoldControl(entered: entered, release: release)
     }
+    func auditHoldIO(entered: @escaping @Sendable () -> Void, release: DispatchSemaphore) {
+        queueOwner.auditHoldIO(entered: entered, release: release)
+    }
+    func auditAfterIO(_ completion: @escaping @Sendable () -> Void) {
+        queueOwner.auditAfterIO(completion)
+    }
 }
 
 extension LoopAudioQueueOwner {
@@ -21,6 +27,15 @@ extension LoopAudioQueueOwner {
             entered()
             precondition(release.wait(timeout: .now() + 3) == .success, "TEST_CONTROL_HOLD_NOT_RELEASED")
         }
+    }
+    func auditHoldIO(entered: @escaping @Sendable () -> Void, release: DispatchSemaphore) {
+        io.async {
+            entered()
+            precondition(release.wait(timeout: .now() + 3) == .success, "TEST_IO_HOLD_NOT_RELEASED")
+        }
+    }
+    func auditAfterIO(_ completion: @escaping @Sendable () -> Void) {
+        io.async(execute: completion)
     }
     // Test-only control-lane admission. Appended by the host test driver only.
     func auditStopAdmission(owner: UInt64, direct: Bool, result: @escaping @Sendable (Bool) -> Void) {
