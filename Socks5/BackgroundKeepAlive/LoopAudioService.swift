@@ -268,6 +268,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
     private var timer: DispatchSourceTimer?
     private var timerDeadline: Double?
     private var timerOperation: UInt64?
+    private var timerRecovery = false
     private var lastState = State()
     private var lastPublishedRevision: UInt64?
     private var playing = false
@@ -747,12 +748,18 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
     private func schedule(after delay: Double) {
         schedule(at: Self.now + max(0.001, delay))
     }
-    private func schedule(at deadline: Double) {
+    private func schedule(at requestedDeadline: Double) {
         guard latest().on else { cancelTimer(); return }
-        // Within the same work/wait context, hints cannot postpone an already
-        // armed earlier deadline. A completed/replaced work invalidates its old
-        // watchdog target, so the next active deadline may legitimately differ.
-        if let armed = timerDeadline, timerOperation == work?.id, armed <= deadline { return }
+        let recovery = !playing
+        var deadline = requestedDeadline
+        // Within the same work/wait context, preserve an earlier deadline even
+        // when recovery changes the source flags. Completed/replaced work may
+        // legitimately use a new watchdog target.
+        if let armed = timerDeadline, timerOperation == work?.id, armed <= deadline {
+            if timerRecovery == recovery { return }
+            deadline = armed
+        }
+        if timer != nil && timerRecovery != recovery { cancelTimer() }
         if timer == nil {
             guard timerSequence < UInt64.max else {
                 publish(State(text: "Waiting \u{2014} audio timer identifier limit reached"))
@@ -761,7 +768,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             }
             timerSequence += 1
             let epoch = timerSequence
-            let source = DispatchSource.makeTimerSource(queue: control)
+            let source = DispatchSource.makeTimerSource(flags: recovery ? .strict : [], queue: control)
             source.setEventHandler { [weak self] in
                 guard let self, timer != nil, timerSequence == epoch else { return }
                 timerDeadline = nil
@@ -769,6 +776,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
                 tick()
             }
             timer = source
+            timerRecovery = recovery
             source.resume()
         }
         timerDeadline = deadline
@@ -795,6 +803,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         timer = nil
         timerDeadline = nil
         timerOperation = nil
+        timerRecovery = false
     }
     private func makeLease() -> RecoveryExecutionLease {
         RecoveryExecutionLease(provider: leaseProvider, granted: { [weak self] granted in

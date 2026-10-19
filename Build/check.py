@@ -130,7 +130,8 @@ def composition():
         service = (ROOT / 'Socks5/BackgroundKeepAlive/LoopAudioService.swift').read_text()
         assert 'service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,' in service
         assert 'var interval = 0.5' in service
-        assert service.count('DispatchSource.makeTimerSource(queue: control)') == 1
+        assert service.count('DispatchSource.makeTimerSource(') == 1
+        assert service.count('DispatchSource.makeTimerSource(flags: recovery ? .strict : [], queue: control)') == 1
         assert 'precondition(outstanding == 1)' in service
         assert 'if next.stop != current.stop { releaseBarrier = true }' in service
         assert 'Timer(' not in source and 'AVAudioPlayer' not in source

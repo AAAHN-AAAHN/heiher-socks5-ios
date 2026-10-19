@@ -115,7 +115,8 @@ def main():
     assert 'deinit { audio.unregister(audioOwner) }' in controller
     assert 'audio.setEnabled(enabled, owner: audioOwner)' in controller
     service = text('Socks5/BackgroundKeepAlive/LoopAudioService.swift')
-    assert service.count('DispatchSource.makeTimerSource(queue: control)') == 1
+    assert service.count('DispatchSource.makeTimerSource(') == 1
+    assert service.count('DispatchSource.makeTimerSource(flags: recovery ? .strict : [], queue: control)') == 1
     assert 'var interval = 0.5' in service and 'var warning = 2.0' in service and 'var stalled = 10.0' in service
     assert 'var speculativeRecoveryCertified = false' in service
     assert 'precondition(outstanding == 1)' in service

@@ -66,6 +66,12 @@ private final class ProviderTrace: Sendable {
             fatalError(marker)
         }
     }
+    // These barriers deliberately occupy main while an independent worker
+    // returns. Keep them synchronous: yielding main would change the oracle.
+    @MainActor static func occupyMain(until signal: DispatchSemaphore, marker: String) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        check(signal.wait(timeout: .now() + 3) == .success, marker)
+    }
     @MainActor static func until(_ condition: () -> Bool) async throws {
         let deadline = ProcessInfo.processInfo.systemUptime + 3
         while !condition() && ProcessInfo.processInfo.systemUptime < deadline {
@@ -109,7 +115,7 @@ private final class ProviderTrace: Sendable {
             release.signal()
             // Keep main occupied while the worker publishes the returned ID.
             // Its asynchronous cleanup must not block the worker or signal AV.
-            check(workerReturned.wait(timeout: .now() + 3) == .success, "APPLICATION_EARLY_END_BLOCKED_WORKER")
+            occupyMain(until: workerReturned, marker: "APPLICATION_EARLY_END_BLOCKED_WORKER")
             check(observed.use { $0.issued == 0 } && trace.state.use { $0.ends == 0 },
                   "APPLICATION_EARLY_EXPIRY_CONTINUATION_PRECEDED_END")
             try await until { observed.use { $0.issued == 1 } }
@@ -202,7 +208,7 @@ private final class ProviderTrace: Sendable {
             }
             // Keep main occupied: all duplicate requests must return promptly,
             // reserve one job, and leave actual end for main/expiry.
-            check(queued.wait(timeout: .now() + 3) == .success, "APPLICATION_QUEUED_END_BLOCKED_CALLER")
+            occupyMain(until: queued, marker: "APPLICATION_QUEUED_END_BLOCKED_CALLER")
             check(trace.state.use { $0.ends == 0 }, "APPLICATION_NORMAL_END_LEFT_MAIN")
             trace.state.use { $0.callbacks[0] }()
             check(trace.state.use { $0.ends == 1 } && observed.use { $0.expired == 1 },
@@ -213,7 +219,7 @@ private final class ProviderTrace: Sendable {
                 rawProvider.request({}, { id in result.use { $0.received = true; $0.granted = id != nil } })
                 attempted.signal()
             }
-            check(attempted.wait(timeout: .now() + 3) == .success, "APPLICATION_QUEUED_END_BLOCKED_ADMISSION")
+            occupyMain(until: attempted, marker: "APPLICATION_QUEUED_END_BLOCKED_ADMISSION")
             check(result.use { $0.received && !$0.granted } && trace.state.use { $0.begins == 1 },
                   "APPLICATION_QUEUED_END_ADMITTED_ANOTHER_CLAIM")
             await withCheckedContinuation { continuation in
