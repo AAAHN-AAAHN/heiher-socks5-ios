@@ -24,7 +24,9 @@ OWNED = ROOT / 'Socks5/BackgroundKeepAlive'
 SERVICE_CASES = ('normal', 'finite-failure', 'pending-off-on', 'pending-reset', 'pending-owner',
                  'pending-deactivation', 'pending-inspection', 'storm', 'stopped-player', 'duplicate-completion')
 BOUNDARY_CASES = ('race-tick', 'race-admit', 'lease-blocked', 'progress-clock', 'lease-matrix',
-                  'lease-main-issued', 'lease-main-cancelled', 'lease-main-resource-reset', 'lease-main-off-on')
+                  'lease-main-issued', 'lease-main-relapse', 'lease-main-cancelled', 'lease-main-resource-reset', 'lease-main-off-on')
+APPLICATION_PROVIDER_CASES = ('worker-expiry-before-return', 'expiry-before-receipt', 'reentrant-end',
+                              'queued-end-bound', 'settled-lifetime')
 RELAPSE_CASES = ('early-relapse', 'healthy-inspection-relapse', 'continuous-granted',
                  'continuous-denied', 'continuous-expired', 'continuous-missing', 'stale-success')
 INGRESS_CASES = ('recovered-interrupted', 'recovered-media-reset', 'pending-interrupted',
@@ -52,6 +54,25 @@ ADAPTER_CASES = ('healthy', 'preferences', 'category-failure', 'prepare-failure'
                  'failure-1', 'failure-100', 'failure-1000', 'stale-delegate', 'mixed-delegate',
                  'delayed-consumption')
 ASYNC_CASES = ('pending-owner', 'pending-reset', 'pending-off-on', 'pending-deactivation', 'pending-final-owner')
+FINALIZATION_ADAPTER_CASES = ('reused-finish', 'reused-decoder', 'reused-queued-delegate', 'reused-current-mixed',
+    'reused-generation-limit', 'failed-allocation-generation', 'owner-unregister-blocked',
+    'owner-off-blocked', 'owner-on-preserved', 'owner-release-failure', 'owner-last-off')
+FINALIZATION_SERVICE_CASES = ('owner-unregister-paced', 'owner-off-paced', 'inspect-stopped',
+    'inspect-misconfigured', 'inspect-error-paced', 'inspect-empty-paced', 'inspect-superseded-paced',
+    'inspect-epoch-changed-paced', 'inspect-invalid-asset-paced', 'inspect-wrong-sample-epoch-paced',
+    'start-stopped-paced', 'start-error-paced')
+FINALIZATION_NEGATIVES = {
+    'reused-finish': 'REUSED_PLAYBACK_ACCEPTED_STALE_DELEGATE',
+    'reused-decoder': 'REUSED_PLAYBACK_ACCEPTED_STALE_DELEGATE',
+    'reused-queued-delegate': 'REUSED_PLAYBACK_ACCEPTED_STALE_DELEGATE',
+    'reused-generation-limit': 'SATURATED_REUSE_STARTED_WITH_OLD_CALLBACK_IDENTITY',
+    'owner-unregister-blocked': 'OWNER_CLEANUP_REOPENED_BLOCKED_ASSET',
+    'owner-off-blocked': 'OWNER_CLEANUP_REOPENED_BLOCKED_ASSET',
+    'owner-unregister-paced': 'OWNER_CLEANUP_ERASED_RETRY_DEADLINE',
+    'owner-off-paced': 'OWNER_CLEANUP_ERASED_RETRY_DEADLINE',
+    'inspect-stopped': 'FIRST_OBSERVED_STOP_ADDED_RETRY_COOLDOWN',
+    'inspect-misconfigured': 'FIRST_OBSERVED_STOP_ADDED_RETRY_COOLDOWN',
+}
 
 
 def run(command, records, label, timeout=30, expected=None):
@@ -203,6 +224,78 @@ def ingress_lease(lease):
     return lease.replace(before, before + '\n                IngressObservation.endGateDidClear(id)', 1)
 
 
+def finalization_previous_source(source):
+    # Reverse only these three product fixes. All other guards, timings and
+    # previously accepted fixes remain byte-identical to the current input.
+    replacements = [
+        ('        inbox.explicit = inbox.explicit || (explicit && enabled)',
+         '        inbox.explicit = inbox.explicit || explicit'),
+        ('        // Owner cleanup preserves any already accepted explicit On signal.',
+         '        inbox.explicit = true'),
+        ('''                // A first observed stop is not a failed recovery attempt.
+                // Start that new episode now; actual failed starts keep pacing.
+                if case .inspect = job.command, !episode, reply.error == nil, !reply.invalidAsset,
+                   let sample = reply.sample, sample.epoch == job.ticket.epoch,
+                   !sample.playing || !sample.configured {
+                    retryAt = returnedAt
+                }
+''', ''),
+        ('''                    do {
+                        guard generation < UInt64.max else { throw error("Player generation limit reached") }
+                        if player == nil {
+                            player = try atStep(.playerCreate, context: context) {
+                                try AVAudioPlayer(data: data!, fileTypeHint: "wav")
+                            }
+                            guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
+                            atStep(.loops, context: context) { player?.numberOfLoops = -1 }
+                        }
+                        guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
+                        // Reusing a stopped player begins a new callback lifetime.
+                        generation += 1
+                        guard let relay else { preconditionFailure("Audio endpoint relay is missing") }
+                        relay.generation(generation)
+                        let proxy = DelegateProxy(generation: generation, event: relay.delegate)
+                        delegate = proxy
+                        atStep(.delegate, context: context) { player?.delegate = proxy }
+''',
+         '''                    do {
+                        if player == nil {
+                            guard generation < UInt64.max else { throw error("Player generation limit reached") }
+                            player = try atStep(.playerCreate, context: context) {
+                                try AVAudioPlayer(data: data!, fileTypeHint: "wav")
+                            }
+                            generation += 1
+                            guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
+                            atStep(.loops, context: context) { player?.numberOfLoops = -1 }
+                            guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
+                            guard let relay else { preconditionFailure("Audio endpoint relay is missing") }
+                            relay.generation(generation)
+                            let proxy = DelegateProxy(generation: generation, event: relay.delegate)
+                            delegate = proxy
+                            atStep(.delegate, context: context) { player?.delegate = proxy }
+                        }
+'''),
+    ]
+    for before, after in replacements:
+        assert source.count(before) == 1
+        source = source.replace(before, after, 1)
+    return source
+
+
+def finalization_source(source, legacy):
+    source = adapter_source(source, legacy)
+    observation = '                FinalizationObservation.completed(job.id, returnedAt, retryAt, episode)\n'
+    # Observe both the unchanged superseded path and returned unhealthy results.
+    for before in (
+        '                publish(State(text: Phase.retry.rawValue, detail: "Audio resources changed during recovery"))',
+        '                monitor.knownFailure(now: Self.now)\n'
+        '                publish(State(text: "Waiting to resume:',
+    ):
+        assert source.count(before) == 1
+        source = source.replace(before, observation + before, 1)
+    return source + '\n' + (HERE / 'RecoveryFinalizationAccess.swift.inc').read_text()
+
+
 def adapter_source(service, legacy):
     marker = '#if canImport(AVFAudio) && canImport(UIKit)\n/// Only the service I/O queue'
     assert service.count(marker) == 1
@@ -265,6 +358,16 @@ extension LoopAudioQueueOwner {
 def compile_fixture(folder, label, source, monitor, lease, fixture, optimize, records, mocks=None, facade=None):
     work = folder / label
     work.mkdir()
+    if fixture in ('LeaseLifecycleTests.swift', 'ApplicationProviderBoundaryTests.swift'):
+        lease += '\n' + (HERE / 'ApplicationProviderAccess.swift.inc').read_text()
+    if fixture == 'ApplicationProviderBoundaryTests.swift':
+        # The same copied-input observation counts actual main cleanup jobs in
+        # normal and invalid variants. It does not alter queueing or ownership.
+        before = '            DispatchQueue.main.async {\n                self.state.withValue { value in'
+        assert lease.count(before) == 1
+        lease = lease.replace(before, '            DispatchQueue.main.async {\n'
+            '                ApplicationProviderBoundaryTests.mainEndJobDequeued()\n'
+            '                self.state.withValue { value in', 1)
     paths = []
     for name, body in [('Service.swift', source), ('Monitor.swift', monitor), ('Lease.swift', lease)]:
         path = work / name
@@ -286,7 +389,7 @@ def compile_fixture(folder, label, source, monitor, lease, fixture, optimize, re
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--group', choices=('all', 'service', 'boundary', 'adapter', 'facade'), default='all')
+    parser.add_argument('--group', choices=('all', 'service', 'boundary', 'adapter', 'facade', 'finalization'), default='all')
     parser.add_argument('--mode', choices=('all', 'debug', 'optimized'), default='all')
     parser.add_argument('--negative-only', action='store_true')
     parser.add_argument('--case', choices=FACADE_CASES)
@@ -319,6 +422,25 @@ def main():
             modes = [False, True] if args.mode == 'all' else [args.mode == 'optimized']
             for optimize in modes:
                 suffix = 'optimized' if optimize else 'debug'
+                if args.group in ('all', 'finalization'):
+                    previous = finalization_previous_source(source)
+                    report['finalization_previous_source_sha256'] = hashlib.sha256(previous.encode()).hexdigest()
+                    for legacy in (False, True):
+                        label = 'finalization-' + ('legacy-' if legacy else 'async-') + suffix
+                        cases = FINALIZATION_ADAPTER_CASES + (() if legacy else FINALIZATION_SERVICE_CASES)
+                        if not args.negative_only:
+                            exe = compile_fixture(folder, label, finalization_source(source, legacy), monitor, lease,
+                                                  'RecoveryFinalizationTests.swift', optimize, records,
+                                                  mocks='AudioEndpointMocks.swift')
+                            for case in cases:
+                                run_checked_cleanup([exe, case, OWNED / 'Silence.wav', invalid], records, label + '-' + case)
+                        exe = compile_fixture(folder, 'previous-' + label, finalization_source(previous, legacy), monitor, lease,
+                                              'RecoveryFinalizationTests.swift', optimize, records,
+                                              mocks='AudioEndpointMocks.swift')
+                        for case in cases:
+                            run_checked_cleanup([exe, case, OWNED / 'Silence.wav', invalid], records,
+                                                'previous-' + label + '-' + case,
+                                                expected=FINALIZATION_NEGATIVES.get(case))
                 if not args.negative_only and args.group in ('all', 'service'):
                     exe = compile_fixture(folder, 'service-' + suffix, source, monitor, lease,
                                           'LoopAudioServiceTests.swift', optimize, records)
@@ -334,6 +456,10 @@ def main():
                         exe = compile_fixture(folder, label + '-' + suffix, source, monitor, lease,
                                               fixture, optimize, records)
                         run([exe], records, suffix + '-' + label)
+                    exe = compile_fixture(folder, 'application-provider-' + suffix, source, monitor, lease,
+                                          'ApplicationProviderBoundaryTests.swift', optimize, records)
+                    for case in APPLICATION_PROVIDER_CASES:
+                        run([exe, case], records, suffix + '-application-provider-' + case)
                     exe = compile_fixture(folder, 'early-relapse-' + suffix, source, monitor, relapse_lease(lease),
                                           'EarlyRelapseTests.swift', optimize, records)
                     for case in RELAPSE_CASES:
@@ -439,20 +565,21 @@ def main():
                     run([exe], records, suffix + '-bad-holder', expected='EXTENSION_OLD_SIGNAL_RELEASED_NEW_HOLDER')
                     application_variants = [
                         ('expiry-end-deferred',
-                         '            finish(request)\n            request.expire()',
-                         '            DispatchQueue.main.async { self.finish(request) }\n            request.expire()',
+                         '            if action == 1 { finish(request) }',
+                         '            if action == 1 { DispatchQueue.main.async { self.finish(request) } }',
                          'APPLICATION_EXPIRY_RETURNED_BEFORE_ACTUAL_END'),
                         ('continuation-before-begin',
-                         '                    holder.request(allowed: allowed, expire: expire, receipt: receipt)\n                    returned()',
-                         '                    returned()\n                    holder.request(allowed: allowed, expire: expire, receipt: receipt)',
+                         '                holder.request(allowed: allowed, expire: expire, receipt: receipt, returned: returned)',
+                         '                returned()\n'
+                         '                holder.request(allowed: allowed, expire: expire, receipt: receipt, returned: returned)',
                          'APPLICATION_CONTINUATION_BEFORE_BEGIN_RETURN'),
                         ('queued-off-still-begins',
-                         '            guard allowed(), current == nil, sequence < Int.max else { receipt(nil); return }',
-                         '            guard current == nil, sequence < Int.max else { receipt(nil); return }',
+                         '            guard allowed() else {',
+                         '            guard request.id > 0 else {',
                          'APPLICATION_QUEUED_OFF_ISSUED_PLATFORM_BEGIN'),
                         ('early-expiry-loses-id',
-                         '                finish(request)\n            } else if id == nil {',
-                         '                // Invalid variant: omit the first safe end after begin.\n            } else if id == nil {',
+                         '                if value.ended { return true }',
+                         '                if value.ended { return false }',
                          'APPLICATION_EARLY_EXPIRY_LEAKED_RETURNED_ID'),
                         ('generic-return-waits-receipt',
                          '                if allowed() { request(expire, receipt) } else { receipt(nil) }\n'
@@ -473,6 +600,54 @@ def main():
                         exe = compile_fixture(folder, 'bad-' + label + '-' + suffix, source, monitor,
                                               lease.replace(before, after, 1), 'LeaseLifecycleTests.swift', optimize, records)
                         run([exe], records, suffix + '-bad-' + label, expected=expected)
+                    application_issue = '                holder.request(allowed: allowed, expire: expire, receipt: receipt, returned: returned)'
+                    assert lease.count(application_issue) == 1
+                    old_main_issue = lease.replace(application_issue,
+                        '                DispatchQueue.main.async {\n' + application_issue + '\n                }', 1)
+                    exe = compile_fixture(folder, 'bad-application-main-hop-' + suffix, source + admission, monitor,
+                                          old_main_issue, 'RecoveryBoundaryTests.swift', optimize, records)
+                    run([exe, 'lease-main-issued'], records, suffix + '-bad-application-main-hop',
+                        expected='APPLICATION_BEGIN_WAITED_FOR_MAIN')
+                    provider_variants = [
+                        ('unknown-expiry-deferred',
+                         '                    value.expiryNotified = true\n                    return 2',
+                         '                    return 0',
+                         'worker-expiry-before-return', 'APPLICATION_UNKNOWN_ID_EXPIRY_WAITED_FOR_BEGIN'),
+                        ('worker-early-end-skipped',
+                         '                    DispatchQueue.main.async { self.finish(request) }',
+                         '                    receipt(id == nil ? nil : request.id)\n                    returned()',
+                         'worker-expiry-before-return', 'APPLICATION_EARLY_EXPIRY_CONTINUATION_PRECEDED_END'),
+                        ('end-releases-ownership-early',
+                         '            if let id = action.1 { platformEnd(id) }',
+                         '            state.withValue { $0.current = nil }\n            if let id = action.1 { platformEnd(id) }',
+                         'reentrant-end', 'APPLICATION_END_RELEASED_CLAIM_EARLY'),
+                        ('reentrant-end-duplicates',
+                         '                guard value.received, !value.ending else { return (false, nil, nil) }',
+                         '                guard value.received else { return (false, nil, nil) }',
+                         'reentrant-end', 'APPLICATION_DUPLICATE_END_IN_FLIGHT'),
+                        ('late-receipt-ignores-identity',
+                         'guard let request = value.current, request.id == id, value.queuedEnd == nil else',
+                         'guard let request = value.current, value.queuedEnd == nil else',
+                         'expiry-before-receipt', 'APPLICATION_LATE_RECEIPT_ENDED_REUSED_RAW_ID'),
+                        ('queued-end-admission-ignored',
+                         'guard value.current == nil, value.queuedEnd == nil, value.sequence < Int.max else',
+                         'guard value.current == nil, value.sequence < Int.max else',
+                         'queued-end-bound', 'APPLICATION_QUEUED_END_ADMITTED_ANOTHER_CLAIM'),
+                        ('duplicate-end-reservation',
+                         'guard let request = value.current, request.id == id, value.queuedEnd == nil else',
+                         'guard let request = value.current, request.id == id else',
+                         'queued-end-bound', 'APPLICATION_DUPLICATE_END_JOB_QUEUED'),
+                        ('settled-completion-retained',
+                         '                if value.ended { return true }\n                value.completion = nil',
+                         '                if value.ended { return true }\n                // Invalid variant: retain a delivered issue completion.',
+                         'settled-lifetime', 'APPLICATION_SETTLED_CALLBACK_RETAINED_LEASE'),
+                    ]
+                    for label, before, after, case, expected in provider_variants:
+                        assert lease.count(before) == 1, label
+                        exe = compile_fixture(folder, 'bad-' + label + '-' + suffix, source, monitor,
+                                              lease.replace(before, after, 1), 'ApplicationProviderBoundaryTests.swift',
+                                              optimize, records)
+                        run([exe, case], records, suffix + '-bad-' + label, expected=expected)
                     sample_span = ' && s.finishedAt - s.startedAt <= 0.1'
                     assert monitor.count(sample_span) == 1
                     exe = compile_fixture(folder, 'bad-sample-' + suffix, source,

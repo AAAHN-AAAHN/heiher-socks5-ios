@@ -115,7 +115,8 @@ def main():
     assert 'deinit { audio.unregister(audioOwner) }' in controller
     assert 'audio.setEnabled(enabled, owner: audioOwner)' in controller
     service = text('Socks5/BackgroundKeepAlive/LoopAudioService.swift')
-    assert service.count('DispatchSource.makeTimerSource(queue: control)') == 1
+    assert service.count('DispatchSource.makeTimerSource(') == 1
+    assert service.count('DispatchSource.makeTimerSource(flags: recovery ? .strict : [], queue: control)') == 1
     assert 'var interval = 0.5' in service and 'var warning = 2.0' in service and 'var stalled = 10.0' in service
     assert 'var speculativeRecoveryCertified = false' in service
     assert 'precondition(outstanding == 1)' in service
@@ -152,7 +153,8 @@ def main():
     assert 'OSAllocatedUnfairLock(initialState: value)' in lease and 'Mutex(value)' in lease
     assert 'withValue<Result: Sendable>(_ body: @Sendable (inout Value) -> Result)' in lease
     assert 'uncheckedState' not in lease and 'withLockUnchecked' not in lease
-    assert '@MainActor private final class ApplicationHolder' in lease
+    assert 'private final class ApplicationHolder: Sendable' in lease
+    assert '@MainActor private func finish(_ request: Request)' in lease
     assert 'return mayIssue()' in lease
     monitor = text('Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift')
     assert 'let positionQuantum: Double?' in monitor

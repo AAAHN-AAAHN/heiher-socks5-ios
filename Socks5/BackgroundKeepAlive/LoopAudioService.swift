@@ -268,6 +268,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
     private var timer: DispatchSourceTimer?
     private var timerDeadline: Double?
     private var timerOperation: UInt64?
+    private var timerRecovery = false
     private var lastState = State()
     private var lastPublishedRevision: UInt64?
     private var playing = false
@@ -338,7 +339,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         ticket.on = !exhausted && owners.values.contains(where: \.enabled)
         if old && !ticket.on { bumpStop() }
         bumpRevision()
-        inbox.explicit = inbox.explicit || explicit
+        inbox.explicit = inbox.explicit || (explicit && enabled)
         let schedule = enqueueLocked()
         lock.unlock()
         if schedule { control.async { self.drain() } }
@@ -351,7 +352,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         ticket.on = !exhausted && owners.values.contains(where: \.enabled)
         if old && !ticket.on { bumpStop() }
         bumpRevision()
-        inbox.explicit = true
+        // Owner cleanup preserves any already accepted explicit On signal.
         let schedule = enqueueLocked()
         lock.unlock()
         if schedule { control.async { self.drain() } }
@@ -729,6 +730,13 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
                 // Keep the actual completed-failure deadline. A delayed control
                 // consumer must not add another full cooldown after it elapsed.
                 retryAt = returnedAt + policy.interval
+                // A first observed stop is not a failed recovery attempt.
+                // Start that new episode now; actual failed starts keep pacing.
+                if case .inspect = job.command, !episode, reply.error == nil, !reply.invalidAsset,
+                   let sample = reply.sample, sample.epoch == job.ticket.epoch,
+                   !sample.playing || !sample.configured {
+                    retryAt = returnedAt
+                }
                 monitor.knownFailure(now: Self.now)
                 publish(State(text: "Waiting to resume: \(String((reply.error ?? "Audio playback stopped").prefix(256)))"))
                 if assetBlocked { cancelTimer(); finishLease(); return }
@@ -740,12 +748,18 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
     private func schedule(after delay: Double) {
         schedule(at: Self.now + max(0.001, delay))
     }
-    private func schedule(at deadline: Double) {
+    private func schedule(at requestedDeadline: Double) {
         guard latest().on else { cancelTimer(); return }
-        // Within the same work/wait context, hints cannot postpone an already
-        // armed earlier deadline. A completed/replaced work invalidates its old
-        // watchdog target, so the next active deadline may legitimately differ.
-        if let armed = timerDeadline, timerOperation == work?.id, armed <= deadline { return }
+        let recovery = !playing
+        var deadline = requestedDeadline
+        // Within the same work/wait context, preserve an earlier deadline even
+        // when recovery changes the source flags. Completed/replaced work may
+        // legitimately use a new watchdog target.
+        if let armed = timerDeadline, timerOperation == work?.id, armed <= deadline {
+            if timerRecovery == recovery { return }
+            deadline = armed
+        }
+        if timer != nil && timerRecovery != recovery { cancelTimer() }
         if timer == nil {
             guard timerSequence < UInt64.max else {
                 publish(State(text: "Waiting \u{2014} audio timer identifier limit reached"))
@@ -754,7 +768,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             }
             timerSequence += 1
             let epoch = timerSequence
-            let source = DispatchSource.makeTimerSource(queue: control)
+            let source = DispatchSource.makeTimerSource(flags: recovery ? .strict : [], queue: control)
             source.setEventHandler { [weak self] in
                 guard let self, timer != nil, timerSequence == epoch else { return }
                 timerDeadline = nil
@@ -762,6 +776,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
                 tick()
             }
             timer = source
+            timerRecovery = recovery
             source.resume()
         }
         timerDeadline = deadline
@@ -788,6 +803,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         timer = nil
         timerDeadline = nil
         timerOperation = nil
+        timerRecovery = false
     }
     private func makeLease() -> RecoveryExecutionLease {
         RecoveryExecutionLease(provider: leaseProvider, granted: { [weak self] granted in
@@ -1017,21 +1033,22 @@ private nonisolated final class AudioEndpoint: NSObject, LoopAudioEndpoint {
                     guard success else { completion(.init(error: message ?? "Audio activation failed")); return }
                     guard context.mayStart() else { completion(.init(superseded: true)); return }
                     do {
+                        guard generation < UInt64.max else { throw error("Player generation limit reached") }
                         if player == nil {
-                            guard generation < UInt64.max else { throw error("Player generation limit reached") }
                             player = try atStep(.playerCreate, context: context) {
                                 try AVAudioPlayer(data: data!, fileTypeHint: "wav")
                             }
-                            generation += 1
                             guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
                             atStep(.loops, context: context) { player?.numberOfLoops = -1 }
-                            guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
-                            guard let relay else { preconditionFailure("Audio endpoint relay is missing") }
-                            relay.generation(generation)
-                            let proxy = DelegateProxy(generation: generation, event: relay.delegate)
-                            delegate = proxy
-                            atStep(.delegate, context: context) { player?.delegate = proxy }
                         }
+                        guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
+                        // Reusing a stopped player begins a new callback lifetime.
+                        generation += 1
+                        guard let relay else { preconditionFailure("Audio endpoint relay is missing") }
+                        relay.generation(generation)
+                        let proxy = DelegateProxy(generation: generation, event: relay.delegate)
+                        delegate = proxy
+                        atStep(.delegate, context: context) { player?.delegate = proxy }
                         guard let active = player else { throw error("Audio player unavailable") }
                         guard context.mayStart() else { discard(context); completion(.init(superseded: true)); return }
                         context.phase(.preparing)

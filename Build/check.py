@@ -136,7 +136,8 @@ def composition():
         assert 'normalize: { BackgroundKeepAlive.audioEventValue($0) })' in service
         assert 'BackgroundKeepAlive.audioNotifications' not in view
         assert 'var interval = 0.5' in service
-        assert service.count('DispatchSource.makeTimerSource(queue: control)') == 1
+        assert service.count('DispatchSource.makeTimerSource(') == 1
+        assert service.count('DispatchSource.makeTimerSource(flags: recovery ? .strict : [], queue: control)') == 1
         assert 'precondition(outstanding == 1)' in service
         assert 'if next.stop != current.stop { releaseBarrier = true }' in service
         assert 'Timer(timeInterval:' not in source + service
