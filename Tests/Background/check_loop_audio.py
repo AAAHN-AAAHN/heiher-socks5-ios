@@ -594,6 +594,16 @@ def main():
                                           lease.replace(holder_identity, 'guard let holder = value.current else', 1),
                                           'LeaseLifecycleTests.swift', optimize, records)
                     run([exe], records, suffix + '-bad-holder', expected='EXTENSION_OLD_SIGNAL_RELEASED_NEW_HOLDER')
+                    denial_receipt = ('                        // A denied assertion may report only expired=true. Settle\n'
+                                      '                        // that no-grant receipt so the shared gate can admit again.\n'
+                                      '                        // Existing receipt/identity gates ignore it after a grant.\n'
+                                      '                        receipt(nil)\n')
+                    assert lease.count(denial_receipt) == 1
+                    exe = compile_fixture(folder, 'bad-extension-denial-' + suffix, source, monitor,
+                                          lease.replace(denial_receipt, '', 1), 'LeaseLifecycleTests.swift', optimize, records)
+                    run_checked_cleanup([exe, 'extension-denial'], records, suffix + '-bad-extension-denial',
+                                        expected='EXTENSION_DENIAL_BLOCKED_FUTURE_CLAIM')
+                    assert records[-1]['stderr'] == 'EXTENSION_DENIAL_BLOCKED_FUTURE_CLAIM\n', records[-1]
                     application_variants = [
                         ('expiry-end-deferred',
                          '            if action == 1 { finish(request) }',
