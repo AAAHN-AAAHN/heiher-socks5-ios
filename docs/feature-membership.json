@@ -122,7 +122,7 @@
     }
   },
   "files": {
-    "Socks5/Settings/SettingsStore.swift": "3884dc86adaf5269990f19da5756808ae7e11f065caa6cb7bbdd72b8865ab7c9",
+    "Socks5/Settings/SettingsStore.swift": "d36b143f318b8b33e50ab8f42efd54ba3484f1af8705efdb2fbf43efe07b84d0",
     "Socks5/Settings/SettingsView.swift": "6b6f9d45d803ac8cb77929033c9c5f18fcd42e1633bf19b1ccbc8d0931ccaa25",
     "Socks5/AppRoot.swift": "31317abed92503f5855ce077104baf945b02833d08490822bd7307e92aec48a0"
   },
