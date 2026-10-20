@@ -72,6 +72,10 @@ final class SettingsStore: @MainActor ObservableObject {
     }
     private struct Loaded: Sendable { let value: AppSettings; let migrated: Bool }
     private struct Prepared: Sendable { let value: AppSettings; let backup: URL? }
+    private struct RollbackFailure: LocalizedError {
+        let message: String
+        var errorDescription: String? { message }
+    }
 
     private let io = DispatchQueue(label: "Socks5.settings.io", qos: .utility)
     private let storage: Storage
@@ -253,7 +257,10 @@ final class SettingsStore: @MainActor ObservableObject {
 
     private func load() {
         defer { publishChanges() }
-        guard !busy, !revisionExhausted else { return }
+        // A failed rollback can leave a rejected import at the target. When
+        // loading had already failed, only a validated explicit import may
+        // replace that uncertain file; do not silently adopt it on read retry.
+        guard !busy, !revisionExhausted, !(storageFailure is RollbackFailure) else { return }
         busy = true
         loadState = .loading
         let target = fileURL, source = storage, legacy = legacy
@@ -352,12 +359,26 @@ final class SettingsStore: @MainActor ObservableObject {
         }
     }
 
+    private func failedRollback(_ error: Error) {
+        // The target may still contain a rejected import. Its previous durable
+        // identity cannot suppress an explicit retry of the current live value.
+        durable = nil
+        savePending = true
+        guard !revisionExhausted else { return }
+        let failure = (error as? RollbackFailure) ??
+            RollbackFailure(message: "Import rollback failed: \(error.localizedDescription)")
+        storageFailure = failure
+        errorMessage = failure.localizedDescription + (loadState == .failed ?
+            " Import a valid configuration to replace the uncertain file." : "")
+    }
+
     private func finishImport(_ request: Import, _ result: Result<Prepared, Error>) {
         defer { publishChanges() }
         switch result {
         case .failure(let error):
             busy = false
             activeImport = nil
+            if error is RollbackFailure { failedRollback(error) }
             request.receipt.resume(throwing: error)
             pump()
         case .success(let prepared):
@@ -393,8 +414,11 @@ final class SettingsStore: @MainActor ObservableObject {
                     busy = false
                     activeImport = nil
                     if case .failure(let error) = cleanup {
-                        storageFailure = error
-                        errorMessage = "Settings transaction cleanup failed: \(error.localizedDescription)"
+                        if rejection != nil { failedRollback(error) }
+                        else if !revisionExhausted {
+                            storageFailure = error
+                            errorMessage = "Settings transaction cleanup failed: \(error.localizedDescription)"
+                        }
                         request.receipt.resume(throwing: error)
                     } else {
                         if cleanupMigration { migrationPending = false }
@@ -440,7 +464,7 @@ final class SettingsStore: @MainActor ObservableObject {
         do { try storage.write(encoded, target) }
         catch {
             do { try rollback(backup, target: target) }
-            catch { throw SettingsError.invalid("Import rollback failed: \(error.localizedDescription)") }
+            catch { throw RollbackFailure(message: "Import rollback failed: \(error.localizedDescription)") }
             throw error
         }
         return Prepared(value: next, backup: backup)
