@@ -1,55 +1,151 @@
-name: Verify server and persistent-settings boundaries
+name: Verify and build current integrated release
 on:
   push:
-    branches: [feature/server-control, feature/settings-persistence]
+    branches: [release/integrated]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  verify:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, xcode-27]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+  verify-linux:
+    name: verify (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      BUILD_IPA: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0
-      - name: Install formatter without replacing the compiler
+      - name: Install formatter without overriding the compiler
         shell: bash
         run: |
           set -euo pipefail
-          if [ "$RUNNER_OS" = Linux ]; then
-            sudo apt-get update -qq
-            sudo apt-get install -y clang-format-18
-          else
-            brew install llvm@18
-            mkdir -p "$RUNNER_TEMP/format-only"
-            ln -s "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
-            echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
-          fi
-      - name: Native, lifecycle and persistence checks without IPA
-        shell: bash
-        run: BUILD_IPA=0 bash Build/build.sh
-      - name: Actual iOS 27 API type checks
-        if: runner.os == 'macOS'
-        run: bash Build/check_swift_sdk.sh
-      - name: Actual server-control UI and native listener on iOS 27 Simulator
-        if: runner.os == 'macOS' && github.ref == 'refs/heads/feature/server-control'
-        run: python3 Tests/ServerControl/ui_audit.py
-      - name: Actual persistence, restart and JSON on iOS 27 Simulator
-        if: runner.os == 'macOS' && github.ref == 'refs/heads/feature/settings-persistence'
-        run: python3 Tests/Settings/ui_audit.py
-      - name: Record exact tested source
+          sudo apt-get update -qq
+          sudo apt-get install -y clang-format-18
+      - name: Verify product handoff rejection and preservation boundaries
+        run: |
+          mkdir -p artifacts/integrated
+          python3 Tests/Integration/review_handoff_boundaries.py > artifacts/integrated/review-handoff-boundaries.log 2>&1
+      - name: Exact latest composition, native and model checks
+        run: bash Build/build.sh
+      - name: Record exact source independently of generated products
         if: always()
         run: python3 Build/record_evidence.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: Feature-checks-${{ runner.os }}
+          name: Integrated-release-Linux-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/
+          retention-days: 30
+
+  verify-macos:
+    name: verify (xcode-27)
+    runs-on: xcode-27
+    timeout-minutes: 60
+    env:
+      BUILD_IPA: '1'
+    outputs:
+      review-artifact-id: ${{ steps.review-upload.outputs.artifact-id }}
+      review-artifact-digest: ${{ steps.review-upload.outputs.artifact-digest }}
+      review-archive-sha256: ${{ steps.review-input.outputs.archive-sha256 }}
+      producer-attempt: ${{ steps.review-input.outputs.producer-attempt }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install formatter without overriding the compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install llvm@18
+          mkdir -p "$RUNNER_TEMP/format-only"
+          ln -s "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
+          echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
+          mkdir -p artifacts/integrated
+          xcodebuild -version | tee artifacts/integrated/environment.txt
+          xcrun --sdk iphoneos --show-sdk-version | tee -a artifacts/integrated/environment.txt | grep -E '^27\.'
+          xcrun swiftc --version >> artifacts/integrated/environment.txt
+          sw_vers >> artifacts/integrated/environment.txt
+      - name: Verify product handoff rejection and preservation boundaries
+        run: python3 Tests/Integration/review_handoff_boundaries.py > artifacts/integrated/review-handoff-boundaries.log 2>&1
+      - name: Exact latest composition, native and model checks; ARM64 archive on macOS
+        run: bash Build/build.sh
+      - name: Actual iOS 27 type check and archived IPA validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash Build/check_swift_sdk.sh
+          python3 Build/verify_release.py > artifacts/integrated/package-review.log 2>&1
+      - name: Preserve verified product bytes and modes for the independent review job
+        id: review-input
+        run: python3 Build/review_handoff.py pack
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        id: review-upload
+        with:
+          name: Integrated-review-input-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/integrated-input/review-input.tar.gz
+          if-no-files-found: error
+          retention-days: 30
+      - name: Record exact source independently of generated products
+        if: always()
+        run: python3 Build/record_evidence.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Integrated-release-macOS-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/
+          retention-days: 30
+
+  review-macos:
+    name: Simulator and integrated UI (xcode-27)
+    needs: verify-macos
+    runs-on: xcode-27
+    timeout-minutes: 45
+    env:
+      REVIEW_INPUT_ARTIFACT_ID: ${{ needs.verify-macos.outputs.review-artifact-id }}
+      REVIEW_INPUT_ARTIFACT_DIGEST: ${{ needs.verify-macos.outputs.review-artifact-digest }}
+      REVIEW_INPUT_SHA256: ${{ needs.verify-macos.outputs.review-archive-sha256 }}
+      REVIEW_PRODUCER_ATTEMPT: ${{ needs.verify-macos.outputs.producer-attempt }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Record the independent Apple review environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/integrated
+          xcodebuild -version | tee artifacts/integrated/review-environment.txt
+          xcrun --sdk iphoneos --show-sdk-version | tee -a artifacts/integrated/review-environment.txt | grep -E '^27\.'
+          xcrun swiftc --version >> artifacts/integrated/review-environment.txt
+          sw_vers >> artifacts/integrated/review-environment.txt
+      # The immutable producer ID remains valid if only this job is rerun.
+      # The manifest records producer and consumer attempts separately.
+      - name: Require the specific producer ID and digest before downloading
+        run: python3 Build/review_handoff.py check-request
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ needs.verify-macos.outputs.review-artifact-id }}
+          path: .build/integrated-input
+          merge-multiple: true
+      - name: Verify and restore the exact producer source, framework and phase evidence
+        run: python3 Build/review_handoff.py restore .build/integrated-input/review-input.tar.gz
+      - name: Original and remapped Simulator installs, saved tabs and real TCP
+        run: python3 Build/simulator_review.py > artifacts/integrated/simulator-review.log 2>&1
+      - name: Actual integrated UI, saved intent and native response
+        run: python3 Build/ui_review.py > artifacts/integrated/ui-review.log 2>&1
+      - name: Record exact source independently of generated products
+        if: always()
+        run: python3 Build/record_evidence.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Integrated-review-macOS-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/
           retention-days: 30

@@ -50,6 +50,16 @@ def patches():
         yield item['repository'], ROOT / 'Patches' / item['file']
 
 
+def apply_patch(repo, patch, reverse=False):
+    if CONFIG['name'] == 'integrated' and patch.name == 'hev-server-startup-stop.patch':
+        from server_patch import apply as apply_server_patch
+        apply_server_patch(repo, patch, reverse=reverse)
+        return
+    options = ['-R'] if reverse else ['--whitespace=error-all']
+    git(repo, 'apply', *options, '--check', str(patch))
+    git(repo, 'apply', *options, str(patch))
+
+
 def apply(core):
     for relative, sha in CONFIG['sources'].items():
         repo = core / relative
@@ -60,8 +70,7 @@ def apply(core):
         assert not (git(repo, 'ls-files', '--others', '--exclude-standard') or
                     git(repo, 'ls-files', '--others', '--', 'src', 'include', '.rev-id')), 'Untracked native input: ' + relative
     for relative, patch in patches():
-        git(core / relative, 'apply', '--check', '--whitespace=error-all', str(patch))
-        git(core / relative, 'apply', '--whitespace=error-all', str(patch))
+        apply_patch(core / relative, patch)
         print(hashlib.sha256(patch.read_bytes()).hexdigest(), patch.name)
 
 
@@ -79,8 +88,7 @@ def formatting(core, formatter):
 
 def reverse(core):
     for relative, patch in reversed(list(patches())):
-        git(core / relative, 'apply', '-R', '--check', str(patch))
-        git(core / relative, 'apply', '-R', str(patch))
+        apply_patch(core / relative, patch, reverse=True)
     for relative in CONFIG['sources']:
         git(core / relative, 'diff', '--exit-code', 'HEAD', '--')
         git(core / relative, 'diff', '--cached', '--exit-code', 'HEAD', '--')
@@ -114,10 +122,28 @@ def composition():
     if 'background' in FEATURES:
         silence(ROOT / 'Socks5/BackgroundKeepAlive/Silence.wav')
         view = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift').read_text()
-        assert 'BackgroundKeepAlive.audioNotifications.map' in view
         source = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift').read_text()
-        assert 'scheduleAudioCheck(after: 2)' not in source and 'scheduleAudioCheck(after: 1)' in source
-        assert 'retryDelay' not in source and 'UserDefaults' not in source
+        for event in ('interruptionNotification', 'routeChangeNotification',
+                      'mediaServicesWereLostNotification', 'mediaServicesWereResetNotification',
+                      'didBecomeInactiveNotification', 'resumptionRecommendationNotification',
+                      'didBecomeActiveNotification', 'silenceSecondaryAudioHintNotification',
+                      'spatialPlaybackCapabilitiesChangedNotification', 'renderingModeChangeNotification',
+                      'renderingCapabilitiesChangeNotification', 'outputMuteStateChangeNotification',
+                      'userIntentToUnmuteOutputNotification'):
+            assert event in source, event
+        service = (ROOT / 'Socks5/BackgroundKeepAlive/LoopAudioService.swift').read_text()
+        assert 'service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,' in service
+        assert 'normalize: { BackgroundKeepAlive.audioEventValue($0) })' in service
+        assert 'BackgroundKeepAlive.audioNotifications' not in view
+        assert 'var interval = 0.5' in service
+        assert service.count('DispatchSource.makeTimerSource(') == 1
+        assert service.count('DispatchSource.makeTimerSource(flags: recovery ? .strict : [], queue: control)') == 1
+        assert 'precondition(outstanding == 1)' in service
+        assert 'if next.stop != current.stop { releaseBarrier = true }' in service
+        assert 'Timer(timeInterval:' not in source + service
+        assert 'AVAudioPlayer' not in source and 'retryDelay' not in source
+        assert 'UserDefaults' not in source + service
+        assert 'private let audio: LoopAudioService' in source
     if 'server' in FEATURES:
         content = (ROOT / 'Socks5/ContentView.swift').read_text()
         for field in ('workers', 'listenAddress', 'listenPort', 'udpListenAddress', 'udpListenPort',
@@ -133,6 +159,7 @@ def composition():
         members = json.loads((ROOT / 'docs/feature-membership.json').read_text())
         for name, expected in members['files'].items():
             assert hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == expected, name
+        subprocess.run([sys.executable, str(ROOT / 'Tests/Integration/intent_boundaries.py'), '--source-only'], check=True)
     subprocess.run([sys.executable, str(ROOT / 'Build/check_ownership.py')], check=True)
     print('PASS: declared patches, isolated modules, source format, wiring and assets')
 

@@ -1,0 +1,315 @@
+// Scripted platform doubles for the unmodified production controller logic.
+// These tests cannot simulate actual iOS scheduling or call/audio priority.
+import Foundation
+import Dispatch
+
+
+// Only the utility-work boundary is scriptable. Main/default/labeled dispatch
+// stays real, so worker delegate and Combine scheduling tests retain real hops.
+final class DispatchQueue {
+    static var scriptUtility = true
+    static var deferUtility = false
+    static var pendingUtility: [@Sendable () -> Void] = []
+    private let queue: Dispatch.DispatchQueue
+    private let utility: Bool
+    static var main: Dispatch.DispatchQueue { Dispatch.DispatchQueue.main }
+    static func global(qos: DispatchQoS.QoSClass = .default) -> DispatchQueue {
+        DispatchQueue(queue: Dispatch.DispatchQueue.global(qos: qos), utility: qos == .utility)
+    }
+    init(label: String) { queue = Dispatch.DispatchQueue(label: label); utility = false }
+    private init(queue: Dispatch.DispatchQueue, utility: Bool) { self.queue = queue; self.utility = utility }
+    func async(execute work: @escaping @Sendable () -> Void) {
+        if utility && Self.scriptUtility {
+            if Self.deferUtility { Self.pendingUtility.append(work) }
+            else { work() }
+        } else { queue.async(execute: work) }
+    }
+    func sync(execute work: () -> Void) { queue.sync(execute: work) }
+    static func completeUtility() { pendingUtility.removeFirst()() }
+}
+
+protocol ObservableObject {}
+@propertyWrapper struct Published<Value> {
+    var wrappedValue: Value
+}
+protocol CLLocationManagerDelegate: AnyObject {
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager)
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation])
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error)
+}
+protocol AVAudioPlayerDelegate: AnyObject {
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool)
+    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?)
+}
+
+enum CLAuthorizationStatus { case notDetermined, authorizedAlways, authorizedWhenInUse, denied, restricted }
+let kCLLocationAccuracyThreeKilometers = 3000.0
+let kCLDistanceFilterNone = -1.0
+struct CLLocation {}
+struct CLError: Error {
+    enum Code { case denied, locationUnknown }
+    let code: Code
+}
+
+@MainActor final class CLLocationManager {
+    static var initialAuthorization = CLAuthorizationStatus.authorizedAlways
+    static var instances: [CLLocationManager] = []
+    static var notifyOnDelegate = false
+    weak var delegate: CLLocationManagerDelegate? {
+        didSet { if Self.notifyOnDelegate { delegate?.locationManagerDidChangeAuthorization(self) } }
+    }
+    var authorizationStatus = initialAuthorization
+    var desiredAccuracy = 0.0
+    var distanceFilter = 0.0
+    var allowsBackgroundLocationUpdates = false
+    var showsBackgroundLocationIndicator = false
+    var pausesLocationUpdatesAutomatically = true
+    var starts = 0
+    var stops = 0
+    var requests = 0
+    var accuracyAtStart = 0.0
+    var backgroundAtStart = false
+    var pausingAtStart = true
+    init() { Self.instances.append(self) }
+    func requestAlwaysAuthorization() { requests += 1 }
+    func startUpdatingLocation() {
+        starts += 1
+        accuracyAtStart = desiredAccuracy
+        backgroundAtStart = allowsBackgroundLocationUpdates
+        pausingAtStart = pausesLocationUpdatesAutomatically
+    }
+    func stopUpdatingLocation() { stops += 1 }
+}
+
+@MainActor final class UIApplication {
+    enum State { case active, inactive, background }
+    static let shared = UIApplication()
+    var applicationState = State.active
+    static let willResignActiveNotification = Notification.Name("WillResignActive")
+    static let didEnterBackgroundNotification = Notification.Name("DidEnterBackground")
+    static let willEnterForegroundNotification = Notification.Name("WillEnterForeground")
+    static let protectedDataDidBecomeAvailableNotification = Notification.Name("ProtectedDataAvailable")
+    static let didBecomeActiveNotification = Notification.Name("AppDidBecomeActive")
+}
+
+let AVAudioSessionInterruptionTypeKey = "InterruptionType"
+let AVAudioSessionInterruptionOptionKey = "InterruptionOption"
+let AVAudioSessionRouteChangeReasonKey = "RouteChangeReason"
+
+struct AVAudioSessionActivationOptions: OptionSet {
+    let rawValue: Int
+}
+struct AVAudioSessionDeactivationOptions: OptionSet {
+    let rawValue: Int
+    static let notifyOthersOnDeactivation = Self(rawValue: 1)
+}
+
+final class AVAudioSession {
+    enum Category { case playback, ambient }
+    enum Mode { case `default`, voiceChat }
+    enum InterruptionType: UInt { case ended = 0, began = 1 }
+    enum RouteChangeReason: UInt { case newDeviceAvailable = 1, oldDeviceUnavailable = 2, categoryChange = 3 }
+    struct CategoryOptions: OptionSet {
+        let rawValue: Int
+        static let mixWithOthers = Self(rawValue: 1)
+    }
+    struct SetActiveOptions: OptionSet {
+        let rawValue: Int
+        static let notifyOthersOnDeactivation = Self(rawValue: 1)
+    }
+    static let interruptionNotification = Notification.Name("Interruption")
+    static let routeChangeNotification = Notification.Name("RouteChange")
+    static let mediaServicesWereLostNotification = Notification.Name("ServicesLost")
+    static let mediaServicesWereResetNotification = Notification.Name("ServicesReset")
+    static let silenceSecondaryAudioHintNotification = Notification.Name("SecondaryAudioHint")
+    static let spatialPlaybackCapabilitiesChangedNotification = Notification.Name("SpatialCapabilities")
+    static let renderingModeChangeNotification = Notification.Name("RenderingMode")
+    static let renderingCapabilitiesChangeNotification = Notification.Name("RenderingCapabilities")
+    static let outputMuteStateChangeNotification = Notification.Name("OutputMute")
+    static let userIntentToUnmuteOutputNotification = Notification.Name("UnmuteIntent")
+    static let didBecomeActiveNotification = Notification.Name("SessionActive")
+    static let didBecomeInactiveNotification = Notification.Name("SessionInactive")
+    enum ResumptionRecommendation { case shouldResume, shouldNotResume }
+    final class ResumptionContext {
+        let recommendation: ResumptionRecommendation
+        init(_ recommendation: ResumptionRecommendation) { self.recommendation = recommendation }
+    }
+    static let resumptionContextKey = "ResumptionContext"
+    static let resumptionRecommendationNotification = Notification.Name("ResumptionRecommendation")
+    static let shared = AVAudioSession()
+    static func sharedInstance() -> AVAudioSession { shared }
+    var category = Category.ambient
+    var mode = Mode.default
+    var categoryOptions: CategoryOptions = []
+    var prefersNoInterruptionsFromSystemAlerts = false
+    var rejectActivation = false
+    var rejectCategory = false
+    var rejectPreference = false
+    var isActive = false
+    var activations = 0
+    var deactivations = 0
+    var configurations = 0
+    var onCategory: (() -> Void)?
+    var onActivation: (() -> Void)?
+    var onPreference: (() -> Void)?
+    func setCategory(_ category: Category, mode: Mode, options: CategoryOptions) throws {
+        if rejectCategory { throw NSError(domain: "MockCategory", code: 1) }
+        configurations += 1
+        self.category = category
+        self.mode = mode
+        categoryOptions = options
+        onCategory?()
+    }
+    func setPrefersNoInterruptionsFromSystemAlerts(_ value: Bool) throws {
+        if rejectPreference { throw NSError(domain: "MockPreference", code: 1) }
+        prefersNoInterruptionsFromSystemAlerts = value
+        onPreference?()
+    }
+    struct Request {
+        let active: Bool
+        let success: Bool
+        let error: Error?
+        let completion: @Sendable (Bool, Error?) -> Void
+    }
+    var deferTransitions = false
+    var rejectDeactivation = false
+    var pending: [Request] = []
+    var maxPending = 0
+    var synchronousCalls = 0
+    var synchronousOnMain = false
+    var synchronousDelay: TimeInterval = 0
+    var onDeactivation: (() -> Void)?
+
+    func activate(options: AVAudioSessionActivationOptions = [],
+                  completionHandler: @escaping @Sendable (Bool, Error?) -> Void) {
+        precondition(options.isEmpty)
+        request(true, completion: completionHandler)
+    }
+
+    func deactivate(options: AVAudioSessionDeactivationOptions = [],
+                    completionHandler: @escaping @Sendable (Bool, Error?) -> Void) {
+        precondition(options == [.notifyOthersOnDeactivation])
+        request(false, completion: completionHandler)
+    }
+
+    private func request(_ active: Bool, completion: @escaping @Sendable (Bool, Error?) -> Void) {
+        if active { activations += 1; onActivation?() }
+        else { deactivations += 1; onDeactivation?() }
+        let failed = active ? rejectActivation : rejectDeactivation
+        let error: Error? = failed ? NSError(domain: "MockAudioPriority", code: 1) : nil
+        let request = Request(active: active, success: !failed, error: error, completion: completion)
+        if deferTransitions {
+            pending.append(request)
+            maxPending = max(maxPending, pending.count)
+        } else {
+            if !failed { isActive = active }
+            completion(!failed, error)
+        }
+    }
+
+    func completeNext(success: Bool? = nil, error: Error? = nil) {
+        let request = pending.removeFirst()
+        let accepted = success ?? request.success
+        if accepted { isActive = request.active }
+        request.completion(accepted, error ?? request.error)
+    }
+
+    func setActive(_ active: Bool, options: SetActiveOptions = []) throws {
+        synchronousCalls += 1
+        synchronousOnMain = Thread.isMainThread
+        if synchronousDelay > 0 { Thread.sleep(forTimeInterval: synchronousDelay) }
+        if active {
+            activations += 1
+            onActivation?()
+            if rejectActivation { throw NSError(domain: "MockAudioPriority", code: 1) }
+            isActive = true
+        } else { deactivations += 1; isActive = false }
+    }
+}
+
+final class AVAudioPlayer {
+    static var instances: [AVAudioPlayer] = []
+    static var rejectInit = false
+    static var rejectPlay = false
+    static var rejectPreparation = false
+    static var preparationDelay: TimeInterval = 0
+    static var onPrepare: (() -> Void)?
+    static var preparations = 0
+    static var preparationsOnMain = 0
+    static var implicitPreparations = 0
+    var isPrepared = false
+    static var onPlay: ((AVAudioPlayer) -> Void)?
+    static var onStop: (() -> Void)?
+    weak var delegate: AVAudioPlayerDelegate?
+    var numberOfLoops = 0
+    var isPlaying = false
+    var plays = 0
+    var stops = 0
+    init(contentsOf url: URL) throws {
+        if Self.rejectInit { throw NSError(domain: "MockDecoder", code: 1) }
+        Self.instances.append(self)
+    }
+    func prepareToPlay() -> Bool {
+        Self.preparations += 1
+        if Thread.isMainThread { Self.preparationsOnMain += 1 }
+        if Self.preparationDelay > 0 { Thread.sleep(forTimeInterval: Self.preparationDelay) }
+        Self.onPrepare?()
+        isPrepared = !Self.rejectPreparation
+        return isPrepared
+    }
+    func play() -> Bool {
+        if !isPrepared {
+            Self.implicitPreparations += 1
+            guard prepareToPlay() else { return false }
+        }
+        plays += 1
+        isPlaying = !Self.rejectPlay
+        let result = isPlaying
+        Self.onPlay?(self)
+        return result
+    }
+    func stop() { stops += 1; isPlaying = false; isPrepared = false; Self.onStop?() }
+}
+
+@MainActor enum Bundle {
+    static let main = ResourceBundle()
+    final class ResourceBundle {
+        var resourceAvailable = true
+        func url(forResource: String, withExtension: String) -> URL? {
+            resourceAvailable ? URL(fileURLWithPath: "/Silence.wav") : nil
+        }
+    }
+}
+
+@MainActor final class Timer {
+    static var scheduled: [Timer] = []
+    static var live: [Timer] { scheduled.filter(\.valid) }
+    let interval: TimeInterval
+    var tolerance: TimeInterval = 0
+    nonisolated(unsafe) var valid = true
+    private let block: @Sendable (Timer) -> Void
+    init(timeInterval: TimeInterval, repeats: Bool, block: @escaping @Sendable (Timer) -> Void) {
+        precondition(!repeats)
+        interval = timeInterval
+        self.block = block
+    }
+    nonisolated func invalidate() { valid = false }
+    func fireStale() { block(self) }
+    func fire() {
+        guard valid else { return }
+        valid = false
+        block(self)
+        Self.scheduled.removeAll { !$0.valid }
+    }
+}
+
+@MainActor enum RunLoop {
+    static let main = MainRunLoop()
+    @MainActor final class MainRunLoop {
+        enum Mode { case common }
+        func add(_ timer: Timer, forMode: Mode) {
+            Timer.scheduled.removeAll { !$0.valid }
+            Timer.scheduled.append(timer)
+        }
+    }
+}

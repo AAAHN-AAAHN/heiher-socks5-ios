@@ -7,16 +7,19 @@ NAME=$(python3 -c 'import json; print(json.load(open("Build/features.json"))["na
 OUT="$ROOT/artifacts/$NAME"
 CORE="$ROOT/.build/core"
 mkdir -p "$OUT"
-# A failed retry must not leave prior native/SDK success evidence usable.
-rm -f "$OUT/SUCCESS.txt" "$OUT/sdk-success.txt"
+# A new attempt cannot inherit obsolete pass markers or package attestations.
+rm -f "$OUT/SUCCESS.txt" "$OUT/sdk-success.txt" "$OUT/package-review.json"
 python3 -c 'import sys; sys.exit(0 if __debug__ else "Assertions must be enabled.")'
-# Bind tracked working files and the index to the recorded revision.
 git diff --exit-code HEAD -- > "$OUT/input-worktree.log"
 git diff --cached --exit-code HEAD -- > "$OUT/input-index.log"
 python3 Build/check.py baseline > "$OUT/baseline-audit.log"
 python3 Tests/baseline_audit.py > "$OUT/baseline-driver.log" 2>&1
-python3 Tests/ServerControl/audit_driver_check.py > "$OUT/audit-driver.log"
-python3 Tests/ServerControl/input_integrity_check.py > "$OUT/input-integrity.log"
+python3 Build/integration_checks.py > "$OUT/integration-source-checks.log" 2>&1
+python3 Build/owner_checks.py > "$OUT/owner-checks.log" 2>&1
+python3 Tests/Integration/intent_boundaries.py > "$OUT/intent-boundaries.log" 2>&1
+python3 Tests/Integration/input_boundaries.py > "$OUT/input-boundaries.log" 2>&1
+python3 Tests/Integration/package_boundaries.py > "$OUT/package-boundaries.log" 2>&1
+python3 Tests/Integration/package_metadata.py > "$OUT/package-metadata.log" 2>&1
 SERVER_REF=$(python3 -c 'import json; print(json.load(open("Build/upstream.json"))["sources"]["."])')
 if [ ! -d "$CORE/.git" ]; then
     git clone --no-checkout https://github.com/heiher/hev-socks5-server.git "$CORE"
@@ -27,6 +30,9 @@ python3 Build/check.py apply "$CORE" > "$OUT/source-audit.log"
 CF=$(command -v clang-format-18 || command -v clang-format)
 "$CF" --version | grep -E 'version 18\.'
 python3 Build/check.py format "$CORE" "$CF" >> "$OUT/source-audit.log"
+for SOURCE in Tests/udp_stream_boundaries.c Tests/SocketIO/*.c; do
+    "$CF" --style="file:$CORE/.clang-format" "$SOURCE" | cmp - "$SOURCE"
+done
 python3 Build/check.py composition >> "$OUT/source-audit.log"
 cp Build/features.json "$OUT/features.json"
 {
@@ -35,67 +41,17 @@ cp Build/features.json "$OUT/features.json"
     git -C "$CORE" submodule status --recursive
 } > "$OUT/build-info.txt"
 feature() { python3 -c 'import json,sys; sys.exit(sys.argv[1] not in json.load(open("Build/features.json"))["features"])' "$1"; }
+# The shared dispatcher exercises the actual compiled I/O mode and the full
+# retained UDP/statistics probes instead of inferring modes from CFLAGS labels.
+python3 Build/native_checks.py "$CORE" "$OUT/native" > "$OUT/native-checks.log" 2>&1
 make -C "$CORE" clean > "$OUT/native-clean.log" 2>&1
-mode=buffered
-splice=0
-for flags in '' '-DENABLE_IO_SPLICE_SYSCALL'; do
-    if [ -n "$flags" ]; then
-        if [ "$(uname -s)" != Linux ] || ! feature statistics; then break; fi
-        mode=splice
-        splice=1
-    fi
-    make -C "$CORE" -j3 ENABLE_IO_SPLICE_SYSCALL="$splice" CFLAGS="$flags" static exec > "$OUT/$mode-build.log" 2>&1
-    python3 Tests/tcp_smoke.py "$CORE/bin/hev-socks5-server" > "$OUT/$mode-tcp.log"
-    if feature udp; then
-        python3 Tests/udp_sockaddr_regression.py "$CORE/bin/hev-socks5-server" \
-            --output "$OUT/$mode-protocol.json" > "$OUT/$mode-protocol.log" 2>&1
-    fi
-    if feature statistics; then
-        python3 Tests/SocketIO/run.py "$CORE" --mode "$mode" --output "$OUT/$mode-socket-io" \
-            > "$OUT/$mode-statistics.log" 2>&1
-    fi
-    if feature server; then
-        cc -std=gnu11 -O2 -Wall -Werror -pthread -I"$CORE/src" Tests/server_lifecycle_host.c \
-            "$CORE/bin/libhev-socks5-server.a" "$CORE/third-part/yaml/bin/libyaml.a" \
-            "$CORE/third-part/hev-task-system/bin/libhev-task-system.a" -o "$OUT/lifecycle-host"
-        python3 Tests/server_lifecycle_regression.py "$OUT/lifecycle-host" > "$OUT/$mode-lifecycle.log" 2>&1
-        rm "$OUT/lifecycle-host"
-        swiftc -swift-version 5 -warnings-as-errors Socks5/Server/ServerSettings.swift \
-            Tests/ServerControl/EmitConfiguration.swift -o "$OUT/emit-config"
-        "$OUT/emit-config" "$OUT/yaml"
-        cc -std=gnu11 -O2 -Wall -Werror -pthread -I"$CORE/src" Tests/ServerControl/configuration_probe.c \
-            "$CORE/bin/libhev-socks5-server.a" "$CORE/third-part/yaml/bin/libyaml.a" \
-            "$CORE/third-part/hev-task-system/bin/libhev-task-system.a" -o "$OUT/config-probe"
-        "$OUT/config-probe" "$OUT/yaml/defaults.yml" "$OUT/yaml/quoted.yml" > "$OUT/$mode-configuration.log"
-        rm "$OUT/emit-config" "$OUT/config-probe"
-        python3 Tests/ServerControl/native_controller_check.py "$CORE" "$OUT/native-controller" \
-            > "$OUT/native-controller.log" 2>&1
-        python3 Tests/ServerControl/delayed_completion_check.py "$CORE" "$OUT/delayed-completion" \
-            > "$OUT/delayed-completion.log" 2>&1
-        mkdir -p "$OUT/compiled-headers"
-        cp "$CORE/src/hev-main.h" "$CORE/module.modulemap" "$OUT/compiled-headers/"
-        git rev-parse HEAD > "$OUT/compiled-headers/source-commit.txt"
-        (cd "$OUT/compiled-headers" && shasum -a 256 hev-main.h module.modulemap > SHA256SUMS.txt)
-        python3 Tests/ServerControl/active_clients_check.py "$CORE" "$OUT/active-clients" \
-            > "$OUT/active-clients.log" 2>&1
-        python3 Tests/ServerControl/final_native_check.py "$CORE" "$OUT/final-native" \
-            > "$OUT/final-native.log" 2>&1
-        if feature settings; then
-            python3 Tests/Settings/native_persistence_check.py "$CORE" "$OUT/native-persistence" > "$OUT/native-persistence.log" 2>&1
-            python3 Tests/Settings/delayed_persistence_check.py "$CORE" "$OUT/delayed-persistence" > "$OUT/delayed-persistence.log" 2>&1
-        fi
-    fi
-    make -C "$CORE" clean >> "$OUT/$mode-build.log" 2>&1
-done
-if feature statistics; then
-    swiftc Socks5/Statistics/TrafficStatistics.swift Tests/traffic_statistics_model.swift -o "$OUT/stats-model"
-    "$OUT/stats-model" > "$OUT/statistics-model.log"
-    rm "$OUT/stats-model"
-fi
 if feature background; then
     python3 Tests/Background/run_checks.py > "$OUT/background.log" 2>&1
+    python3 Tests/Background/check_async_session.py > "$OUT/background-async.log" 2>&1
+    python3 Build/owner_checks.py --background-policy > "$OUT/background-policy.log" 2>&1
     if [ "$(uname -s)" = Darwin ]; then
         python3 Tests/Background/check_subscription.py > "$OUT/background-subscription.log" 2>&1
+        python3 Tests/Background/check_live_scheduling.py > "$OUT/background-live-scheduling.log" 2>&1
         swift Tests/Background/check_silence.swift Socks5/BackgroundKeepAlive/Silence.wav > "$OUT/decoded-silence.log"
     fi
 fi
@@ -107,17 +63,24 @@ if feature settings; then
     python3 Tests/Settings/run_checks.py --baseline-import > "$OUT/original-import-negative.log" 2>&1
     python3 Tests/Settings/run_checks.py --previous-store > "$OUT/previous-store-negative.log" 2>&1
 fi
-git diff --exit-code HEAD -- > "$OUT/final-worktree.log"
-git diff --cached --exit-code HEAD -- > "$OUT/final-index.log"
+if [ "$(uname -s)" = Darwin ]; then
+    MODULE="$OUT/compiled-headers"
+    mkdir -p "$MODULE"
+    cp "$CORE/src/hev-main.h" "$MODULE/hev-main.h"
+    printf 'module HevSocks5Server { header "hev-main.h" export * }\n' > "$MODULE/module.modulemap"
+    git rev-parse HEAD > "$MODULE/source-commit.txt"
+    (cd "$MODULE" && shasum -a 256 hev-main.h module.modulemap > SHA256SUMS.txt)
+fi
 if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
     (cd "$CORE" && ./build-apple.sh) > "$OUT/core-apple.log" 2>&1
-    # Keep the source checkout immutable; package only a disposable HEAD copy.
-    PRODUCT="$ROOT/.build/$NAME-product-source"
+    # Generated libraries belong only to a disposable source copy, never HEAD.
+    PRODUCT="$ROOT/.build/integrated-product-source"
     test ! -e "$PRODUCT"
     mkdir -p "$PRODUCT"
     git archive HEAD | tar -x -C "$PRODUCT"
     rm -rf "$PRODUCT/HevSocks5Server.xcframework"
     cp -R "$CORE/HevSocks5Server.xcframework" "$PRODUCT/"
+    python3 Build/release_source.py record
     xcodebuild archive -project "$PRODUCT/Socks5.xcodeproj" -scheme Socks5 -configuration Release \
         -sdk iphoneos -destination 'generic/platform=iOS' \
         -archivePath "$ROOT/.build/$NAME.xcarchive" \
