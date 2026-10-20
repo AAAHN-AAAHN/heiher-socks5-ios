@@ -113,3 +113,4 @@ with tempfile.TemporaryDirectory() as name:
 
 if not baseline and not previous:
     subprocess.run([sys.executable, str(Path(__file__).with_name('async_storage_check.py'))], check=True)
+    subprocess.run([sys.executable, str(Path(__file__).with_name('rollback_storage_check.py'))], check=True)
