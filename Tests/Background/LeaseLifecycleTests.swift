@@ -254,6 +254,88 @@ private final class ApplicationClaimTrace: Sendable {
         check(blocking.use { $0.ended == [91] }, "BLOCKED_REQUEST_LATE_RECEIPT_LEAKED_AFTER_OFF")
     }
 
+    @MainActor static func extensionGateIsIdle(_ provider: RecoveryExecutionLease.Provider) -> Bool {
+        let trace = LeaseValue((reached: false, grants: [Bool](), returned: 0))
+        let probe = RecoveryExecutionLease(provider: provider,
+            granted: { value in trace.use { $0.grants.append(value) } })
+        probe.start(mayIssue: {
+            trace.use { $0.reached = true }
+            return false // Observe admission without allocating a new holder.
+        }, completion: { trace.use { $0.returned += 1 } })
+        probe.finish()
+        check(trace.use { $0.grants == [false] && $0.returned == 1 },
+              "EXTENSION_GATE_PROBE_DID_NOT_SETTLE")
+        return trace.use { $0.reached }
+    }
+
+    @MainActor static func extensionDeniedReceipt() async throws {
+        let callbacks = LeaseValue([@Sendable (Bool) -> Void]())
+        let ends = LeaseValue([Int]())
+        let actual = RecoveryExecutionLease.Provider.expiringActivity { callback in
+            callbacks.use { $0.append(callback) }
+        }
+        let provider = RecoveryExecutionLease.Provider(request: { expire, receipt in
+            actual.request(expire, receipt)
+        }, end: { id in
+            ends.use { $0.append(id) }
+            actual.end(id)
+        }).serializingEnds()
+        let denied = LeaseValue([Bool]())
+        let expired = LeaseValue(0)
+        let first = RecoveryExecutionLease(provider: provider,
+            granted: { value in denied.use { $0.append(value) } },
+            expired: { expired.use { $0 += 1 } })
+        first.start()
+        let old = callbacks.use { $0[0] }
+        old(true) // Assertion denial can produce only this expired=true callback.
+        let granted = LeaseValue([Bool]())
+        let nextExpired = LeaseValue(0)
+        let second = RecoveryExecutionLease(provider: provider,
+            granted: { value in granted.use { $0.append(value) } },
+            expired: { nextExpired.use { $0 += 1 } })
+        second.start()
+        if !callbacks.use({ $0.count == 2 }) {
+            // The missing next admission is already observed. Now settle the
+            // old request before reporting the exact original-source failure.
+            let cleanup = LeaseValue(false)
+            DispatchQueue.global().async { old(false); cleanup.use { $0 = true } }
+            try await until { cleanup.use { $0 } && ends.use { $0 == [1] } }
+            second.finish()
+            // Provider end tracing precedes its return. Reaching this disallowed
+            // probe proves the gate cleared, without allocating another holder.
+            try await until { extensionGateIsIdle(provider) }
+            check(callbacks.use { $0.count == 1 } && ends.use { $0 == [1] },
+                  "EXTENSION_NEGATIVE_CLEANUP_MINTED_ANOTHER_HOLDER")
+            let report: [String: Any] = [
+                "case": "extension-denial", "status": "FAIL",
+                "failures": ["EXTENSION_DENIAL_BLOCKED_FUTURE_CLAIM"],
+                "cleanup_passed": true, "gate_idle": true,
+                "begin_count": callbacks.use { $0.count }, "ended_ids": ends.use { $0 }
+            ]
+            let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
+            print(String(decoding: data, as: UTF8.self))
+            FileHandle.standardError.write(Data("EXTENSION_DENIAL_BLOCKED_FUTURE_CLAIM\n".utf8))
+            exit(74)
+        }
+        check(denied.use { $0 == [false] }, "EXTENSION_DENIAL_RECEIPT_MISSING")
+        let next = callbacks.use { $0[1] }
+        let finished = LeaseValue(false)
+        DispatchQueue.global().async { next(false); finished.use { $0 = true } }
+        try await until { granted.use { $0 == [true] } }
+        let oldFinished = LeaseValue(false)
+        DispatchQueue.global().async { old(false); oldFinished.use { $0 = true } }
+        try await until { oldFinished.use { $0 } }
+        DispatchQueue.concurrentPerform(iterations: 1000) { _ in old(true) }
+        check(denied.use { $0 == [false] } && expired.use { $0 == 1 },
+              "EXTENSION_STALE_CALLBACK_REPUBLISHED_DENIAL")
+        check(!finished.use { $0 } && nextExpired.use { $0 == 0 } && ends.use { $0.isEmpty },
+              "EXTENSION_DENIED_CALLBACK_RELEASED_NEW_HOLDER")
+        second.finish()
+        try await until { finished.use { $0 } && ends.use { $0 == [2] } }
+        try await until { extensionGateIsIdle(provider) }
+        check(granted.use { $0 == [true] }, "EXTENSION_DUPLICATE_LEASE_RECEIPT")
+    }
+
     @MainActor static func main() async throws {
         let trace = LeaseValue((requests: 0, endEntered: 0, ended: [Int](), noGrant: 0))
         let release = DispatchSemaphore(value: 0)
@@ -340,6 +422,7 @@ private final class ApplicationClaimTrace: Sendable {
             }
         }
         try await applicationAndIssueBoundaries()
+        try await extensionDeniedReceipt()
         print("PASS: blocked token end, no-grant cap, stale identity, extension acquisition/expiration/reuse order; worker application begin, main end ownership, synchronous expiry end, issue/receipt separation and cancellation")
     }
 }
