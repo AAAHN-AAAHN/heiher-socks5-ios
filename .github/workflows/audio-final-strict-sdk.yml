@@ -1,0 +1,1366 @@
+name: Final release strict SDK verification
+on:
+  push:
+    branches: ["work/audio-final-verification-20261021"]
+    paths: [.github/workflows/audio-final-strict-sdk.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  strict-sdk:
+    name: Actual final release iOS 27 Swift 5 complete
+    runs-on: xcode-27
+    timeout-minutes: 10
+    steps:
+      - name: Check out the immutable supplemental control source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: control-source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out the exact final release product source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: f94c9f98147fe73a747d04461bfa7fa4c47d423d
+          path: product-source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Materialize the reviewed verifier outside both original checkouts
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/audio-final-strict-sdk.py" <<'PY'
+          #!/usr/bin/env python3
+          """One actual strict iOS SDK typecheck of the immutable integrated app inputs.
+          
+          The producer artifact pins must be rendered after the real final-release macOS producer
+          completes. This supplemental verifier never changes the app or its existing CI.
+          """
+          import argparse
+          import hashlib
+          import json
+          import os
+          from pathlib import Path, PurePosixPath
+          import re
+          import signal
+          import stat
+          import subprocess
+          import sys
+          import time
+          import traceback
+          import urllib.request
+          import zipfile
+          
+          REPOSITORY = 'AAAHN-AAAHN/heiher-socks5-ios'
+          CONTROL_PARENT = 'f94c9f98147fe73a747d04461bfa7fa4c47d423d'
+          CONTROL_PARENT_FILES = '272'
+          SOURCE_FILE_COUNT = 272
+          SOURCE_COMMIT = 'f94c9f98147fe73a747d04461bfa7fa4c47d423d'
+          SOURCE_TREE = 'db46d5456de8a122d3f1b773b3ac8016380ebe47'
+          PRODUCER_RUN = '39480944495'
+          PRODUCER_ATTEMPT = '1'
+          PRODUCER_JOB = '118829029911'
+          ARTIFACT_NAME = 'Integrated-release-macOS-39480944495-1'
+          ARTIFACT_ID = '12294307660'
+          ARTIFACT_BYTES = '12282393'
+          ARTIFACT_SHA256 = 'e129f7ba7d4e891c4517e0f0081e0b4a1fca1acc09f7cc55c07eac96cacf4c81'
+          SOURCE_ARCHIVE_SHA256 = 'ab3a1a45a1f5184ce767dede22fdd8fb5085805f07dc15ed0ef9a529af72744a'
+          HEADER_SHA256 = {
+              'hev-main.h': 'f10c791c4577a5c289a86ef01e6b5befde9f2ca7470e903a7d84aa53dbf71f0a',
+              'module.modulemap': 'e6a6b61113a94f7616109ff2acdbb47073b6a91cb48d43b09f71f8b4abb0204b',
+              'source-commit.txt': '44ba3dd2ff91015b85547f4656a429118411a2c1e7ffc8d4d72299a2f6fb9519',
+              'SHA256SUMS.txt': 'd8faa50ece5faf0d40c24f40d3ba5f00a9f38220a0d08ef219010462cccd8864',
+          }
+          NEW_CONTROL_FILES = {
+              '.github/workflows/audio-final-strict-sdk.yml',
+          }
+          SWIFT_SOURCES = [
+              'Socks5/AppRoot.swift',
+              'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift',
+              'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift',
+              'Socks5/BackgroundKeepAlive/LoopAudioService.swift',
+              'Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift',
+              'Socks5/BackgroundKeepAlive/RecoveryExecutionLease.swift',
+              'Socks5/ContentView.swift',
+              'Socks5/Server/ServerController.swift',
+              'Socks5/Server/ServerSettings.swift',
+              'Socks5/Settings/AppSettings.swift',
+              'Socks5/Settings/SettingsStore.swift',
+              'Socks5/Settings/SettingsView.swift',
+              'Socks5/Socks5App.swift',
+              'Socks5/Statistics/TrafficStatistics.swift',
+              'Socks5/Statistics/TrafficStatisticsView.swift',
+          ]
+          SCOPE = ('One typecheck of the 15 unchanged production Swift inputs using the '
+                   'actual iPhoneOS 27 SDK, Swift 5, arm64-apple-ios17.2, complete strict '
+                   'concurrency and warnings-as-errors. The real runtime #available '
+                   'branches are both compiled; neither is executed on a device here.')
+          
+          def need(ok, message):
+              if not ok:
+                  raise RuntimeError(message)
+          
+          def sha(data):
+              return hashlib.sha256(data).hexdigest()
+          
+          def emit(path, data):
+              path.parent.mkdir(parents=True, exist_ok=True)
+              with path.open('xb') as stream:
+                  stream.write(data)
+          
+          def write_json(path, value):
+              emit(path, (json.dumps(value, indent=2, sort_keys=True) + '\n').encode())
+          
+          def reference(path):
+              data = path.read_bytes()
+              return {'path': str(path), 'bytes': len(data), 'sha256': sha(data)}
+          
+          def pins():
+              for name, value in [('control parent', CONTROL_PARENT), ('source commit', SOURCE_COMMIT), ('source tree', SOURCE_TREE)]:
+                  need(re.fullmatch('[0-9a-f]{40}', value) is not None, 'Unrendered or invalid ' + name)
+              for name, value in [('control parent count', CONTROL_PARENT_FILES), ('source count', SOURCE_FILE_COUNT), ('producer run', PRODUCER_RUN), ('producer attempt', PRODUCER_ATTEMPT), ('producer job', PRODUCER_JOB)]:
+                  need(str(value).isdigit() and int(value) > 0, 'Unrendered or invalid ' + name)
+              need(str(ARTIFACT_ID).isdigit() and int(ARTIFACT_ID) > 0,
+                   'Unrendered or invalid final-release producer artifact ID')
+              need(str(ARTIFACT_BYTES).isdigit() and int(ARTIFACT_BYTES) > 0,
+                   'Unrendered or invalid final-release producer artifact byte count')
+              for value in [ARTIFACT_SHA256, SOURCE_ARCHIVE_SHA256, *HEADER_SHA256.values()]:
+                  need(re.fullmatch('[0-9a-f]{64}', value) is not None,
+                       'Unrendered or invalid immutable producer SHA256 pin')
+              return {
+                  'source_commit': SOURCE_COMMIT, 'source_tree': SOURCE_TREE,
+                  'source_file_count': SOURCE_FILE_COUNT, 'control_parent': CONTROL_PARENT,
+                  'control_parent_file_count': int(CONTROL_PARENT_FILES),
+                  'producer_run': int(PRODUCER_RUN), 'producer_attempt': int(PRODUCER_ATTEMPT),
+                  'producer_job': int(PRODUCER_JOB), 'artifact_id': int(ARTIFACT_ID),
+                  'artifact_name': ARTIFACT_NAME, 'artifact_bytes': int(ARTIFACT_BYTES),
+                  'artifact_sha256': ARTIFACT_SHA256,
+                  'source_archive_sha256': SOURCE_ARCHIVE_SHA256,
+                  'header_sha256': HEADER_SHA256,
+              }
+          
+          def command(out, label, argv, cwd, timeout=30):
+              """Preserve merged raw output even on timeout; kill the whole child group."""
+              log = out / (label + '.log')
+              started = time.monotonic()
+              row = {'command': [str(x) for x in argv], 'cwd': str(cwd),
+                     'timeout_seconds': timeout, 'returncode': None, 'timed_out': False}
+              with log.open('xb') as stream:
+                  try:
+                      child = subprocess.Popen(row['command'], cwd=cwd, stdout=stream,
+                                               stderr=subprocess.STDOUT, start_new_session=True)
+                      try:
+                          row['returncode'] = child.wait(timeout=timeout)
+                      except subprocess.TimeoutExpired:
+                          row['timed_out'] = True
+                          try:
+                              os.killpg(child.pid, signal.SIGKILL)
+                          except ProcessLookupError:
+                              pass
+                          row['returncode'] = child.wait(timeout=10)
+                          stream.write(('\nT21_TIMEOUT: command exceeded %ss; child group killed\n'
+                                        % timeout).encode())
+                  except Exception as error:
+                      row['exception'] = type(error).__name__ + ': ' + str(error)
+                      stream.write(('\nT21_COMMAND_EXCEPTION: ' + row['exception'] + '\n').encode())
+              row['elapsed_seconds'] = time.monotonic() - started
+              row['log'] = reference(log)
+              write_json(out / (label + '.command.json'), row)
+              return row, log.read_bytes()
+          
+          def checked(out, label, argv, cwd, timeout=30):
+              row, data = command(out, label, argv, cwd, timeout)
+              need(row['returncode'] == 0 and not row['timed_out'] and 'exception' not in row,
+                   'Command failed: ' + label)
+              return data
+          
+          def tree(out, label, root, revision):
+              data = checked(out, label, ['git', 'ls-tree', '-rz', revision], root)
+              rows = {}
+              for item in data.split(b'\0'):
+                  if not item:
+                      continue
+                  meta, raw_path = item.split(b'\t', 1)
+                  mode, kind, blob = meta.decode().split()
+                  path = raw_path.decode()
+                  need(path not in rows and kind == 'blob' and mode in ('100644', '100755'),
+                       'Unexpected Git entry: ' + path)
+                  rows[path] = {'path': path, 'mode': mode, 'git_blob': blob}
+              return rows
+          
+          def source_state(out, label, root, expected_commit, expected_tree=None,
+                           expected_count=None):
+              """Record both diff exits plus all actual tracked bytes, modes and index."""
+              rows = {}
+              for suffix, args in [
+                  ('head', ['rev-parse', 'HEAD']),
+                  ('tree', ['rev-parse', 'HEAD^{tree}']),
+                  ('status', ['status', '--porcelain=v1', '--untracked-files=all']),
+                  ('worktree', ['diff', '--exit-code', 'HEAD', '--']),
+                  ('index', ['diff', '--cached', '--exit-code', 'HEAD', '--']),
+                  ('index-entries', ['ls-files', '--stage', '-z']),
+              ]:
+                  row, data = command(out, label + '-' + suffix, ['git', *args], root)
+                  rows[suffix] = {'command': row, 'data': data}
+              identity = tree(out, label + '-git-tree', root, 'HEAD')
+              actual = []
+              for path, entry in sorted(identity.items()):
+                  file = root / path
+                  need(file.is_file() and not file.is_symlink(), 'Non-regular source: ' + path)
+                  data = file.read_bytes()
+                  mode = '100755' if file.stat().st_mode & 0o111 else '100644'
+                  blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+                  actual.append({**entry, 'actual_mode': mode, 'actual_git_blob': blob,
+                                 'bytes': len(data), 'sha256': sha(data),
+                                 'matches_git': mode == entry['mode'] and blob == entry['git_blob']})
+              index = {}
+              for item in rows['index-entries']['data'].split(b'\0'):
+                  if not item:
+                      continue
+                  meta, raw_path = item.split(b'\t', 1)
+                  mode, blob, stage = meta.decode().split()
+                  path = raw_path.decode()
+                  need(path not in index and stage == '0', 'Non-canonical index entry')
+                  index[path] = {'path': path, 'mode': mode, 'git_blob': blob}
+              result = {
+                  'head': rows['head']['data'].decode().strip(),
+                  'tree': rows['tree']['data'].decode().strip(),
+                  'entries': actual, 'count': len(actual),
+                  'index_matches_git_tree': index == identity,
+                  'commands': {k: v['command'] for k, v in rows.items()},
+              }
+              result['accepted'] = (
+                  all(x['command']['returncode'] == 0 and not x['command']['timed_out']
+                      and 'exception' not in x['command'] for x in rows.values())
+                  and result['head'] == expected_commit
+                  and (expected_tree is None or result['tree'] == expected_tree)
+                  and (expected_count is None or result['count'] == expected_count)
+                  and rows['status']['data'] == b''
+                  and all(x['matches_git'] for x in actual) and index == identity)
+              write_json(out / (label + '.json'), result)
+              need(result['accepted'], 'Original source/index identity failed: ' + label)
+              return result
+          
+          def control_identity(out, label, control):
+              head = os.environ.get('GITHUB_SHA', '')
+              need(re.fullmatch('[0-9a-f]{40}', head) is not None, 'Missing control commit')
+              identity = source_state(out, label, control, head, expected_count=int(CONTROL_PARENT_FILES) + 1)
+              parents = checked(out, label + '-parents',
+                                ['git', 'show', '-s', '--format=%P', 'HEAD'], control).decode().split()
+              need(parents == [CONTROL_PARENT], 'Supplemental control must be sole child of the pinned control parent')
+              previous = tree(out, label + '-parent-tree', control, CONTROL_PARENT)
+              current = {r['path']: {k: r[k] for k in ('path', 'mode', 'git_blob')}
+                         for r in identity['entries']}
+              need(len(previous) == int(CONTROL_PARENT_FILES) and set(current) - set(previous) == NEW_CONTROL_FILES,
+                   'Control must add only the reviewed one-file strict SDK workflow')
+              need(all(current.get(p) == item for p, item in previous.items()),
+                   'Existing control-parent bytes or modes changed')
+              return {'head': head, 'tree': identity['tree'], 'parent': CONTROL_PARENT,
+                      'preserved_files': len(previous), 'new_files': sorted(NEW_CONTROL_FILES)}
+          
+          def api_json(out, name, endpoint):
+              token = os.environ.get('T21_GITHUB_TOKEN', '')
+              need(bool(token), 'Missing read-only Actions token')
+              url = 'https://api.github.com/repos/' + REPOSITORY + endpoint
+              request = urllib.request.Request(url, headers={
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'Authorization': 'Bearer ' + token,
+                  'User-Agent': 'T21-immutable-strict-sdk-verifier',
+              })
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  need(response.status == 200 and response.url == url, 'Unexpected API response')
+                  data = response.read(8 * 1024 * 1024 + 1)
+              need(len(data) <= 8 * 1024 * 1024, 'Unexpectedly large API metadata')
+              emit(out / (name + '.json'), data)
+              return json.loads(data)
+          
+          def check_request(args, out, control, source):
+              out.mkdir(parents=True, exist_ok=False)
+              emit(out / 'runtime-verifier.py', Path(__file__).read_bytes())
+              result = {'accepted': False, 'scope': SCOPE, 'phase': 'request'}
+              try:
+                  result['pins'] = pins()
+                  need(os.environ.get('GITHUB_REPOSITORY') == REPOSITORY, 'Unexpected repository')
+                  result['control'] = control_identity(out, 'control-before', control)
+                  state = source_state(out, 'source-before', source, SOURCE_COMMIT, SOURCE_TREE, SOURCE_FILE_COUNT)
+                  need(sorted(x['path'] for x in state['entries']
+                              if x['path'].startswith('Socks5/') and x['path'].endswith('.swift'))
+                       == SWIFT_SOURCES, 'Exact original 15 Swift input set changed')
+                  artifact = api_json(out, 'producer-artifact-metadata',
+                                      '/actions/artifacts/' + str(ARTIFACT_ID))
+                  job = api_json(out, 'producer-job-metadata',
+                                 '/actions/jobs/' + str(PRODUCER_JOB))
+                  need(artifact['id'] == int(ARTIFACT_ID) and artifact['name'] == ARTIFACT_NAME
+                       and artifact['size_in_bytes'] == int(ARTIFACT_BYTES)
+                       and artifact['digest'] == 'sha256:' + ARTIFACT_SHA256
+                       and artifact['expired'] is False, 'Producer artifact API pin mismatch')
+                  need(artifact['workflow_run']['id'] == int(PRODUCER_RUN)
+                       and artifact['workflow_run']['head_sha'] == SOURCE_COMMIT,
+                       'Artifact does not belong to the exact final-release run/source')
+                  need(job['id'] == int(PRODUCER_JOB) and job['run_id'] == int(PRODUCER_RUN)
+                       and job['run_attempt'] == int(PRODUCER_ATTEMPT) and job['head_sha'] == SOURCE_COMMIT
+                       and job['name'] == 'verify (xcode-27)' and job['status'] == 'completed'
+                       and job['conclusion'] == 'success', 'Actual macOS producer is not successful')
+                  output = os.environ.get('GITHUB_OUTPUT')
+                  need(bool(output), 'Missing Actions output channel')
+                  with open(output, 'a') as stream:
+                      stream.write('artifact-id=' + str(ARTIFACT_ID) + '\n')
+                      stream.write('producer-run=' + str(PRODUCER_RUN) + '\n')
+                  result['accepted'] = True
+              except Exception as error:
+                  result['error'] = type(error).__name__ + ': ' + str(error)
+                  raise
+              finally:
+                  write_json(out / 'request.json', result)
+          
+          def project_membership(out, source):
+              raw = checked(out, 'project-json',
+                            ['plutil', '-convert', 'json', '-o', '-',
+                             'Socks5.xcodeproj/project.pbxproj'], source)
+              project = json.loads(raw)
+              objects = project['objects']
+              root = objects[project['rootObject']]
+              need(root['isa'] == 'PBXProject', 'Not an Xcode project')
+              targets = [objects[x] for x in root['targets']]
+              need(len(targets) == 1 and targets[0]['isa'] == 'PBXNativeTarget'
+                   and targets[0]['name'] == 'Socks5'
+                   and targets[0]['productType'] == 'com.apple.product-type.application',
+                   'Unexpected actual product target')
+              paths = {}
+              visited = set()
+              def visit(key, parent):
+                  need(key not in visited, 'Duplicate or cyclic Xcode group member')
+                  visited.add(key)
+                  obj = objects[key]
+                  if obj['isa'] not in ('PBXGroup', 'PBXFileReference'):
+                      raise RuntimeError('Unexpected project group object')
+                  part = obj.get('path', '')
+                  need(not PurePosixPath(part).is_absolute() and '..' not in PurePosixPath(part).parts,
+                       'Escaping Xcode source path')
+                  path = str(PurePosixPath(parent) / part)
+                  if obj['isa'] == 'PBXGroup':
+                      need(obj['sourceTree'] == '<group>', 'Unsupported Xcode group root')
+                      for child in obj['children']:
+                          visit(child, path)
+                  elif obj.get('lastKnownFileType') == 'sourcecode.swift':
+                      need(obj['sourceTree'] == '<group>', 'Unexpected Swift source root')
+                      paths[key] = path
+              visit(root['mainGroup'], '')
+              phases = [objects[x] for x in targets[0]['buildPhases']
+                        if objects[x]['isa'] == 'PBXSourcesBuildPhase']
+              need(len(phases) == 1 and str(phases[0]['runOnlyForDeploymentPostprocessing']) == '0',
+                   'Unexpected application sources build phase')
+              selected = []
+              for key in phases[0]['files']:
+                  item = objects[key]
+                  need(set(item) == {'isa', 'fileRef'} and item['isa'] == 'PBXBuildFile',
+                       'Unexpected per-source build filter or setting')
+                  selected.append(paths[item['fileRef']])
+              need(len(selected) == 15 and len(set(selected)) == 15
+                   and sorted(selected) == SWIFT_SOURCES, 'Compiler and app target inputs differ')
+              text = (source / 'Socks5.xcodeproj/project.pbxproj').read_text()
+              need(set(re.findall(r'IPHONEOS_DEPLOYMENT_TARGET = ([^;]+)', text)) == {'17.2'},
+                   'Application deployment target changed')
+              need(set(re.findall(r'SWIFT_VERSION = ([^;]+)', text)) == {'5.0'},
+                   'Application Swift language version changed')
+              proof = {'accepted': True, 'target': 'Socks5', 'sources': selected,
+                       'compiler_sources': SWIFT_SOURCES, 'source_count': 15,
+                       'project': reference(source / 'Socks5.xcodeproj/project.pbxproj')}
+              write_json(out / 'project-membership.json', proof)
+              return proof
+          
+          def header_identity(out, label, artifact_root, copy=False):
+              header_root = artifact_root / 'integrated/compiled-headers'
+              need(header_root.is_dir() and not header_root.is_symlink(), 'Missing actual compiled headers')
+              need({x.name for x in header_root.iterdir()} == set(HEADER_SHA256),
+                   'Unexpected compiled-header member set')
+              result = {}
+              for name, expected in sorted(HEADER_SHA256.items()):
+                  path = header_root / name
+                  need(path.is_file() and not path.is_symlink(), 'Non-regular compiled header')
+                  need(path.resolve().is_relative_to(artifact_root), 'Escaping compiled header path')
+                  data = path.read_bytes()
+                  result[name] = reference(path)
+                  need(sha(data) == expected, 'Actual producer header hash mismatch: ' + name)
+                  if copy:
+                      emit(out / 'compiled-headers' / name, data)
+              need((header_root / 'source-commit.txt').read_bytes() == (SOURCE_COMMIT + '\n').encode(),
+                   'Compiled header source-commit mismatch')
+              sums = (header_root / 'SHA256SUMS.txt').read_text().splitlines()
+              parsed = {}
+              for line in sums:
+                  match = re.fullmatch(r'([0-9a-f]{64})  (hev-main\.h|module\.modulemap)', line)
+                  need(match is not None and match[2] not in parsed, 'Invalid producer header checksum list')
+                  parsed[match[2]] = match[1]
+              need(parsed == {k: HEADER_SHA256[k] for k in ('hev-main.h', 'module.modulemap')},
+                   'Actual SHA256SUMS does not bind the compiled module inputs')
+              need((header_root / 'module.modulemap').read_bytes()
+                   == b'module HevSocks5Server { header "hev-main.h" export * }\n',
+                   'Unexpected compiled module import map')
+              write_json(out / (label + '.json'), result)
+              return header_root
+          
+          def producer_source(out, artifact_root, source_entries):
+              archive = artifact_root / 'integrated/Socks5-integrated-source.zip'
+              need(archive.is_file() and not archive.is_symlink(), 'Missing producer source archive')
+              need(archive.resolve().is_relative_to(artifact_root), 'Escaping producer source archive path')
+              need(sha(archive.read_bytes()) == SOURCE_ARCHIVE_SHA256, 'Producer source ZIP pin mismatch')
+              expected = {x['path']: x for x in source_entries}
+              proof = []
+              with zipfile.ZipFile(archive) as value:
+                  need(value.testzip() is None, 'Producer source ZIP CRC failed')
+                  members = [x for x in value.infolist() if not x.is_dir()]
+                  need(len(members) == len(expected)
+                       and len({x.filename for x in members}) == len(members)
+                       and {x.filename for x in members} == set(expected),
+                       'Producer source archive is not the exact Git file set')
+                  for item in members:
+                      data = value.read(item)
+                      mode = item.external_attr >> 16
+                      need(stat.S_IFMT(mode) in (0, stat.S_IFREG), 'Unexpected source ZIP member type')
+                      want = expected[item.filename]
+                      need(sha(data) == want['sha256'] and len(data) == want['bytes']
+                           and ('100755' if mode & 0o111 else '100644') == want['mode'],
+                           'Producer source ZIP bytes/modes differ from final-release: ' + item.filename)
+                      proof.append({'path': item.filename, 'bytes': len(data),
+                                    'sha256': sha(data), 'zip_mode': mode})
+              need((artifact_root / 'integrated/SUCCESS.txt').read_bytes()
+                   == b'PASS: integrated build and applicable checks completed\n',
+                   'Missing actual producer build success marker')
+              report = json.loads((artifact_root / 'integrated/package-review.json').read_bytes())
+              need(report['commit'] == SOURCE_COMMIT, 'Producer package source is not final-release')
+              write_json(out / 'producer-source-archive.json',
+                         {'archive': reference(archive), 'members': proof, 'accepted': True})
+          
+          def compile_once(args, out, control, source):
+              result = {'accepted': False, 'scope': SCOPE, 'phase': 'actual-strict-typecheck',
+                        'compiler_command_count': 0, 'source_preserved_after': False,
+                        'headers_preserved_after': False}
+              artifact_root = Path(args.artifact_root).resolve()
+              try:
+                  result['pins'] = pins()
+                  request = json.loads((out / 'request.json').read_bytes())
+                  need(request['accepted'] is True and request['pins'] == result['pins'],
+                       'Missing immutable producer preflight acceptance')
+                  need(artifact_root.is_dir() and not artifact_root.is_symlink(),
+                       'Missing specific producer artifact directory')
+                  need(artifact_root != source and source not in artifact_root.parents
+                       and artifact_root not in source.parents, 'Artifact and product source must be separate')
+                  state = source_state(out, 'source-compile-input', source, SOURCE_COMMIT, SOURCE_TREE, SOURCE_FILE_COUNT)
+                  result['compiled_inputs'] = [x for x in state['entries'] if x['path'] in SWIFT_SOURCES]
+                  result['project_membership'] = project_membership(out, source)
+                  producer_source(out, artifact_root, state['entries'])
+                  headers = header_identity(out, 'headers-before', artifact_root, copy=True)
+                  xcode = checked(out, 'xcode-version', ['xcodebuild', '-version'], source).decode()
+                  sdk_version = checked(out, 'sdk-version',
+                                        ['xcrun', '--sdk', 'iphoneos', '--show-sdk-version'], source).decode().strip()
+                  sdk = checked(out, 'sdk-path',
+                                ['xcrun', '--sdk', 'iphoneos', '--show-sdk-path'], source).decode().strip()
+                  checked(out, 'swift-version', ['xcrun', 'swiftc', '--version'], source)
+                  checked(out, 'host-version', ['sw_vers'], source)
+                  need(re.search(r'^Xcode 27(?:\.|$)', xcode, re.M) is not None
+                       and re.fullmatch(r'27\.[0-9.]+', sdk_version) is not None
+                       and Path(sdk).is_dir(), 'Actual Xcode/iPhoneOS 27 SDK required')
+                  source_text = (source / 'Socks5/BackgroundKeepAlive/LoopAudioService.swift').read_text()
+                  markers = ['if #available(iOS 27.0, *)', 'session.activate(options:',
+                             'session.deactivate(options:', 'session.setActive(active, options:']
+                  need(all(source_text.count(x) == 1 for x in markers),
+                       'Original runtime availability/API branches changed')
+                  result['availability_compile_scope'] = {
+                      'runtime_execution': False, 'deployment_target': '17.2', 'sdk_version': sdk_version,
+                      'source': 'Socks5/BackgroundKeepAlive/LoopAudioService.swift',
+                      'markers': {x: source_text[:source_text.index(x)].count('\n') + 1 for x in markers},
+                      'claim': 'Both unmodified runtime availability branches participate in this typecheck.',
+                  }
+                  argv = ['xcrun', 'swiftc', '-typecheck', '-swift-version', '5',
+                          '-strict-concurrency=complete', '-warnings-as-errors',
+                          '-sdk', sdk, '-target', 'arm64-apple-ios17.2', '-I', str(headers),
+                          *SWIFT_SOURCES]
+                  result['compiler_command_count'] = 1
+                  row, diagnostics = command(out, 'ios-sdk-typecheck', argv, source, timeout=180)
+                  result['compiler'] = row
+                  text = diagnostics.decode('utf-8', errors='replace')
+                  warning_lines = [x for x in text.splitlines() if re.search(r'\bwarning:', x)]
+                  error_lines = [x for x in text.splitlines() if re.search(r'\berror:', x)]
+                  result['diagnostics'] = {
+                      'warning_headers': len(warning_lines), 'error_headers': len(error_lines),
+                      'warning_lines': warning_lines, 'error_lines': error_lines,
+                      'concurrency_warning_lines': [
+                          x for x in warning_lines
+                          if re.search(r'actor|Sendable|sendable|concurren|isolat', x)],
+                      'raw_log': row['log'],
+                  }
+                  need(row['returncode'] == 0 and not row['timed_out'] and 'exception' not in row,
+                       'Actual strict SDK compiler command did not succeed')
+                  need(not warning_lines and not error_lines,
+                       'Actual strict SDK diagnostics contain warnings or errors; no suppression is permitted')
+                  result['compiler_accepted'] = True
+              except Exception as error:
+                  result['error'] = type(error).__name__ + ': ' + str(error)
+                  emit(out / 'compile-failure.txt', traceback.format_exc().encode())
+              finally:
+                  for key, operation in [
+                      ('source_preserved_after',
+                       lambda: source_state(out, 'source-after-compiler', source,
+                                            SOURCE_COMMIT, SOURCE_TREE, SOURCE_FILE_COUNT)),
+                      ('headers_preserved_after',
+                       lambda: header_identity(out, 'headers-after', artifact_root)),
+                  ]:
+                      try:
+                          operation()
+                          result[key] = True
+                      except Exception as error:
+                          result[key + '_error'] = type(error).__name__ + ': ' + str(error)
+                  result['accepted'] = (result.get('compiler_accepted') is True
+                                        and result['source_preserved_after']
+                                        and result['headers_preserved_after'])
+                  write_json(out / 'compile-result.json', result)
+              need(result['accepted'], 'T21 actual strict SDK acceptance failed; preserved evidence gives the cause')
+          
+          def finalize(args, out, control, source):
+              out.mkdir(parents=True, exist_ok=True)
+              result = {'accepted': False, 'scope': SCOPE, 'phase': 'final-source-and-result',
+                        'source_preserved': False, 'control_preserved': False}
+              for key, operation in [
+                  ('source_preserved', lambda: source_state(out, 'source-final', source,
+                                                            SOURCE_COMMIT, SOURCE_TREE, SOURCE_FILE_COUNT)),
+                  ('control_preserved', lambda: control_identity(out, 'control-final', control)),
+              ]:
+                  try:
+                      result[key + '_identity'] = operation()
+                      result[key] = True
+                  except Exception as error:
+                      result[key + '_error'] = type(error).__name__ + ': ' + str(error)
+              try:
+                  current_pins = pins()
+                  request = json.loads((out / 'request.json').read_bytes())
+                  compiled = json.loads((out / 'compile-result.json').read_bytes())
+                  need(request['accepted'] is True and request['pins'] == current_pins,
+                       'Request was not accepted')
+                  need(compiled['accepted'] is True and compiled['pins'] == current_pins
+                       and compiled['compiler_command_count'] == 1
+                       and compiled['diagnostics']['warning_headers'] == 0
+                       and compiled['diagnostics']['error_headers'] == 0,
+                       'Strict compiler result was not accepted')
+                  result['request'] = reference(out / 'request.json')
+                  result['compiled'] = reference(out / 'compile-result.json')
+                  result['accepted'] = result['source_preserved'] and result['control_preserved']
+              except Exception as error:
+                  result['error'] = type(error).__name__ + ': ' + str(error)
+              write_json(out / 'final-result.json', result)
+              if result['accepted']:
+                  emit(out / 'SUCCESS.txt',
+                       b'PASS: exact 15 production Swift inputs, actual iOS 27 strict SDK typecheck, zero diagnostic warning/error headers, original source/index preserved; no device execution.\n')
+              need(result['accepted'], 'T21 final acceptance failed; actual evidence was preserved')
+          
+          def main():
+              if not __debug__:
+                  raise SystemExit('Assertions must be enabled')
+              parser = argparse.ArgumentParser(description=__doc__)
+              parser.add_argument('phase', choices=['check-request', 'compile', 'finalize'])
+              parser.add_argument('--control-root', required=True)
+              parser.add_argument('--source-root', required=True)
+              parser.add_argument('--output', required=True)
+              parser.add_argument('--artifact-root')
+              args = parser.parse_args()
+              control = Path(args.control_root).resolve()
+              source = Path(args.source_root).resolve()
+              out = Path(args.output).resolve()
+              for root in (source, control):
+                  need(out != root and root not in out.parents and out not in root.parents,
+                       'Evidence output must be separate from either original checkout')
+              if args.phase == 'check-request':
+                  check_request(args, out, control, source)
+              elif args.phase == 'compile':
+                  need(bool(args.artifact_root), 'Specific producer artifact root required')
+                  compile_once(args, out, control, source)
+              else:
+                  finalize(args, out, control, source)
+          
+          if __name__ == '__main__':
+              main()
+          
+          PY
+      - name: Require rendered immutable producer pins and exact source identity
+        id: request
+        env:
+          T21_GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 "$RUNNER_TEMP/audio-final-strict-sdk.py" check-request             --control-root control-source --source-root product-source --output artifacts/final-strict-sdk
+      - name: Download only the exact successful final-release macOS producer artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ steps.request.outputs.artifact-id }}
+          run-id: ${{ steps.request.outputs.producer-run }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: producer-input
+          merge-multiple: true
+      - name: Typecheck the original 15 inputs once with complete strict concurrency
+        run: |
+          python3 "$RUNNER_TEMP/audio-final-strict-sdk.py" compile             --control-root control-source --source-root product-source --artifact-root producer-input             --output artifacts/final-strict-sdk
+      - name: Preserve original source and index after success or failure
+        if: always()
+        run: |
+          python3 "$RUNNER_TEMP/audio-final-strict-sdk.py" finalize             --control-root control-source --source-root product-source --output artifacts/final-strict-sdk
+      - name: Preserve actual diagnostics and source evidence including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Audio-Final-Strict-macOS-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+  storage-boundaries:
+    name: T16 (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Linux
+            runner: ubuntu-24.04
+          - label: macOS
+            runner: xcode-27
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - name: Check out the immutable supplemental control source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: control-source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out the exact final release product source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: f94c9f98147fe73a747d04461bfa7fa4c47d423d
+          path: product-source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Materialize the exact repinned T16 runner and unchanged Swift driver
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY_T16_PINS'
+          import re
+          if re.fullmatch('[0-9a-f]{40}', 'f94c9f98147fe73a747d04461bfa7fa4c47d423d') is None:
+              raise SystemExit('Unrendered control identity; no T16 execution is allowed')
+          PY_T16_PINS
+          mkdir -p "$RUNNER_TEMP/t16"
+          cat > "$RUNNER_TEMP/t16/t16_storage_boundaries.py" <<'PY_T16_RUNNER'
+          #!/usr/bin/env python3
+          """Supplement T16 using exact Rfinal source, disposable observation gates and host adapters.
+          
+          No source checkout is edited. This neither replaces the original release workflow nor
+          executes AVFAudio/UIKit/physical storage. Negative controls are separate copies.
+          """
+          import argparse
+          import datetime as dt
+          import difflib
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import resource
+          import shutil
+          import subprocess
+          import sys
+          import tempfile
+          import time
+          import uuid
+          
+          COMMIT = 'f94c9f98147fe73a747d04461bfa7fa4c47d423d'
+          TREE = 'db46d5456de8a122d3f1b773b3ac8016380ebe47'
+          SOURCES = {
+              'Socks5/AppRoot.swift': '47325a42f17a026ce0fba3ede56b53fbffef47f794cb8deacb2d051ce1624c9e',
+              'Tests/Integration/IntentBoundaryTests.swift': '340d7693f844974603734e8890ed060617676152cfe232cfc4bc52465d85c064',
+              'Socks5/Server/ServerSettings.swift': 'e64a89cece6dc47cebe6ee910ba4e6a7d71b17837bc24f4354a30b1307bdd0fd',
+              'Socks5/Settings/AppSettings.swift': '719d98606021c927450bfd586d8de925190aa6687f10eefcafa108145e028c56',
+              'Socks5/Settings/SettingsStore.swift': 'd36b143f318b8b33e50ab8f42efd54ba3484f1af8705efdb2fbf43efe07b84d0',
+              'Socks5/BackgroundKeepAlive/LoopAudioService.swift': '389d1d8cefbd59d114743d9464e85004561f174c4eea4b92a4df5f65b4f66ac5',
+              'Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift': 'd2d08c919f55190f8c5b162ed8077939752d9b44f8094aa9955719968793f8c1',
+              'Socks5/BackgroundKeepAlive/RecoveryExecutionLease.swift': '35d97c2c7809efff76edc048a7b91e68fb1bd728af9397a42fe28058fbc141c9',
+          }
+          CASES = ('read', 'write', 'encode', 'rollback-rename')
+          MODES = ('-Onone', '-O')
+          COMPILE_SECONDS = 90
+          RUNTIME_SECONDS = 30
+          CLEANUP_SECONDS = 10
+          DRIVER = Path(__file__).with_name('T16StorageBoundaryDriver.swift')
+          
+          
+          def need(condition, message):
+              if not condition:
+                  raise RuntimeError(message)
+          
+          
+          def digest(raw):
+              return hashlib.sha256(raw).hexdigest()
+          
+          
+          def put(path, value):
+              path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n')
+          
+          
+          def pin(path):
+              raw = path.read_bytes()
+              return {'path': str(path), 'bytes': len(raw), 'sha256': digest(raw)}
+          
+          
+          def git(root, *args):
+              return subprocess.check_output(['git', '-C', str(root), *args], timeout=30).decode().strip()
+          
+          
+          def source_identity(root):
+              need(git(root, 'rev-parse', 'HEAD') == COMMIT, 'Source HEAD differs from actual Rfinal')
+              need(git(root, 'rev-parse', 'HEAD^{tree}') == TREE, 'Source tree differs from actual Rfinal')
+              need(git(root, 'status', '--porcelain=v1') == '', 'Source checkout must be clean')
+              entries = []
+              for name, expected in SOURCES.items():
+                  raw = (root / name).read_bytes()
+                  need(digest(raw) == expected, 'Input source SHA mismatch: ' + name)
+                  committed = subprocess.check_output(['git', '-C', str(root), 'show', COMMIT + ':' + name], timeout=30)
+                  need(raw == committed, 'Input differs from committed blob: ' + name)
+                  entries.append({'path': name, 'bytes': len(raw), 'sha256': expected})
+              return {'commit': COMMIT, 'tree': TREE, 'clean': True, 'inputs': entries}
+          
+          
+          def replace_once(text, before, after, label, edits):
+              need(text.count(before) == 1, 'Observation boundary not unique: ' + label)
+              edits.append({'label': label, 'before': before, 'after': after})
+              return text.replace(before, after, 1)
+          
+          
+          def prepare(root, work, out):
+              originals = {name: (root / name).read_text() for name in SOURCES}
+              for name, text in originals.items():
+                  need(text.encode() == (root / name).read_bytes(), 'Unexpected input text normalization: ' + name)
+              root_text = originals['Socks5/AppRoot.swift']
+              start, stop = '    private var audioEnabled: Binding<Bool> {', '    var body: some View {'
+              need(root_text.count(start) == root_text.count(stop) == 1, 'Root extraction boundaries changed')
+              methods = root_text[root_text.index(start):root_text.index(stop)]
+              original_fixture = originals['Tests/Integration/IntentBoundaryTests.swift']
+              marker = '// INSERT_ROOT_INTENT_HOST'
+              need(original_fixture.count(marker) == 1, 'Original facade extraction boundary changed')
+              prefix = original_fixture[:original_fixture.index(marker)]
+              driver = DRIVER.read_text()
+              sources = list(SOURCES)[2:]
+              manifest = {'schema': 1, 'commit': COMMIT, 'tree': TREE,
+                          'root_routing_methods_sha256': digest(methods.encode()),
+                          'original_fixture_facade_prefix_sha256': digest(prefix.encode()),
+                          'supplemental_driver': pin(DRIVER), 'runner': pin(Path(__file__).resolve()),
+                          'scope': 'Temporary copies only; positive source changes are framework import adaptation and opt-in observation calls. Negative copies have explicitly named semantic mutations.',
+                          'variants': {}}
+              variants = {}
+              for variant in ('current-observed', 'worker-on-main-control', 'missing-off-control'):
+                  folder = work / variant
+                  folder.mkdir(parents=True)
+                  variant_record = {'sources': [], 'edits': []}
+                  paths = []
+                  for name in sources:
+                      original = originals[name]
+                      text = original.replace('import HevSocks5Server\n', '').replace('import SwiftUI\n', 'import Foundation\n')
+                      adapted = text
+                      edits = []
+                      if name.endswith('/AppSettings.swift'):
+                          text = replace_once(text, '        let data = try encoder.encode(self)\n',
+                              '        T16StorageGate.hit("encode")\n        let data = try encoder.encode(self)\n',
+                              'encode-call-boundary', edits)
+                      if name.endswith('/SettingsStore.swift'):
+                          for before, after, label in (
+                              ('    private nonisolated static func read(_ url: URL) throws -> Data {\n',
+                               '    private nonisolated static func read(_ url: URL) throws -> Data {\n        T16StorageGate.hit("read")\n', 'read-call-boundary'),
+                              ('    private nonisolated static func write(_ data: Data, _ url: URL) throws {\n',
+                               '    private nonisolated static func write(_ data: Data, _ url: URL) throws {\n        T16StorageGate.hit("write")\n', 'write-call-boundary'),
+                              ('        return Prepared(value: next, backup: backup)\n',
+                               '        T16StorageGate.hit("after-import-commit")\n        return Prepared(value: next, backup: backup)\n', 'committed-import-observation'),
+                              ('            guard rename(backup.path, target.path) == 0 else {\n',
+                               '            T16StorageGate.hit("rollback-rename")\n            guard rename(backup.path, target.path) == 0 else {\n', 'explicit-rollback-rename-call-boundary'),
+                              ('                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)\n            }\n',
+                               '                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)\n            }\n            T16StorageGate.hit("after-rollback-rename")\n', 'completed-rollback-observation'),
+                          ):
+                              text = replace_once(text, before, after, label, edits)
+                      recovered = text
+                      for edit in reversed(edits):
+                          need(recovered.count(edit['after']) == 1, 'Instrumentation is not reversible')
+                          recovered = recovered.replace(edit['after'], edit['before'], 1)
+                      need(recovered == adapted, 'Positive transformation changed source beyond the exact gates')
+                      if variant == 'worker-on-main-control' and name.endswith('/SettingsStore.swift'):
+                          text = replace_once(text,
+                              '    private let io = DispatchQueue(label: "Socks5.settings.io", qos: .utility)\n',
+                              '    private let io = DispatchQueue.main\n', 'negative-storage-lane-moved-to-main', edits)
+                      path = folder / Path(name).name
+                      path.write_text(text)
+                      paths.append(path)
+                      variant_record['sources'].append({'original_path': name, 'original_sha256': SOURCES[name],
+                          'compiled_copy': pin(path), 'framework_import_adapted_sha256': digest(adapted.encode()),
+                          'diff_from_exact_source': ''.join(difflib.unified_diff(original.splitlines(True), text.splitlines(True), fromfile=name, tofile=variant + '/' + path.name))})
+                      variant_record['edits'].extend({'source': name, **edit} for edit in edits)
+                  body = methods
+                  if variant == 'missing-off-control':
+                      body = replace_once(body, '        keepAlive.setAudio(enabled)\n',
+                          '        if enabled { keepAlive.setAudio(enabled) }\n', 'negative-explicit-off-not-delivered', variant_record['edits'])
+                  host = ('@MainActor private final class RootIntentHost {\n'
+                          '    let settings: SettingsStore\n'
+                          '    let server = ServerController()\n'
+                          '    let keepAlive = BackgroundKeepAlive()\n'
+                          '    var appliedSettingsChange: SettingsStore.Change?\n'
+                          '    init(settings: SettingsStore) { self.settings = settings }\n' + body + '}\n')
+                  fixture = folder / 'T16Fixture.swift'
+                  fixture.write_text(prefix + host + '\n' + driver)
+                  variant_record['fixture'] = pin(fixture)
+                  variant_record['routing_body_sha256'] = digest(body.encode())
+                  manifest['variants'][variant] = variant_record
+                  variants[variant] = [fixture, *paths]
+              put(out / 'transformations.json', manifest)
+              return variants
+          
+          
+          def no_core_dump():
+              resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+          
+          
+          def timeout_output(error):
+              def decoded(value):
+                  return value.decode('utf-8', errors='replace') if isinstance(value, bytes) else (value or '')
+              stdout = error.stdout if error.stdout is not None else error.output
+              return decoded(stdout) + decoded(error.stderr) + '\nT16_TIMEOUT: ' + str(error) + '\n'
+          
+          
+          def check_case(row, name):
+              need(row['status'] == 'PASS' and row['case'] == name, 'Case result identity')
+              need(row['worker_not_main'] is True and row['off_request_after_confirmed_worker_hold'] is True, 'Worker/Off order')
+              need(row['main_heartbeats_while_held'] == 100, 'Missing held MainActor heartbeats')
+              timing = row['timeline'][name]
+              need(timing['entered'] <= row['off_issued_at'] <= row['off_completed_at'] <= timing['released'] <= timing['departed'], 'Held phase ordering')
+              need(row['audio_operation_after_off'] is None and row['audio_timer_after_off'] is False, 'Audio operation/timer remains')
+              need(row['maximum_outstanding_audio_operations'] == 1, 'Operation bound not observed')
+              for prefix in ('', 'final_'):
+                  requested = row['lease_requests_at_off'] if not prefix else row['final_lease_requests']
+                  ended = row['lease_ends_at_off'] if not prefix else row['final_lease_ends']
+                  need(requested > 0 and sorted(ended) == list(range(1, requested + 1)), 'Claim end identity differs')
+              settings = row['final_settings']
+              need(settings['background'] == {'silentAudio': False, 'continuousLocation': False}, 'Final background intent differs')
+              need(settings['serverRunning'] is False and settings['selectedTab'] == 'settings', 'Final settings differ')
+              need(row['final_save_pending'] is False and row['backup_files_remaining'] == 0, 'Final storage cleanup incomplete')
+              if name == 'rollback-rename':
+                  need(row['rollback_restored_original_bytes'] is True, 'Rollback bytes not verified')
+                  need(set(row['timeline']) == {'after-import-commit', 'rollback-rename', 'after-rollback-rename'}, 'Rollback timeline missing')
+              else:
+                  need(set(row['timeline']) == {name}, 'Unexpected held phases')
+          
+          
+          def main():
+              if not __debug__:
+                  raise SystemExit('Assertions must remain enabled in the independent T16 runner')
+              parser = argparse.ArgumentParser()
+              parser.add_argument('--source-root', type=Path, required=True)
+              parser.add_argument('--output', type=Path, required=True)
+              parser.add_argument('--prepare-only', action='store_true')
+              parser.add_argument('--work-dir', type=Path)
+              args = parser.parse_args()
+              root, out = args.source_root.resolve(), args.output.resolve()
+              need(root != out and root not in out.parents, 'Evidence must be written outside the immutable product checkout')
+              need(not out.exists(), 'Use a fresh T16 evidence output directory')
+              before = source_identity(root)
+              out.mkdir(parents=True)
+              put(out / 'source-before.json', before)
+              result = {'schema': 1, 'status': 'PREPARING', 'created_at_utc': dt.datetime.now(dt.timezone.utc).isoformat(),
+                        'commit': COMMIT, 'tree': TREE, 'platform': sys.platform,
+                        'github_context': {key: os.environ.get(key) for key in (
+                            'GITHUB_REPOSITORY', 'GITHUB_SHA', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_JOB', 'RUNNER_OS')},
+                        'runner': pin(Path(__file__).resolve()), 'driver': pin(DRIVER),
+                        'compile_timeout_seconds': COMPILE_SECONDS, 'runtime_timeout_seconds': RUNTIME_SECONDS,
+                        'cleanup_timeout_seconds': CLEANUP_SECONDS,
+                        'gate_timeout_seconds': 10, 'observation_timeout_seconds': 5,
+                        'commands': [], 'runtime_results': [], 'cleanup_commands': [],
+                        'original_product_and_test_sources_edited': False,
+                        'scope': 'Supplemental host evidence for four application worker call boundaries with actual service/lease source and controlled endpoint/grant adapters; no physical syscall, AVFAudio, iOS protection, Simulator/UI, or overall release acceptance.'}
+              temporary = None
+              try:
+                  if args.work_dir:
+                      work = args.work_dir.resolve()
+                      need(root != work and root not in work.parents, 'Copied sources must remain outside the immutable product checkout')
+                      need(not work.exists(), 'Use a fresh copied-source directory')
+                      work.mkdir(parents=True)
+                  else:
+                      temporary = tempfile.TemporaryDirectory(prefix='T16-source-copy-')
+                      work = Path(temporary.name)
+                  variants = prepare(root, work, out)
+                  compiler = shutil.which('swiftc')
+                  plans = []
+                  for mode in MODES:
+                      for variant, sources in variants.items():
+                          binary = work / (variant + mode)
+                          command = [compiler or 'swiftc', mode, '-parse-as-library', '-swift-version', '5',
+                                     '-strict-concurrency=complete', '-warnings-as-errors', '-D', 'LIVE_SETTINGS',
+                                     *map(str, sources), '-o', str(binary)]
+                          cases = CASES if variant == 'current-observed' else (('read',) if variant == 'worker-on-main-control' else ('write',))
+                          expected = None if variant == 'current-observed' else ('T16_STORAGE_ON_MAIN' if variant == 'worker-on-main-control' else 'T16_OFF_NOT_COMPLETED_WHILE_STORAGE_HELD')
+                          plans.append({'mode': mode, 'variant': variant, 'compile': command, 'binary': str(binary),
+                                        'cases': list(cases), 'expected_runtime_failure_marker': expected})
+                  put(out / 'command-plan.json', plans)
+                  if args.prepare_only:
+                      result['status'] = 'PREPARED_NOT_EXECUTED'
+                      result['compiler_available'] = compiler is not None
+                      result['runtime_acceptance'] = False
+                  else:
+                      need(compiler is not None, 'swiftc unavailable; no execution or PASS is claimed')
+                      (out / 'toolchain.txt').write_text(subprocess.check_output([compiler, '--version'], text=True, timeout=30))
+                      result['status'] = 'RUNNING'
+          
+                      def run(label, command, timeout, marker=None, case=None):
+                          start = time.monotonic()
+                          environment = None
+                          case_root = None
+                          suite = None
+                          cleanup_passed = True
+                          if case is not None:
+                              case_root = work / 'runtime-sandboxes' / label
+                              need(not case_root.exists() and not case_root.is_symlink(), 'Case sandbox already exists')
+                              case_root.mkdir(parents=True)
+                              suite = 'T16-storage-' + uuid.uuid4().hex
+                              environment = os.environ.copy()
+                              environment.update(T16_CASE_ROOT=str(case_root), T16_CASE_SUITE=suite)
+                          try:
+                              try:
+                                  proc = subprocess.run(command, cwd=root, capture_output=True, text=True, timeout=timeout,
+                                                        preexec_fn=no_core_dump, env=environment)
+                                  output, code = proc.stdout + proc.stderr, proc.returncode
+                              except subprocess.TimeoutExpired as exc:
+                                  output, code = timeout_output(exc), 124
+                              except OSError as exc:
+                                  output, code = repr(exc), 125
+                              # Retain the command's own result before any cleanup can fail.
+                              (out / (label + '.log')).write_text(output)
+                              passed = code == 0 if marker is None else code not in (0, 124, 125) and marker in output
+                              item = {'label': label, 'argv': command, 'timeout_seconds': timeout,
+                                      'elapsed_seconds': time.monotonic() - start, 'returncode': code,
+                                      'expected_failure_marker': marker, 'passed': passed}
+                              result['commands'].append(item)
+                              put(out / 'results.json', result)
+                          finally:
+                              if case_root is not None:
+                                  cleanup_command = [command[0], '--cleanup-suite']
+                                  try:
+                                      clean = subprocess.run(cleanup_command, cwd=root, capture_output=True, text=True,
+                                          timeout=CLEANUP_SECONDS, preexec_fn=no_core_dump, env=environment)
+                                      clean_output, clean_code = clean.stdout + clean.stderr, clean.returncode
+                                  except subprocess.TimeoutExpired as exc:
+                                      clean_output, clean_code = timeout_output(exc), 124
+                                  except OSError as exc:
+                                      clean_output, clean_code = repr(exc), 125
+                                  (out / (label + '-cleanup.log')).write_text(clean_output)
+                                  receipts = []
+                                  try:
+                                      receipts = [json.loads(line.removeprefix('T16_CLEANUP_RESULT ')) for line in clean_output.splitlines()
+                                                  if line.startswith('T16_CLEANUP_RESULT ')]
+                                  except ValueError:
+                                      pass
+                                  domain_clean = clean_code == 0 and receipts == [
+                                      {'suite': suite, 'persistent_domain_empty_or_absent': True}]
+                                  # Only the exact fresh case path owned by this invocation
+                                  # may be removed, and a substituted link is never followed.
+                                  directory_clean = False
+                                  directory_error = None
+                                  try:
+                                      need(case_root.parent == work / 'runtime-sandboxes' and not case_root.is_symlink(),
+                                           'Refusing unsafe case sandbox removal')
+                                      shutil.rmtree(case_root)
+                                      directory_clean = not case_root.exists()
+                                  except (OSError, RuntimeError) as exc:
+                                      directory_error = repr(exc)
+                                  cleanup_passed = domain_clean and directory_clean
+                                  result['cleanup_commands'].append({'case_label': label, 'argv': cleanup_command,
+                                      'timeout_seconds': CLEANUP_SECONDS, 'returncode': clean_code,
+                                      'suite': suite, 'persistent_domain_empty_or_absent': domain_clean,
+                                      'case_directory': str(case_root), 'case_directory_removed': directory_clean,
+                                      'case_directory_cleanup_error': directory_error,
+                                      'passed': cleanup_passed})
+                                  put(out / 'results.json', result)
+                          need(cleanup_passed, 'T16 cleanup failed after retaining the original result: ' + label)
+                          need(passed, 'T16 command failed: ' + label + '\n' + output[-12000:])
+                          if case is not None and marker is None:
+                              rows = [json.loads(line.removeprefix('T16_RESULT ')) for line in output.splitlines() if line.startswith('T16_RESULT ')]
+                              need(len(rows) == 1, 'Runtime must emit one complete case result')
+                              check_case(rows[0], case)
+                              result['runtime_results'].append({'label': label, **rows[0]})
+                              put(out / 'results.json', result)
+                          print('PASS:', label, ('expected named negative control' if marker else ''), flush=True)
+          
+                      for plan in plans:
+                          label = plan['mode'] + '-' + plan['variant']
+                          run(label + '-compile', plan['compile'], COMPILE_SECONDS)
+                          for case in plan['cases']:
+                              run(label + '-' + case, [plan['binary'], case], RUNTIME_SECONDS,
+                                  marker=plan['expected_runtime_failure_marker'], case=case)
+                      need(len(result['commands']) == 18 and len(result['runtime_results']) == 8, 'Incomplete T16 selection')
+                      need(len(result['cleanup_commands']) == 12 and all(row['passed'] for row in result['cleanup_commands']),
+                           'Incomplete independent per-case cleanup')
+                      result['status'] = 'PASS_SUPPLEMENTAL_T16_HOST_BOUNDARIES'
+                      result['runtime_acceptance'] = True
+                      result['positive_cases'] = 8
+                      result['expected_named_negative_controls'] = 4
+                      result['compile_commands'] = 6
+                      result['separate_case_cleanup_commands'] = 12
+              except BaseException as exc:
+                  result['status'] = 'FAIL'
+                  result['error'] = repr(exc)
+                  result['runtime_acceptance'] = False
+                  raise
+              finally:
+                  try:
+                      after = source_identity(root)
+                      need(after == before, 'Original source identity changed during supplemental check')
+                      put(out / 'source-after.json', after)
+                      result['original_source_identity_preserved'] = True
+                  except BaseException as exc:
+                      result['status'] = 'FAIL'
+                      result['source_preservation_error'] = repr(exc)
+                      result['runtime_acceptance'] = False
+                      raise
+                  finally:
+                      result['completed_at_utc'] = dt.datetime.now(dt.timezone.utc).isoformat()
+                      put(out / 'results.json', result)
+                      if temporary:
+                          temporary.cleanup()
+              print(json.dumps({'status': result['status'], 'report': pin(out / 'results.json')}), flush=True)
+          
+          
+          if __name__ == '__main__':
+              main()
+          PY_T16_RUNNER
+          cat > "$RUNNER_TEMP/t16/T16StorageBoundaryDriver.swift" <<'SWIFT_T16_DRIVER'
+          // Supplemental host driver appended to the unchanged original intent fixture
+          // facades and exact AppRoot routing methods. This file is not an app target.
+          // The only positive production-source additions are the opt-in observation calls
+          // listed by t16_storage_boundaries.py. System codec/syscall internals are opaque.
+          
+          final class T16StorageGate: @unchecked Sendable {
+              static let shared = T16StorageGate()
+              private let lock = NSLock()
+              private let mainKey = DispatchSpecificKey<UInt8>()
+              private var armed: [String: DispatchSemaphore] = [:]
+              private var waiting: Set<String> = []
+              private var entered: [String: Double] = [:]
+              private var released: [String: Double] = [:]
+              private var departed: [String: Double] = [:]
+          
+              private init() { DispatchQueue.main.setSpecific(key: mainKey, value: 1) }
+              func arm(_ name: String) {
+                  lock.lock(); defer { lock.unlock() }
+                  guard armed[name] == nil && entered[name] == nil else {
+                      fatalError("T16_DUPLICATE_GATE_ARM")
+                  }
+                  armed[name] = DispatchSemaphore(value: 0)
+              }
+              static func hit(_ name: String) { shared.hold(name) }
+              private func hold(_ name: String) {
+                  lock.lock()
+                  guard let gate = armed[name], entered[name] == nil else { lock.unlock(); return }
+                  if DispatchQueue.getSpecific(key: mainKey) == 1 {
+                      lock.unlock(); fatalError("T16_STORAGE_ON_MAIN")
+                  }
+                  entered[name] = ProcessInfo.processInfo.systemUptime
+                  waiting.insert(name)
+                  lock.unlock()
+                  guard gate.wait(timeout: .now() + 10) == .success else {
+                      fatalError("T16_WORKER_HOLD_DEADLINE")
+                  }
+                  lock.lock()
+                  waiting.remove(name)
+                  departed[name] = ProcessInfo.processInfo.systemUptime
+                  lock.unlock()
+              }
+              func isHeld(_ name: String) -> Bool {
+                  lock.lock(); defer { lock.unlock() }
+                  return waiting.contains(name) && released[name] == nil
+              }
+              func enteredAt(_ name: String) -> Double? {
+                  lock.lock(); defer { lock.unlock() }; return entered[name]
+              }
+              func release(_ name: String) {
+                  lock.lock()
+                  guard waiting.contains(name), released[name] == nil, let gate = armed[name] else {
+                      lock.unlock(); fatalError("T16_RELEASE_WITHOUT_HELD_GATE")
+                  }
+                  released[name] = ProcessInfo.processInfo.systemUptime
+                  lock.unlock()
+                  gate.signal()
+              }
+              func timeline() -> [String: [String: Double]] {
+                  lock.lock(); defer { lock.unlock() }
+                  var result: [String: [String: Double]] = [:]
+                  for (name, time) in entered {
+                      var row = ["entered": time]
+                      if let value = released[name] { row["released"] = value }
+                      if let value = departed[name] { row["departed"] = value }
+                      result[name] = row
+                  }
+                  return result
+              }
+          }
+          
+          private final class T16DiagnosticBox: @unchecked Sendable {
+              private let lock = NSLock()
+              private var value: LoopAudioService.Diagnostics?
+              func store(_ next: LoopAudioService.Diagnostics) {
+                  lock.lock(); value = next; lock.unlock()
+              }
+              func get() -> LoopAudioService.Diagnostics? {
+                  lock.lock(); defer { lock.unlock() }; return value
+              }
+          }
+          
+          private extension LeaseProbe {
+              func t16Counts() -> (requests: Int, endings: [Int]) {
+                  lock.lock(); defer { lock.unlock() }; return (requests, endings)
+              }
+          }
+          
+          @MainActor private extension BackgroundKeepAlive {
+              func t16Claims() -> (requests: Int, endings: [Int]) { leases.t16Counts() }
+              func requestT16Diagnostics(_ receipt: @escaping @Sendable (LoopAudioService.Diagnostics) -> Void) {
+                  service.diagnostics(receipt)
+              }
+          }
+          
+          @MainActor private final class T16Outcome {
+              var finished = false
+              var succeeded = false
+              var cancelled = false
+              var error: String?
+          }
+          
+          private func t16FixtureSuite() -> String {
+              guard let suite = ProcessInfo.processInfo.environment["T16_CASE_SUITE"],
+                    suite.range(of: "^T16-storage-[0-9a-f]{32}$", options: .regularExpression) != nil else {
+                  fatalError("T16_CASE_SUITE_NOT_PROVIDED_BY_PARENT")
+              }
+              return suite
+          }
+          
+          @MainActor private extension RootIntentHost {
+              static func t16Check(_ condition: Bool, _ marker: String) {
+                  if !condition { fatalError(marker) }
+              }
+              static func t16Wait(_ marker: String, _ condition: () -> Bool) async throws {
+                  let deadline = ProcessInfo.processInfo.systemUptime + 5
+                  while !condition() {
+                      t16Check(ProcessInfo.processInfo.systemUptime < deadline, marker)
+                      try await Task.sleep(nanoseconds: 1_000_000)
+                  }
+              }
+              func t16Diagnostics() async throws -> LoopAudioService.Diagnostics {
+                  let box = T16DiagnosticBox()
+                  keepAlive.requestT16Diagnostics { box.store($0) }
+                  try await Self.t16Wait("T16_DIAGNOSTIC_DEADLINE") { box.get() != nil }
+                  return box.get()!
+              }
+          
+              static func t16(_ name: String) async throws {
+                  t16Check(["read", "write", "encode", "rollback-rename"].contains(name), "T16_UNKNOWN_CASE")
+                  let gate = T16StorageGate.shared
+                  guard let caseRoot = ProcessInfo.processInfo.environment["T16_CASE_ROOT"], caseRoot.hasPrefix("/") else {
+                      fatalError("T16_CASE_ROOT_NOT_PROVIDED_BY_PARENT")
+                  }
+                  let folder = URL(fileURLWithPath: caseRoot, isDirectory: true).appendingPathComponent("settings-fixture")
+                  try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                  defer { try? FileManager.default.removeItem(at: folder) }
+                  let target = folder.appendingPathComponent("settings.json")
+                  let suite = t16FixtureSuite()
+                  let defaults = UserDefaults(suiteName: suite)!
+                  defer { defaults.removePersistentDomain(forName: suite) }
+                  var saved = AppSettings()
+                  saved.server.listenPort = "23456"
+                  saved.background.silentAudio = true
+                  let original = try saved.encoded()
+                  try original.write(to: target, options: .atomic)
+                  if name == "read" { gate.arm("read") }
+                  // Real default storage functions are retained, including FileHandle,
+                  // JSONEncoder, Data.write(.atomic) and the explicit rollback rename.
+                  let settings = SettingsStore(fileURL: target, legacy: defaults)
+                  let host = RootIntentHost(settings: settings)
+                  let importOutcome = T16Outcome()
+                  var importTask: Task<Void, Never>?
+                  if name == "read" {
+                      try await t16Wait("T16_PHASE_NOT_ENTERED") { gate.isHeld("read") }
+                      // An explicit live On remains possible while initial load is held.
+                      // This gives Off actual playing work to stop before releasing read.
+                      host.applyAudioIntent(true)
+                  } else {
+                      try await t16Wait("T16_INITIAL_LOAD_DEADLINE") { settings.loadState != .loading }
+                      t16Check(settings.loadState == .ready, "T16_INITIAL_LOAD_FAILED")
+                      host.restoreServices()
+                  }
+                  try await t16Wait("T16_PLAYING_DEADLINE") { host.keepAlive.audioState == "Playing silent WAV continuously" }
+          
+                  if name == "write" || name == "encode" {
+                      gate.arm(name)
+                      // Start independent persistence while audio remains On. Off is not
+                      // the operation that causes the write/encode barrier to be entered.
+                      settings.set(\.selectedTab, .server)
+                  } else if name == "rollback-rename" {
+                      gate.arm("after-import-commit")
+                      gate.arm("rollback-rename")
+                      gate.arm("after-rollback-rename")
+                      var replacement = saved
+                      replacement.server.listenPort = "34567"
+                      let data = try replacement.encoded()
+                      importTask = Task { @MainActor in
+                          do {
+                              try await settings.importData(data)
+                              importOutcome.succeeded = true
+                          } catch {
+                              importOutcome.cancelled = error is CancellationError
+                              importOutcome.error = String(describing: error)
+                          }
+                          importOutcome.finished = true
+                      }
+                      try await t16Wait("T16_IMPORT_COMMIT_NOT_ENTERED") { gate.isHeld("after-import-commit") }
+                      t16Check(try Data(contentsOf: target) != original, "T16_IMPORT_NOT_COMMITTED")
+                      importTask?.cancel()
+                      gate.release("after-import-commit")
+                  }
+          
+                  try await t16Wait("T16_PHASE_NOT_ENTERED") { gate.isHeld(name) }
+                  t16Check(host.keepAlive.audioState == "Playing silent WAV continuously", "T16_NOT_PLAYING_BEFORE_OFF")
+                  let enteredAt = gate.enteredAt(name)!
+                  let offIssuedAt = ProcessInfo.processInfo.systemUptime
+                  t16Check(offIssuedAt >= enteredAt && gate.isHeld(name), "T16_OFF_ISSUED_BEFORE_WORKER_HELD")
+                  host.applyAudioIntent(false)
+                  settings.set(\.selectedTab, .settings)
+                  t16Check(!settings.value.background.silentAudio && settings.savePending, "T16_OFF_INTENT_NOT_ACCEPTED")
+          
+                  var heartbeats = 0
+                  let heartbeatDeadline = ProcessInfo.processInfo.systemUptime + 5
+                  for _ in 0..<100 {
+                      try await Task.sleep(nanoseconds: 1_000_000)
+                      t16Check(ProcessInfo.processInfo.systemUptime < heartbeatDeadline, "T16_MAIN_HEARTBEAT_DEADLINE")
+                      t16Check(gate.isHeld(name), "T16_GATE_RELEASED_BEFORE_HEARTBEAT")
+                      heartbeats += 1
+                  }
+                  try await t16Wait("T16_OFF_NOT_COMPLETED_WHILE_STORAGE_HELD") {
+                      host.keepAlive.audioState == "Off" && host.keepAlive.claimsBalanced()
+                  }
+                  let audio = try await host.t16Diagnostics()
+                  t16Check(audio.operation == nil && !audio.timerActive && audio.maximumOutstanding == 1,
+                           "T16_AUDIO_OR_TIMER_OR_OPERATION_REMAINS")
+                  let claims = host.keepAlive.t16Claims()
+                  t16Check(claims.requests > 0 && claims.endings.sorted() == Array(1...claims.requests),
+                           "T16_LEASE_END_COUNT_OR_IDENTITY")
+                  t16Check(heartbeats == 100 && gate.isHeld(name), "T16_HELD_POSTCONDITIONS_NOT_COMPLETE")
+                  let offCompletedAt = ProcessInfo.processInfo.systemUptime
+          
+                  var rollbackExact: Bool?
+                  gate.release(name)
+                  if name == "rollback-rename" {
+                      try await t16Wait("T16_ROLLBACK_COMPLETION_NOT_ENTERED") { gate.isHeld("after-rollback-rename") }
+                      rollbackExact = try Data(contentsOf: target) == original
+                      t16Check(rollbackExact == true, "T16_ROLLBACK_ORIGINAL_BYTES_DIFFER")
+                      gate.release("after-rollback-rename")
+                      try await t16Wait("T16_IMPORT_RECEIPT_DEADLINE") { importOutcome.finished }
+                      t16Check(importOutcome.cancelled && !importOutcome.succeeded, "T16_CANCELLED_IMPORT_ACCEPTED")
+                  }
+                  try await t16Wait("T16_LOAD_COMPLETION_DEADLINE") { settings.loadState != .loading }
+                  let flush = T16Outcome()
+                  Task { @MainActor in
+                      do { try await settings.flush(); flush.succeeded = true }
+                      catch { flush.error = String(describing: error) }
+                      flush.finished = true
+                  }
+                  try await t16Wait("T16_FINAL_FLUSH_DEADLINE") { flush.finished }
+                  t16Check(flush.succeeded && !settings.savePending && settings.errorMessage == nil, "T16_FINAL_FLUSH_FAILED")
+                  let finalBytes = try Data(contentsOf: target)
+                  let durable = try AppSettings.decoded(finalBytes)
+                  t16Check(durable == settings.value && !durable.background.silentAudio &&
+                           durable.selectedTab == .settings && durable.server == saved.server &&
+                           !durable.serverRunning && !durable.background.continuousLocation,
+                           "T16_LATEST_DURABLE_INTENT_DIFFER")
+                  host.restoreServices()
+                  try await t16Wait("T16_FINAL_OFF_DEADLINE") { host.keepAlive.audioState == "Off" && host.keepAlive.claimsBalanced() }
+                  let finalAudio = try await host.t16Diagnostics()
+                  t16Check(finalAudio.operation == nil && !finalAudio.timerActive && finalAudio.maximumOutstanding == 1,
+                           "T16_FINAL_AUDIO_CLEANUP_DIFFER")
+                  t16Check(try FileManager.default.contentsOfDirectory(atPath: folder.path).allSatisfy { !$0.hasSuffix(".backup") },
+                           "T16_BACKUP_LEAK")
+                  let timeline = gate.timeline()
+                  t16Check(timeline[name]!["released"]! >= offCompletedAt, "T16_RELEASE_PRECEDED_OFF_COMPLETION")
+                  let finalClaims = host.keepAlive.t16Claims()
+                  var record: [String: Any] = [
+                      "case": name, "status": "PASS", "main_heartbeats_while_held": heartbeats,
+                      "off_issued_at": offIssuedAt, "off_completed_at": offCompletedAt,
+                      "timeline": timeline, "worker_not_main": true,
+                      "off_request_after_confirmed_worker_hold": true,
+                      "audio_operation_after_off": NSNull(), "audio_timer_after_off": false,
+                      "maximum_outstanding_audio_operations": audio.maximumOutstanding,
+                      "lease_requests_at_off": claims.requests, "lease_ends_at_off": claims.endings,
+                      "final_lease_requests": finalClaims.requests, "final_lease_ends": finalClaims.endings,
+                      "final_settings": try JSONSerialization.jsonObject(with: finalBytes),
+                      "final_save_pending": settings.savePending, "backup_files_remaining": 0,
+                      "scope": "Exact application source bodies with explicit host observation gates; controlled endpoint and grant provider. Not AVFAudio, physical storage syscall, iOS protection or UI proof."
+                  ]
+                  if let rollbackExact { record["rollback_restored_original_bytes"] = rollbackExact }
+                  let encoded = try JSONSerialization.data(withJSONObject: record, options: [.sortedKeys])
+                  print("T16_RESULT " + String(data: encoded, encoding: .utf8)!)
+              }
+          }
+          
+          @main private enum T16StorageBoundaryMain {
+              @MainActor static func main() async throws {
+                  let name = CommandLine.arguments.dropFirst().first ?? "read"
+                  if name == "--cleanup-suite" {
+                      // Parent executes this even after fatalError/timeout. No product
+                      // object or mutant path is instantiated in this cleanup process.
+                      let suite = t16FixtureSuite()
+                      let defaults = UserDefaults(suiteName: suite)!
+                      defaults.removePersistentDomain(forName: suite)
+                      let domain = defaults.persistentDomain(forName: suite)
+                      RootIntentHost.t16Check(domain == nil || domain!.isEmpty, "T16_SUITE_CLEANUP_FAILED")
+                      let receipt: [String: Any] = ["suite": suite, "persistent_domain_empty_or_absent": true]
+                      let data = try JSONSerialization.data(withJSONObject: receipt, options: [.sortedKeys])
+                      print("T16_CLEANUP_RESULT " + String(data: data, encoding: .utf8)!)
+                      return
+                  }
+                  try await RootIntentHost.t16(name)
+              }
+          }
+          SWIFT_T16_DRIVER
+          python3 - <<'PY_T16_HASHES'
+          import hashlib, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 't16'
+          pins = {'t16_storage_boundaries.py': 'cab70be81bffcb75c3f130aa86ccd5baa3d7cf77c1c451a7e6ba337ed1f65027', 'T16StorageBoundaryDriver.swift': 'e7a3a0a201281192e79a3c5f76d1ca5ac1fdea2f2f1ad54e1c38c972b0705665'}
+          for name, expected in pins.items():
+              if hashlib.sha256((root / name).read_bytes()).hexdigest() != expected:
+                  raise SystemExit('Materialized T16 input differs from reviewed bytes: ' + name)
+          PY_T16_HASHES
+      - name: Record the host compiler and Apple environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          swiftc --version | tee artifacts/compiler.txt
+          if [ "$RUNNER_OS" = macOS ]; then
+            xcodebuild -version | tee artifacts/apple-environment.txt
+            xcrun --sdk iphoneos --show-sdk-version | tee -a artifacts/apple-environment.txt | grep -E '^27\.'
+            sw_vers >> artifacts/apple-environment.txt
+          fi
+      - name: Verify four held worker phases and two named controls in both Swift modes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$RUNNER_TEMP/t16/t16_storage_boundaries.py" \
+            --source-root product-source --output artifacts/t16-boundaries
+      - name: Preserve actual supplemental evidence including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Audio-Final-T16-${{ matrix.label }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
