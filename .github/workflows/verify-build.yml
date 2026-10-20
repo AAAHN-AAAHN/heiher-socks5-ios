@@ -43,7 +43,7 @@ jobs:
   verify-macos:
     name: verify (xcode-27)
     runs-on: xcode-27
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       BUILD_IPA: '1'
     outputs:
