@@ -1,18 +1,26 @@
 {
-  "branch": "feature/background",
-  "frozen_source": "0244d1e83b325c3cf4e775d40f95d1c9d5746e25",
+  "branch": "release/integrated",
+  "frozen_source": "3bb1e35058f2bb75b4b56c03df2c29f2352be764",
   "parents": {
-    "main": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7"
+    "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
+    "feature/background": "30d3ca282eb7a74dde5a9f9a5a88d78dbc5f9c6a",
+    "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
+    "feature/settings-persistence": "272ce294d1477d566c9cc04cf0a262b3b2cb9c4e",
+    "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
+    "feature/traffic-statistics": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e"
   },
   "owned_documents": [
     "README.md",
-    "docs/features/background.md"
+    "docs/features/integrated.md"
   ],
-  "readme_mirror": "docs/features/background.md",
+  "readme_mirror": "docs/features/integrated.md",
   "validation_files": {
-    "Build/check.py": "c9320437ee4cfd13833aece0bc59f8f2d9d38dd5",
+    "Build/check.py": "8b3aaea839e4e520bc46e8faea5afda10e780e5f",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
+    "Build/check_ownership.py": "3b234c9cc2c49647c9b9f0cad852f992a7194ce4",
+    "Tests/AppIcon/check_icon.py": "df9748bbb27f5e71cccc647a9fd1cc9c03fc73ab",
     "Tests/Background/check_scope.py": "b25a71e135f3b3c032bcfdc93b057e1e1aff5531",
+    "Tests/Statistics/audit.py": "62c0fc22ce1cf714dbec4c9bb3071a75ec167b06",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }

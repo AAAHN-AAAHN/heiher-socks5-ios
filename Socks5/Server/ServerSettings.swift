@@ -1,0 +1,77 @@
+import Foundation
+
+/// Validated server options; Codable supports callers without owning any storage.
+struct ServerSettings: Codable, Equatable {
+    var workers = "4"
+    var listenAddress = "::"
+    var listenPort = "1080"
+    var udpListenAddress = ""
+    var udpListenPort = "1080"
+    var bindIPv4Address = "0.0.0.0"
+    var bindIPv6Address = "::"
+    var bindInterface = ""
+    var authUsername = ""
+    var authPassword = ""
+    var listenIPv6Only = false
+
+    /// Validate before starting; partially edited text can still be saved as a draft.
+    func configuration() throws -> String {
+        guard let count = Int(workers), (1...64).contains(count),
+              let port = Int(listenPort), (1...65535).contains(port),
+              let udpPort = Int(udpListenPort), (0...65535).contains(udpPort) else {
+            throw ServerConfigurationError.invalid("Use 1-64 workers, a listen port of 1-65535, and a UDP port of 0-65535.")
+        }
+        let fields = [listenAddress, udpListenAddress, bindIPv4Address, bindIPv6Address,
+                      bindInterface, authUsername, authPassword]
+        // The native parser stores each of these fields in a 256-byte C buffer.
+        guard fields.allSatisfy({ $0.utf8.count <= 255 && $0.rangeOfCharacter(from: .controlCharacters.union(.newlines)) == nil }),
+              authUsername.isEmpty == authPassword.isEmpty else {
+            throw ServerConfigurationError.invalid("Text fields must be single-line and at most 255 UTF-8 bytes. Set both authentication fields or leave both empty.")
+        }
+        let yamlExcluded = CharacterSet(charactersIn: "\u{FFFE}\u{FFFF}")
+        guard fields.allSatisfy({ $0.rangeOfCharacter(from: yamlExcluded) == nil }) else {
+            throw ServerConfigurationError.invalid("Text fields must not contain U+FFFE or U+FFFF.")
+        }
+        func quote(_ text: String) -> String { "'" + text.replacingOccurrences(of: "'", with: "''") + "'" }
+        return """
+        main:
+          workers: \(count)
+          port: \(port)
+          listen-address: \(quote(listenAddress))
+          udp-port: \(udpPort)
+          udp-listen-address: \(quote(udpListenAddress))
+          listen-ipv6-only: \(listenIPv6Only)
+          bind-address-v4: \(quote(bindIPv4Address))
+          bind-address-v6: \(quote(bindIPv6Address))
+          bind-interface: \(quote(bindInterface))
+        auth:
+          username: \(quote(authUsername))
+          password: \(quote(authPassword))
+        """
+    }
+}
+
+enum ServerConfigurationError: LocalizedError {
+    case invalid(String)
+    var errorDescription: String? {
+        switch self { case .invalid(let message): return message }
+    }
+}
+
+extension ServerSettings {
+    /// Hev receives UTF-8 bytes, not Swift's canonically equivalent characters.
+    /// Keep credential changes and raw drafts observable without normalizing them.
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.workers.utf8.elementsEqual(rhs.workers.utf8) &&
+        lhs.listenAddress.utf8.elementsEqual(rhs.listenAddress.utf8) &&
+        lhs.listenPort.utf8.elementsEqual(rhs.listenPort.utf8) &&
+        lhs.udpListenAddress.utf8.elementsEqual(rhs.udpListenAddress.utf8) &&
+        lhs.udpListenPort.utf8.elementsEqual(rhs.udpListenPort.utf8) &&
+        lhs.bindIPv4Address.utf8.elementsEqual(rhs.bindIPv4Address.utf8) &&
+        lhs.bindIPv6Address.utf8.elementsEqual(rhs.bindIPv6Address.utf8) &&
+        lhs.bindInterface.utf8.elementsEqual(rhs.bindInterface.utf8) &&
+        lhs.authUsername.utf8.elementsEqual(rhs.authUsername.utf8) &&
+        lhs.authPassword.utf8.elementsEqual(rhs.authPassword.utf8) &&
+        lhs.listenIPv6Only == rhs.listenIPv6Only
+    }
+}

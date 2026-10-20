@@ -1,0 +1,305 @@
+#!/usr/bin/env python3
+"""Native-only audit: no Apple framework build, xcodebuild archive, or IPA output."""
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+OUT = ROOT / 'artifacts/udp-final-audit'
+CORE = ROOT / '.build/udp-final-audit/core'
+CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
+SUMMARY = []
+
+
+def run(args, name, cwd=ROOT, timeout=180):
+    args = [str(arg) for arg in args]
+    mode = 'a' if name.endswith('.log') else 'w'
+    with (OUT / name).open(mode) as log:
+        if mode == 'a':
+            log.write(json.dumps(args) + '\n')
+            log.flush()
+        subprocess.run(args, cwd=cwd, stdout=log,
+                       stderr=subprocess.STDOUT, check=True, timeout=timeout)
+
+
+def patch(name, repo, reverse=False):
+    args = ['git', '-C', repo, 'apply', '--whitespace=error-all']
+    if reverse:
+        args.append('-R')
+    run([*args, '--check', ROOT / 'Patches' / name], name + '.check.log')
+    run([*args, ROOT / 'Patches' / name], name + '.apply.log')
+
+
+def network(name, *options, observation=False):
+    args = [sys.executable, ROOT / 'Tests/udp_sockaddr_regression.py',
+            CORE / 'bin/hev-socks5-server', '--output', OUT / (name + '.json'),
+            *options]
+    if observation:
+        args.append('--allow-failures')
+    run(args, name + '.log', timeout=90)
+    rows = json.loads((OUT / (name + '.json')).read_text())
+    SUMMARY.append({'profile': name, 'observation_only': observation,
+                    'passed': sum(row['passed'] for row in rows),
+                    'failed': [row for row in rows if not row['passed']]})
+    return rows
+
+
+def build():
+    run(['make', '-j3', 'static', 'exec'], 'native-build.log', CORE)
+
+
+
+def prior_three_patch_server():
+    # Preserve the exact historical truncation oracle. New upstream deliberately
+    # drops MSG_TRUNC, so rebuilding the old control on new sources is invalid.
+    reference = 'c286fbb0871490fec03f0f22b74fcd605fc97394'
+    config = json.loads(subprocess.check_output(
+        ['git', 'show', reference + ':Build/features.json'], cwd=ROOT, text=True))
+    core = CORE.parent / 'prior-core'
+    for path, sha in config['sources'].items():
+        run(['git', 'worktree', 'add', '--detach', core / path, sha],
+            'prior-source.log', CORE / path)
+    for item in config['patches'][:3]:
+        data = subprocess.check_output(
+            ['git', 'show', reference + ':Patches/' + item['file']], cwd=ROOT)
+        source = OUT / ('prior-' + item['file'])
+        source.write_bytes(data)
+        for options in (['--check'], []):
+            run(['git', 'apply', '--index', '--whitespace=error-all', *options, source],
+                'prior-patches.log', core / item['repository'])
+    run(['make', '-j3', 'static', 'exec'], 'prior-build.log', core)
+    binary = OUT / 'three-patch-server'
+    shutil.copy2(core / 'bin/hev-socks5-server', binary)
+    (OUT / 'prior-input.json').write_text(json.dumps(
+        {'reference': reference, 'sources': config['sources'],
+         'patches': config['patches'][:3]}, indent=2) + '\n')
+    return binary
+
+
+def main():
+    # A rejected or failed retry must not reuse an earlier success marker.
+    (OUT / 'SUCCESS.txt').unlink(missing_ok=True)
+    if not __debug__:
+        raise SystemExit('Assertions are required; do not use Python -O.')
+    if CONFIG['name'] != 'udp-compat' or CONFIG['features'] != ['udp']:
+        raise SystemExit('This audit is only for the UDP compatibility branch.')
+    OUT.mkdir(parents=True, exist_ok=True)
+    if CORE.exists():
+        raise SystemExit('Use a fresh checkout or remove .build/udp-final-audit first.')
+    # The working files, index and archived HEAD must describe the same input.
+    run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'input-worktree.log')
+    run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'input-index.log')
+    run(['git', 'rev-parse', 'HEAD'], 'tested-commit.txt')
+    run(['git', 'diff', '--name-status', CONFIG['base_commit'], 'HEAD'], 'branch-files.txt')
+    run(['git', 'diff', CONFIG['base_commit'], 'HEAD'], 'branch-diff.patch')
+    run(['git', 'archive', '--format=zip', 'HEAD', '-o', OUT / 'source.zip'], 'source-archive.log')
+    if (ROOT / 'README.md').read_bytes() != (ROOT / 'docs/features/udp-compatibility.md').read_bytes():
+        raise RuntimeError('Root README and feature specification differ.')
+    # Unified patches require a single space on empty context lines. Their added
+    # C code is checked separately by git apply and the upstream formatter.
+    run(['git', 'diff', '--check', CONFIG['base_commit'], 'HEAD', '--', '.',
+         ':(exclude)Patches/*.patch'], 'whitespace.log')
+    run([sys.executable, 'Build/check.py', 'baseline'], 'baseline.log')
+    run([sys.executable, 'Tests/baseline_audit.py'], 'baseline-driver.log')
+    run([sys.executable, 'Build/check.py', 'composition'], 'composition.log')
+    run([sys.executable, 'Tests/udp_audit_driver_regression.py'], 'audit-driver.log')
+    if sys.platform == 'darwin':
+        run(['plutil', '-lint', 'Socks5/Info.plist',
+             'Socks5.xcodeproj/project.pbxproj'], 'xcode-metadata.log')
+    run(['git', 'clone', '--no-checkout', 'https://github.com/heiher/hev-socks5-server.git', CORE], 'clone.log')
+    run(['git', 'checkout', '--detach', CONFIG['sources']['.']], 'checkout.log', CORE)
+    run(['git', 'submodule', 'update', '--init', '--recursive'], 'submodules.log', CORE)
+    for path, sha in CONFIG['sources'].items():
+        actual = subprocess.check_output(['git', '-C', str(CORE / path), 'rev-parse', 'HEAD'], text=True).strip()
+        if actual != sha:
+            raise RuntimeError('Source mismatch: ' + path)
+
+    # Negative controls distinguish the two repairs; these are not pass claims.
+    build()
+    baseline = network('control-unpatched', observation=True)
+    network('control-unpatched-fixed', '--fixed-udp-port', observation=True)
+    run(['make', 'clean'], 'clean.log', CORE)
+    patch('hev-udp-port-zero.patch', CORE)
+    build()
+    port_only = network('control-port-only', observation=True)
+    run(['make', 'clean'], 'clean.log', CORE)
+    patch('hev-udp-port-zero.patch', CORE, reverse=True)
+    patch('hev-udp-sockaddr.patch', CORE / 'src/core')
+    build()
+    address_only = network('control-address-only', observation=True)
+    run(['make', 'clean'], 'clean.log', CORE)
+    patch('hev-udp-port-zero.patch', CORE)
+    build()
+    run([sys.executable, 'Tests/udp_peer_regression.py', CORE / 'bin/hev-socks5-server',
+         '--expect-vulnerable', '--output', OUT / 'peer-original.json'],
+        'peer-original.log', timeout=45)
+    run(['make', 'clean'], 'clean.log', CORE)
+    patch('hev-udp-peer-filter.patch', CORE / 'src/core')
+    build()
+    run([sys.executable, 'Tests/udp_peer_regression.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / 'peer-filtered.json'], 'peer-filtered.log', timeout=45)
+    old_binary = prior_three_patch_server()
+    if sys.platform == 'linux':
+        run([sys.executable, 'Tests/udp_worker_resources.py', old_binary,
+             '--old-control', '--output', OUT / 'worker-resource-old-control.json'],
+            'worker-resource-old-control.log', timeout=30)
+    else:
+        print('SKIP: old-server FD starvation control is Linux-only; '
+              'the current-server resource checks remain required.', flush=True)
+    run([sys.executable, 'Tests/udp_buffer_network.py', old_binary,
+         '--old-control', '--output', OUT / 'buffer-old-control.json'],
+        'buffer-old-control.log', timeout=45)
+    run([sys.executable, 'Tests/udp_header_regression.py', old_binary,
+         '--old-control', '--output', OUT / 'header-old-control.json'],
+        'header-old-control.log', timeout=45)
+    run(['make', 'clean'], 'clean.log', CORE)
+    for item in CONFIG['patches'][3:]:
+        patch(item['file'], CORE / item['repository'])
+    build()
+
+    formatter = shutil.which('clang-format-18') or shutil.which('clang-format')
+    if not formatter:
+        raise RuntimeError('clang-format 18 is required.')
+    version = subprocess.check_output([formatter, '--version'], text=True)
+    if 'version 18.' not in version:
+        raise RuntimeError(version)
+    run([formatter, CORE / 'src/core/src/hev-socks5-udp.c'], 'expected-dynamic-core.c')
+    for name in ('udp_buffer_unit.c', 'udp_buffer_io.c', 'udp_buffer_timer.c',
+                 'udp_buffer_send.c', 'udp_buffer_live_hold.c', 'udp_stream_boundaries.c',
+                 'udp_splicer_lifetime.c', 'udp_netaddr_errors.c',
+                 'udp_session_setup.c', 'udp_address_conversion.c',
+                 'udp_reactor_resources.c', 'udp_worker_failures.c',
+                 'udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c',
+                 'udp_signal_lifecycle.c', 'udp_gso.c', 'udp_socket_interrupt.c'):
+        run([formatter, '--style=file:' + str(CORE / '.clang-format'), ROOT / 'Tests' / name],
+            'expected-' + name)
+        if (OUT / ('expected-' + name)).read_bytes() != (ROOT / 'Tests' / name).read_bytes():
+            raise RuntimeError('New unit fixture differs from upstream formatting: ' + name)
+    run([sys.executable, 'Build/check.py', 'format', CORE, formatter], 'core-format.log')
+    # The test follows the same project formatting as the C code it exercises.
+    formatted = subprocess.check_output([formatter, '--style=file:' + str(CORE / '.clang-format'),
+                                         str(ROOT / 'Tests/udp_sockaddr_unit.c')])
+    if formatted != (ROOT / 'Tests/udp_sockaddr_unit.c').read_bytes():
+        raise RuntimeError('The UDP unit test differs from upstream C formatting.')
+
+    if sys.platform == 'darwin':
+        sdk = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path'], text=True).strip()
+        includes = ['-I' + str(CORE / path) for path in (
+            'src/misc', 'src/core/include', 'src/core/src',
+            'third-part/yaml/src', 'third-part/hev-task-system/include',
+            'third-part/hev-task-system/src')]
+        sources = {CORE / item['repository'] / name
+                   for item in CONFIG['patches']
+                   for name in re.findall(r'^\+\+\+ b/(.+\.c)$',
+                                          (ROOT / 'Patches' / item['file']).read_text(), re.M)}
+        run(['xcrun', '--sdk', 'iphoneos', 'clang', '-target', 'arm64-apple-ios17.2',
+             '-isysroot', sdk, '-std=gnu11', '-Wall', '-Werror', '-fsyntax-only',
+             *includes, *sorted(sources)], 'ios-arm64-syntax.log')
+        if all(row['passed'] for row in baseline):
+            raise RuntimeError('Darwin negative control did not reproduce either defect.')
+        known = next(row for row in port_only if row['test'].startswith('UDP 127.0.0.1 hint=known'))
+        unknown = next(row for row in address_only if row['test'].startswith('UDP 127.0.0.1 hint=0.0.0.0'))
+        if not known.get('error', '').startswith('AssertionError: Wrong source:'):
+            raise RuntimeError('Missing address repair did not produce a wrong source address.')
+        if unknown.get('error') != 'AssertionError: UDP/TCP setup REP=0x01':
+            raise RuntimeError('Missing port repair did not produce the expected setup error.')
+
+    network('patched-default')
+    network('patched-workers4', '--workers', '4')
+    network('patched-mixed', '--unbound')
+    network('patched-mixed-workers4', '--unbound', '--workers', '4')
+    for workers in ('1', '4'):
+        network('patched-fixed-known-' + workers, '--fixed-udp-port', '--known-concurrent', '--workers', workers)
+        network('limit-fixed-unknown-' + workers, '--fixed-udp-port', '--workers', workers, observation=True)
+
+    compiler = os.environ.get('CC', 'clang')
+    includes = ['-I' + str(CORE / 'src'), '-I' + str(CORE / 'src/core/src'),
+                '-I' + str(CORE / 'src/misc'),
+                '-I' + str(CORE / 'third-part/hev-task-system/include'),
+                '-I' + str(CORE / 'third-part/hev-task-system/src')]
+    libs = [CORE / 'bin/libhev-socks5-server.a', CORE / 'third-part/yaml/bin/libyaml.a',
+            CORE / 'third-part/hev-task-system/bin/libhev-task-system.a']
+    executable = OUT / 'unit'
+    run([compiler, '-std=gnu11', '-O2', '-g', '-Wall', '-Werror', '-pthread',
+         '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer',
+         *includes, ROOT / 'Tests/udp_sockaddr_unit.c', *libs, '-o', executable], 'unit-build.log')
+    run([executable], 'unit.log')
+    executable.unlink()
+    run([compiler, '-std=gnu11', '-O3', '-Wall', '-Werror', '-fstrict-aliasing', '-pthread',
+         *includes, ROOT / 'Tests/udp_sockaddr_unit.c', *libs, '-o', executable], 'unit-optimized-build.log')
+    run([executable], 'unit-optimized.log')
+    executable.unlink()
+
+    for name in ('udp_buffer_unit', 'udp_buffer_io', 'udp_buffer_send',
+                 'udp_stream_boundaries', 'udp_splicer_lifetime', 'udp_netaddr_errors',
+                 'udp_session_setup', 'udp_address_conversion',
+                 'udp_reactor_resources', 'udp_worker_failures',
+                 'udp_proxy_worker_cascade', 'udp_dns_lifecycle',
+                 'udp_signal_lifecycle', 'udp_gso', 'udp_socket_interrupt'):
+        modes = [('asan', ['-O1', '-g', '-fsanitize=address,undefined',
+                           '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']),
+                 ('optimized', ['-O3', '-fstrict-aliasing'])]
+        if name == 'udp_socket_interrupt':
+            modes += [(label + '-fallback', flags + ['-DFORCE_FALLBACK'])
+                      for label, flags in modes[:2]]
+            if sys.platform == 'linux':
+                modes += [(label + '-splice', flags + ['-DENABLE_IO_SPLICE_SYSCALL'])
+                          for label, flags in modes[:2]]
+        for mode, flags in modes:
+            executable = OUT / (name + '-' + mode)
+            run([compiler, '-std=gnu11', '-Wall', '-Werror', '-pthread', *flags,
+                 *includes, ROOT / 'Tests' / (name + '.c'), *libs, '-o', executable],
+                name + '-' + mode + '-build.log')
+            run([executable], name + '-' + mode + '.log')
+            executable.unlink()
+    if sys.platform == 'darwin':
+        executable = OUT / 'auth-publication-tsan'
+        run([compiler, '-std=gnu11', '-O1', '-g', '-Wall', '-Werror', '-pthread',
+             '-fsanitize=thread', *includes, ROOT / 'Tests/udp_proxy_worker_cascade.c',
+             CORE / 'third-part/hev-task-system/src/lib/object/hev-object-atomic.c',
+             *libs, '-o', executable], 'auth-publication-tsan-build.log')
+        run(['env', 'TSAN_OPTIONS=halt_on_error=1', executable, '--auth-publication'],
+            'auth-publication-tsan.log', timeout=40)
+        executable.unlink()
+    executable = OUT / 'buffer-real-timer'
+    run([compiler, '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread', *includes,
+         ROOT / 'Tests/udp_buffer_timer.c', *libs, '-o', executable], 'buffer-real-timer-build.log')
+    run([executable], 'buffer-real-timer.log', timeout=90)
+    executable.unlink()
+    executable = OUT / 'buffer-live-hold'
+    run([compiler, '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread', *includes,
+         ROOT / 'Tests/udp_buffer_live_hold.c', *libs, '-o', executable], 'buffer-live-hold-build.log')
+    run([executable], 'buffer-live-hold.log', timeout=490)
+    executable.unlink()
+    run([sys.executable, 'Tests/udp_header_regression.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / 'header-regression.json'], 'header-regression.log', timeout=45)
+    run([sys.executable, 'Tests/udp_worker_resources.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / 'worker-resources.json'], 'worker-resources.log', timeout=30)
+    run([sys.executable, 'Tests/udp_buffer_network.py', CORE / 'bin/hev-socks5-server',
+         '--output', OUT / 'buffer-network.json'], 'buffer-network.log', timeout=120)
+    run([sys.executable, 'Tests/udp_buffer_network.py', CORE / 'bin/hev-socks5-server',
+         '--udp-buffer-count', '342', '--output', OUT / 'buffer-large-batch.json'],
+        'buffer-large-batch.log', timeout=120)
+    run([sys.executable, 'Tests/udp_buffer_benchmark.py', old_binary,
+         CORE / 'bin/hev-socks5-server', '--output', OUT / 'buffer-benchmark.json'],
+        'buffer-benchmark.log', timeout=180)
+    # Preserve exact patched C and header bytes before the mandatory reversal.
+    run(['tar', '--exclude=./.git', '--exclude=*/.git', '--exclude=./bin',
+         '--exclude=*/bin', '--exclude=./build', '--exclude=*/build',
+         '-czf', OUT / 'native-patched-source.tar.gz', '.'], 'native-archive.log', CORE)
+    run([sys.executable, 'Build/check.py', 'reverse', CORE], 'reverse.log')
+    run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'final-worktree.log')
+    run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'final-index.log')
+    (OUT / 'SUCCESS.txt').write_text('Scoped UDP repair and dynamic-buffer audit passed. Read summary.json and buffer evidence for limits and observations. No IPA was built.\n')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    finally:
+        if OUT.exists():
+            (OUT / 'summary.json').write_text(json.dumps(SUMMARY, indent=2) + '\n')

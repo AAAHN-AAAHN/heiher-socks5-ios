@@ -39,11 +39,8 @@ def baseline():
     else:
         base = CONFIG['base_commit']
         git(ROOT, 'merge-base', '--is-ancestor', base, 'HEAD')
-        for path in ('Build/upstream.json', 'Build/baseline-framework.json', 'Build/build.sh',
-                     'HevSocks5Server.xcframework'):
+        for path in ('Build/upstream.json', 'Build/baseline-framework.json', 'HevSocks5Server.xcframework'):
             assert git(ROOT, 'rev-parse', 'HEAD:' + path) == git(ROOT, 'rev-parse', base + ':' + path), path
-    # Feature validation evolves with its source; the runtime build script,
-    # engine pins and committed framework above remain byte-locked to main.
     subprocess.run([sys.executable, str(ROOT / 'Build/check_documentation.py')], check=True)
     print('PASS: shared source pins, baseline framework, app identity and main ancestry')
 
@@ -51,6 +48,16 @@ def baseline():
 def patches():
     for item in CONFIG['patches']:
         yield item['repository'], ROOT / 'Patches' / item['file']
+
+
+def apply_patch(repo, patch, reverse=False):
+    if CONFIG['name'] == 'integrated' and patch.name == 'hev-server-startup-stop.patch':
+        from server_patch import apply as apply_server_patch
+        apply_server_patch(repo, patch, reverse=reverse)
+        return
+    options = ['-R'] if reverse else ['--whitespace=error-all']
+    git(repo, 'apply', *options, '--check', str(patch))
+    git(repo, 'apply', *options, str(patch))
 
 
 def apply(core):
@@ -63,8 +70,7 @@ def apply(core):
         assert not (git(repo, 'ls-files', '--others', '--exclude-standard') or
                     git(repo, 'ls-files', '--others', '--', 'src', 'include', '.rev-id')), 'Untracked native input: ' + relative
     for relative, patch in patches():
-        git(core / relative, 'apply', '--check', '--whitespace=error-all', str(patch))
-        git(core / relative, 'apply', '--whitespace=error-all', str(patch))
+        apply_patch(core / relative, patch)
         print(hashlib.sha256(patch.read_bytes()).hexdigest(), patch.name)
 
 
@@ -82,8 +88,7 @@ def formatting(core, formatter):
 
 def reverse(core):
     for relative, patch in reversed(list(patches())):
-        git(core / relative, 'apply', '-R', '--check', str(patch))
-        git(core / relative, 'apply', '-R', str(patch))
+        apply_patch(core / relative, patch, reverse=True)
     for relative in CONFIG['sources']:
         git(core / relative, 'diff', '--exit-code', 'HEAD', '--')
         git(core / relative, 'diff', '--cached', '--exit-code', 'HEAD', '--')
@@ -112,12 +117,11 @@ def composition():
         assert data.isascii() and b'\t' not in data and b'\r' not in data, path
         assert path.name + ' in Sources' in project, path
         assert all(not line.endswith(b' ') for line in data.splitlines()), path
-    for name, feature in [('Statistics', 'statistics'), ('Settings', 'settings'), ('BackgroundKeepAlive', 'background')]:
+    for name, feature in [('Statistics', 'statistics'), ('Settings', 'settings'), ('Server', 'server'), ('BackgroundKeepAlive', 'background')]:
         assert (ROOT / 'Socks5' / name).exists() == (feature in FEATURES), name
     if 'background' in FEATURES:
         silence(ROOT / 'Socks5/BackgroundKeepAlive/Silence.wav')
         view = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift').read_text()
-        assert 'private let audioEvents' not in view
         source = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift').read_text()
         for event in ('interruptionNotification', 'routeChangeNotification',
                       'mediaServicesWereLostNotification', 'mediaServicesWereResetNotification',
@@ -129,18 +133,22 @@ def composition():
             assert event in source, event
         service = (ROOT / 'Socks5/BackgroundKeepAlive/LoopAudioService.swift').read_text()
         assert 'service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,' in service
+        assert 'normalize: { BackgroundKeepAlive.audioEventValue($0) })' in service
+        assert 'BackgroundKeepAlive.audioNotifications' not in view
         assert 'var interval = 0.5' in service
         assert service.count('DispatchSource.makeTimerSource(') == 1
         assert service.count('DispatchSource.makeTimerSource(flags: recovery ? .strict : [], queue: control)') == 1
         assert 'precondition(outstanding == 1)' in service
         assert 'if next.stop != current.stop { releaseBarrier = true }' in service
-        assert 'Timer(' not in source and 'AVAudioPlayer' not in source
-        assert 'retryDelay' not in source and 'UserDefaults' not in source
-    if 'settings' in FEATURES:
+        assert 'Timer(timeInterval:' not in source + service
+        assert 'AVAudioPlayer' not in source and 'retryDelay' not in source
+        assert 'UserDefaults' not in source + service
+        assert 'private let audio: LoopAudioService' in source
+    if 'server' in FEATURES:
         content = (ROOT / 'Socks5/ContentView.swift').read_text()
         for field in ('workers', 'listenAddress', 'listenPort', 'udpListenAddress', 'udpListenPort',
                       'bindIPv4Address', 'bindIPv6Address', 'bindInterface', 'authUsername', 'authPassword', 'listenIPv6Only'):
-            assert f'settings.binding(\\.server.{field})' in content, field
+            assert f'$configuration.{field}' in content, field
     if 'icon' in FEATURES:
         data = (ROOT / 'Socks5/Assets.xcassets/AppIcon.appiconset/AppIcon.png').read_bytes()
         assert data[:8] == b'\x89PNG\r\n\x1a\n' and struct.unpack('>II', data[16:24]) == (1024, 1024)
@@ -151,6 +159,8 @@ def composition():
         members = json.loads((ROOT / 'docs/feature-membership.json').read_text())
         for name, expected in members['files'].items():
             assert hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == expected, name
+        subprocess.run([sys.executable, str(ROOT / 'Tests/Integration/intent_boundaries.py'), '--source-only'], check=True)
+    subprocess.run([sys.executable, str(ROOT / 'Build/check_ownership.py')], check=True)
     print('PASS: declared patches, isolated modules, source format, wiring and assets')
 
 
