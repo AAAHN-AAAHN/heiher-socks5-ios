@@ -2,9 +2,9 @@
   "base_commit": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7",
   "branches": {
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
-    "feature/background": "30d3ca282eb7a74dde5a9f9a5a88d78dbc5f9c6a",
+    "feature/background": "57b1da44671d8a5b4da6eec2200cd7a2f955403f",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
-    "feature/settings-persistence": "272ce294d1477d566c9cc04cf0a262b3b2cb9c4e",
+    "feature/settings-persistence": "1ba20d7a188c16b7e2fcde7f306597bbe8c2bca1",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
     "feature/traffic-statistics": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e"
   },
@@ -92,8 +92,8 @@
       "sha256": "d2d08c919f55190f8c5b162ed8077939752d9b44f8094aa9955719968793f8c1"
     },
     "Socks5/BackgroundKeepAlive/RecoveryExecutionLease.swift": {
-      "commit": "4915a593af682b2e532814c632cb8ec3f735151f",
-      "sha256": "cd2f9b23d74db9435142ce1977e81966f99dc31e9430545e6792859e6d7cb600"
+      "commit": "0244d1e83b325c3cf4e775d40f95d1c9d5746e25",
+      "sha256": "35d97c2c7809efff76edc048a7b91e68fb1bd728af9397a42fe28058fbc141c9"
     },
     "Socks5/BackgroundKeepAlive/Silence.wav": {
       "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
@@ -116,8 +116,8 @@
       "sha256": "719d98606021c927450bfd586d8de925190aa6687f10eefcafa108145e028c56"
     },
     "Socks5/Settings/SettingsStore.swift": {
-      "commit": "11ffc688cc4a1b02db63ae9d7e062ae88f0568ab",
-      "sha256": "3884dc86adaf5269990f19da5756808ae7e11f065caa6cb7bbdd72b8865ab7c9"
+      "commit": "e66e9e7085da03f251ba3376ddcc3ebbc1b2fd51",
+      "sha256": "d36b143f318b8b33e50ab8f42efd54ba3484f1af8705efdb2fbf43efe07b84d0"
     },
     "Socks5/Settings/SettingsView.swift": {
       "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
@@ -236,8 +236,8 @@
       "sha256": "a68d8709542eade49e1b93b83b855f03df6bc6db5a2b95bd7385569dbe901ad3"
     },
     "Tests/Background/LeaseLifecycleTests.swift": {
-      "commit": "4915a593af682b2e532814c632cb8ec3f735151f",
-      "sha256": "87c212f6088da22577a8f5ed229c1dc4dce8d8697fc5577fdbd09486c28cd5c2"
+      "commit": "0244d1e83b325c3cf4e775d40f95d1c9d5746e25",
+      "sha256": "17f22974797e47fda1304b9653aa9621577035ff08b914e9e987fb2b1153b496"
     },
     "Tests/Background/LifecycleTests.swift": {
       "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
@@ -324,8 +324,8 @@
       "sha256": "88ccb4b2f628d20d899277f85c7fb061e0f4ed1c6718312af1b0431dfa25e454"
     },
     "Tests/Background/check_loop_audio.py": {
-      "commit": "29d6cd0e0a8a6529bd85e2f28bad0814a671bb36",
-      "sha256": "81114e1c8c9e54645f72e251dd1e5994d46ce7649a9fccc52c0cf3b41c6b6e17"
+      "commit": "0244d1e83b325c3cf4e775d40f95d1c9d5746e25",
+      "sha256": "d6f332f0db70c0828c264d42fac7937b78f15ea1befd3eabff7df228c95f6ab4"
     },
     "Tests/Background/check_mixed_notifications.py": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
@@ -516,8 +516,8 @@
       "sha256": "be7e30168e945ee6092abb493c9679fabf32d37a677027675f3c1efb97c56e79"
     },
     "Tests/Settings/run_checks.py": {
-      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
-      "sha256": "105f4f56aa22a83b337480d856fe6b19aadd85fcf6229450025fa61548511db5"
+      "commit": "e66e9e7085da03f251ba3376ddcc3ebbc1b2fd51",
+      "sha256": "cc61a94049d32e17164a765c8d30fdc395fc9d1070361f716b26d968c6c39963"
     },
     "Tests/Settings/ui_audit.py": {
       "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
@@ -778,10 +778,18 @@
     "Tests/udp_worker_resources.py": {
       "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
       "sha256": "0d6d66b9f943396b7cdaaa994213a2043b99800db655381bde468cb291c49f61"
+    },
+    "Tests/Settings/RollbackFailureTests.swift": {
+      "commit": "e66e9e7085da03f251ba3376ddcc3ebbc1b2fd51",
+      "sha256": "4da53fad6c66629da991aa9dcfc3929ac420f4e283bc04418031904df5532f59"
+    },
+    "Tests/Settings/rollback_storage_check.py": {
+      "commit": "e66e9e7085da03f251ba3376ddcc3ebbc1b2fd51",
+      "sha256": "b59d92f61a09aa55d4b2c5be1ac513aa2d65ca7cc6b47b16125c9d64c5889ddc"
     }
   },
   "files": {
-    "Socks5/Settings/SettingsStore.swift": "3884dc86adaf5269990f19da5756808ae7e11f065caa6cb7bbdd72b8865ab7c9",
+    "Socks5/Settings/SettingsStore.swift": "d36b143f318b8b33e50ab8f42efd54ba3484f1af8705efdb2fbf43efe07b84d0",
     "Tests/udp_buffer_network.py": "66fb430ab26f7d69c8b5d22a78f8d1d50428919f83bf4b354ea10c90e5fc7703"
   }
 }
