@@ -6,6 +6,7 @@ Its evidence is labeled historical. Current-service tests run in separate driver
 """
 import hashlib
 import json
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -45,5 +46,26 @@ def run_historical(entry, arguments=()):
             if result.stderr: print(result.stderr, end='', file=sys.stderr, flush=True)
             result.check_returncode()
         finally:
-            subprocess.run(['git', '-C', str(ROOT), 'worktree', 'remove', '--force', str(checkout)], check=True)
+            had_original_error = sys.exc_info()[0] is not None
+            try:
+                failure = checkout / 'artifacts/audio-checks/async-session-failure'
+                if failure.is_dir():
+                    if failure.is_symlink() or any(path.is_symlink() for path in failure.rglob('*')):
+                        raise RuntimeError('Unexpected symlink in historical failure evidence')
+                    destination = directory / (label + '-failure-' + checkout.parent.name)
+                    shutil.copytree(failure, destination)
+                    (destination / 'historical-provenance.json').write_text(json.dumps({
+                        'historical_commit': BASE, 'entry': entry, 'arguments': list(arguments),
+                        'entry_sha256': hashlib.sha256(source).hexdigest(),
+                        'source_relative_path': 'artifacts/audio-checks/async-session-failure',
+                        'scope': 'Generated historical failure evidence copied before disposable checkout cleanup; no current-code pass claim.'
+                    }, indent=2) + '\n')
+                    print('PRESERVED HISTORICAL FAILURE EVIDENCE:', destination, flush=True)
+            except Exception as preservation_error:
+                print('FAILED TO PRESERVE HISTORICAL FAILURE EVIDENCE:', repr(preservation_error),
+                      file=sys.stderr, flush=True)
+                if not had_original_error:
+                    raise
+            finally:
+                subprocess.run(['git', '-C', str(ROOT), 'worktree', 'remove', '--force', str(checkout)], check=True)
     print('PASS HISTORICAL BASELINE ONLY:', entry, flush=True)

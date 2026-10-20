@@ -151,6 +151,8 @@ private struct FinalizationFailure: Error { let marker: String }
             try await wait({ count("play") == 2 && fixture.use { $0.physicalPlaying } },
                            "FIXTURE_STOPPED_PLAYER_DID_NOT_RESUME")
             _ = try await settle()
+            // Control/I/O completion does not order the separate main-queue publication.
+            try await wait(playing, "FIXTURE_REUSED_PLAYBACK_NOT_PUBLISHED")
             try check(count("player-init") == 1 && playing(), "VALID_STOPPED_PLAYER_NOT_REUSED")
             return old
         }

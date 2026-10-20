@@ -2,7 +2,7 @@
   "base_commit": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7",
   "branches": {
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
-    "feature/background": "5d08be7612270ee9af27ca00e60442f0e4e8b8f5",
+    "feature/background": "30d3ca282eb7a74dde5a9f9a5a88d78dbc5f9c6a",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
     "feature/settings-persistence": "272ce294d1477d566c9cc04cf0a262b3b2cb9c4e",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
@@ -276,8 +276,8 @@
       "sha256": "ada099550403362afbc0102a278d8e77cc27b7251167ea781d07b28758c61bfc"
     },
     "Tests/Background/RecoveryFinalizationTests.swift": {
-      "commit": "4915a593af682b2e532814c632cb8ec3f735151f",
-      "sha256": "8901267a3cab92f2e2bd8359e03f9cabef36b452b2ee5c2052c81560bda6abcb"
+      "commit": "f1ac71644424c012ee207cbf12703e2ae0d68da2",
+      "sha256": "1254a3ccd55185ea3c57b51a55e95e87b6dc479fd05c1a99e0b57e1aaa8d5b95"
     },
     "Tests/Background/RecoveryTests.swift": {
       "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
@@ -348,8 +348,8 @@
       "sha256": "8277df873399f280aca89959546dd4ce5dc51940dd2648e82a8d3a5b71c809d4"
     },
     "Tests/Background/historical_checks.py": {
-      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
-      "sha256": "a24452574da071eabd85874c189bc89cb710321d0e56c10b6c603e4ddcc8a6c4"
+      "commit": "f1ac71644424c012ee207cbf12703e2ae0d68da2",
+      "sha256": "023153eb4aa08596f329db66fc477cab549969eccb32fab518ad4b8838efe0fa"
     },
     "Tests/Background/run_checks.py": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
