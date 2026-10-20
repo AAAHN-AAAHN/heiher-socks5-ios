@@ -120,6 +120,10 @@ final class RecoveryExecutionLease: Sendable {
                     if expired {
                         expire()
                         holders.end(holder.id)
+                        // A denied assertion may report only expired=true. Settle
+                        // that no-grant receipt so the shared gate can admit again.
+                        // Existing receipt/identity gates ignore it after a grant.
+                        receipt(nil)
                     } else {
                         receipt(holder.id)
                         if holder.finished.wait(timeout: .now() + 25) == .timedOut {
