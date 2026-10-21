@@ -112,6 +112,9 @@ ASSET_ADMISSION_NEGATIVES = {
 }
 ASSET_RETRY_BASELINE_COMMIT = 'eb67d07e760380ef363703926318dd40939aba05'
 ASSET_RETRY_BASELINE_SERVICE_SHA256 = 'd1e21cc4054c70879451891f53281d0235d5503405ce7f0ed1d2ee244316c6e1'
+FINALIZATION_BASELINE_COMMIT = 'eb67d07e760380ef363703926318dd40939aba05'
+FINALIZATION_BASELINE_SERVICE_SHA256 = 'd1e21cc4054c70879451891f53281d0235d5503405ce7f0ed1d2ee244316c6e1'
+FINALIZATION_PREVIOUS_SERVICE_SHA256 = 'f229417b64aa478259095ea74ee12db13d7262833a283dc497f90f1cc3a4316a'
 
 
 def run(command, records, label, timeout=30, expected=None):
@@ -263,9 +266,12 @@ def ingress_lease(lease):
     return lease.replace(before, before + '\n                IngressObservation.endGateDidClear(id)', 1)
 
 
-def finalization_previous_source(source):
-    # Reverse only these three product fixes. All other guards, timings and
-    # previously accepted fixes remain byte-identical to the current input.
+def finalization_previous_source():
+    # Preserve the previously accepted historical control byte-for-byte. New
+    # independent guards must not mask the older defects this control proves.
+    source = subprocess.check_output(['git', 'show', FINALIZATION_BASELINE_COMMIT +
+        ':Socks5/BackgroundKeepAlive/LoopAudioService.swift'], cwd=ROOT).decode()
+    assert hashlib.sha256(source.encode()).hexdigest() == FINALIZATION_BASELINE_SERVICE_SHA256
     replacements = [
         ('        inbox.explicit = inbox.explicit || (explicit && enabled)',
          '        inbox.explicit = inbox.explicit || explicit'),
@@ -319,6 +325,7 @@ def finalization_previous_source(source):
     for before, after in replacements:
         assert source.count(before) == 1
         source = source.replace(before, after, 1)
+    assert hashlib.sha256(source.encode()).hexdigest() == FINALIZATION_PREVIOUS_SERVICE_SHA256
     return source
 
 
@@ -599,7 +606,9 @@ def main():
                                 run_checked_cleanup([exe, case, OWNED / 'Silence.wav'], records,
                                                     prefix + '-' + case, expected=expected)
                 if args.group in ('all', 'finalization'):
-                    previous = finalization_previous_source(source)
+                    previous = finalization_previous_source()
+                    report['finalization_baseline_commit'] = FINALIZATION_BASELINE_COMMIT
+                    report['finalization_baseline_service_sha256'] = FINALIZATION_BASELINE_SERVICE_SHA256
                     report['finalization_previous_source_sha256'] = hashlib.sha256(previous.encode()).hexdigest()
                     for legacy in (False, True):
                         label = 'finalization-' + ('legacy-' if legacy else 'async-') + suffix
