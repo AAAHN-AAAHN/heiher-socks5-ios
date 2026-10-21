@@ -33,7 +33,7 @@ Playing is published after preparation, play success, `isPlaying`, matching sess
 | iOS 27 application-requested deactivation | Inspect reported playback without invalidating a healthy newer player; an observed stop still recovers |
 | Positive/unknown resumption or foreground availability | Preserve On; bounded opportunity to retry before a pending deadline |
 | Negative resumption advice | Preserve intent and healthy playback without bypassing retry pacing |
-| A valid stopped player | Reuse the existing player, reactivate the session, then prepare/play when configuration remains valid |
+| A valid stopped player | Reuse the existing player when configuration remains valid; if post-start verification still reports stopped, recreate on the next paced attempt |
 | Invalid player/configuration | Stop/release the old player, retain cached WAV, then recreate/reconfigure |
 | Missing or invalid WAV | Visible error, no automatic disk-read loop; explicit intent/availability can retry |
 | Explicit Off | Immediately accept cancellation, cancel automatic timers, show stopping while an entered operation remains unfinished |
