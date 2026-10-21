@@ -2,7 +2,7 @@
   "base_commit": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7",
   "branches": {
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
-    "feature/background": "bf4eb163ddebded6f414cfd60d8e29968399909e",
+    "feature/background": "eb67d07e760380ef363703926318dd40939aba05",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
     "feature/settings-persistence": "1ba20d7a188c16b7e2fcde7f306597bbe8c2bca1",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
@@ -84,8 +84,8 @@
       "sha256": "a9b55a62cb0172f6b0323bc471dfab90fa8f025aed4ba0f5023befa47204bed0"
     },
     "Socks5/BackgroundKeepAlive/LoopAudioService.swift": {
-      "commit": "8b3d018fd81db3d4545c74e6d6c7ab19300f685c",
-      "sha256": "0bd5f8bb347d31ff12326bf37b0587c37a2cc5eac3a49d3bf70de647a43b8800"
+      "commit": "6de799a164ac58e660237def41ed68f96ce63fa6",
+      "sha256": "d1e21cc4054c70879451891f53281d0235d5503405ce7f0ed1d2ee244316c6e1"
     },
     "Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift": {
       "commit": "5126196fbd3d5f457eae2cd7be954aca5b7ecf95",
@@ -324,8 +324,8 @@
       "sha256": "88ccb4b2f628d20d899277f85c7fb061e0f4ed1c6718312af1b0431dfa25e454"
     },
     "Tests/Background/check_loop_audio.py": {
-      "commit": "8b3d018fd81db3d4545c74e6d6c7ab19300f685c",
-      "sha256": "99894c4fa534193d9a40529db913c660dc3da94715caf33445b3e81b06e084b0"
+      "commit": "6de799a164ac58e660237def41ed68f96ce63fa6",
+      "sha256": "b820b32f4a34410e3d5e0e45de0fbe5b4a0faa3c7a4fbb16cbe762adf2bb7b2d"
     },
     "Tests/Background/check_mixed_notifications.py": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
@@ -790,6 +790,10 @@
     "Tests/Background/StoppedStartRecoveryTests.swift": {
       "commit": "8b3d018fd81db3d4545c74e6d6c7ab19300f685c",
       "sha256": "2bd2e3262485ff4bbcbd844d90d187dde234b1995f4d9e1b6c9fbed8a4d18a75"
+    },
+    "Tests/Background/AssetEpisodeRecoveryTests.swift": {
+      "commit": "6de799a164ac58e660237def41ed68f96ce63fa6",
+      "sha256": "887f63731c511bd9c27599c67796827438e7ae3d9e29e8b422ea6f4eeb331a51"
     }
   },
   "files": {
