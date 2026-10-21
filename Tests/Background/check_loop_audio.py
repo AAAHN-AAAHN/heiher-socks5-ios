@@ -100,6 +100,19 @@ ASSET_EPISODE_NEGATIVES = {
 ASSET_EPISODE_BASELINE_COMMIT = 'bf4eb163ddebded6f414cfd60d8e29968399909e'
 ASSET_EPISODE_BASELINE_SERVICE_SHA256 = '0bd5f8bb347d31ff12326bf37b0587c37a2cc5eac3a49d3bf70de647a43b8800'
 
+ASSET_RETRY_CASES = ('available', 'explicit', 'hint', 'echo', 'off-on')
+ASSET_RETRY_NEGATIVES = {
+    'available': 'NEW_ASSET_RETRY_SIGNAL_LOST_TO_OLD_INVALID_RESULT',
+    'explicit': 'NEW_ASSET_RETRY_SIGNAL_LOST_TO_OLD_INVALID_RESULT',
+}
+ASSET_ADMISSION_CASES = ('pre-admission-available', 'pre-admission-explicit', 'media-reset-parked')
+ASSET_ADMISSION_NEGATIVES = {
+    'pre-admission-available': 'PRE_ADMISSION_ASSET_SIGNAL_REPLAYED',
+    'pre-admission-explicit': 'PRE_ADMISSION_ASSET_SIGNAL_REPLAYED',
+}
+ASSET_RETRY_BASELINE_COMMIT = 'eb67d07e760380ef363703926318dd40939aba05'
+ASSET_RETRY_BASELINE_SERVICE_SHA256 = 'd1e21cc4054c70879451891f53281d0235d5503405ce7f0ed1d2ee244316c6e1'
+
 
 def run(command, records, label, timeout=30, expected=None):
     try:
@@ -336,6 +349,27 @@ def stopped_start_source(source, legacy):
     return source + '\n' + (HERE / 'RecoveryFinalizationAccess.swift.inc').read_text()
 
 
+def asset_retry_source(source, legacy):
+    source = asset_episode_source(source, legacy)
+    # Hold identical immutable read results in both revisions while a newer
+    # retry signal crosses the actual control queue; this changes no outcome.
+    before = '                    let bytes = try atStep(.assetRead, context: context) { try Data(contentsOf: url) }'
+    assert source.count(before) == 1
+    return source.replace(before, before + '\n                    AssetReadObservation.didRead()', 1)
+
+
+def asset_admission_source(source, legacy):
+    source = asset_episode_source(source, legacy)
+    # The same external holds separate accepted ingress from its queued drain,
+    # and separate start admission from adoption of that accepted ticket.
+    before = '        adopt(latest())\n        let command: Command'
+    assert source.count(before) == 1
+    source = source.replace(before, '        AssetRetryAdmissionObservation.beforeBegin()\n' + before, 1)
+    before = '        if schedule { control.async { self.drain() } }'
+    assert source.count(before) == 3
+    return source.replace(before, '        AssetRetryAdmissionObservation.afterIngressAccepted()\n' + before)
+
+
 def asset_episode_source(source, legacy):
     # The same read-only queue fence observes both actual source revisions.
     return adapter_source(source, legacy) + '\n' + (HERE / 'RecoveryFinalizationAccess.swift.inc').read_text()
@@ -434,7 +468,7 @@ def compile_fixture(folder, label, source, monitor, lease, fixture, optimize, re
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--group', choices=('all', 'service', 'boundary', 'adapter', 'facade', 'finalization', 'precedence', 'stopped-start', 'asset-episode'), default='all')
+    parser.add_argument('--group', choices=('all', 'service', 'boundary', 'adapter', 'facade', 'finalization', 'precedence', 'stopped-start', 'asset-episode', 'asset-retry'), default='all')
     parser.add_argument('--mode', choices=('all', 'debug', 'optimized'), default='all')
     parser.add_argument('--negative-only', action='store_true')
     parser.add_argument('--case', choices=FACADE_CASES)
@@ -467,6 +501,37 @@ def main():
             modes = [False, True] if args.mode == 'all' else [args.mode == 'optimized']
             for optimize in modes:
                 suffix = 'optimized' if optimize else 'debug'
+                if args.group in ('all', 'adapter', 'asset-retry'):
+                    previous = subprocess.check_output(['git', 'show', ASSET_RETRY_BASELINE_COMMIT +
+                        ':Socks5/BackgroundKeepAlive/LoopAudioService.swift'], cwd=ROOT).decode()
+                    previous_sha = hashlib.sha256(previous.encode()).hexdigest()
+                    assert previous_sha == ASSET_RETRY_BASELINE_SERVICE_SHA256
+                    report['asset_retry_baseline_commit'] = ASSET_RETRY_BASELINE_COMMIT
+                    report['asset_retry_previous_source_sha256'] = previous_sha
+                    for kind, fixture, translate, cases, negatives in (
+                            ('signal', 'AssetRetrySignalTests.swift', asset_retry_source,
+                             ASSET_RETRY_CASES, ASSET_RETRY_NEGATIVES),
+                            ('admission', 'AssetRetryAdmissionTests.swift', asset_admission_source,
+                             ASSET_ADMISSION_CASES, ASSET_ADMISSION_NEGATIVES)):
+                        for legacy in (False, True):
+                            label = 'asset-retry-' + kind + '-' + ('legacy-' if legacy else 'async-') + suffix
+                            for old in (True, False):
+                                if not old and args.negative_only:
+                                    continue
+                                prefix = 'previous-' + label if old else label
+                                exe = compile_fixture(folder, prefix,
+                                                      translate(previous if old else source, legacy),
+                                                      monitor, lease, fixture, optimize, records,
+                                                      mocks='AudioEndpointMocks.swift')
+                                for case in cases:
+                                    run_checked_cleanup([exe, case, OWNED / 'Silence.wav', invalid], records,
+                                                        prefix + '-' + case,
+                                                        expected=negatives.get(case) if old else None)
+                                    observed = json.loads(records[-1]['stdout'])
+                                    if kind == 'signal':
+                                        assert observed['new_signal_consumed_while_old_read_pending'] is True
+                                    elif case != 'media-reset-parked':
+                                        assert observed['pre_admission_signal_incorporation_proven'] is True
                 if args.group in ('all', 'adapter', 'asset-episode'):
                     previous = subprocess.check_output(['git', 'show', ASSET_EPISODE_BASELINE_COMMIT +
                         ':Socks5/BackgroundKeepAlive/LoopAudioService.swift'], cwd=ROOT).decode()
