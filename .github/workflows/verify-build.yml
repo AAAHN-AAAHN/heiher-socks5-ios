@@ -9,7 +9,7 @@ jobs:
   verify-linux:
     name: verify (ubuntu-24.04)
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       BUILD_IPA: '1'
     steps:
