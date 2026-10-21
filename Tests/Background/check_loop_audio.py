@@ -79,6 +79,15 @@ PRECEDENCE_CASES = ('stopped-before-progress', 'misconfigured-before-progress',
                     'healthy-progress-preserved')
 PRECEDENCE_BASELINE_COMMIT = 'dd8c2b25688a3e59c22b2755fa0bccce6de32261'
 PRECEDENCE_BASELINE_SERVICE_SHA256 = 'c9f317de58c90e985082b4374ebf04e27306f0c59ed48cbc9059a0df48f46c1b'
+STOPPED_START_CASES = ('healthy', 'ordinary-stopped', 'initial-stopped', 'bad-resume',
+                       'persistent-stopped', 'off-after-failed-start')
+STOPPED_START_NEGATIVES = {
+    'initial-stopped': 'MISSING_L2_AFTER_FAILED_INITIAL_START',
+    'bad-resume': 'MISSING_L2_AFTER_FAILED_RESUME',
+    'persistent-stopped': 'FAILED_STARTS_NEVER_RECREATE_PLAYER',
+}
+STOPPED_START_BASELINE_COMMIT = '57b1da44671d8a5b4da6eec2200cd7a2f955403f'
+STOPPED_START_BASELINE_SERVICE_SHA256 = '389d1d8cefbd59d114743d9464e85004561f174c4eea4b92a4df5f65b4f66ac5'
 
 
 def run(command, records, label, timeout=30, expected=None):
@@ -303,6 +312,19 @@ def finalization_source(source, legacy):
     return source + '\n' + (HERE / 'RecoveryFinalizationAccess.swift.inc').read_text()
 
 
+def stopped_start_source(source, legacy):
+    source = adapter_source(source, legacy)
+    # Observe the actual assigned deadline and rebuild decision on both inputs.
+    # This callback does not change the service, API outcomes or timer policy.
+    before = ('                monitor.knownFailure(now: Self.now)\n'
+              '                publish(State(text: "Waiting to resume:')
+    assert source.count(before) == 1
+    source = source.replace(before,
+        '                StoppedStartObservation.failed(job.id, job.command, reply.knownFailure, returnedAt, retryAt, rebuild)\n'
+        + before, 1)
+    return source + '\n' + (HERE / 'RecoveryFinalizationAccess.swift.inc').read_text()
+
+
 def adapter_source(service, legacy):
     marker = '#if canImport(AVFAudio) && canImport(UIKit)\n/// Only the service I/O queue'
     assert service.count(marker) == 1
@@ -396,7 +418,7 @@ def compile_fixture(folder, label, source, monitor, lease, fixture, optimize, re
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--group', choices=('all', 'service', 'boundary', 'adapter', 'facade', 'finalization', 'precedence'), default='all')
+    parser.add_argument('--group', choices=('all', 'service', 'boundary', 'adapter', 'facade', 'finalization', 'precedence', 'stopped-start'), default='all')
     parser.add_argument('--mode', choices=('all', 'debug', 'optimized'), default='all')
     parser.add_argument('--negative-only', action='store_true')
     parser.add_argument('--case', choices=FACADE_CASES)
@@ -429,6 +451,27 @@ def main():
             modes = [False, True] if args.mode == 'all' else [args.mode == 'optimized']
             for optimize in modes:
                 suffix = 'optimized' if optimize else 'debug'
+                if args.group in ('all', 'adapter', 'stopped-start'):
+                    previous = subprocess.check_output(['git', 'show', STOPPED_START_BASELINE_COMMIT +
+                        ':Socks5/BackgroundKeepAlive/LoopAudioService.swift'], cwd=ROOT).decode()
+                    previous_sha = hashlib.sha256(previous.encode()).hexdigest()
+                    assert previous_sha == STOPPED_START_BASELINE_SERVICE_SHA256
+                    report['stopped_start_baseline_commit'] = STOPPED_START_BASELINE_COMMIT
+                    report['stopped_start_previous_source_sha256'] = previous_sha
+                    for legacy in (False, True):
+                        label = 'stopped-start-' + ('legacy-' if legacy else 'async-') + suffix
+                        for old in (False, True):
+                            if not old and args.negative_only:
+                                continue
+                            prefix = 'previous-' + label if old else label
+                            exe = compile_fixture(folder, prefix,
+                                                  stopped_start_source(previous if old else source, legacy),
+                                                  monitor, lease, 'StoppedStartRecoveryTests.swift', optimize, records,
+                                                  mocks='AudioEndpointMocks.swift')
+                            for case in STOPPED_START_CASES:
+                                run_checked_cleanup([exe, case, OWNED / 'Silence.wav'], records,
+                                                    prefix + '-' + case,
+                                                    expected=STOPPED_START_NEGATIVES.get(case) if old else None)
                 if args.group in ('all', 'adapter', 'precedence'):
                     # The actual pre-fix product, not a synthetic whole-source
                     # "previous" reconstruction. Its identity is fixed and
