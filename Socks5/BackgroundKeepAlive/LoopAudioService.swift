@@ -681,6 +681,8 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             releaseBarrier = false // The actual release returned, even on isBusy/error.
             releaseFailed = reply.error != nil
             rebuild = true
+            // A completed aggregate Off ends the old asset-failure episode.
+            assetBlocked = false
             finishLease()
             if !current.on {
                 cancelTimer()
