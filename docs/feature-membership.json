@@ -1,0 +1,795 @@
+{
+  "base_commit": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7",
+  "branches": {
+    "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
+    "feature/background": "57b1da44671d8a5b4da6eec2200cd7a2f955403f",
+    "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
+    "feature/settings-persistence": "1ba20d7a188c16b7e2fcde7f306597bbe8c2bca1",
+    "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
+    "feature/traffic-statistics": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e"
+  },
+  "sources": {
+    "Build/check_swift_sdk.sh": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "8bb2aa2d8da52154962516d16012f61f6c05fc91b4c4905453c1663954a072b3"
+    },
+    "Build/inherited-workflows/traffic-statistics-udp-compat-audit.yml": {
+      "commit": "bf99270ff3bcec5a1c141563cb4140bafaa1d783",
+      "sha256": "29b0a203ec2f39aee6c340e26f10270437bcec79be262147d05d90afdccfc168",
+      "path": ".github/workflows/udp-compat-audit.yml"
+    },
+    "Build/inherited-workflows/traffic-statistics-verify-build.yml": {
+      "commit": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e",
+      "sha256": "7a4060f7aaff558d46371355cc5c75116a3b3ed2a37db20370c5260ce0d2c641",
+      "path": ".github/workflows/verify-build.yml"
+    },
+    "Patches/hev-netaddr-result.patch": {
+      "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+      "sha256": "946b049fd7615de70680c0f81d6a4acc394973663067b7dfe51ca3f183587959"
+    },
+    "Patches/hev-server-startup-stop.patch": {
+      "commit": "d1532b72fd8cc2850eaefcc002482fb4386d27ff",
+      "sha256": "77b46a0a4a58d1fdb219d11cde4a99a085799ccf7027e7309ee42ba53eb314db"
+    },
+    "Patches/hev-session-setup.patch": {
+      "commit": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
+      "sha256": "6f8972aff9a58299849ddfec0c50d902f70febec1c6da3056e986f1cbc722c25"
+    },
+    "Patches/hev-socket-meter-core.patch": {
+      "commit": "88312df3e7f626b5f291face33a8baea4825dae5",
+      "sha256": "1ad29324fe5a750e019848961f1e3417fef2ec1d2e59c82a6fec775337b1b704"
+    },
+    "Patches/hev-socket-meter-server.patch": {
+      "commit": "8ba7c5fedbbc230bfa0bd30355f9f25f9a22dc20",
+      "sha256": "e1caf3260c830f845bd6222a8c2536fd5aef449090b4082a28933fdd9e44f1cc"
+    },
+    "Patches/hev-socket-meter-task.patch": {
+      "commit": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e",
+      "sha256": "2f3ab4d3f392ee30cf03bd56999de98234a7a277cee562fa0b9e37e09e7c289c"
+    },
+    "Patches/hev-udp-domain.patch": {
+      "commit": "06cbae0798eadb30e366aa2f6d4de3dfa402f5c6",
+      "sha256": "63145cb1494a81eed18b9be2a6db711964d161724ccbef1c2d992fc71c4cd996"
+    },
+    "Patches/hev-udp-dynamic-buffer.patch": {
+      "commit": "06cbae0798eadb30e366aa2f6d4de3dfa402f5c6",
+      "sha256": "52d0241dc5881a53415703c17ebb1d98d231837afbcafb7bc7c90e7e0df43f06"
+    },
+    "Patches/hev-udp-peer-filter.patch": {
+      "commit": "7e05bf8439335b0ca7385eb1e5c0c2233520ce0e",
+      "sha256": "7c4e67f1d351a68fb37933e84b25f97cd25164aae8cda688255841a7c9c2970f"
+    },
+    "Patches/hev-udp-port-zero.patch": {
+      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
+      "sha256": "9cd0a43550a6128046f81d11bd16971e426386e2656e3e8f16fa790d57bbb315"
+    },
+    "Patches/hev-udp-sockaddr.patch": {
+      "commit": "7e05bf8439335b0ca7385eb1e5c0c2233520ce0e",
+      "sha256": "89ab1326a38c9bade252b85c16e70b9f218fddefef5729398dafe7ddbdb39783"
+    },
+    "Socks5/Assets.xcassets/AppIcon.appiconset/AppIcon.png": {
+      "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
+      "sha256": "4a2f2a9384e8b6db351a9284232db56e719377e60f17123e4a6992cee1799cc2"
+    },
+    "Socks5/Assets.xcassets/AppIcon.appiconset/Contents.json": {
+      "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
+      "sha256": "852920cb36e95beb53771138a4b8195a16fcce1cc31250632f246081cc638f9a"
+    },
+    "Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift": {
+      "commit": "a946a2b8eb7a575b2223297d6dae4d161151347f",
+      "sha256": "bdd3f6ba42c5f1c99a240344a96db8fd42d00cc2a7a7bf94ea14c3fe00bde822"
+    },
+    "Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift": {
+      "commit": "6a4e46df0f436389572669230aa710d844339fe5",
+      "sha256": "a9b55a62cb0172f6b0323bc471dfab90fa8f025aed4ba0f5023befa47204bed0"
+    },
+    "Socks5/BackgroundKeepAlive/LoopAudioService.swift": {
+      "commit": "29d6cd0e0a8a6529bd85e2f28bad0814a671bb36",
+      "sha256": "389d1d8cefbd59d114743d9464e85004561f174c4eea4b92a4df5f65b4f66ac5"
+    },
+    "Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift": {
+      "commit": "5126196fbd3d5f457eae2cd7be954aca5b7ecf95",
+      "sha256": "d2d08c919f55190f8c5b162ed8077939752d9b44f8094aa9955719968793f8c1"
+    },
+    "Socks5/BackgroundKeepAlive/RecoveryExecutionLease.swift": {
+      "commit": "0244d1e83b325c3cf4e775d40f95d1c9d5746e25",
+      "sha256": "35d97c2c7809efff76edc048a7b91e68fb1bd728af9397a42fe28058fbc141c9"
+    },
+    "Socks5/BackgroundKeepAlive/Silence.wav": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "26131825c935435301fb05d3549d815bc93b1e717d6228d890ee9578dd00025e"
+    },
+    "Socks5/ContentView.swift": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "0684c8be1fae897e045ca22471e33c26e1a5ed950c45c107ad04009742ea7208"
+    },
+    "Socks5/Server/ServerController.swift": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "b40dcbf3808644551f0f32169455ca7841b271960f393a91ec18a6b3352c3310"
+    },
+    "Socks5/Server/ServerSettings.swift": {
+      "commit": "83a0d6ef516b5d9b4330a099305b9f4f86804ae3",
+      "sha256": "e64a89cece6dc47cebe6ee910ba4e6a7d71b17837bc24f4354a30b1307bdd0fd"
+    },
+    "Socks5/Settings/AppSettings.swift": {
+      "commit": "68e7c027ee474f7b34c89ca341cc5ac8898d2e91",
+      "sha256": "719d98606021c927450bfd586d8de925190aa6687f10eefcafa108145e028c56"
+    },
+    "Socks5/Settings/SettingsStore.swift": {
+      "commit": "e66e9e7085da03f251ba3376ddcc3ebbc1b2fd51",
+      "sha256": "d36b143f318b8b33e50ab8f42efd54ba3484f1af8705efdb2fbf43efe07b84d0"
+    },
+    "Socks5/Settings/SettingsView.swift": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "6b6f9d45d803ac8cb77929033c9c5f18fcd42e1633bf19b1ccbc8d0931ccaa25"
+    },
+    "Socks5/Statistics/TrafficStatistics.swift": {
+      "commit": "da8dfd40293ec2c4f217280bcc17e6fbae491ab5",
+      "sha256": "468467795387dade9a7f8052a9854c7b914a18ea414cafdde12d382a480b1646"
+    },
+    "Socks5/Statistics/TrafficStatisticsView.swift": {
+      "commit": "da8dfd40293ec2c4f217280bcc17e6fbae491ab5",
+      "sha256": "b0bb1c4e2aedab4bfa865fd7b36231ac106e41ff5d89c9ee6671ac917892ec93"
+    },
+    "Tests/AppIcon/DecodeImages.swift": {
+      "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
+      "sha256": "b215c1192da9113f81310404ba0f3cadf64cd2759a9c4fa85201166324a10750"
+    },
+    "Tests/AppIcon/audit_driver_check.py": {
+      "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
+      "sha256": "a58e6c4446aaef522ddc031199327dbc4a474566b7cbd45259b1308393d29ff5"
+    },
+    "Tests/AppIcon/check_compiled.py": {
+      "commit": "3d54b142e14bc5eaf98239df54c545faf44be86d",
+      "sha256": "2c08bd5dcd416aafa06d1850c134226e8ce7af75eacd386b0c43b44c4ef524ce"
+    },
+    "Tests/AppIcon/check_icon.py": {
+      "commit": "efd684afc12a74a960feb4a5674ef27014fc167d",
+      "sha256": "3f4dfbffc9c7afaa8ab4b644317c1fefe932593c087cd29cdb418c3964622d95"
+    },
+    "Tests/AppIcon/run_checks.sh": {
+      "commit": "a7b57385f90500e7a5abd5e379d2a85cbc6c833f",
+      "sha256": "94fe35cef88c6651e91d4eff76706153ca0246b5b087f43cdc31c79131288567"
+    },
+    "Tests/AppIcon/test_audit_boundaries.py": {
+      "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
+      "sha256": "a92bdf913bfb7593dde7d7671534d3cbcd21dcb7438f2eae0df4c6f3193512a0"
+    },
+    "Tests/AppIcon/test_icon.py": {
+      "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
+      "sha256": "16577a6829351889fdd92d52607eea0ea5f82c0e71af7326526c41d261cdfc62"
+    },
+    "Tests/AppIcon/test_imageio.py": {
+      "commit": "a17e33b283025377601aef1bcfd32dfa6b79a426",
+      "sha256": "8a5a0fce2529221acc42f299aeaa16186246c57bbd39b1c53b4b29952a61ca29"
+    },
+    "Tests/Background/ApplicationProviderAccess.swift.inc": {
+      "commit": "4915a593af682b2e532814c632cb8ec3f735151f",
+      "sha256": "84bae84d4401dfb293dcab00596dcff9f4dd722483cb318c45dd319e6179318d"
+    },
+    "Tests/Background/ApplicationProviderBoundaryTests.swift": {
+      "commit": "a05b7571b53089a14c20ae708f6e023ef56e42e3",
+      "sha256": "1306def5167d40b41508a34db9346e86f725beb96ef2f0c654075a5a2fecab33"
+    },
+    "Tests/Background/AsyncAudioUITests.swift": {
+      "commit": "dd9804b16fb4d470728809afce4de059e8bfef59",
+      "sha256": "14cfa19dbd0c8a167b3ea0f1d7412456a74449cbdd3843e8a15f46d03c34f260"
+    },
+    "Tests/Background/AsyncSessionTests.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "9f9fd9fec39de5f52be0465f61c857c3fb34d49bdbff1450442a8e35ffe12dd1"
+    },
+    "Tests/Background/AudioEndpointBoundaryTests.swift": {
+      "commit": "5126196fbd3d5f457eae2cd7be954aca5b7ecf95",
+      "sha256": "da42d95eade96a51ef00ab0ad96e3809d94041936a1da1416df17af12494a320"
+    },
+    "Tests/Background/AudioEndpointMocks.swift": {
+      "commit": "29d6cd0e0a8a6529bd85e2f28bad0814a671bb36",
+      "sha256": "3e49866fc7b8ed9118175abefb89cc4b06f418d056bc06dd53cad65351e499ad"
+    },
+    "Tests/Background/AuthorizationResetTests.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "fca7068e1e22a1c9df49525cbc4b5eae9ae4bec81a8e53a16692dee0c2e4647d"
+    },
+    "Tests/Background/CallbackLifetimeTests.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "e06c6842715d9066068ad113ef28f2a7b6049693133d799f5431c93867fcd909"
+    },
+    "Tests/Background/ControllerTests.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "47128d67a3fba8014be3f24febf1474ef5d12b2fb4a382cdbe5ee06fdd07e27d"
+    },
+    "Tests/Background/DelegateTests.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "2bd51d070c552a5a4dc9afa9768df60d9f1c3611bead356b1abac5dad5971a44"
+    },
+    "Tests/Background/EarlyRelapseTests.swift": {
+      "commit": "e9d404e9205e3dcb6ab3053bfcae2d36032f9903",
+      "sha256": "5b8db0c7598954d9cb297b92749a727aa29df94370a0e22dac15de1087b2ee91"
+    },
+    "Tests/Background/FacadeBoundaryTests.swift": {
+      "commit": "a946a2b8eb7a575b2223297d6dae4d161151347f",
+      "sha256": "2f25c22c6b2d2b75a50165cae1fa726dd7e18238e98fd1f49793264ae7430a2a"
+    },
+    "Tests/Background/FacadePlatformMocks.swift": {
+      "commit": "a946a2b8eb7a575b2223297d6dae4d161151347f",
+      "sha256": "af2dd326a3a9f324958624a95a180c852d0ce9f12444ef020c4788e760679e52"
+    },
+    "Tests/Background/FinalRecoveryTests.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "eaa58786fa2ebe93f2b9660534c9aadca0c3cffa6f288d7a1bcc3ac9c1dfc71e"
+    },
+    "Tests/Background/IngressReplayAccess.swift.inc": {
+      "commit": "a946a2b8eb7a575b2223297d6dae4d161151347f",
+      "sha256": "241bf1f3aab5cecfea146569f348455edf420e6c856142cc73c1dfb0a8e82687"
+    },
+    "Tests/Background/IngressReplayTests.swift": {
+      "commit": "a946a2b8eb7a575b2223297d6dae4d161151347f",
+      "sha256": "e2dd4be775724330b6d9a8e6a3623c492fcc00b5d397f2954cfc84cc3a00e4f6"
+    },
+    "Tests/Background/InterruptionPolicyTests.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "c557e4e708d06e8b0c0fd5b82e976e8b4009c0f8223de7779b6e2b2a36ac0d10"
+    },
+    "Tests/Background/KnownFailurePrecedenceTests.swift": {
+      "commit": "29d6cd0e0a8a6529bd85e2f28bad0814a671bb36",
+      "sha256": "a68d8709542eade49e1b93b83b855f03df6bc6db5a2b95bd7385569dbe901ad3"
+    },
+    "Tests/Background/LeaseLifecycleTests.swift": {
+      "commit": "0244d1e83b325c3cf4e775d40f95d1c9d5746e25",
+      "sha256": "17f22974797e47fda1304b9653aa9621577035ff08b914e9e987fb2b1153b496"
+    },
+    "Tests/Background/LifecycleTests.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "31bfe7a4b118c6500406b09e7936afff07fab0632ba93e86852d2068ef881b40"
+    },
+    "Tests/Background/LoopAudioServiceTests.swift": {
+      "commit": "6a4e46df0f436389572669230aa710d844339fe5",
+      "sha256": "1059f83765016a40df3aeca5e07f5cfc07bbf31b65579c80a551258b8a0b4c9c"
+    },
+    "Tests/Background/MixedNotificationTests.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "a94542f4aecde7edb601f4e265b0f9bc531f8fc0ff326999c232d55a92f7cc4f"
+    },
+    "Tests/Background/PlatformMocks.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "59f9aed88294a478bd54c1d5a548a213b2d8c38c37bce6b7d800806d1a678648"
+    },
+    "Tests/Background/PlaybackProgressTests.swift": {
+      "commit": "5126196fbd3d5f457eae2cd7be954aca5b7ecf95",
+      "sha256": "eeac7ee35296dd77de8a504025f40b8c9c4115e4124bbe3e8925dcf897012401"
+    },
+    "Tests/Background/PreparationTests.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "31f5c4fbbfc45f342563e3ae5d540c56c74e72012871453684be224c96d8a587"
+    },
+    "Tests/Background/RecoveryAdmissionAccess.swift.inc": {
+      "commit": "4915a593af682b2e532814c632cb8ec3f735151f",
+      "sha256": "03bf409601e2b616a84169c60afc08b45e84bda5e17a4bb43fccfa863627fa32"
+    },
+    "Tests/Background/RecoveryBoundaryTests.swift": {
+      "commit": "4915a593af682b2e532814c632cb8ec3f735151f",
+      "sha256": "fd9c5c9022ea4dd9953eed3d132c9ba2f11bc2373d0ef162dc80953d8769a8c9"
+    },
+    "Tests/Background/RecoveryFinalizationAccess.swift.inc": {
+      "commit": "4915a593af682b2e532814c632cb8ec3f735151f",
+      "sha256": "ada099550403362afbc0102a278d8e77cc27b7251167ea781d07b28758c61bfc"
+    },
+    "Tests/Background/RecoveryFinalizationTests.swift": {
+      "commit": "f1ac71644424c012ee207cbf12703e2ae0d68da2",
+      "sha256": "1254a3ccd55185ea3c57b51a55e95e87b6dc479fd05c1a99e0b57e1aaa8d5b95"
+    },
+    "Tests/Background/RecoveryTests.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "26e0f73672f116cc5643ce8921d31245bafda7be5f3e3059b70ba107180b8e36"
+    },
+    "Tests/Background/ReentryClosureTests.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "b40910c6604577342fd956959edc2d78e3c2eec9bfcfe3ce463711343195a5f4"
+    },
+    "Tests/Background/SessionOwnershipTests.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "7c3e2d79a4e47f7651b15b55519fc79741e0fcbcbc000df4dd0e373448e4474b"
+    },
+    "Tests/Background/audit_driver_check.py": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "a41a3cdc7dfbbd9d426d6652ba855d493638a321fd683558512aebca6c15db60"
+    },
+    "Tests/Background/check_async_session.py": {
+      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
+      "sha256": "a291a9ef4ea3ae8dc3241c94beaf179e3e946ccd50fa35a0b815924177bfff7c"
+    },
+    "Tests/Background/check_async_ui.py": {
+      "commit": "964ef52cb2340a57f7274d0f155ec580c4aade6a",
+      "sha256": "36fc0de081599066c16f46a4cd727c7cd4bc9ade4b0df573d8ec24f264d42b58"
+    },
+    "Tests/Background/check_audio_sdk.sh": {
+      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
+      "sha256": "d9b4e562f62a2ec66424bd28bd8b2c28aad5263bef81e712c53943bfaef270e7"
+    },
+    "Tests/Background/check_audit_integrity.py": {
+      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
+      "sha256": "62506cf80dc6293d2772ada00b8da38c3bc1a64befaf787cfcf2de209731afa3"
+    },
+    "Tests/Background/check_final_recovery.py": {
+      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
+      "sha256": "7287f1019a1b2a1f8ed2432e78f4310388ebf5ff4d9b9261fa8e9d7b414777aa"
+    },
+    "Tests/Background/check_interruption_policy.py": {
+      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
+      "sha256": "76f0754ac9ae0cf2e09ab048b5a7c3f5d97835cdfa91ba866efa1ea88de0f6d5"
+    },
+    "Tests/Background/check_live_scheduling.py": {
+      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
+      "sha256": "88ccb4b2f628d20d899277f85c7fb061e0f4ed1c6718312af1b0431dfa25e454"
+    },
+    "Tests/Background/check_loop_audio.py": {
+      "commit": "0244d1e83b325c3cf4e775d40f95d1c9d5746e25",
+      "sha256": "d6f332f0db70c0828c264d42fac7937b78f15ea1befd3eabff7df228c95f6ab4"
+    },
+    "Tests/Background/check_mixed_notifications.py": {
+      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
+      "sha256": "5e8cdf359c441c9bafe1589a07e4ae3c79534e2f8f453200ded8f70e838275fe"
+    },
+    "Tests/Background/check_scope.py": {
+      "commit": "a05b7571b53089a14c20ae708f6e023ef56e42e3",
+      "sha256": "49c9b42b7264e53462e796b2d1b44875a8d8a9a2c9cc27c1fbea9cf7e6b529fe"
+    },
+    "Tests/Background/check_session_ownership.py": {
+      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
+      "sha256": "4eaa5ebcb1fb019cd6a281dc90589058a5313ff73b534432fedbbc90f90a7a8e"
+    },
+    "Tests/Background/check_silence.swift": {
+      "commit": "5480cbf9859b8d58c20f9001b0c9fda8e23fd6df",
+      "sha256": "7244abd16efdc1c18d91b99a0474166d840b68771cea3d029a039c216dc9bd19"
+    },
+    "Tests/Background/check_subscription.py": {
+      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
+      "sha256": "8277df873399f280aca89959546dd4ce5dc51940dd2648e82a8d3a5b71c809d4"
+    },
+    "Tests/Background/historical_checks.py": {
+      "commit": "f1ac71644424c012ee207cbf12703e2ae0d68da2",
+      "sha256": "023153eb4aa08596f329db66fc477cab549969eccb32fab518ad4b8838efe0fa"
+    },
+    "Tests/Background/run_checks.py": {
+      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
+      "sha256": "d6105e5e130dcfb0ccc8c32c1e8c324426e330b04e4544b786e06417f88951fe"
+    },
+    "Tests/ServerControl/ConfigurationParity.swift": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "6e4acbcb6e1ece2952d61bca84a9849f9c9cd45acc4e662b7c0831167306a808"
+    },
+    "Tests/ServerControl/DelayedCompletionHost.swift": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "6b9ad1c570ed1c500a0f49a656876d91af71b273c52539fd73778b5495175c5e"
+    },
+    "Tests/ServerControl/EmitConfiguration.swift": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "040498c7bcc6656282148ee9790698dae873e25564647ec456ff9c2c3d8afbf2"
+    },
+    "Tests/ServerControl/NativeControllerHost.swift": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "4eeb16146b8f5de006a389cc3f61eb4678335a561983ed3c30ab523fad956a94"
+    },
+    "Tests/ServerControl/PrepareStopProbe.c": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "d1e2c5ed883a34aa5f7938894707abac7e4fcc1e52c71258b684fecc9ee9d7bd"
+    },
+    "Tests/ServerControl/RevalidationTests.swift": {
+      "commit": "83a0d6ef516b5d9b4330a099305b9f4f86804ae3",
+      "sha256": "d5ebb6dcc9e000bf433d1f28a1a5d50085d4e52a10b18cc38469d26af5d72f48"
+    },
+    "Tests/ServerControl/ServerControlUITests.swift": {
+      "commit": "76ea24405ab748e35652f82ea04cc201b22253de",
+      "sha256": "a7ca68acc92fd82dee032efa47775e4926f2476fe3606ca3f9b7c1f2ad5af9d0"
+    },
+    "Tests/ServerControl/ServerMocks.swift": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "9a0969cdb720d09928ab6fbec29f77e4e8ab162d670ac61b9eaf83e81a7602b8"
+    },
+    "Tests/ServerControl/ServerTests.swift": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "f36dc7ea29012b762249eda4613fc91c95fde88c8e7a9c710ea1dbcd0f6eb378"
+    },
+    "Tests/ServerControl/TransitionBoundary.swift": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "d7ba7f7c650a358fad2e421a47b3336ba67ab984c2cbc29728b36e943c0f0efb"
+    },
+    "Tests/ServerControl/TransitionMatrix.swift": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "6bff598fee7dd0fa7bf099fe68cfe38c3e8515bf103b553e723964e68bf8ea48"
+    },
+    "Tests/ServerControl/active_clients_check.py": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "9996cbf49158f8650a24ae09306850421919038bb2dd918f65a03a27aa12c777"
+    },
+    "Tests/ServerControl/audit_driver_check.py": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "9c9303269def290daadf89be7c0397c866c509885e3799e38f14f4cb9fd3cb67"
+    },
+    "Tests/ServerControl/auth_startup_probe.c": {
+      "commit": "8ce44ced1c7c21e3f8f2c5fe59ec42142c110d9f",
+      "sha256": "4b2d84bff9a576c0aff13ab9f31eb354fec1c2a4ae64baab5b478218716eb6ad"
+    },
+    "Tests/ServerControl/configuration_probe.c": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "b7595cd1d6c1b042865e462a63c4306550e63692c1a2ddd4385d4aa507248203"
+    },
+    "Tests/ServerControl/delayed_completion_check.py": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "231399736827436c4ebfcc5f9b8e95ce358f219aa4c1a8e5b965e2b55e3592e8"
+    },
+    "Tests/ServerControl/final_native_check.py": {
+      "commit": "b3b770cc59ce9d6746a460e4f89bec424215c7db",
+      "sha256": "e9066f4766602f545108855a4c8b17ac107149591849fe16aed145a9e6f8f865"
+    },
+    "Tests/ServerControl/input_integrity_check.py": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "a8fff4b29de1f90de8b1a7134d6e7de834e5cd40ba1b0046c88f031c82695c28"
+    },
+    "Tests/ServerControl/native_controller_check.py": {
+      "commit": "bbb4ff8bd8bc54d848ed90009c15226eada3ec23",
+      "sha256": "4a753830d941684d4067b82796a40980a9c89415efa03bbf5b4ac9bc4ffd272d"
+    },
+    "Tests/ServerControl/run_checks.py": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "c0b5b155afa1b84c947177769184a3474533d831bace868f680d090122ec636c"
+    },
+    "Tests/ServerControl/ui_audit.py": {
+      "commit": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
+      "sha256": "3fc7fd19b34e95f547b2b1fe2fd6ee42735ed9fd741ceeb35bd74c12b11df3ff"
+    },
+    "Tests/ServerControl/worker_stop_probe.c": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "4460986fd3351e2080d9f545a56aaf5f53065e16d4adca285b34f31b776bd911"
+    },
+    "Tests/Settings/AsyncStorageTests.swift": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "b9dc7a708870a3e5e61e4eb367122022d2f4f76ef1ff3a337ce33f53c19483df"
+    },
+    "Tests/Settings/CoordinationMocks.swift": {
+      "commit": "a52f2599c4bdb895bc4e8d04ba84f03f45b2a5c7",
+      "sha256": "55d033b04be8c14f6d291ce6b5b90a3f5d745d4f725ac398abf50647cd67e037"
+    },
+    "Tests/Settings/FinalCoordination.swift": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "1ff9dc501c3acdd117e79874354519fc5d0fb085c4356d1f325847a5d50f820e"
+    },
+    "Tests/Settings/FinalPersistenceTests.swift": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "ad24b82ebcda4ee46cab3ae5db7eed83839af0464eebc9c6e599323bf7c9abf1"
+    },
+    "Tests/Settings/HostProvider.swift": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "6e20d953a63057453055040c961e56a6638e6592cc81679352087b61a2e58e73"
+    },
+    "Tests/Settings/HostUI.swift": {
+      "commit": "11ffc688cc4a1b02db63ae9d7e062ae88f0568ab",
+      "sha256": "a59b526196e2bf54ff3b2391a193cd8dc5b81d7e3313d23933f3563e9bc2cd8d"
+    },
+    "Tests/Settings/ImportTests.swift": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "6dfe6e86a3958e924dbc2491513735f13310485cb3ba1e346331923ca1f6bd6f"
+    },
+    "Tests/Settings/LoadAccessTests.swift": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "01318325b490711a844b214eed4da7b792d51c4020b47c712b032aded8026c0e"
+    },
+    "Tests/Settings/NativePersistenceHost.swift": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "10290ad0df7f536879ac00252defa20e0b7dc9c77f9c522552da5eb96a80b4b5"
+    },
+    "Tests/Settings/PersistenceDelayed.swift": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "1dbcc5b485e05e9937a6a6b8333f0e6645ac6dbe3da62abefff379799028ea90"
+    },
+    "Tests/Settings/PersistenceRevalidation.swift": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "00f8de3c4ed79476f087724ee0a20999c5e27184c90cad2f1ad614cdac9a6450"
+    },
+    "Tests/Settings/SettingsPersistenceUITests.swift": {
+      "commit": "438592ee44206d0056644021c3af0c750e91cc84",
+      "sha256": "35941d4d1fbafe280eae68ad732a10ae99fe56f3ec97c6386ac671953374d523"
+    },
+    "Tests/Settings/SettingsTests.swift": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "0d9d113424f1c4695bc050a44fbad8e7cc2c7f0d74fafe9779e20dee4752444e"
+    },
+    "Tests/Settings/StorageTestSupport.swift": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "14838f2bbd51fb1043d7e969fc21ba250dba878ab524a6dfe0e4bce8bb28db75"
+    },
+    "Tests/Settings/ValidationTests.swift": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "ce5dd6508c34dfa96dcf55ac830872938633fc083b99cd000dd6f3398ca7903b"
+    },
+    "Tests/Settings/async_storage_check.py": {
+      "commit": "11ffc688cc4a1b02db63ae9d7e062ae88f0568ab",
+      "sha256": "b3ec5dae4483aa096a42ca8de5f2d569aa24a8fafb9b8815a19849c96d1dfac6"
+    },
+    "Tests/Settings/delayed_persistence_check.py": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "f210693840bf24587622d923f03b512b20195b843872a53a327446e86a80c3fb"
+    },
+    "Tests/Settings/native_persistence_check.py": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "be7e30168e945ee6092abb493c9679fabf32d37a677027675f3c1efb97c56e79"
+    },
+    "Tests/Settings/run_checks.py": {
+      "commit": "e66e9e7085da03f251ba3376ddcc3ebbc1b2fd51",
+      "sha256": "cc61a94049d32e17164a765c8d30fdc395fc9d1070361f716b26d968c6c39963"
+    },
+    "Tests/Settings/ui_audit.py": {
+      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
+      "sha256": "d8707b1ddebfc938fd26924cb80510609f07dbc0439dd047c5ebeec618f59e19"
+    },
+    "Tests/SocketIO/BridgeTests.swift": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "2c3f7125e079c54835f738b575b5ab3243bf0a024e7d152194d128d32881aa58"
+    },
+    "Tests/SocketIO/accept_reset.c": {
+      "commit": "5701496230a2fd18ac83bb4fb2c1bd2df0f2a77f",
+      "sha256": "46f5b2e0b30fc5fb7e85a8805e26e5b8987ea79f5cbad0d739fe7d8fa370096f"
+    },
+    "Tests/SocketIO/connected_peer.c": {
+      "commit": "8aa502780f9349bbc340fc43b84749d5cb2a1b1a",
+      "sha256": "a8337c4d4d5176c881f8113f3afac2a9930f0b772782606f8b3237025897dbcd"
+    },
+    "Tests/SocketIO/contract.py": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "484cbef7a5841119ee7ad90f2b6cee421a674fbadf6fbfd8d199cc32319ff341"
+    },
+    "Tests/SocketIO/integration.py": {
+      "commit": "9ec32066e70c96d74e0c13235b02ead6e9e873a9",
+      "sha256": "c735400a1197b3985c822d930f3011851456498c2be20793b6f656acaea9e73b"
+    },
+    "Tests/SocketIO/loopback.py": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "863695d52166b4f94bb2b43f1f14e90867bc1b2e6be2a6b20f19416ec798db12"
+    },
+    "Tests/SocketIO/loopback_check.py": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "9b7cbdd25b9fccf6f0a525d15cc578935d3c0059f07b0087181debce1b390e7b"
+    },
+    "Tests/SocketIO/meter_host.c": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "a8f4f3c1f89990c3b5cadc712c5340bccdfca4f7b00f55bd373541b3b837546d"
+    },
+    "Tests/SocketIO/meter_pool_failure.c": {
+      "commit": "d1ca1ff827a27a0f4bb62295c63edccd921beff9",
+      "sha256": "6f20f328bf2f0fd07d77a95758c863d9379e9596fabf7ede7a914c5d1693f3b2"
+    },
+    "Tests/SocketIO/pair_example.py": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "d872ba23804097103edfb21d383e36914b0e65977b9eea58ec5983522e8e788e"
+    },
+    "Tests/SocketIO/registry.c": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "864ff658166c293c3e29964c5ce2f88beb94e08909505c908d2d55a033aeaf95"
+    },
+    "Tests/SocketIO/restart.py": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "d5ad9d08e8aaa5e1dd303ecad3d4fb8aa6e15379d706e18157750c6cbbb7fec1"
+    },
+    "Tests/SocketIO/restart_host.c": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "97acd9467b1f33cb6579ea7ccdf9c1ab0b5774bf47a6e466f53ed275bd0fa5c8"
+    },
+    "Tests/SocketIO/run.py": {
+      "commit": "5b4bb6ea5d5f981cfaf50e30141955e562e179d3",
+      "sha256": "5aad3429838834a397647817f4c4d9c5d47f9416a180296940b36750785f4058"
+    },
+    "Tests/SocketIO/snapshot_rows.c": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "80e353fe0b88f3deffe0f3f9f48b62d59905fd7763f046aec41e69fcf46f26a2"
+    },
+    "Tests/SocketIO/socket_observer.c": {
+      "commit": "2aa6d33fb57c3f2162fe2bab7ea3c5dbf923d40d",
+      "sha256": "af33a850c9051f7d7896ba976e2131f893d59992f9862cb6b27efaf88f1773d9"
+    },
+    "Tests/SocketIO/stream_matrix.c": {
+      "commit": "36e7bca37ec8288488431a95581aded6c467d94e",
+      "sha256": "6d57476f28d2f05577d4c7876f9a23207a352f4af38387e610d31006cfc4476c"
+    },
+    "Tests/SocketIO/udp_fixture_main.h": {
+      "commit": "2968901116dcf0958f278180044a8963d4fcde2d",
+      "sha256": "3397126eacbaaffba105caf47e4ec238086436537b37ca42998f2fa86d39ed28"
+    },
+    "Tests/SocketIO/udp_gso_accounting.c": {
+      "commit": "5b4bb6ea5d5f981cfaf50e30141955e562e179d3",
+      "sha256": "fe513d012f0acd093815f5a2d0b864a6027cbbec76cc208281dad56f26690183"
+    },
+    "Tests/SocketIO/worker-native.json": {
+      "commit": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e",
+      "sha256": "27314c2fde1289c6c6881f411fcf3eed8e993c172a18f9bb405f507b3efc95c6"
+    },
+    "Tests/SocketIO/worker_boundaries.c": {
+      "commit": "8aa502780f9349bbc340fc43b84749d5cb2a1b1a",
+      "sha256": "beb1dedb10e0941561c75195c25136d01e82027d850eb04ce879d640536c07c3"
+    },
+    "Tests/Statistics/SamplingContractTests.swift": {
+      "commit": "da8dfd40293ec2c4f217280bcc17e6fbae491ab5",
+      "sha256": "c5d9900388f056647395aebc65c1ef09e0a17b212ea4155a64f5779bc11bf9bd"
+    },
+    "Tests/Statistics/SamplingTaskTests.swift": {
+      "commit": "c9d9b2c996bb1756e71680ae9867e8fcfa6ebff1",
+      "sha256": "5de5f9cef4b582d7a2033082dd0fa5e301697678b1b106801a8d1d5bacccbbe6"
+    },
+    "Tests/Statistics/StatisticsUITests.swift": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
+    },
+    "Tests/Statistics/audit.py": {
+      "commit": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e",
+      "sha256": "11ca9b0638e474530bfe786ff3f580e013bb798d8c630e78f3cb10982dbd4217"
+    },
+    "Tests/Statistics/audit_driver_probe.py": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "230bdb3bee81d26ce7ae5c64085484f3d0c7fa93430caf206fe96a6ad1c289ca"
+    },
+    "Tests/Statistics/client_model.swift": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "793278d9ef110789583832f96ff91a2571f04701ed9297c36d6946098073a408"
+    },
+    "Tests/Statistics/input_probe.py": {
+      "commit": "da8dfd40293ec2c4f217280bcc17e6fbae491ab5",
+      "sha256": "030620c66583191de7daf780b5888266b1203b4558fb8efb8a2e6bb33e8a671c"
+    },
+    "Tests/Statistics/sampling_contract.py": {
+      "commit": "da8dfd40293ec2c4f217280bcc17e6fbae491ab5",
+      "sha256": "e1761c942a9ce602a51a67f99e147707731b99ddd0d74852bfa87e6b5cc97c68"
+    },
+    "Tests/Statistics/udp_inheritance_regression.py": {
+      "commit": "07798a80016b860b98929bc967271ed2b58bac85",
+      "sha256": "c41980fccc66dacb9bddff470050fb0e24a1c658d1537568c8ed23a0cfe076d2"
+    },
+    "Tests/Statistics/ui_audit.py": {
+      "commit": "da8dfd40293ec2c4f217280bcc17e6fbae491ab5",
+      "sha256": "baccc98408b0f6723258899f65d5233e9e5cd6b08acec663b83038ecd6789683"
+    },
+    "Tests/baseline_audit.py": {
+      "commit": "dafb19cda8cf80998b687b419b73f9181e47bd1e",
+      "sha256": "c2c71fbb4122e6695f13c118ee17e6fdaab8a264d797fa7f43b4d4f587ea7ada"
+    },
+    "Tests/documentation_contract.py": {
+      "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+      "sha256": "7e31f337dcda0331fc81fd63ad8034e4e7401987b3485a5978ca5d0e47cdfc31"
+    },
+    "Tests/server_lifecycle_host.c": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "294c6f41300beb8b33df3b37796a4b9a215c9161350b2e3ea722264519393cf4"
+    },
+    "Tests/server_lifecycle_regression.py": {
+      "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
+      "sha256": "6705e3f54c41ec3e61929d2062cb3eae1d8b64841c40c170059bbe5d6ccd941d"
+    },
+    "Tests/tcp_smoke.py": {
+      "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+      "sha256": "dffccd0e20212790d6c0dbdcd9426333a9d16f3f3bcb85b96f3945bae39de9db"
+    },
+    "Tests/traffic_statistics_model.swift": {
+      "commit": "97338b7778576289fb7115f291dba79163864ae8",
+      "sha256": "3de79ec3a7f7d43ff0df5bcda72fa4411c2ac9cc42c041144ca8886995917823"
+    },
+    "Tests/udp_address_conversion.c": {
+      "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+      "sha256": "3486b13ea458420215154996f077ca46128262b60e1e860bdcf2f943333abd48"
+    },
+    "Tests/udp_audit_driver_regression.py": {
+      "commit": "105d95770e18e13a491b23e0fb925f22843aa395",
+      "sha256": "026b7807f9564f19f5beb6aceb9eec87c077ca6ff88a9a7e1b7465dfcbabc570"
+    },
+    "Tests/udp_buffer_benchmark.py": {
+      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
+      "sha256": "f90965c90d9a44bf558b9b27f048c374182293b112a3868c3743db30f5a59eb5"
+    },
+    "Tests/udp_buffer_io.c": {
+      "commit": "06cbae0798eadb30e366aa2f6d4de3dfa402f5c6",
+      "sha256": "df382396fade5054cfb354bb30243d4c2be77d945f75eba1426d099978e643be"
+    },
+    "Tests/udp_buffer_live_hold.c": {
+      "commit": "105d95770e18e13a491b23e0fb925f22843aa395",
+      "sha256": "f8502cb333641ba69e42b7023baeb20ab0921c0b1cfa3bf85f049c885b39149f"
+    },
+    "Tests/udp_buffer_network.py": {
+      "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+      "sha256": "66fb430ab26f7d69c8b5d22a78f8d1d50428919f83bf4b354ea10c90e5fc7703"
+    },
+    "Tests/udp_buffer_send.c": {
+      "commit": "55b4e2e9c683416e9f4523bbff02577e2cca2cfe",
+      "sha256": "7c6c4cafa46333d909a10b9d69580ecfe142b35828b29f96c18d1ffec87d1f19"
+    },
+    "Tests/udp_buffer_timer.c": {
+      "commit": "105d95770e18e13a491b23e0fb925f22843aa395",
+      "sha256": "404b0051804817045a6ececf06100707078d7fd9b9003042fbf06a14d99a8e6b"
+    },
+    "Tests/udp_buffer_unit.c": {
+      "commit": "7e05bf8439335b0ca7385eb1e5c0c2233520ce0e",
+      "sha256": "6f80bb0d9832068ac64adedd13872f4931d8a719c3b040606475e990519f80d5"
+    },
+    "Tests/udp_compat_audit.py": {
+      "commit": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
+      "sha256": "264bf1404cba7039b6737c5bf32e0145d117dd911446e1cc60d0ba28980daace"
+    },
+    "Tests/udp_dns_lifecycle.c": {
+      "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+      "sha256": "9d15328ac42752be4c6bb4d2f3d37181d52945116fd4f49ab1bac6332b15e6f0"
+    },
+    "Tests/udp_gso.c": {
+      "commit": "7e05bf8439335b0ca7385eb1e5c0c2233520ce0e",
+      "sha256": "71d42aa082883b1222dff2020de06000cb5c44aacbd4c43eb17cfe61d8b4fe2a"
+    },
+    "Tests/udp_header_regression.py": {
+      "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+      "sha256": "0ed56e1ce6d91b0da189080d6f9a53a68a59c2c8e31df4048974de8a71ce6ddf"
+    },
+    "Tests/udp_netaddr_errors.c": {
+      "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+      "sha256": "ddf16641f44adf3d8d98f14584f864ecfd89cff30444d93885c60666b8a9fd1f"
+    },
+    "Tests/udp_peer_regression.py": {
+      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
+      "sha256": "3444451356f2a553b2de6f6fe1c4f735b214b7769b357006eeaea34edcf41637"
+    },
+    "Tests/udp_proxy_worker_cascade.c": {
+      "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+      "sha256": "26f9e07a563c3f43f3df0cbd1baed40c474400bdb608a5a29a829c6518d67957"
+    },
+    "Tests/udp_queue_observation.py": {
+      "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",
+      "sha256": "9a6d95b3b140adb243722897be97973f67a7ab38e4219c01536e7aaabbf663a7"
+    },
+    "Tests/udp_reactor_resources.c": {
+      "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
+      "sha256": "4e8b4d0082f7bf2ee42178406aa4deb1965f503aad7a1212825ddbb5e7723921"
+    },
+    "Tests/udp_session_setup.c": {
+      "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+      "sha256": "2099dcb40af077b99d937051d9202e04f32ea21d6dfd0a658227af6d08ac34fd"
+    },
+    "Tests/udp_signal_lifecycle.c": {
+      "commit": "c286fbb0871490fec03f0f22b74fcd605fc97394",
+      "sha256": "19b99cbda033b0527360fecee8a7912a65384868bb56392e71fed71cd7ed4d6e"
+    },
+    "Tests/udp_sockaddr_regression.py": {
+      "commit": "23ce31d217e0e621b1621c866b03c563bef88685",
+      "sha256": "18e8fdfba42b807c06fb8aa755a3cc98eeeaf4df0dc9529464caa2ec9ce2fa36"
+    },
+    "Tests/udp_sockaddr_unit.c": {
+      "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+      "sha256": "a20563838ca2469c65b2bccc89bf299089916484cf0e56fbb8b3fd50d5147878"
+    },
+    "Tests/udp_socket_interrupt.c": {
+      "commit": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
+      "sha256": "75686b09217f2c6226efdce6c5aaf5da70145e093d989ac9b61951b514142620"
+    },
+    "Tests/udp_splicer_lifetime.c": {
+      "commit": "23ce31d217e0e621b1621c866b03c563bef88685",
+      "sha256": "7d1fe4e42261415b6c6a23de6f44cee925c47611e520a521a3f76dcc9c5b6548"
+    },
+    "Tests/udp_stream_boundaries.c": {
+      "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+      "sha256": "c18e6a8d2da06634fbf001b7f4f0ec36bbf416d9580d1d769ff1b8db2ad75b93"
+    },
+    "Tests/udp_worker_failures.c": {
+      "commit": "b5e7cb9cad0807b208de7ccbdf5224aab2bdad71",
+      "sha256": "26cb4506652806a369574ac52193199eddea2844a72451c3a418c38c57e938e9"
+    },
+    "Tests/udp_worker_resources.py": {
+      "commit": "861a021835981494d9db9790d6373cbb1179c0f2",
+      "sha256": "0d6d66b9f943396b7cdaaa994213a2043b99800db655381bde468cb291c49f61"
+    },
+    "Tests/Settings/RollbackFailureTests.swift": {
+      "commit": "e66e9e7085da03f251ba3376ddcc3ebbc1b2fd51",
+      "sha256": "4da53fad6c66629da991aa9dcfc3929ac420f4e283bc04418031904df5532f59"
+    },
+    "Tests/Settings/rollback_storage_check.py": {
+      "commit": "e66e9e7085da03f251ba3376ddcc3ebbc1b2fd51",
+      "sha256": "b59d92f61a09aa55d4b2c5be1ac513aa2d65ca7cc6b47b16125c9d64c5889ddc"
+    }
+  },
+  "files": {
+    "Socks5/Settings/SettingsStore.swift": "d36b143f318b8b33e50ab8f42efd54ba3484f1af8705efdb2fbf43efe07b84d0",
+    "Tests/udp_buffer_network.py": "66fb430ab26f7d69c8b5d22a78f8d1d50428919f83bf4b354ea10c90e5fc7703"
+  }
+}
