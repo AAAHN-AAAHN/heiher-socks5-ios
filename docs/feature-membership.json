@@ -2,7 +2,7 @@
   "base_commit": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7",
   "branches": {
     "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
-    "feature/background": "eb67d07e760380ef363703926318dd40939aba05",
+    "feature/background": "721fe3597285651ad123444a7159f8cd511266f6",
     "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
     "feature/settings-persistence": "1ba20d7a188c16b7e2fcde7f306597bbe8c2bca1",
     "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
@@ -84,8 +84,8 @@
       "sha256": "a9b55a62cb0172f6b0323bc471dfab90fa8f025aed4ba0f5023befa47204bed0"
     },
     "Socks5/BackgroundKeepAlive/LoopAudioService.swift": {
-      "commit": "6de799a164ac58e660237def41ed68f96ce63fa6",
-      "sha256": "d1e21cc4054c70879451891f53281d0235d5503405ce7f0ed1d2ee244316c6e1"
+      "commit": "e54045faa767470dcc1ff68f60b8770262d49f39",
+      "sha256": "e826e8a7ea0c1442b53d346ffb4e13452257f76e6a69059ec90b2e91cec52e8e"
     },
     "Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift": {
       "commit": "5126196fbd3d5f457eae2cd7be954aca5b7ecf95",
@@ -324,8 +324,8 @@
       "sha256": "88ccb4b2f628d20d899277f85c7fb061e0f4ed1c6718312af1b0431dfa25e454"
     },
     "Tests/Background/check_loop_audio.py": {
-      "commit": "6de799a164ac58e660237def41ed68f96ce63fa6",
-      "sha256": "b820b32f4a34410e3d5e0e45de0fbe5b4a0faa3c7a4fbb16cbe762adf2bb7b2d"
+      "commit": "e54045faa767470dcc1ff68f60b8770262d49f39",
+      "sha256": "b288cc05fd53deffa4237f9cfa56d06df77d1bb232527d28d83bd6c61efa3bb1"
     },
     "Tests/Background/check_mixed_notifications.py": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
@@ -794,6 +794,14 @@
     "Tests/Background/AssetEpisodeRecoveryTests.swift": {
       "commit": "6de799a164ac58e660237def41ed68f96ce63fa6",
       "sha256": "887f63731c511bd9c27599c67796827438e7ae3d9e29e8b422ea6f4eeb331a51"
+    },
+    "Tests/Background/AssetRetrySignalTests.swift": {
+      "commit": "e54045faa767470dcc1ff68f60b8770262d49f39",
+      "sha256": "97a1b2b14c58179731c72397d491f4d5bbbbc0fa443a8b65eca70c9f094b7f06"
+    },
+    "Tests/Background/AssetRetryAdmissionTests.swift": {
+      "commit": "e54045faa767470dcc1ff68f60b8770262d49f39",
+      "sha256": "3617e6e58c2269fa684b4d255ee345d9cd2715f2260f84cb39d002e12174f7be"
     }
   },
   "files": {
