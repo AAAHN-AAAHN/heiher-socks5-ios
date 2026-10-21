@@ -212,6 +212,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         var revision: UInt64 = 0
         var stop: UInt64 = 0
         var epoch: UInt64 = 0
+        var assetRetry: UInt64 = 0
     }
     private struct Inbox {
         var queued = false
@@ -278,6 +279,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
     private var releaseBarrier = false
     private var releaseFailed = false
     private var assetBlocked = false
+    private var lastAssetAttempt: UInt64 = 0
     private var retryAt = 0.0
     private var inspectAt = 0.0
     private var episode = false
@@ -341,6 +343,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         ticket.on = !exhausted && owners.values.contains(where: \.enabled)
         if old && !ticket.on { bumpStop() }
         bumpRevision()
+        if explicit && enabled { bumpAssetRetry() }
         inbox.explicit = inbox.explicit || (explicit && enabled)
         let schedule = enqueueLocked()
         lock.unlock()
@@ -365,12 +368,17 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         guard ticket.on, !exhausted else { lock.unlock(); return }
         switch event {
         case .hint: inbox.hint = true
-        case .available: inbox.available = true
+        case .available:
+            bumpAssetRetry()
+            inbox.available = true
         case .routeChanged: inbox.hint = true; inbox.route = true
         case .interrupted, .decoderFailed, .mediaLost, .mediaReset:
             if !inbox.invalidated { bumpEpoch() }
             inbox.invalidated = true
-            if case .mediaReset = event { inbox.available = true }
+            if case .mediaReset = event {
+                bumpAssetRetry()
+                inbox.available = true
+            }
         }
         let schedule = enqueueLocked()
         lock.unlock()
@@ -389,6 +397,10 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
     private func bumpEpoch() {
         if ticket.epoch == UInt64.max { exhausted = true; ticket.on = false }
         else { ticket.epoch += 1 }
+    }
+    private func bumpAssetRetry() {
+        if ticket.assetRetry == UInt64.max { exhausted = true; ticket.on = false }
+        else { ticket.assetRetry += 1 }
     }
     private func enqueueLocked() -> Bool {
         guard !inbox.queued else { return false }
@@ -442,7 +454,8 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             if !episode { retryAt = now } // First invalidation may recover immediately.
         }
         if events.explicit || events.available {
-            assetBlocked = false
+            // A delayed drain cannot replay a request already used by a start.
+            if next.assetRetry != lastAssetAttempt { assetBlocked = false }
             if events.explicit {
                 retryAt = 0
             } else if !expedited {
@@ -522,6 +535,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         lock.unlock()
         switch command {
         case .start:
+            lastAssetAttempt = input.assetRetry
             if !episode {
                 episode = true
                 let claim = makeLease()
@@ -736,7 +750,8 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
                 }
                 // Failed starts have exhausted reuse; the next paced attempt recreates.
                 if case .start = job.command { rebuild = true }
-                assetBlocked = reply.invalidAsset
+                // An older asset result cannot consume a newer retry request.
+                assetBlocked = reply.invalidAsset && current.assetRetry == job.ticket.assetRetry
                 // Keep the actual completed-failure deadline. A delayed control
                 // consumer must not add another full cooldown after it elapsed.
                 retryAt = returnedAt + policy.interval
