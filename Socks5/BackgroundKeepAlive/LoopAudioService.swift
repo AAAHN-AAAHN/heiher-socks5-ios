@@ -732,6 +732,8 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
                 case .configurationMismatch: rebuild = true
                 case nil: rebuild = reply.error != nil || reply.sample?.configured != true
                 }
+                // Failed starts have exhausted reuse; the next paced attempt recreates.
+                if case .start = job.command { rebuild = true }
                 assetBlocked = reply.invalidAsset
                 // Keep the actual completed-failure deadline. A delayed control
                 // consumer must not add another full cooldown after it elapsed.
