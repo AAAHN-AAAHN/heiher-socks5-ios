@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -124,6 +125,8 @@ RETRY_PACING_NEGATIVES = {
 RETRY_PACING_BASELINE_COMMIT = 'd40120df2a9877c25fc4134e1d3d38a1800bbd45'
 RETRY_PACING_BASELINE_SERVICE_SHA256 = 'e826e8a7ea0c1442b53d346ffb4e13452257f76e6a69059ec90b2e91cec52e8e'
 INGRESS_PREVIOUS_SERVICE_SHA256 = '90a84615e8c50d470b77711bbacfd30ae2d4b9e89d4bb7b811ab327ba57d8a34'
+STANDALONE_ROOT_CASES = ('nested-off', 'nested-on', 'plain-toggle', 'publication-off')
+STANDALONE_ROOT_BASELINE_SHA256 = '21485909c865c4e3036a9985d6351332fc87f4deddabd5507da123e252e24187'
 FINALIZATION_BASELINE_COMMIT = 'eb67d07e760380ef363703926318dd40939aba05'
 FINALIZATION_BASELINE_SERVICE_SHA256 = 'd1e21cc4054c70879451891f53281d0235d5503405ce7f0ed1d2ee244316c6e1'
 FINALIZATION_PREVIOUS_SERVICE_SHA256 = 'f229417b64aa478259095ea74ee12db13d7262833a283dc497f90f1cc3a4316a'
@@ -405,6 +408,9 @@ def retry_pacing_source(source, legacy):
     before = '        if schedule { control.async { self.drain() } }'
     assert source.count(before) == 3
     source = source.replace(before, '        RetrySignalObservation.afterIngressAccepted()\n' + before)
+    before = '        adopt(next)\n        let now = Self.now'
+    assert source.count(before) == 1
+    source = source.replace(before, '        RetrySignalObservation.beforeDrain(retryAt)\n' + before, 1)
     before = '        if !current.on || overflow {'
     assert source.count(before) == 1
     return source.replace(before, '        RetrySignalObservation.afterDrain(retryAt)\n' + before, 1)
@@ -474,7 +480,19 @@ extension LoopAudioQueueOwner {
     return result
 
 
-def compile_fixture(folder, label, source, monitor, lease, fixture, optimize, records, mocks=None, facade=None):
+def standalone_root_fixture(source):
+    assert '@AppStorage("background.silentAudio")' in source
+    bodies = re.findall(r'audioEnabled: Binding\(get: \{ audioEnabled \}, set: \{ value in\n(.*?)\n\s*\}\)\)',
+                        source, re.S)
+    assert len(bodies) == 1
+    template = (HERE / 'StandaloneRootIntentTests.swift').read_text()
+    marker = '        // ACTUAL_ROOT_SETTER'
+    assert template.count(marker) == 1
+    return template.replace(marker, bodies[0], 1)
+
+
+def compile_fixture(folder, label, source, monitor, lease, fixture, optimize, records,
+                    mocks=None, facade=None, fixture_source=None):
     work = folder / label
     work.mkdir()
     if fixture in ('LeaseLifecycleTests.swift', 'ApplicationProviderBoundaryTests.swift'):
@@ -498,7 +516,12 @@ def compile_fixture(folder, label, source, monitor, lease, fixture, optimize, re
         path = work / 'Facade.swift'
         path.write_text(facade)
         paths.append(path)
-    paths.append(HERE / fixture)
+    if fixture_source is None:
+        paths.append(HERE / fixture)
+    else:
+        path = work / fixture
+        path.write_text(fixture_source)
+        paths.append(path)
     executable = work / 'fixture'
     run(['swiftc', '-swift-version', '5', '-strict-concurrency=complete', '-warnings-as-errors',
          '-parse-as-library', '-O' if optimize else '-Onone', *paths, '-o', executable],
@@ -508,11 +531,14 @@ def compile_fixture(folder, label, source, monitor, lease, fixture, optimize, re
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--group', choices=('all', 'service', 'boundary', 'adapter', 'facade', 'finalization', 'precedence', 'stopped-start', 'asset-episode', 'asset-retry', 'retry-pacing'), default='all')
+    parser.add_argument('--group', choices=('all', 'service', 'boundary', 'adapter', 'facade', 'finalization', 'precedence', 'stopped-start', 'asset-episode', 'asset-retry', 'retry-pacing', 'standalone-root'), default='all')
     parser.add_argument('--mode', choices=('all', 'debug', 'optimized'), default='all')
     parser.add_argument('--negative-only', action='store_true')
     parser.add_argument('--case', choices=FACADE_CASES)
     args = parser.parse_args()
+    standalone = json.loads((ROOT / 'Build/features.json').read_text())['features'] == ['background']
+    if args.group == 'standalone-root' and not standalone:
+        raise SystemExit('Standalone Background root checks require its owner checkout; Release owns a different root.')
     source = (OWNED / 'LoopAudioService.swift').read_text()
     monitor = (OWNED / 'PlaybackProgressMonitor.swift').read_text()
     lease = (OWNED / 'RecoveryExecutionLease.swift').read_text()
@@ -532,6 +558,7 @@ def main():
               'source_sha256': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in OWNED.glob('*.swift')},
               'tested_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'scope': 'Actual service/adapter bodies; controlled AV outcomes and real host Dispatch. Not Apple playback or physical-device execution.',
+              'standalone_root_in_scope': standalone,
               'commands': records}
     try:
         with tempfile.TemporaryDirectory(prefix='loop-audio-') as directory:
@@ -541,6 +568,26 @@ def main():
             modes = [False, True] if args.mode == 'all' else [args.mode == 'optimized']
             for optimize in modes:
                 suffix = 'optimized' if optimize else 'debug'
+                if standalone and args.group in ('all', 'standalone-root'):
+                    root_source = (ROOT / 'Socks5/AppRoot.swift').read_text()
+                    previous_root = subprocess.check_output(['git', 'show', RETRY_PACING_BASELINE_COMMIT +
+                        ':Socks5/AppRoot.swift'], cwd=ROOT).decode()
+                    assert hashlib.sha256(previous_root.encode()).hexdigest() == STANDALONE_ROOT_BASELINE_SHA256
+                    report['standalone_root_source_sha256'] = hashlib.sha256(root_source.encode()).hexdigest()
+                    report['standalone_root_baseline_commit'] = RETRY_PACING_BASELINE_COMMIT
+                    report['standalone_root_previous_source_sha256'] = STANDALONE_ROOT_BASELINE_SHA256
+                    for old in (True, False):
+                        if not old and args.negative_only:
+                            continue
+                        prefix = ('previous-' if old else '') + 'standalone-root-' + suffix
+                        exe = compile_fixture(folder, prefix, source, monitor, lease,
+                                              'StandaloneRootIntentTests.swift', optimize, records,
+                                              mocks='FacadePlatformMocks.swift', facade=facade,
+                                              fixture_source=standalone_root_fixture(previous_root if old else root_source))
+                        for case in STANDALONE_ROOT_CASES:
+                            expected = ('STANDALONE_STORAGE_ECHO_OVERWROTE_LATEST_INTENT'
+                                        if old and case in ('nested-off', 'nested-on') else None)
+                            run_checked_cleanup([exe, case], records, prefix + '-' + case, expected=expected)
                 if args.group in ('all', 'adapter', 'retry-pacing'):
                     previous = subprocess.check_output(['git', 'show', RETRY_PACING_BASELINE_COMMIT +
                         ':Socks5/BackgroundKeepAlive/LoopAudioService.swift'], cwd=ROOT).decode()

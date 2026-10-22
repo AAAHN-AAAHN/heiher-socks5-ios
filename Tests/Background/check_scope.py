@@ -107,7 +107,8 @@ def main():
     assert 'keepAlive.setLocation(value)' in root
     assert 'keepAlive.syncAudio(value)' in root
     binding = root[root.index('audioEnabled: Binding('):root.index('.tabItem { Label("Background"')]
-    assert binding.index('keepAlive.setAudio(value)') < binding.index('audioEnabled = value')
+    assert binding.index('keepAlive.setAudio(value)') < binding.index('audioEnabled = keepAlive.audioEnabled')
+    assert 'audioEnabled = value' not in binding
     controller = text('Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift')
     assert all(token not in controller for token in ('UserDefaults', 'AppStorage', 'HevSocks5Server',
                                                     'BGTaskScheduler', 'MPRemoteCommandCenter'))

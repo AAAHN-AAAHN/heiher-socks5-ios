@@ -18,6 +18,7 @@ enum RetrySignalObservation {
         var accepted = false
         var returned = false
         var watchDrain = false
+        var priorDeadline: Double?
         var drainedDeadline: Double?
     }
     static let state = RetrySignalValue(State())
@@ -39,9 +40,14 @@ enum RetrySignalObservation {
         }
         if hold { precondition(releaseIngress.wait(timeout: .now() + 10) == .success, "FIXTURE_INGRESS_NOT_RELEASED") }
     }
+    static func beforeDrain(_ deadline: Double) {
+        state.use { value in
+            if value.watchDrain && value.priorDeadline == nil { value.priorDeadline = deadline }
+        }
+    }
     static func afterDrain(_ deadline: Double) {
         state.use { value in
-            if value.watchDrain && value.drainedDeadline == nil { value.drainedDeadline = deadline }
+            if value.priorDeadline != nil && value.drainedDeadline == nil { value.drainedDeadline = deadline }
         }
     }
 }
@@ -146,9 +152,12 @@ struct RetrySignalFailure: Error { let marker: String }
             else if name == "new-hint" { service.notify(.hint) }
             else { throw RetrySignalFailure(marker: "UNKNOWN_CASE") }
             try await wait({ RetrySignalObservation.state.use { $0.drainedDeadline != nil } }, "FIXTURE_DRAIN_NOT_OBSERVED")
+            before = RetrySignalObservation.state.use { $0.priorDeadline! }
             after = RetrySignalObservation.state.use { $0.drainedDeadline! }
-            // Observe the policy assignment itself. Host wake-up speed is not
-            // the oracle and the production 0.5-second interval is unchanged.
+            // Both observations belong to the same serial drain. An ordinary
+            // retry between the main actor's setup and this drain cannot alter
+            // the comparison. The production 0.5-second interval is unchanged.
+            try check(before > 0, "FIXTURE_DRAIN_DID_NOT_BEGIN_WITH_FAILURE_DEADLINE")
             if preAdmission {
                 try check(after == before, "PRE_ADMISSION_RETRY_SIGNAL_REPLAYED_AFTER_FAILED_START")
             } else if budget {

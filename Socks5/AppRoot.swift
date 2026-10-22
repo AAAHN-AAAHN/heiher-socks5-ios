@@ -16,7 +16,8 @@ struct AppRoot: View {
                                     locationEnabled: $locationEnabled,
                                     audioEnabled: Binding(get: { audioEnabled }, set: { value in
                                         keepAlive.setAudio(value)
-                                        audioEnabled = value
+                                        // Publication may accept a newer intent synchronously.
+                                        audioEnabled = keepAlive.audioEnabled
                                     }))
                 .tabItem { Label("Background", systemImage: "switch.2") }
                 .tag("background")
