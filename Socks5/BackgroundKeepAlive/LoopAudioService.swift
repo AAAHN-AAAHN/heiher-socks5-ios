@@ -512,7 +512,10 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             publish(State(text: "Waiting \u{2014} audio operation identifier limit reached"))
             return
         }
-        adopt(latest())
+        lock.lock()
+        let admission = (ticket: ticket, explicit: inbox.explicit, available: inbox.available)
+        lock.unlock()
+        adopt(admission.ticket)
         let command: Command
         switch requested {
         case .inspect where rebuild: command = .start(rebuild: true)
@@ -537,8 +540,8 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             inbox.invalidated = false
             // Admission can precede a signal's queued drain. Consume the same
             // one-per-episode availability opportunity at that actual boundary.
-            if inbox.available > lastAssetAttempt, inbox.available <= input.assetRetry,
-               inbox.explicit <= lastAssetAttempt {
+            if admission.available > lastAssetAttempt, admission.available <= input.assetRetry,
+               admission.explicit <= lastAssetAttempt {
                 expedited = true
             }
         }

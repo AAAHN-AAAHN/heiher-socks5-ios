@@ -12,6 +12,8 @@ final class RetrySignalValue<Value>: @unchecked Sendable {
 
 enum RetrySignalObservation {
     struct State {
+        var holdSnapshot = false
+        var snapshotHeld = false
         var holdBegin = false
         var began = false
         var holdIngress = false
@@ -22,6 +24,7 @@ enum RetrySignalObservation {
         var drainedDeadline: Double?
     }
     static let state = RetrySignalValue(State())
+    static let releaseSnapshot = DispatchSemaphore(value: 0)
     static let releaseBegin = DispatchSemaphore(value: 0)
     static let releaseIngress = DispatchSemaphore(value: 0)
     static func beforeBegin() {
@@ -31,6 +34,14 @@ enum RetrySignalObservation {
             return true
         }
         if hold { precondition(releaseBegin.wait(timeout: .now() + 10) == .success, "FIXTURE_BEGIN_NOT_RELEASED") }
+    }
+    static func afterSnapshot() {
+        let hold = state.use { value -> Bool in
+            guard value.holdSnapshot else { return false }
+            value.holdSnapshot = false; value.snapshotHeld = true
+            return true
+        }
+        if hold { precondition(releaseSnapshot.wait(timeout: .now() + 10) == .success, "FIXTURE_SNAPSHOT_NOT_RELEASED") }
     }
     static func afterIngressAccepted() {
         let hold = state.use { value -> Bool in
@@ -84,7 +95,11 @@ struct RetrySignalFailure: Error { let marker: String }
         let budget = name == "availability-budget-after-admission"
         let staleExplicit = name == "stale-explicit-new-available"
         let newExplicit = name == "new-explicit-old-available"
-        let delayed = preAdmission || budget || staleExplicit || newExplicit
+        let lateExplicit = name == "late-explicit-after-snapshot"
+        let lateAvailable = name == "late-available-after-snapshot"
+        let admittedExplicit = name == "admitted-explicit-late-explicit"
+        let snapshotCase = lateExplicit || lateAvailable || admittedExplicit
+        let delayed = preAdmission || budget || staleExplicit || newExplicit || snapshotCase
         let isExplicit = name == "pre-admission-explicit" || staleExplicit
         let fixture = AudioEndpointFixture.shared
         fixture.use { $0.resource = CommandLine.arguments[2]; $0.rejections["activate"] = 100 }
@@ -110,6 +125,7 @@ struct RetrySignalFailure: Error { let marker: String }
         var after = -1.0
         var admissionProven = false
         do {
+            if snapshotCase { RetrySignalObservation.state.use { $0.holdSnapshot = true } }
             if staleExplicit {
                 service.setEnabled(true, owner: owner)
                 _ = try await settled(service, operations: 1)
@@ -129,17 +145,30 @@ struct RetrySignalFailure: Error { let marker: String }
                     RetrySignalObservation.state.use { $0.returned = true }
                 }
                 try await wait({ RetrySignalObservation.state.use { $0.accepted } }, "FIXTURE_RETRY_SIGNAL_NOT_ACCEPTED")
+                if admittedExplicit { service.setEnabled(true, owner: owner) }
                 RetrySignalObservation.releaseBegin.signal()
+                if snapshotCase {
+                    try await wait({ RetrySignalObservation.state.use { $0.snapshotHeld } }, "FIXTURE_SNAPSHOT_NOT_HELD")
+                    if lateAvailable { service.notify(.available) }
+                    else { service.setEnabled(true, owner: owner) }
+                    RetrySignalObservation.releaseSnapshot.signal()
+                }
             }
             let first = try await settled(service, operations: staleExplicit ? 2 : 1)
             try check(first.timerActive && fixture.use { $0.calls.filter { $0 == "activate" }.count >= 1 }, "FIXTURE_FAILED_START_NOT_PACED")
+            if lateExplicit || admittedExplicit {
+                RetrySignalObservation.releaseIngress.signal()
+                try await wait({ RetrySignalObservation.state.use { $0.returned } }, "FIXTURE_INGRESS_DISPATCH_NOT_RETURNED")
+                _ = try await settled(service, operations: 2)
+            }
             admissionProven = delayed
             before = await withCheckedContinuation { continuation in
                 service.auditRetryDeadline { continuation.resume(returning: $0) }
             }
             try check(before > 0, "FIXTURE_MISSING_FAILURE_DEADLINE")
             RetrySignalObservation.state.use { $0.watchDrain = true }
-            if delayed {
+            if lateExplicit || admittedExplicit { service.notify(.available) }
+            else if delayed {
                 // These inputs arrive after the attempt while the earlier
                 // signal's drain is still held. Its latest slot is coalesced,
                 // so identity and the consumed availability budget both matter.
@@ -158,7 +187,13 @@ struct RetrySignalFailure: Error { let marker: String }
             // retry between the main actor's setup and this drain cannot alter
             // the comparison. The production 0.5-second interval is unchanged.
             try check(before > 0, "FIXTURE_DRAIN_DID_NOT_BEGIN_WITH_FAILURE_DEADLINE")
-            if preAdmission {
+            if lateExplicit {
+                try check(after == before, "LATE_EXPLICIT_ERASED_ADMITTED_AVAILABILITY_BUDGET")
+            } else if lateAvailable {
+                try check(after == before, "LATE_AVAILABLE_REOPENED_ADMITTED_RETRY_BUDGET")
+            } else if admittedExplicit {
+                try check(after == 0, "ADMITTED_EXPLICIT_LOST_PRIORITY_AFTER_SNAPSHOT")
+            } else if preAdmission {
                 try check(after == before, "PRE_ADMISSION_RETRY_SIGNAL_REPLAYED_AFTER_FAILED_START")
             } else if budget {
                 try check(after == before, "ADMITTED_AVAILABILITY_OPPORTUNITY_REUSED")
@@ -172,7 +207,8 @@ struct RetrySignalFailure: Error { let marker: String }
             try check(claims.use { $0.requests == 1 }, "CONTINUOUS_FAILURE_RENEWED_CLAIM")
         } catch let error as RetrySignalFailure { failures.append(error.marker) }
         catch { failures.append("UNEXPECTED: \(error)") }
-        RetrySignalObservation.state.use { $0.holdBegin = false; $0.holdIngress = false }
+        RetrySignalObservation.state.use { $0.holdBegin = false; $0.holdIngress = false; $0.holdSnapshot = false }
+        RetrySignalObservation.releaseSnapshot.signal()
         RetrySignalObservation.releaseBegin.signal(); RetrySignalObservation.releaseIngress.signal()
         service.setEnabled(false, owner: owner)
         do {

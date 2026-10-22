@@ -115,15 +115,22 @@ ASSET_RETRY_BASELINE_COMMIT = 'eb67d07e760380ef363703926318dd40939aba05'
 ASSET_RETRY_BASELINE_SERVICE_SHA256 = 'd1e21cc4054c70879451891f53281d0235d5503405ce7f0ed1d2ee244316c6e1'
 RETRY_PACING_CASES = ('pre-admission-explicit', 'pre-admission-available',
                       'availability-budget-after-admission', 'stale-explicit-new-available',
-                      'new-explicit-old-available', 'new-explicit', 'new-available', 'new-hint')
+                      'new-explicit-old-available', 'new-explicit', 'new-available', 'new-hint',
+                      'late-explicit-after-snapshot', 'late-available-after-snapshot',
+                      'admitted-explicit-late-explicit')
 RETRY_PACING_NEGATIVES = {
     'pre-admission-explicit': 'PRE_ADMISSION_RETRY_SIGNAL_REPLAYED_AFTER_FAILED_START',
     'pre-admission-available': 'PRE_ADMISSION_RETRY_SIGNAL_REPLAYED_AFTER_FAILED_START',
     'availability-budget-after-admission': 'ADMITTED_AVAILABILITY_OPPORTUNITY_REUSED',
     'stale-explicit-new-available': 'STALE_EXPLICIT_PROMOTED_NEW_AVAILABILITY',
+    'late-explicit-after-snapshot': 'LATE_EXPLICIT_ERASED_ADMITTED_AVAILABILITY_BUDGET',
+    'late-available-after-snapshot': 'LATE_AVAILABLE_REOPENED_ADMITTED_RETRY_BUDGET',
 }
 RETRY_PACING_BASELINE_COMMIT = 'd40120df2a9877c25fc4134e1d3d38a1800bbd45'
 RETRY_PACING_BASELINE_SERVICE_SHA256 = 'e826e8a7ea0c1442b53d346ffb4e13452257f76e6a69059ec90b2e91cec52e8e'
+RETRY_KIND_BASELINE_COMMIT = 'a2fdf57ff8a78baee03aafe9de7c3b88fbb262ea'
+RETRY_KIND_BASELINE_SERVICE_SHA256 = '8c731c0de9b230acd09105b5fbad0518157b911528a625b384a88eee257914a7'
+RETRY_KIND_NARROW_SERVICE_SHA256 = '807070407b0f04cd6a76d0878986c18a8ed54df53c8bfaa4145c4f73b6348fb5'
 INGRESS_PREVIOUS_SERVICE_SHA256 = '90a84615e8c50d470b77711bbacfd30ae2d4b9e89d4bb7b811ab327ba57d8a34'
 STANDALONE_ROOT_CASES = ('nested-off', 'nested-on', 'plain-toggle', 'publication-off')
 STANDALONE_ROOT_BASELINE_SHA256 = '21485909c865c4e3036a9985d6351332fc87f4deddabd5507da123e252e24187'
@@ -385,13 +392,22 @@ def asset_retry_source(source, legacy):
     return source.replace(before, before + '\n                    AssetReadObservation.didRead()', 1)
 
 
+def hold_start_admission(source, observation):
+    # Hold before the same latest-input snapshot in both representations. The
+    # current input includes its pending kind identities in one lock boundary.
+    markers = ('        adopt(latest())\n        let command: Command',
+               '        lock.lock()\n        let admission = (ticket: ticket, explicit: inbox.explicit, available: inbox.available)')
+    present = [marker for marker in markers if source.count(marker) == 1]
+    assert len(present) == 1
+    before = present[0]
+    return source.replace(before, '        ' + observation + '.beforeBegin()\n' + before, 1)
+
+
 def asset_admission_source(source, legacy):
     source = asset_episode_source(source, legacy)
     # The same external holds separate accepted ingress from its queued drain,
     # and separate start admission from adoption of that accepted ticket.
-    before = '        adopt(latest())\n        let command: Command'
-    assert source.count(before) == 1
-    source = source.replace(before, '        AssetRetryAdmissionObservation.beforeBegin()\n' + before, 1)
+    source = hold_start_admission(source, 'AssetRetryAdmissionObservation')
     before = '        if schedule { control.async { self.drain() } }'
     assert source.count(before) == 3
     return source.replace(before, '        AssetRetryAdmissionObservation.afterIngressAccepted()\n' + before)
@@ -402,9 +418,10 @@ def retry_pacing_source(source, legacy):
     # admission. The read-only drain observation sees the assigned deadline;
     # host wake-up latency is never used as an upper-bound timing oracle.
     source = adapter_source(source, legacy)
-    before = '        adopt(latest())\n        let command: Command'
+    source = hold_start_admission(source, 'RetrySignalObservation')
+    before = '        let input = current\n'
     assert source.count(before) == 1
-    source = source.replace(before, '        RetrySignalObservation.beforeBegin()\n' + before, 1)
+    source = source.replace(before, before + '        RetrySignalObservation.afterSnapshot()\n', 1)
     before = '        if schedule { control.async { self.drain() } }'
     assert source.count(before) == 3
     source = source.replace(before, '        RetrySignalObservation.afterIngressAccepted()\n' + before)
@@ -613,8 +630,8 @@ def main():
                                     assert observed['pre_admission_signal_incorporation_proven'] is True
                     consumed_availability = ('''            // Admission can precede a signal's queued drain. Consume the same
             // one-per-episode availability opportunity at that actual boundary.
-            if inbox.available > lastAssetAttempt, inbox.available <= input.assetRetry,
-               inbox.explicit <= lastAssetAttempt {
+            if admission.available > lastAssetAttempt, admission.available <= input.assetRetry,
+               admission.explicit <= lastAssetAttempt {
                 expedited = true
             }
 ''')
@@ -626,6 +643,30 @@ def main():
                     run_checked_cleanup([exe, 'availability-budget-after-admission', OWNED / 'Silence.wav'], records,
                                         suffix + '-bad-availability-admission',
                                         expected='ADMITTED_AVAILABILITY_OPPORTUNITY_REUSED')
+                    previous_kind = subprocess.check_output(['git', 'show', RETRY_KIND_BASELINE_COMMIT +
+                        ':Socks5/BackgroundKeepAlive/LoopAudioService.swift'], cwd=ROOT).decode()
+                    assert hashlib.sha256(previous_kind.encode()).hexdigest() == RETRY_KIND_BASELINE_SERVICE_SHA256
+                    report['retry_kind_baseline_commit'] = RETRY_KIND_BASELINE_COMMIT
+                    report['retry_kind_previous_source_sha256'] = RETRY_KIND_BASELINE_SERVICE_SHA256
+                    narrow_before = '               inbox.explicit <= lastAssetAttempt {'
+                    assert previous_kind.count(narrow_before) == 1
+                    narrow_kind = previous_kind.replace(narrow_before,
+                        '               (inbox.explicit <= lastAssetAttempt || inbox.explicit > input.assetRetry) {', 1)
+                    assert hashlib.sha256(narrow_kind.encode()).hexdigest() == RETRY_KIND_NARROW_SERVICE_SHA256
+                    report['retry_kind_narrow_source_sha256'] = RETRY_KIND_NARROW_SERVICE_SHA256
+                    for kind, kind_source in [('previous', previous_kind), ('narrow', narrow_kind)]:
+                        prefix = kind + '-retry-kind-' + suffix
+                        exe = compile_fixture(folder, prefix, retry_pacing_source(kind_source, False), monitor, lease,
+                                              'RetrySignalPacingTests.swift', optimize, records,
+                                              mocks='AudioEndpointMocks.swift')
+                        for case in ('late-explicit-after-snapshot', 'late-available-after-snapshot',
+                                     'admitted-explicit-late-explicit'):
+                            failures = RETRY_PACING_NEGATIVES if kind == 'previous' else {
+                                'late-available-after-snapshot': 'LATE_AVAILABLE_REOPENED_ADMITTED_RETRY_BUDGET',
+                                'admitted-explicit-late-explicit': 'ADMITTED_EXPLICIT_LOST_PRIORITY_AFTER_SNAPSHOT',
+                            }
+                            run_checked_cleanup([exe, case, OWNED / 'Silence.wav'], records,
+                                                prefix + '-' + case, expected=failures.get(case))
                 if args.group in ('all', 'adapter', 'asset-retry'):
                     previous = subprocess.check_output(['git', 'show', ASSET_RETRY_BASELINE_COMMIT +
                         ':Socks5/BackgroundKeepAlive/LoopAudioService.swift'], cwd=ROOT).decode()
