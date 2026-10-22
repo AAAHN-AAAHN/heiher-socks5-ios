@@ -12,7 +12,7 @@ The build validates input identity before native patching, applies each declared
 
 On Linux, the applicable paths execute native networking, C fixtures and platform-independent Swift models. Statistics-enabled compositions exercise buffered and splice paths. Apple execution adds Darwin networking, the actual iPhoneOS SDK, resource compilation and the product or Simulator stages selected by the branch. Expected platform-specific skips remain skips, not successful executions.
 
-The integrated release validates a freshly generated patched framework, twelve production Swift files, an ARM64 archive and an unsigned IPA. It also exercises seeded original/remapped Simulator installations and the actual integrated, background-audio and traffic-statistics UI tests. These are separate gates, not a single interchangeable success flag.
+The integrated release validates a freshly generated patched framework, the declared production Swift sources, an ARM64 archive and an unsigned IPA. It also exercises seeded original/remapped Simulator installations and the actual integrated, background-audio and traffic-statistics UI tests. These are separate gates, not a single interchangeable success flag.
 
 Each result applies to its recorded source, toolchain and executed stage. The retained runtime evidence covers native host execution, the iPhoneOS SDK, archive/unsigned IPA and Simulator behavior. It does not establish SideStore installation, LiveContainer guest execution or physical background survival. A documentation-only revision preserves the runtime inputs but is not a new execution of those layers.
 
