@@ -1,12 +1,12 @@
 {
   "base_commit": "6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7",
   "branches": {
-    "feature/app-icon": "efd684afc12a74a960feb4a5674ef27014fc167d",
-    "feature/background": "0e2e73b68277a8391b61330a63e2a66c6e27ade5",
-    "feature/server-control": "39684d30fd398f312d3e0d0482cb23b3b6e041c2",
-    "feature/settings-persistence": "1ba20d7a188c16b7e2fcde7f306597bbe8c2bca1",
-    "feature/udp-compat": "0f380f19b6a5b69476a58fce0d9f59c9b25de729",
-    "feature/traffic-statistics": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e"
+    "feature/app-icon": "94617b17a644990a60ce1619c9464982db479f0a",
+    "feature/background": "eefba1fbc1b7b5e349ef9ff1921f6d6c70c20dfe",
+    "feature/server-control": "48b8cd524502d347a4274188160b7a2d87bd7028",
+    "feature/settings-persistence": "9821751eb0f61a6651ef585ad3b55dc1e6486f76",
+    "feature/udp-compat": "06e7337c6d7b332a8a393e4779eb29993bc45b9c",
+    "feature/traffic-statistics": "a766146a12bad87d420e03959af30bbfdd7f7c99"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -19,8 +19,8 @@
       "path": ".github/workflows/udp-compat-audit.yml"
     },
     "Build/inherited-workflows/traffic-statistics-verify-build.yml": {
-      "commit": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e",
-      "sha256": "7a4060f7aaff558d46371355cc5c75116a3b3ed2a37db20370c5260ce0d2c641",
+      "commit": "a766146a12bad87d420e03959af30bbfdd7f7c99",
+      "sha256": "bba9aee8cca45b8ae7a97706fac73fcde061a36288ce1aaccbe852705e2a392c",
       "path": ".github/workflows/verify-build.yml"
     },
     "Patches/hev-netaddr-result.patch": {
@@ -620,8 +620,8 @@
       "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e",
-      "sha256": "11ca9b0638e474530bfe786ff3f580e013bb798d8c630e78f3cb10982dbd4217"
+      "commit": "a766146a12bad87d420e03959af30bbfdd7f7c99",
+      "sha256": "e30f500e1379955f4768ab37ca140cc23c10b6b8b8e79ac787aea50797a272c2"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
