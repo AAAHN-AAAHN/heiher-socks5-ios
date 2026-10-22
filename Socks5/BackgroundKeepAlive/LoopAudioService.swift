@@ -216,9 +216,9 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
     }
     private struct Inbox {
         var queued = false
-        var explicit = false
+        var explicit: UInt64 = 0
         var hint = false
-        var available = false
+        var available: UInt64 = 0
         var invalidated = false
         var route = false
     }
@@ -343,8 +343,10 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         ticket.on = !exhausted && owners.values.contains(where: \.enabled)
         if old && !ticket.on { bumpStop() }
         bumpRevision()
-        if explicit && enabled { bumpAssetRetry() }
-        inbox.explicit = inbox.explicit || (explicit && enabled)
+        if explicit && enabled {
+            bumpAssetRetry()
+            inbox.explicit = ticket.assetRetry
+        }
         let schedule = enqueueLocked()
         lock.unlock()
         if schedule { control.async { self.drain() } }
@@ -370,14 +372,14 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         case .hint: inbox.hint = true
         case .available:
             bumpAssetRetry()
-            inbox.available = true
+            inbox.available = ticket.assetRetry
         case .routeChanged: inbox.hint = true; inbox.route = true
         case .interrupted, .decoderFailed, .mediaLost, .mediaReset:
             if !inbox.invalidated { bumpEpoch() }
             inbox.invalidated = true
             if case .mediaReset = event {
                 bumpAssetRetry()
-                inbox.available = true
+                inbox.available = ticket.assetRetry
             }
         }
         let schedule = enqueueLocked()
@@ -453,10 +455,13 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             monitor.knownFailure(now: now)
             if !episode { retryAt = now } // First invalidation may recover immediately.
         }
-        if events.explicit || events.available {
-            // A delayed drain cannot replay a request already used by a start.
-            if next.assetRetry != lastAssetAttempt { assetBlocked = false }
-            if events.explicit {
+        let explicitRetry = events.explicit > lastAssetAttempt
+        let availableRetry = events.available > lastAssetAttempt
+        if explicitRetry || availableRetry {
+            // A delayed drain cannot replay an already admitted request or
+            // promote newer availability using an older explicit On bit.
+            assetBlocked = false
+            if explicitRetry {
                 retryAt = 0
             } else if !expedited {
                 retryAt = 0
@@ -476,7 +481,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             return
         }
         if work != nil { return }
-        reconcile(inspect: (events.hint || events.explicit || events.available) && playing && !rebuild)
+        reconcile(inspect: (events.hint || events.explicit > 0 || events.available > 0) && playing && !rebuild)
     }
 
     private func reconcile(inspect: Bool = false) {
@@ -507,7 +512,10 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             publish(State(text: "Waiting \u{2014} audio operation identifier limit reached"))
             return
         }
-        adopt(latest())
+        lock.lock()
+        let admission = (ticket: ticket, explicit: inbox.explicit, available: inbox.available)
+        lock.unlock()
+        adopt(admission.ticket)
         let command: Command
         switch requested {
         case .inspect where rebuild: command = .start(rebuild: true)
@@ -530,6 +538,12 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
         // A later event must revoke it even if an earlier drain is still queued.
         if case .start = command, ticket.on, ticket.stop == input.stop, ticket.epoch == input.epoch {
             inbox.invalidated = false
+            // Admission can precede a signal's queued drain. Consume the same
+            // one-per-episode availability opportunity at that actual boundary.
+            if admission.available > lastAssetAttempt, admission.available <= input.assetRetry,
+               admission.explicit <= lastAssetAttempt {
+                expedited = true
+            }
         }
         timing = Timing(id: job.id, phase: .queued)
         lock.unlock()

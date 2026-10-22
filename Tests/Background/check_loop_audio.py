@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -112,6 +113,27 @@ ASSET_ADMISSION_NEGATIVES = {
 }
 ASSET_RETRY_BASELINE_COMMIT = 'eb67d07e760380ef363703926318dd40939aba05'
 ASSET_RETRY_BASELINE_SERVICE_SHA256 = 'd1e21cc4054c70879451891f53281d0235d5503405ce7f0ed1d2ee244316c6e1'
+RETRY_PACING_CASES = ('pre-admission-explicit', 'pre-admission-available',
+                      'availability-budget-after-admission', 'stale-explicit-new-available',
+                      'new-explicit-old-available', 'new-explicit', 'new-available', 'new-hint',
+                      'late-explicit-after-snapshot', 'late-available-after-snapshot',
+                      'admitted-explicit-late-explicit')
+RETRY_PACING_NEGATIVES = {
+    'pre-admission-explicit': 'PRE_ADMISSION_RETRY_SIGNAL_REPLAYED_AFTER_FAILED_START',
+    'pre-admission-available': 'PRE_ADMISSION_RETRY_SIGNAL_REPLAYED_AFTER_FAILED_START',
+    'availability-budget-after-admission': 'ADMITTED_AVAILABILITY_OPPORTUNITY_REUSED',
+    'stale-explicit-new-available': 'STALE_EXPLICIT_PROMOTED_NEW_AVAILABILITY',
+    'late-explicit-after-snapshot': 'LATE_EXPLICIT_ERASED_ADMITTED_AVAILABILITY_BUDGET',
+    'late-available-after-snapshot': 'LATE_AVAILABLE_REOPENED_ADMITTED_RETRY_BUDGET',
+}
+RETRY_PACING_BASELINE_COMMIT = 'd40120df2a9877c25fc4134e1d3d38a1800bbd45'
+RETRY_PACING_BASELINE_SERVICE_SHA256 = 'e826e8a7ea0c1442b53d346ffb4e13452257f76e6a69059ec90b2e91cec52e8e'
+RETRY_KIND_BASELINE_COMMIT = 'a2fdf57ff8a78baee03aafe9de7c3b88fbb262ea'
+RETRY_KIND_BASELINE_SERVICE_SHA256 = '8c731c0de9b230acd09105b5fbad0518157b911528a625b384a88eee257914a7'
+RETRY_KIND_NARROW_SERVICE_SHA256 = '807070407b0f04cd6a76d0878986c18a8ed54df53c8bfaa4145c4f73b6348fb5'
+INGRESS_PREVIOUS_SERVICE_SHA256 = '90a84615e8c50d470b77711bbacfd30ae2d4b9e89d4bb7b811ab327ba57d8a34'
+STANDALONE_ROOT_CASES = ('nested-off', 'nested-on', 'plain-toggle', 'publication-off')
+STANDALONE_ROOT_BASELINE_SHA256 = '21485909c865c4e3036a9985d6351332fc87f4deddabd5507da123e252e24187'
 FINALIZATION_BASELINE_COMMIT = 'eb67d07e760380ef363703926318dd40939aba05'
 FINALIZATION_BASELINE_SERVICE_SHA256 = 'd1e21cc4054c70879451891f53281d0235d5503405ce7f0ed1d2ee244316c6e1'
 FINALIZATION_PREVIOUS_SERVICE_SHA256 = 'f229417b64aa478259095ea74ee12db13d7262833a283dc497f90f1cc3a4316a'
@@ -211,8 +233,12 @@ def ingress_source(source):
     return source + '\n' + (HERE / 'IngressReplayAccess.swift.inc').read_text()
 
 
-def ingress_previous_admission(source):
-    # Restore the exact previous admission and invalidation-consumption behavior.
+def ingress_previous_admission():
+    # Preserve the previously accepted full control input before the retry
+    # mailbox gains per-kind identities and admission-time budget consumption.
+    source = subprocess.check_output(['git', 'show', RETRY_PACING_BASELINE_COMMIT +
+        ':Socks5/BackgroundKeepAlive/LoopAudioService.swift'], cwd=ROOT).decode()
+    assert hashlib.sha256(source.encode()).hexdigest() == RETRY_PACING_BASELINE_SERVICE_SHA256
     replacements = [
         (
             '''    private func begin(_ requested: Command) {
@@ -257,6 +283,7 @@ def ingress_previous_admission(source):
     for before, after in replacements:
         assert source.count(before) == 1
         source = source.replace(before, after, 1)
+    assert hashlib.sha256(source.encode()).hexdigest() == INGRESS_PREVIOUS_SERVICE_SHA256
     return source
 
 
@@ -365,16 +392,45 @@ def asset_retry_source(source, legacy):
     return source.replace(before, before + '\n                    AssetReadObservation.didRead()', 1)
 
 
+def hold_start_admission(source, observation):
+    # Hold before the same latest-input snapshot in both representations. The
+    # current input includes its pending kind identities in one lock boundary.
+    markers = ('        adopt(latest())\n        let command: Command',
+               '        lock.lock()\n        let admission = (ticket: ticket, explicit: inbox.explicit, available: inbox.available)')
+    present = [marker for marker in markers if source.count(marker) == 1]
+    assert len(present) == 1
+    before = present[0]
+    return source.replace(before, '        ' + observation + '.beforeBegin()\n' + before, 1)
+
+
 def asset_admission_source(source, legacy):
     source = asset_episode_source(source, legacy)
     # The same external holds separate accepted ingress from its queued drain,
     # and separate start admission from adoption of that accepted ticket.
-    before = '        adopt(latest())\n        let command: Command'
-    assert source.count(before) == 1
-    source = source.replace(before, '        AssetRetryAdmissionObservation.beforeBegin()\n' + before, 1)
+    source = hold_start_admission(source, 'AssetRetryAdmissionObservation')
     before = '        if schedule { control.async { self.drain() } }'
     assert source.count(before) == 3
     return source.replace(before, '        AssetRetryAdmissionObservation.afterIngressAccepted()\n' + before)
+
+
+def retry_pacing_source(source, legacy):
+    # The same external holds separate accepted ingress from dispatch and start
+    # admission. The read-only drain observation sees the assigned deadline;
+    # host wake-up latency is never used as an upper-bound timing oracle.
+    source = adapter_source(source, legacy)
+    source = hold_start_admission(source, 'RetrySignalObservation')
+    before = '        let input = current\n'
+    assert source.count(before) == 1
+    source = source.replace(before, before + '        RetrySignalObservation.afterSnapshot()\n', 1)
+    before = '        if schedule { control.async { self.drain() } }'
+    assert source.count(before) == 3
+    source = source.replace(before, '        RetrySignalObservation.afterIngressAccepted()\n' + before)
+    before = '        adopt(next)\n        let now = Self.now'
+    assert source.count(before) == 1
+    source = source.replace(before, '        RetrySignalObservation.beforeDrain(retryAt)\n' + before, 1)
+    before = '        if !current.on || overflow {'
+    assert source.count(before) == 1
+    return source.replace(before, '        RetrySignalObservation.afterDrain(retryAt)\n' + before, 1)
 
 
 def asset_episode_source(source, legacy):
@@ -441,7 +497,19 @@ extension LoopAudioQueueOwner {
     return result
 
 
-def compile_fixture(folder, label, source, monitor, lease, fixture, optimize, records, mocks=None, facade=None):
+def standalone_root_fixture(source):
+    assert '@AppStorage("background.silentAudio")' in source
+    bodies = re.findall(r'audioEnabled: Binding\(get: \{ audioEnabled \}, set: \{ value in\n(.*?)\n\s*\}\)\)',
+                        source, re.S)
+    assert len(bodies) == 1
+    template = (HERE / 'StandaloneRootIntentTests.swift').read_text()
+    marker = '        // ACTUAL_ROOT_SETTER'
+    assert template.count(marker) == 1
+    return template.replace(marker, bodies[0], 1)
+
+
+def compile_fixture(folder, label, source, monitor, lease, fixture, optimize, records,
+                    mocks=None, facade=None, fixture_source=None):
     work = folder / label
     work.mkdir()
     if fixture in ('LeaseLifecycleTests.swift', 'ApplicationProviderBoundaryTests.swift'):
@@ -465,7 +533,12 @@ def compile_fixture(folder, label, source, monitor, lease, fixture, optimize, re
         path = work / 'Facade.swift'
         path.write_text(facade)
         paths.append(path)
-    paths.append(HERE / fixture)
+    if fixture_source is None:
+        paths.append(HERE / fixture)
+    else:
+        path = work / fixture
+        path.write_text(fixture_source)
+        paths.append(path)
     executable = work / 'fixture'
     run(['swiftc', '-swift-version', '5', '-strict-concurrency=complete', '-warnings-as-errors',
          '-parse-as-library', '-O' if optimize else '-Onone', *paths, '-o', executable],
@@ -475,11 +548,14 @@ def compile_fixture(folder, label, source, monitor, lease, fixture, optimize, re
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--group', choices=('all', 'service', 'boundary', 'adapter', 'facade', 'finalization', 'precedence', 'stopped-start', 'asset-episode', 'asset-retry'), default='all')
+    parser.add_argument('--group', choices=('all', 'service', 'boundary', 'adapter', 'facade', 'finalization', 'precedence', 'stopped-start', 'asset-episode', 'asset-retry', 'retry-pacing', 'standalone-root'), default='all')
     parser.add_argument('--mode', choices=('all', 'debug', 'optimized'), default='all')
     parser.add_argument('--negative-only', action='store_true')
     parser.add_argument('--case', choices=FACADE_CASES)
     args = parser.parse_args()
+    standalone = json.loads((ROOT / 'Build/features.json').read_text())['features'] == ['background']
+    if args.group == 'standalone-root' and not standalone:
+        raise SystemExit('Standalone Background root checks require its owner checkout; Release owns a different root.')
     source = (OWNED / 'LoopAudioService.swift').read_text()
     monitor = (OWNED / 'PlaybackProgressMonitor.swift').read_text()
     lease = (OWNED / 'RecoveryExecutionLease.swift').read_text()
@@ -499,6 +575,7 @@ def main():
               'source_sha256': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in OWNED.glob('*.swift')},
               'tested_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'scope': 'Actual service/adapter bodies; controlled AV outcomes and real host Dispatch. Not Apple playback or physical-device execution.',
+              'standalone_root_in_scope': standalone,
               'commands': records}
     try:
         with tempfile.TemporaryDirectory(prefix='loop-audio-') as directory:
@@ -508,6 +585,88 @@ def main():
             modes = [False, True] if args.mode == 'all' else [args.mode == 'optimized']
             for optimize in modes:
                 suffix = 'optimized' if optimize else 'debug'
+                if standalone and args.group in ('all', 'standalone-root'):
+                    root_source = (ROOT / 'Socks5/AppRoot.swift').read_text()
+                    previous_root = subprocess.check_output(['git', 'show', RETRY_PACING_BASELINE_COMMIT +
+                        ':Socks5/AppRoot.swift'], cwd=ROOT).decode()
+                    assert hashlib.sha256(previous_root.encode()).hexdigest() == STANDALONE_ROOT_BASELINE_SHA256
+                    report['standalone_root_source_sha256'] = hashlib.sha256(root_source.encode()).hexdigest()
+                    report['standalone_root_baseline_commit'] = RETRY_PACING_BASELINE_COMMIT
+                    report['standalone_root_previous_source_sha256'] = STANDALONE_ROOT_BASELINE_SHA256
+                    for old in (True, False):
+                        if not old and args.negative_only:
+                            continue
+                        prefix = ('previous-' if old else '') + 'standalone-root-' + suffix
+                        exe = compile_fixture(folder, prefix, source, monitor, lease,
+                                              'StandaloneRootIntentTests.swift', optimize, records,
+                                              mocks='FacadePlatformMocks.swift', facade=facade,
+                                              fixture_source=standalone_root_fixture(previous_root if old else root_source))
+                        for case in STANDALONE_ROOT_CASES:
+                            expected = ('STANDALONE_STORAGE_ECHO_OVERWROTE_LATEST_INTENT'
+                                        if old and case in ('nested-off', 'nested-on') else None)
+                            run_checked_cleanup([exe, case], records, prefix + '-' + case, expected=expected)
+                if args.group in ('all', 'adapter', 'retry-pacing'):
+                    previous = subprocess.check_output(['git', 'show', RETRY_PACING_BASELINE_COMMIT +
+                        ':Socks5/BackgroundKeepAlive/LoopAudioService.swift'], cwd=ROOT).decode()
+                    previous_sha = hashlib.sha256(previous.encode()).hexdigest()
+                    assert previous_sha == RETRY_PACING_BASELINE_SERVICE_SHA256
+                    report['retry_pacing_baseline_commit'] = RETRY_PACING_BASELINE_COMMIT
+                    report['retry_pacing_previous_source_sha256'] = previous_sha
+                    for legacy in (False, True):
+                        label = 'retry-pacing-' + ('legacy-' if legacy else 'async-') + suffix
+                        for old in (True, False):
+                            if not old and args.negative_only:
+                                continue
+                            prefix = 'previous-' + label if old else label
+                            exe = compile_fixture(folder, prefix,
+                                                  retry_pacing_source(previous if old else source, legacy),
+                                                  monitor, lease, 'RetrySignalPacingTests.swift', optimize, records,
+                                                  mocks='AudioEndpointMocks.swift')
+                            for case in RETRY_PACING_CASES:
+                                run_checked_cleanup([exe, case, OWNED / 'Silence.wav'], records, prefix + '-' + case,
+                                                    expected=RETRY_PACING_NEGATIVES.get(case) if old else None)
+                                observed = json.loads(records[-1]['stdout'])
+                                if case not in ('new-explicit', 'new-available', 'new-hint'):
+                                    assert observed['pre_admission_signal_incorporation_proven'] is True
+                    consumed_availability = ('''            // Admission can precede a signal's queued drain. Consume the same
+            // one-per-episode availability opportunity at that actual boundary.
+            if admission.available > lastAssetAttempt, admission.available <= input.assetRetry,
+               admission.explicit <= lastAssetAttempt {
+                expedited = true
+            }
+''')
+                    assert source.count(consumed_availability) == 1
+                    exe = compile_fixture(folder, 'bad-availability-admission-' + suffix,
+                                          retry_pacing_source(source.replace(consumed_availability, '', 1), False),
+                                          monitor, lease, 'RetrySignalPacingTests.swift', optimize, records,
+                                          mocks='AudioEndpointMocks.swift')
+                    run_checked_cleanup([exe, 'availability-budget-after-admission', OWNED / 'Silence.wav'], records,
+                                        suffix + '-bad-availability-admission',
+                                        expected='ADMITTED_AVAILABILITY_OPPORTUNITY_REUSED')
+                    previous_kind = subprocess.check_output(['git', 'show', RETRY_KIND_BASELINE_COMMIT +
+                        ':Socks5/BackgroundKeepAlive/LoopAudioService.swift'], cwd=ROOT).decode()
+                    assert hashlib.sha256(previous_kind.encode()).hexdigest() == RETRY_KIND_BASELINE_SERVICE_SHA256
+                    report['retry_kind_baseline_commit'] = RETRY_KIND_BASELINE_COMMIT
+                    report['retry_kind_previous_source_sha256'] = RETRY_KIND_BASELINE_SERVICE_SHA256
+                    narrow_before = '               inbox.explicit <= lastAssetAttempt {'
+                    assert previous_kind.count(narrow_before) == 1
+                    narrow_kind = previous_kind.replace(narrow_before,
+                        '               (inbox.explicit <= lastAssetAttempt || inbox.explicit > input.assetRetry) {', 1)
+                    assert hashlib.sha256(narrow_kind.encode()).hexdigest() == RETRY_KIND_NARROW_SERVICE_SHA256
+                    report['retry_kind_narrow_source_sha256'] = RETRY_KIND_NARROW_SERVICE_SHA256
+                    for kind, kind_source in [('previous', previous_kind), ('narrow', narrow_kind)]:
+                        prefix = kind + '-retry-kind-' + suffix
+                        exe = compile_fixture(folder, prefix, retry_pacing_source(kind_source, False), monitor, lease,
+                                              'RetrySignalPacingTests.swift', optimize, records,
+                                              mocks='AudioEndpointMocks.swift')
+                        for case in ('late-explicit-after-snapshot', 'late-available-after-snapshot',
+                                     'admitted-explicit-late-explicit'):
+                            failures = RETRY_PACING_NEGATIVES if kind == 'previous' else {
+                                'late-available-after-snapshot': 'LATE_AVAILABLE_REOPENED_ADMITTED_RETRY_BUDGET',
+                                'admitted-explicit-late-explicit': 'ADMITTED_EXPLICIT_LOST_PRIORITY_AFTER_SNAPSHOT',
+                            }
+                            run_checked_cleanup([exe, case, OWNED / 'Silence.wav'], records,
+                                                prefix + '-' + case, expected=failures.get(case))
                 if args.group in ('all', 'adapter', 'asset-retry'):
                     previous = subprocess.check_output(['git', 'show', ASSET_RETRY_BASELINE_COMMIT +
                         ':Socks5/BackgroundKeepAlive/LoopAudioService.swift'], cwd=ROOT).decode()
@@ -672,8 +831,11 @@ def main():
                     for case in ([args.case] if args.case else FACADE_CASES):
                         run([exe, case], records, suffix + '-facade-' + case)
                 if args.group in ('all', 'boundary'):
+                    report['ingress_baseline_commit'] = RETRY_PACING_BASELINE_COMMIT
+                    report['ingress_baseline_service_sha256'] = RETRY_PACING_BASELINE_SERVICE_SHA256
+                    report['ingress_previous_source_sha256'] = INGRESS_PREVIOUS_SERVICE_SHA256
                     exe = compile_fixture(folder, 'previous-ingress-' + suffix,
-                                          ingress_source(ingress_previous_admission(source)), monitor,
+                                          ingress_source(ingress_previous_admission()), monitor,
                                           ingress_lease(lease), 'IngressReplayTests.swift', optimize, records)
                     for case in INGRESS_CASES:
                         run_checked_cleanup([exe, case], records, suffix + '-previous-ingress-' + case,
