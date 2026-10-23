@@ -21,6 +21,10 @@ LINKED_OUTPUT=$(find "$OUT" -type l -print -quit)
 rm -f "$OUT/SUCCESS.txt" "$OUT/Socks5-$NAME-unsigned.ipa" "$OUT/Socks5-dSYMs.zip" \
     "$OUT/Socks5-$NAME-source.zip" "$OUT/SHA256SUMS.txt" "$OUT/source.zip" \
     "$OUT/history.bundle" "$OUT/tested-commit.txt" "$OUT/features.json" "$OUT/build-info.txt"
+# Only this attempt's prepared directory may be uploaded, even after failure.
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    printf 'composition=%s\nartifact_path=artifacts/%s\n' "$NAME" "$NAME" >> "$GITHUB_OUTPUT"
+fi
 COMMIT=$(git rev-parse HEAD)
 python3 -c 'import sys; sys.exit(0 if __debug__ else "Assertions must be enabled.")'
 git diff --exit-code "$COMMIT" -- > "$OUT/input-worktree.log"

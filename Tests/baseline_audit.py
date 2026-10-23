@@ -4,6 +4,7 @@ import ast
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -338,28 +339,117 @@ def linked_outputs(previous, current):
     return count
 
 
-def artifact_names():
-    path = '.github/workflows/verify-build.yml'
-    previous = original('8877581c104fbf4bba975596db5ef859468ebfb4').decode()
+def workflow_boundaries(current_build):
+    workflow = (ROOT / '.github/workflows/verify-build.yml').read_text()
+    previous = git(ROOT, 'show', 'ca489e2f20be17b459dc36ec5dad37cfe4806f3c:.github/workflows/verify-build.yml').decode()
+    # Assert the real workflow consumes only the outputs of the actual build step.
+    for required in ('id: build', 'run: bash Build/build.sh',
+                     "if: ${{ always() && steps.build.outputs.artifact_path != '' }}",
+                     'path: ${{ steps.build.outputs.artifact_path }}',
+                     'name: Socks5-${{ steps.build.outputs.composition }}-${{ runner.os }}'):
+        if required not in workflow:
+            raise RuntimeError(('Missing workflow boundary', required))
     count = 0
-    for label, workflow in [('previous', previous), ('current', (ROOT / path).read_text())]:
-        block = workflow.split('      - name: Name artifact\n', 1)[1].split('      - uses:', 1)[0]
-        script = block.split('        run: ', 1)[1]
-        script = textwrap.dedent(script[2:]) if script.startswith('|\n') else script
-        for name in ('baseline', 'background', '../../victim', 'baseline\nUNEXPECTED=1', '', None, 3):
-            with tempfile.TemporaryDirectory(prefix='baseline-artifact-name-') as directory:
-                root = Path(directory)
-                (root / 'Build').mkdir()
-                (root / 'Build/features.json').write_text(json.dumps({'name': name}))
-                env = dict(os.environ, GITHUB_ENV=str(root / 'github-env'))
-                result = subprocess.run(['bash', '-euo', 'pipefail', '-c', script], cwd=root,
-                                        env=env, capture_output=True, timeout=15)
-                expected = name if name in ('baseline', 'background') else 'invalid-composition'
-                correct = (root / 'github-env').read_text() == f'NAME={expected}\n'
-                if result.returncode != 0 or correct != (label == 'current' or name in ('baseline', 'background')):
-                    raise RuntimeError((label, 'artifact name', name, result.returncode, result.stderr))
-                print('PASS artifact name:', label, repr(name), flush=True)
+    with tempfile.TemporaryDirectory(prefix='baseline-checkout-ref-') as directory:
+        root = Path(directory)
+        event_commit = initialize(root)
+        git(root, 'branch', '-f', 'event-tip', event_commit)
+        alter(root, 'head-only')
+        branch_commit = git(root, 'rev-parse', 'HEAD').decode().strip()
+        git(root, 'branch', '-f', 'event-tip', branch_commit)
+        for label, source in (('previous', previous), ('current', workflow)):
+            match = re.search(r'ref: \$\{\{ inputs.ref \|\| github\.(ref|sha) \}\}', source)
+            if match is None:
+                raise RuntimeError('Unknown checkout selection')
+            for explicit in (False, True):
+                selected = event_commit if explicit or match[1] == 'sha' else 'refs/heads/event-tip'
+                actual = git(root, 'rev-parse', selected).decode().strip()
+                expected = branch_commit if label == 'previous' and not explicit else event_commit
+                if actual != expected:
+                    raise RuntimeError((label, 'checkout identity', explicit, actual, expected))
+                print('PASS checkout:', label, 'explicit=', explicit, 'event_commit=', actual == event_commit, flush=True)
                 count += 1
+    # Retain the original name-injection negative control, not a rewritten old implementation.
+    old = original('8877581c104fbf4bba975596db5ef859468ebfb4').decode()
+    block = old.split('      - name: Name artifact\n', 1)[1].split('      - uses:', 1)[0]
+    script = block.split('        run: ', 1)[1]
+    script = textwrap.dedent(script[2:]) if script.startswith('|\n') else script
+    names = ('baseline', 'background', '../../victim', 'baseline\nUNEXPECTED=1', '', None, 3)
+    for name in names:
+        with tempfile.TemporaryDirectory(prefix='baseline-old-artifact-name-') as directory:
+            root = Path(directory)
+            (root / 'Build').mkdir()
+            (root / 'Build/features.json').write_text(json.dumps({'name': name}))
+            env = dict(os.environ, GITHUB_ENV=str(root / 'github-env'))
+            result = subprocess.run(['bash', '-euo', 'pipefail', '-c', script], cwd=root,
+                                    env=env, capture_output=True, timeout=15)
+            expected = name if name in ('baseline', 'background') else 'invalid-composition'
+            correct = (root / 'github-env').read_text() == f'NAME={expected}\n'
+            if result.returncode != 0 or correct != (name in ('baseline', 'background')):
+                raise RuntimeError(('Historical artifact name', name, result.stderr))
+            print('PASS artifact name: previous', repr(name), flush=True)
+            count += 1
+    cases = [(str(i), name) for i, name in enumerate(names)]
+    cases += [(case, 'baseline') for case in ('malformed', 'missing', 'root-link',
+                                            'directory-link', 'log-link', 'dirty', 'optimized')]
+    for case, name in cases:
+        with tempfile.TemporaryDirectory(prefix='baseline-current-publication-') as directory:
+            root, outside = Path(directory) / 'repo', Path(directory) / 'outside'
+            initialize(root)
+            (root / 'Build').mkdir()
+            (root / 'Build/build.sh').write_bytes(current_build)
+            config = root / 'Build/features.json'
+            config.write_text(json.dumps({'name': name}))
+            (root / 'Build/check.py').write_text('raise SystemExit(19)\n')
+            git(root, 'add', '-f', 'Build')
+            git(root, '-c', 'user.name=Input fixture', '-c', 'user.email=audit@localhost',
+                'commit', '-qm', 'Publication input')
+            if case == 'malformed':
+                config.write_text('{')
+            elif case == 'missing':
+                config.unlink()
+            elif case == 'dirty':
+                alter(root, 'modified-c')
+            out = root / 'artifacts' / (name if name in ('baseline', 'background') else 'baseline')
+            outside.mkdir()
+            witness = outside / 'witness'
+            witness.write_bytes(b'preserve outside bytes')
+            if case == 'root-link':
+                out.parent.symlink_to(outside, target_is_directory=True)
+            elif case == 'directory-link':
+                out.parent.mkdir()
+                out.symlink_to(outside, target_is_directory=True)
+            out.mkdir(parents=True, exist_ok=True)
+            (out / 'SUCCESS.txt').write_text('old success')
+            product = out / f'Socks5-{out.name}-unsigned.ipa'
+            product.write_bytes(b'old product')
+            if case == 'log-link':
+                (out / 'input-worktree.log').symlink_to(witness)
+            output = Path(directory) / 'step-output'
+            output.touch()
+            env = dict(os.environ, GITHUB_OUTPUT=str(output))
+            env.pop('PYTHONOPTIMIZE', None)
+            if case == 'optimized':
+                env['PYTHONOPTIMIZE'] = '1'
+            result = subprocess.run(['bash', 'Build/build.sh'], cwd=root, env=env,
+                                    capture_output=True, timeout=15)
+            ready = case in ('0', '1', 'dirty', 'optimized')
+            expected = f'composition={name}\nartifact_path=artifacts/{name}\n' if ready else ''
+            if output.read_text() != expected or result.returncode == 0:
+                raise RuntimeError(('Publication gate', case, result.returncode, output.read_text(), result.stderr))
+            if ready:
+                if (out / 'SUCCESS.txt').exists() or product.exists():
+                    raise RuntimeError('Published stale product/verdict')
+                if result.returncode != (19 if case in ('0', '1') else 1):
+                    raise RuntimeError(('Wrong prepared-output rejection', case, result.stderr))
+            elif case.endswith('link') and b'Linked ' not in result.stderr:
+                raise RuntimeError(('Wrong linked-output rejection', case, result.stderr))
+            elif case in ('2', '3', '4', '5', '6') and b'Invalid composition name' not in result.stderr:
+                raise RuntimeError(('Wrong name rejection', case, result.stderr))
+            if witness.read_bytes() != b'preserve outside bytes':
+                raise RuntimeError('External output changed')
+            print('PASS upload gate:', case, 'prepared=', ready, flush=True)
+            count += 1
     return count
 
 
@@ -464,14 +554,14 @@ def main():
     if not __debug__:
         raise SystemExit('Assertions must be enabled')
     # Do not let caller-specific Git environment change isolated fixture identity.
-    for key in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE'):
+    for key in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GITHUB_OUTPUT'):
         os.environ.pop(key, None)
     old, current = original(OLD_CHECK), (ROOT / 'Build/check.py').read_bytes()
     count = native_boundaries(old, current) + optimization(old, current)
     current_build = (ROOT / 'Build/build.sh').read_bytes()
     count += shell_boundaries(original(OLD_BUILD), current_build)
     count += publication_boundaries(original(PREVIOUS_BUILD), current_build)
-    count += artifact_names()
+    count += workflow_boundaries(current_build)
     count += source_boundaries(current, current_build)
     count += linked_outputs(original(PREVIOUS_BUILD), current_build)
     print(f'SUMMARY: {count} exact-old/current input, assertion, publication and cleanup cases; no native/Apple execution')
