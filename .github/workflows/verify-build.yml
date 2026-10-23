@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Install formatter without replacing the compiler
@@ -34,7 +34,10 @@ jobs:
           fi
       - name: Native, lifecycle and persistence checks without IPA
         shell: bash
-        run: BUILD_IPA=0 bash Build/build.sh
+        id: build
+        env:
+          BUILD_IPA: '0'
+        run: bash Build/build.sh
       - name: Actual iOS 27 API type checks
         if: runner.os == 'macOS'
         run: bash Build/check_swift_sdk.sh
@@ -43,13 +46,20 @@ jobs:
         run: python3 Tests/ServerControl/ui_audit.py
       - name: Actual persistence, restart and JSON on iOS 27 Simulator
         if: runner.os == 'macOS' && github.ref == 'refs/heads/feature/settings-persistence'
+        id: ui
         run: python3 Tests/Settings/ui_audit.py
       - name: Record exact tested source
-        if: always()
+        if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         run: python3 Build/record_evidence.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+        if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         with:
-          name: Feature-checks-${{ runner.os }}
-          path: artifacts/
+          name: Socks5-${{ steps.build.outputs.composition }}-${{ runner.os }}
+          path: ${{ steps.build.outputs.artifact_path }}
+          retention-days: 30
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ always() && steps.ui.outcome != '' && steps.ui.outcome != 'skipped' }}
+        with:
+          name: Feature-UI-${{ runner.os }}
+          path: artifacts/settings-persistence-ui-audit/
           retention-days: 30

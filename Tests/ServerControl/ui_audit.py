@@ -34,7 +34,7 @@ def output(*args):
 
 def verify_production():
     baseline = '6cffa8a71b45796eacca3f5a941106646932ec05'
-    source_base = '6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7'
+    source_base = '94cc35ba5b50bab177f7aa678aa5af8fd3b8481d'
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
     expected = json.loads(output('git', 'show', baseline + ':Build/features.json'))
     shared = json.loads(output('git', 'show', source_base + ':Build/features.json'))
