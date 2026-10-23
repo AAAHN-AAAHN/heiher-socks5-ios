@@ -9,7 +9,7 @@ import subprocess
 import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE = '6f8bc1f855aad75e51a30ad5e9c7bad75d3675a7'
+BASE = '94cc35ba5b50bab177f7aa678aa5af8fd3b8481d'
 INPUT = 'f88e8c8946b095c4d5551d413dee3b4a60943714'
 CATALOG = 'Socks5/Assets.xcassets/AppIcon.appiconset'
 IMAGE_HASH = '4a2f2a9384e8b6db351a9284232db56e719377e60f17123e4a6992cee1799cc2'
@@ -116,7 +116,8 @@ def main():
     originals = documents['code_paths'](ROOT, git('ls-tree', '-r', '--name-only', INPUT).decode().splitlines())
     allowed = {'.github/workflows/verify-build.yml', 'README.md', 'docs/features/app-icon.md'}
     shared = {'Build/build.sh', 'Build/check.py', 'docs/main-baseline.md',
-              'Build/upstream.json', 'Build/baseline-framework.json'}
+              'Build/upstream.json', 'Build/baseline-framework.json',
+              'Tests/tcp_smoke.py', 'Tests/tcp_smoke_contract.py'}
     shared.update(p for p in git('ls-tree', '-r', '--name-only', BASE).decode().splitlines()
                   if p.startswith('HevSocks5Server.xcframework/'))
     inherited = {'Tests/baseline_audit.py', 'docs/top-level-principles.md'}
@@ -134,7 +135,7 @@ def main():
         if path not in allowed | shared | {'Build/features.json'}:
             require((ROOT / path).read_bytes() == git('show', INPUT + ':' + path), path)
             preserved.append(path)
-    require(all(p.startswith('Tests/AppIcon/') or p in inherited
+    require(all(p.startswith('Tests/AppIcon/') or p in inherited | shared
                 for p in set(paths) - set(originals)),
             'Unexpected feature addition')
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
