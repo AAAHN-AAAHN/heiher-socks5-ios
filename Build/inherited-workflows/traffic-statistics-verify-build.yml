@@ -14,7 +14,7 @@ jobs:
   udp-prerequisite:
     uses: ./.github/workflows/udp-compat-audit.yml
     with:
-      ref: 06e7337c6d7b332a8a393e4779eb29993bc45b9c
+      ref: 1bc90a21ee97b38be4b8ba5f8d0eff6372f75982
   verify:
     needs: udp-prerequisite
     strategy:
@@ -29,6 +29,9 @@ jobs:
           ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
           fetch-depth: 0
+      - name: Prepare this audit output
+        id: build
+        run: python3 Tests/Statistics/audit.py --prepare
       - name: Install upstream formatter
         shell: bash
         run: |
@@ -58,10 +61,17 @@ jobs:
       - name: Exercise actual Server controls and tabs on iOS 27 Simulator
         if: runner.os == 'macOS'
         shell: bash
+        id: ui
         run: python3 Tests/Statistics/ui_audit.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+        if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         with:
           name: Statistics-final-audit-${{ runner.os }}
-          path: artifacts/
+          path: ${{ steps.build.outputs.artifact_path }}
+          retention-days: 30
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ always() && steps.ui.outcome != '' && steps.ui.outcome != 'skipped' }}
+        with:
+          name: Statistics-UI-${{ runner.os }}
+          path: artifacts/statistics-ui-audit/
           retention-days: 30

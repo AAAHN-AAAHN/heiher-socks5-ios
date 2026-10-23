@@ -43,10 +43,11 @@ def inventory(folder):
     return files
 
 
-def record_product():
+def record_product(product=None):
+    product = PRODUCT if product is None else product
     commit = check_source()
     value = {'commit': commit, 'tree': git('rev-parse', 'HEAD^{tree}'),
-             'framework': inventory(PRODUCT / 'HevSocks5Server.xcframework')}
+             'framework': inventory(product / 'HevSocks5Server.xcframework')}
     (OUT / 'built-framework.json').write_text(json.dumps(value, indent=2) + '\n')
 
 
@@ -116,6 +117,9 @@ def check_ipa_files(ipa, app):
 
 
 if __name__ == '__main__':
+    if len(sys.argv) == 3 and sys.argv[1] == 'record':
+        record_product(Path(sys.argv[2]))
+        raise SystemExit(0)
     if len(sys.argv) != 2 or sys.argv[1] not in ('record', 'check', 'source'):
-        raise SystemExit('Usage: release_source.py record|check|source')
+        raise SystemExit('Usage: release_source.py record [product]|check|source')
     {'record': record_product, 'check': check_product, 'source': check_source}[sys.argv[1]]()

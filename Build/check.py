@@ -2,6 +2,7 @@
 """Exact patch application, feature boundaries and packaged-resource checks."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import plistlib
 import re
@@ -9,6 +10,7 @@ import struct
 import subprocess
 import sys
 import wave
+import zipfile
 
 if not __debug__:
     raise SystemExit('Assertions must be enabled')
@@ -20,7 +22,6 @@ FEATURES = set(CONFIG['features'])
 
 def git(repo, *args):
     return subprocess.check_output(['git', '-C', str(repo), *args])
-
 
 
 def baseline():
@@ -50,6 +51,66 @@ def patches():
         yield item['repository'], ROOT / 'Patches' / item['file']
 
 
+def tracked(repo, ref):
+    for record in git(repo, 'ls-tree', '-rz', ref).split(b'\0'):
+        if record:
+            meta, name = record.split(b'\t', 1)
+            yield (*meta.decode().split(), os.fsdecode(name))
+
+
+def clean_tracked(repo, sha):
+    assert git(repo, 'rev-parse', 'HEAD').decode().strip() == sha, 'Source HEAD changed: ' + str(repo)
+    git(repo, 'diff', '--cached', '--no-ext-diff', '--no-textconv',
+        '--ignore-submodules=none', '--exit-code', sha, '--')
+    # Compare raw files, not Git's configurable/possibly masked working-tree diff.
+    for mode, kind, blob, name in tracked(repo, sha):
+        if kind != 'blob':
+            continue  # Native submodule HEADs are checked through CONFIG['sources'].
+        path = repo / name
+        if path.is_symlink():
+            data, actual_mode = os.fsencode(os.readlink(path)), '120000'
+        else:
+            assert path.is_file(), 'Missing source input: ' + str(path)
+            data = path.read_bytes()
+            actual_mode = '100755' if path.stat().st_mode & 0o100 else '100644'
+        digest = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+        assert (actual_mode, digest) == (mode, blob), 'Changed source input: ' + str(path)
+
+
+def clean_native(core):
+    for relative, sha in CONFIG['sources'].items():
+        repo = core / relative
+        clean_tracked(repo, sha)
+        # Only known generated output roots are exempt, never ignored sources or Makefiles.
+        outputs = (b'bin/', b'build/', b'HevSocks5Server.xcframework/', b'HevTaskSystem.xcframework/')
+        assert all(not name or name.startswith(outputs) for name in
+                   git(repo, 'ls-files', '--others', '-z').split(b'\0')), 'Untracked native input: ' + relative
+
+
+def archive(path, ref):
+    entries = list(tracked(ROOT, ref))
+    assert all(kind == 'blob' for _, kind, _, _ in entries), 'Unarchived source submodule'
+    expected = {name: (mode, blob) for mode, _, blob, name in entries}
+    directories = {str(parent) + '/' for name in expected for parent in Path(name).parents
+                   if str(parent) != '.'}
+    with zipfile.ZipFile(path) as source:
+        names = source.namelist()
+        assert len(names) == len(set(names)), 'Duplicate source archive entry'
+        assert {n for n in names if not n.endswith('/')} == set(expected), 'Source archive inventory differs'
+        assert all(n in directories and not source.read(n) for n in names if n.endswith('/')), 'Unexpected source archive directory'
+        for name, (mode, blob) in expected.items():
+            info = source.getinfo(name)
+            # Git ZIP stores ordinary non-executable files with DOS metadata.
+            permissions = info.external_attr >> 16
+            actual_mode = ('120000' if permissions & 0o170000 == 0o120000 else
+                           '100755' if permissions & 0o100 else '100644')
+            assert permissions & 0o170000 in (0, 0o100000, 0o120000), 'Invalid source archive type'
+            data = source.read(info)  # Also checks the entry's CRC.
+            digest = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+            assert (actual_mode, digest) == (mode, blob), 'Source archive differs: ' + name
+    print('PASS: source archive inventory, Git modes and raw bytes')
+
+
 def apply_patch(repo, patch, reverse=False):
     if CONFIG['name'] == 'integrated' and patch.name == 'hev-server-startup-stop.patch':
         from server_patch import apply as apply_server_patch
@@ -61,14 +122,7 @@ def apply_patch(repo, patch, reverse=False):
 
 
 def apply(core):
-    for relative, sha in CONFIG['sources'].items():
-        repo = core / relative
-        assert git(repo, 'rev-parse', 'HEAD').decode().strip() == sha, relative
-        # Build scripts and the index are source inputs too, not only C/H files.
-        git(repo, 'diff', '--exit-code', 'HEAD', '--')
-        git(repo, 'diff', '--cached', '--exit-code', 'HEAD', '--')
-        assert not (git(repo, 'ls-files', '--others', '--exclude-standard') or
-                    git(repo, 'ls-files', '--others', '--', 'src', 'include', '.rev-id')), 'Untracked native input: ' + relative
+    clean_native(core)
     for relative, patch in patches():
         apply_patch(core / relative, patch)
         print(hashlib.sha256(patch.read_bytes()).hexdigest(), patch.name)
@@ -87,13 +141,11 @@ def formatting(core, formatter):
 
 
 def reverse(core):
+    for relative, sha in CONFIG['sources'].items():
+        assert git(core / relative, 'rev-parse', 'HEAD').decode().strip() == sha, 'Native HEAD changed: ' + relative
     for relative, patch in reversed(list(patches())):
         apply_patch(core / relative, patch, reverse=True)
-    for relative in CONFIG['sources']:
-        git(core / relative, 'diff', '--exit-code', 'HEAD', '--')
-        git(core / relative, 'diff', '--cached', '--exit-code', 'HEAD', '--')
-        assert not (git(core / relative, 'ls-files', '--others', '--exclude-standard') or
-                    git(core / relative, 'ls-files', '--others', '--', 'src', 'include', '.rev-id')), 'Untracked native input: ' + relative
+    clean_native(core)
     git(core, 'submodule', 'foreach', '--recursive',
         'git diff --exit-code HEAD -- && git diff --cached --exit-code HEAD --')
     print('PASS: reverse patches restore exact upstream source')
@@ -180,12 +232,17 @@ def package(app):
     if 'icon' in FEATURES:
         assert info['CFBundleIcons']['CFBundlePrimaryIcon']['CFBundleIconName'] == 'AppIcon'
         assert (app / 'Assets.car').exists()
-    print('PASS: final Info.plist, single scene, feature-specific resources and permissions')
+    print('PASS: final Info.plist and applicable feature-specific resources and permissions')
 
 
 if __name__ == '__main__':
     command = sys.argv[1]
-    if command == 'baseline':
+    if command == 'worktree':
+        clean_tracked(ROOT, sys.argv[2])
+        print('PASS: fixed application HEAD, index, raw bytes and Git modes')
+    elif command == 'archive':
+        archive(Path(sys.argv[2]), sys.argv[3])
+    elif command == 'baseline':
         baseline()
     elif command == 'apply':
         apply(Path(sys.argv[2]))

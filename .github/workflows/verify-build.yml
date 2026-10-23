@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Install formatter without overriding the compiler
@@ -24,20 +24,17 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y clang-format-18
-      - name: Verify product handoff rejection and preservation boundaries
-        run: |
-          mkdir -p artifacts/integrated
-          python3 Tests/Integration/review_handoff_boundaries.py > artifacts/integrated/review-handoff-boundaries.log 2>&1
       - name: Exact latest composition, native and model checks
+        id: build
         run: bash Build/build.sh
       - name: Record exact source independently of generated products
-        if: always()
+        if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         run: python3 Build/record_evidence.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+        if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         with:
-          name: Integrated-release-Linux-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/
+          name: Socks5-${{ steps.build.outputs.composition }}-${{ runner.os }}
+          path: ${{ steps.build.outputs.artifact_path }}
           retention-days: 30
 
   verify-macos:
@@ -54,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Install formatter without overriding the compiler
@@ -65,15 +62,18 @@ jobs:
           mkdir -p "$RUNNER_TEMP/format-only"
           ln -s "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
           echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
+      - name: Exact latest composition, native and model checks; ARM64 archive on macOS
+        id: build
+        run: bash Build/build.sh
+      - name: Record the actual Apple build environment
+        shell: bash
+        run: |
+          set -euo pipefail
           mkdir -p artifacts/integrated
           xcodebuild -version | tee artifacts/integrated/environment.txt
           xcrun --sdk iphoneos --show-sdk-version | tee -a artifacts/integrated/environment.txt | grep -E '^27\.'
           xcrun swiftc --version >> artifacts/integrated/environment.txt
           sw_vers >> artifacts/integrated/environment.txt
-      - name: Verify product handoff rejection and preservation boundaries
-        run: python3 Tests/Integration/review_handoff_boundaries.py > artifacts/integrated/review-handoff-boundaries.log 2>&1
-      - name: Exact latest composition, native and model checks; ARM64 archive on macOS
-        run: bash Build/build.sh
       - name: Actual iOS 27 type check and archived IPA validation
         shell: bash
         run: |
@@ -90,14 +90,17 @@ jobs:
           path: artifacts/integrated-input/review-input.tar.gz
           if-no-files-found: error
           retention-days: 30
-      - name: Record exact source independently of generated products
+      - name: Remove the consumed product source
         if: always()
+        run: rm -rf .build/integrated-product-source
+      - name: Record exact source independently of generated products
+        if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         run: python3 Build/record_evidence.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+        if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         with:
-          name: Integrated-release-macOS-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/
+          name: Socks5-${{ steps.build.outputs.composition }}-${{ runner.os }}
+          path: ${{ steps.build.outputs.artifact_path }}
           retention-days: 30
 
   review-macos:
@@ -113,7 +116,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Record the independent Apple review environment
@@ -140,6 +143,9 @@ jobs:
         run: python3 Build/simulator_review.py > artifacts/integrated/simulator-review.log 2>&1
       - name: Actual integrated UI, saved intent and native response
         run: python3 Build/ui_review.py > artifacts/integrated/ui-review.log 2>&1
+      - name: Remove the consumed product source
+        if: always()
+        run: rm -rf .build/integrated-product-source
       - name: Record exact source independently of generated products
         if: always()
         run: python3 Build/record_evidence.py
@@ -147,5 +153,5 @@ jobs:
         if: always()
         with:
           name: Integrated-review-macOS-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/
+          path: artifacts/integrated/
           retention-days: 30

@@ -9,6 +9,7 @@ import errno
 import hashlib
 import json
 import os
+import runpy
 from pathlib import Path
 import socket
 import subprocess
@@ -100,6 +101,7 @@ class InputTests(unittest.TestCase):
         print('PASS: four actual socket-I/O reservation controls; old IPv4-only accepts occupied IPv6 port, current wildcard rejects it')
 
     def test_native_and_ui_old_current_input(self):
+        raw_check = runpy.run_path(str(audit.ROOT / 'Build/check.py'))['clean_tracked']
         pairs = [(audit, 'b7e7d7561ea4bd0dd8f4e4858eadf1f1e6a05949', False),
                  (ui_audit, '704462ffeef39df9da7408caacedf2eb3a7cba16', True)]
         for current, blob, ui in pairs:
@@ -123,6 +125,9 @@ class InputTests(unittest.TestCase):
                             entered.append(args)
                             raise RuntimeError('intentionally stop at downstream source/SDK boundary')
                         def run(args, log, *unused, **kwargs):
+                            if log == 'input-identity.log':
+                                raw_check(root, args[-1])
+                                return
                             if args[0] != 'git' or '--exit-code' not in args:
                                 raise AssertionError('Unexpected command before controlled boundary')
                             git(root, *args[1:])
