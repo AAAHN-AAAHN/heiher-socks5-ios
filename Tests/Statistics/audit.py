@@ -14,7 +14,7 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 SOCKET_BASE = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
-UDP = '06e7337c6d7b332a8a393e4779eb29993bc45b9c'
+UDP = '1bc90a21ee97b38be4b8ba5f8d0eff6372f75982'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 SOCKET_PATCHES = [
     {'file': 'hev-socket-meter-task.patch', 'repository': 'third-part/hev-task-system'},
@@ -107,7 +107,8 @@ def check_udp_inheritance():
     return preserved
 
 
-def inspect_sources():
+def inspect_sources(commit=None):
+    commit = commit or git('rev-parse', 'HEAD').decode().strip()
     import runpy
     documents = runpy.run_path(str(ROOT / 'Build/check_documentation.py'))
     documents['check'](ROOT)
@@ -143,7 +144,9 @@ def inspect_sources():
     from ui_audit import verify_presentation
     verify_presentation()
     run([sys.executable, 'Build/check.py', 'baseline'], 'baseline.log')
-    run([sys.executable, 'Tests/baseline_audit.py'], 'baseline-driver.log')
+    run([sys.executable, 'Tests/check_baseline_owner.py'], 'baseline-driver.log')
+    run([sys.executable, 'Tests/documentation_contract.py'], 'documentation-contract.log')
+    run([sys.executable, 'Tests/tcp_smoke_contract.py'], 'smoke-contract.log')
     run([sys.executable, 'Build/check.py', 'composition'], 'composition.log')
     run(['git', 'diff', '--check', CONFIG['base_commit'], 'HEAD', '--', '.',
          ':(exclude)Patches/*.patch'], 'whitespace.log')
@@ -166,7 +169,8 @@ def inspect_sources():
     run(['git', 'diff', CONFIG['base_commit'], 'HEAD'], 'main-to-feature.diff')
     run(['git', 'diff', UDP, 'HEAD'], 'udp-to-statistics.diff')
     run(['git', 'rev-parse', 'HEAD'], 'tested-commit.txt')
-    run(['git', 'archive', '--format=zip', 'HEAD', '-o', OUT / 'source.zip'], 'archive.log')
+    run(['git', 'archive', '--format=zip', commit, '-o', OUT / 'source.zip'], 'archive.log')
+    run([sys.executable, 'Build/check.py', 'archive', OUT / 'source.zip', commit], 'archive-identity.log')
     for name in ('README.md', 'docs/features/traffic-statistics.md'):
         for target in re.findall(r'\]\(([^)]+)\)', (ROOT / name).read_text()):
             if '://' not in target and not target.startswith('#'):
@@ -320,18 +324,33 @@ def ios_checks(changed):
     shutil.rmtree(module)
 
 
+def prepare_output(publish=False):
+    """Prepare only this audit's safe output before CI writes or uploads files."""
+    for path in (ROOT / 'artifacts', OUT, ROOT / '.build', CORE.parent, CORE):
+        if path.is_symlink():
+            raise RuntimeError('Linked audit input/output path: ' + str(path))
+    if OUT.exists() and any(path.is_symlink() for path in OUT.rglob('*')):
+        raise RuntimeError('Linked audit output')
+    OUT.mkdir(parents=True, exist_ok=True)
+    for name in ('SUCCESS.txt', 'source.zip', 'tested-commit.txt'):
+        (OUT / name).unlink(missing_ok=True)
+    if publish and os.environ.get('GITHUB_OUTPUT'):
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+            output.write('composition=traffic-statistics\nartifact_path=' + str(OUT.relative_to(ROOT)) + '\n')
+
+
 def main():
-    # A rejected or failed retry must not reuse an earlier success marker.
-    (OUT / 'SUCCESS.txt').unlink(missing_ok=True)
+    prepare_output()
     if not __debug__:
         raise SystemExit('Assertions must be enabled; do not use Python -O.')
-    OUT.mkdir(parents=True, exist_ok=True)
     if CORE.exists():
         raise SystemExit('Use a clean checkout or remove .build/statistics-final-audit.')
     # The working files, index and archived HEAD must describe the same input.
     run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'input-worktree.log')
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'input-index.log')
-    inspect_sources()
+    commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    run([sys.executable, 'Build/check.py', 'worktree', commit], 'input-identity.log')
+    inspect_sources(commit)
     run([sys.executable, 'Tests/Statistics/audit_driver_probe.py'], 'audit-driver.log')
     run([sys.executable, 'Tests/Statistics/udp_inheritance_regression.py'], 'udp-inheritance.log')
     run([sys.executable, 'Tests/Statistics/input_probe.py'], 'input-probe.log')
@@ -383,9 +402,13 @@ def main():
     run([sys.executable, 'Build/check.py', 'reverse', CORE], 'reverse.log')
     run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'final-worktree.log')
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'final-index.log')
+    run([sys.executable, 'Build/check.py', 'worktree', commit], 'final-identity.log')
     (OUT / 'SUCCESS.txt').write_text('PASS: peer socket I/O native audit and applicable type checks.\n'
                                     'UDP contents preserved. No IPA or XCFramework build.\n')
 
 
 if __name__ == '__main__':
-    main()
+    if sys.argv[1:] == ['--prepare']:
+        prepare_output(publish=True)
+    else:
+        main()

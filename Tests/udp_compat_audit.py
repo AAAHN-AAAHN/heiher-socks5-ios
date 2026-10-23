@@ -13,6 +13,7 @@ OUT = ROOT / 'artifacts/udp-final-audit'
 CORE = ROOT / '.build/udp-final-audit/core'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 SUMMARY = []
+PREPARED = False
 
 
 def run(args, name, cwd=ROOT, timeout=180):
@@ -80,23 +81,42 @@ def prior_three_patch_server():
     return binary
 
 
+def prepare_output(publish=False):
+    """Prepare only this audit's safe output before CI writes or uploads files."""
+    global PREPARED
+    PREPARED = False
+    for path in (ROOT / 'artifacts', OUT, ROOT / '.build', CORE.parent, CORE):
+        if path.is_symlink():
+            raise RuntimeError('Linked audit input/output path: ' + str(path))
+    if OUT.exists() and any(path.is_symlink() for path in OUT.rglob('*')):
+        raise RuntimeError('Linked audit output')
+    OUT.mkdir(parents=True, exist_ok=True)
+    PREPARED = True
+    for name in ('SUCCESS.txt', 'source.zip', 'tested-commit.txt'):
+        (OUT / name).unlink(missing_ok=True)
+    if publish and os.environ.get('GITHUB_OUTPUT'):
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+            output.write('composition=udp-compat\nartifact_path=' + str(OUT.relative_to(ROOT)) + '\n')
+
+
 def main():
-    # A rejected or failed retry must not reuse an earlier success marker.
-    (OUT / 'SUCCESS.txt').unlink(missing_ok=True)
+    prepare_output()
     if not __debug__:
         raise SystemExit('Assertions are required; do not use Python -O.')
     if CONFIG['name'] != 'udp-compat' or CONFIG['features'] != ['udp']:
         raise SystemExit('This audit is only for the UDP compatibility branch.')
-    OUT.mkdir(parents=True, exist_ok=True)
     if CORE.exists():
         raise SystemExit('Use a fresh checkout or remove .build/udp-final-audit first.')
     # The working files, index and archived HEAD must describe the same input.
     run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'input-worktree.log')
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'input-index.log')
+    commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    run([sys.executable, 'Build/check.py', 'worktree', commit], 'input-identity.log')
     run(['git', 'rev-parse', 'HEAD'], 'tested-commit.txt')
     run(['git', 'diff', '--name-status', CONFIG['base_commit'], 'HEAD'], 'branch-files.txt')
     run(['git', 'diff', CONFIG['base_commit'], 'HEAD'], 'branch-diff.patch')
-    run(['git', 'archive', '--format=zip', 'HEAD', '-o', OUT / 'source.zip'], 'source-archive.log')
+    run(['git', 'archive', '--format=zip', commit, '-o', OUT / 'source.zip'], 'source-archive.log')
+    run([sys.executable, 'Build/check.py', 'archive', OUT / 'source.zip', commit], 'archive-identity.log')
     if (ROOT / 'README.md').read_bytes() != (ROOT / 'docs/features/udp-compatibility.md').read_bytes():
         raise RuntimeError('Root README and feature specification differ.')
     # Unified patches require a single space on empty context lines. Their added
@@ -104,7 +124,9 @@ def main():
     run(['git', 'diff', '--check', CONFIG['base_commit'], 'HEAD', '--', '.',
          ':(exclude)Patches/*.patch'], 'whitespace.log')
     run([sys.executable, 'Build/check.py', 'baseline'], 'baseline.log')
-    run([sys.executable, 'Tests/baseline_audit.py'], 'baseline-driver.log')
+    run([sys.executable, 'Tests/check_baseline_owner.py'], 'baseline-driver.log')
+    run([sys.executable, 'Tests/documentation_contract.py'], 'documentation-contract.log')
+    run([sys.executable, 'Tests/tcp_smoke_contract.py'], 'smoke-contract.log')
     run([sys.executable, 'Build/check.py', 'composition'], 'composition.log')
     run([sys.executable, 'Tests/udp_audit_driver_regression.py'], 'audit-driver.log')
     if sys.platform == 'darwin':
@@ -117,6 +139,9 @@ def main():
         actual = subprocess.check_output(['git', '-C', str(CORE / path), 'rev-parse', 'HEAD'], text=True).strip()
         if actual != sha:
             raise RuntimeError('Source mismatch: ' + path)
+
+    run([sys.executable, 'Build/check.py', 'apply', CORE], 'native-input-audit.log')
+    run([sys.executable, 'Build/check.py', 'reverse', CORE], 'native-input-restore.log')
 
     # Negative controls distinguish the two repairs; these are not pass claims.
     build()
@@ -294,12 +319,16 @@ def main():
     run([sys.executable, 'Build/check.py', 'reverse', CORE], 'reverse.log')
     run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'final-worktree.log')
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'final-index.log')
+    run([sys.executable, 'Build/check.py', 'worktree', commit], 'final-identity.log')
     (OUT / 'SUCCESS.txt').write_text('Scoped UDP repair and dynamic-buffer audit passed. Read summary.json and buffer evidence for limits and observations. No IPA was built.\n')
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    finally:
-        if OUT.exists():
-            (OUT / 'summary.json').write_text(json.dumps(SUMMARY, indent=2) + '\n')
+    if sys.argv[1:] == ['--prepare']:
+        prepare_output(publish=True)
+    else:
+        try:
+            main()
+        finally:
+            if PREPARED:
+                (OUT / 'summary.json').write_text(json.dumps(SUMMARY, indent=2) + '\n')
