@@ -27,10 +27,10 @@ def original(blob):
     return data
 
 
-def initialize(root):
+def initialize(root, makefile='Makefile'):
     (root / 'src').mkdir(parents=True)
     (root / 'src/probe.c').write_text('int probe;\n')
-    (root / 'Makefile').write_text('all:\n\t@true\n')
+    (root / makefile).write_text('all:\n\t@true\n')
     (root / 'build-apple.sh').write_text('#!/bin/sh\nexit 0\n')
     (root / '.gitignore').write_text('build/\n')
     git(root, 'init', '-q')
@@ -106,7 +106,8 @@ def native_boundaries(old, current):
             for case in cases:
                 with tempfile.TemporaryDirectory(prefix='baseline-native-input-') as folder:
                     root = Path(folder)
-                    head = initialize(root)
+                    # Keep lowercase makefile distinct on case-insensitive hosts.
+                    head = initialize(root, 'OriginalMakefile' if case == 'ignored-make' else 'Makefile')
                     alter(root, case)
                     namespace = {'subprocess': subprocess, 'os': os, 'hashlib': hashlib, 'ROOT': root,
                                  'CONFIG': {'sources': {'.': head}, 'patches': []}}
