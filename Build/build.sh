@@ -11,7 +11,12 @@ if not isinstance(name, str) or re.fullmatch(r"[a-z][a-z0-9-]*", name) is None:
 print(name)')
 OUT="$ROOT/artifacts/$NAME"
 CORE="$ROOT/.build/core"
+for path in "$ROOT/artifacts" "$OUT" "$ROOT/.build" "$CORE" "$ROOT/.build/$NAME.xcarchive"; do
+    [ ! -L "$path" ] || { echo 'Linked build input/output path' >&2; exit 1; }
+done
 mkdir -p "$OUT"
+LINKED_OUTPUT=$(find "$OUT" -type l -print -quit)
+[ -z "$LINKED_OUTPUT" ] || { echo 'Linked artifact output' >&2; exit 1; }
 # Keep diagnostic logs, but never label old products as a new attempt's output.
 rm -f "$OUT/SUCCESS.txt" "$OUT/Socks5-$NAME-unsigned.ipa" "$OUT/Socks5-dSYMs.zip" \
     "$OUT/Socks5-$NAME-source.zip" "$OUT/SHA256SUMS.txt" "$OUT/source.zip" \
@@ -22,6 +27,7 @@ git diff --exit-code "$COMMIT" -- > "$OUT/input-worktree.log"
 git diff --cached --exit-code "$COMMIT" -- > "$OUT/input-index.log"
 python3 Build/check.py baseline > "$OUT/baseline-audit.log"
 python3 Tests/baseline_audit.py > "$OUT/baseline-driver.log" 2>&1
+python3 Tests/tcp_smoke_contract.py > "$OUT/smoke-contract.log" 2>&1
 printf '%s\n' "$COMMIT" > "$OUT/tested-commit.txt"
 git archive --format=zip "$COMMIT" -o "$OUT/source.zip"
 test "$(git rev-parse HEAD)" = "$COMMIT"

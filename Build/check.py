@@ -2,6 +2,7 @@
 """Exact patch application, feature boundaries and packaged-resource checks."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import plistlib
 import re
@@ -20,7 +21,6 @@ FEATURES = set(CONFIG['features'])
 
 def git(repo, *args):
     return subprocess.check_output(['git', '-C', str(repo), *args])
-
 
 
 def baseline():
@@ -51,15 +51,37 @@ def patches():
         yield item['repository'], ROOT / 'Patches' / item['file']
 
 
-def apply(core):
+def clean_native(core):
     for relative, sha in CONFIG['sources'].items():
         repo = core / relative
         assert git(repo, 'rev-parse', 'HEAD').decode().strip() == sha, relative
-        # Build scripts and the index are source inputs too, not only C/H files.
-        git(repo, 'diff', '--exit-code', 'HEAD', '--')
-        git(repo, 'diff', '--cached', '--exit-code', 'HEAD', '--')
-        assert not (git(repo, 'ls-files', '--others', '--exclude-standard') or
-                    git(repo, 'ls-files', '--others', '--', 'src', 'include', '.rev-id')), 'Untracked native input: ' + relative
+        git(repo, 'diff', '--cached', '--no-ext-diff', '--no-textconv',
+            '--ignore-submodules=none', '--exit-code', 'HEAD', '--')
+        # Compare raw files, not Git's configurable/possibly masked working-tree diff.
+        for record in git(repo, 'ls-tree', '-rz', 'HEAD').split(b'\0'):
+            if not record:
+                continue
+            meta, name = record.split(b'\t', 1)
+            mode, kind, blob = meta.decode().split()
+            if kind != 'blob':
+                continue  # Submodule HEADs are checked through CONFIG['sources'].
+            path = repo / os.fsdecode(name)
+            if path.is_symlink():
+                data, actual_mode = os.fsencode(os.readlink(path)), '120000'
+            else:
+                assert path.is_file(), 'Missing native input: ' + str(path)
+                data = path.read_bytes()
+                actual_mode = '100755' if path.stat().st_mode & 0o100 else '100644'
+            digest = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+            assert (actual_mode, digest) == (mode, blob), 'Changed native input: ' + str(path)
+        # Only known generated output roots are exempt, never ignored sources or Makefiles.
+        outputs = (b'bin/', b'build/', b'HevSocks5Server.xcframework/', b'HevTaskSystem.xcframework/')
+        assert all(not name or name.startswith(outputs) for name in
+                   git(repo, 'ls-files', '--others', '-z').split(b'\0')), 'Untracked native input: ' + relative
+
+
+def apply(core):
+    clean_native(core)
     for relative, patch in patches():
         git(core / relative, 'apply', '--check', '--whitespace=error-all', str(patch))
         git(core / relative, 'apply', '--whitespace=error-all', str(patch))
@@ -84,11 +106,7 @@ def reverse(core):
     for relative, patch in reversed(list(patches())):
         git(core / relative, 'apply', '-R', '--check', str(patch))
         git(core / relative, 'apply', '-R', str(patch))
-    for relative in CONFIG['sources']:
-        git(core / relative, 'diff', '--exit-code', 'HEAD', '--')
-        git(core / relative, 'diff', '--cached', '--exit-code', 'HEAD', '--')
-        assert not (git(core / relative, 'ls-files', '--others', '--exclude-standard') or
-                    git(core / relative, 'ls-files', '--others', '--', 'src', 'include', '.rev-id')), 'Untracked native input: ' + relative
+    clean_native(core)
     git(core, 'submodule', 'foreach', '--recursive',
         'git diff --exit-code HEAD -- && git diff --cached --exit-code HEAD --')
     print('PASS: reverse patches restore exact upstream source')
@@ -156,7 +174,7 @@ def package(app):
     if 'icon' in FEATURES:
         assert info['CFBundleIcons']['CFBundlePrimaryIcon']['CFBundleIconName'] == 'AppIcon'
         assert (app / 'Assets.car').exists()
-    print('PASS: final Info.plist, single scene, feature-specific resources and permissions')
+    print('PASS: final Info.plist and applicable feature-specific resources and permissions')
 
 
 if __name__ == '__main__':

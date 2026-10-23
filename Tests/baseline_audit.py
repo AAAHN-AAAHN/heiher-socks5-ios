@@ -42,6 +42,25 @@ def initialize(root):
 def alter(root, case):
     if case == 'clean':
         return
+    if case in ('assume-unchanged', 'skip-worktree'):
+        git(root, 'update-index', '--' + case, 'src/probe.c')
+        (root / 'src/probe.c').write_text('int changed;\n')
+        return
+    if case == 'clean-filter':
+        (root / '.git/info/attributes').write_text('src/probe.c filter=audit\n')
+        git(root, 'config', 'filter.audit.clean', 'sed s/changed/probe/g')
+        (root / 'src/probe.c').write_text('int changed;\n')
+        return
+    if case == 'filemode':
+        git(root, 'config', 'core.fileMode', 'false')
+        (root / 'src/probe.c').chmod(0o755)
+        return
+    if case in ('ignored-gnu-make', 'ignored-make', 'ignored-configs'):
+        name = {'ignored-gnu-make': 'GNUmakefile', 'ignored-make': 'makefile',
+                'ignored-configs': 'configs.mk'}[case]
+        (root / '.git/info/exclude').write_text(name + '\n')
+        (root / name).write_text('all:\n\t@true\n')
+        return
     if case == 'head-only':
         git(root, '-c', 'user.name=Input fixture', '-c', 'user.email=audit@localhost',
             'commit', '--allow-empty', '-qm', 'Different source identity')
@@ -76,19 +95,20 @@ def native_boundaries(old, current):
     cases = ['clean', 'modified-c', 'modified-make', 'deleted-script',
              'staged-c', 'staged-make', 'index-c', 'index-make',
              'untracked-c', 'untracked-config', 'ignored-c', 'ignored-output', 'ignored-config',
-             'head-only', 'committed-make']
+             'head-only', 'committed-make', 'assume-unchanged', 'skip-worktree',
+             'filemode', 'clean-filter', 'ignored-gnu-make', 'ignored-make', 'ignored-configs']
     count = 0
     for label, source in [('old', old), ('current', current)]:
         tree = ast.parse(source)
         functions = ast.Module(body=[n for n in tree.body if isinstance(n, ast.FunctionDef)
-                                     and n.name in ('git', 'patches', 'apply', 'reverse')], type_ignores=[])
+                                     and n.name in ('git', 'patches', 'clean_native', 'apply', 'reverse')], type_ignores=[])
         for operation in ('apply', 'reverse'):
             for case in cases:
                 with tempfile.TemporaryDirectory(prefix='baseline-native-input-') as folder:
                     root = Path(folder)
                     head = initialize(root)
                     alter(root, case)
-                    namespace = {'subprocess': subprocess, 'ROOT': root,
+                    namespace = {'subprocess': subprocess, 'os': os, 'hashlib': hashlib, 'ROOT': root,
                                  'CONFIG': {'sources': {'.': head}, 'patches': []}}
                     exec(compile(functions, '<exact-check-functions>', 'exec'), namespace)
                     accepted = True
@@ -100,6 +120,9 @@ def native_boundaries(old, current):
                     if label == 'old':
                         expected = case not in ('modified-c', 'staged-c') if operation == 'apply' else case.startswith(('clean', 'staged-'))
                         if case in ('untracked-c', 'untracked-config', 'ignored-c', 'ignored-output', 'ignored-config'):
+                            expected = True
+                        if case in ('assume-unchanged', 'skip-worktree', 'filemode', 'clean-filter',
+                                    'ignored-gnu-make', 'ignored-make', 'ignored-configs'):
                             expected = True
                         if case in ('head-only', 'committed-make'):
                             expected = operation == 'reverse'
@@ -269,6 +292,46 @@ def publication_boundaries(previous, current):
     return count
 
 
+def linked_outputs(previous, current):
+    count = 0
+    for label, source in (('previous', previous), ('current', current)):
+        for case in ('root', 'directory', 'log'):
+            with tempfile.TemporaryDirectory(prefix='baseline-linked-output-') as directory:
+                root, outside = Path(directory) / 'repo', Path(directory) / 'outside'
+                initialize(root)
+                (root / 'Build').mkdir()
+                (root / 'Build/build.sh').write_bytes(source)
+                (root / 'Build/features.json').write_text('{"name":"baseline"}\n')
+                (root / 'Build/check.py').write_text('raise SystemExit(19)\n')
+                git(root, 'add', '-f', 'Build')
+                git(root, '-c', 'user.name=Input fixture', '-c', 'user.email=audit@localhost',
+                    'commit', '-qm', 'Output boundary input')
+                outside.mkdir()
+                out = root / 'artifacts/baseline'
+                witness = outside / 'SUCCESS.txt'
+                if case == 'root':
+                    (outside / 'baseline').mkdir()
+                    witness = outside / 'baseline/SUCCESS.txt'
+                    out.parent.symlink_to(outside, target_is_directory=True)
+                elif case == 'directory':
+                    out.parent.mkdir()
+                    out.symlink_to(outside, target_is_directory=True)
+                else:
+                    out.mkdir(parents=True)
+                    (out / 'input-worktree.log').symlink_to(witness)
+                witness.write_text('Outside output boundary.\n')
+                result = subprocess.run(['bash', 'Build/build.sh'], cwd=root,
+                                        capture_output=True, timeout=15)
+                preserved = witness.exists() and witness.read_text() == 'Outside output boundary.\n'
+                if preserved != (label == 'current') or result.returncode != (1 if label == 'current' else 19):
+                    raise RuntimeError((label, case, result.returncode, preserved, result.stderr))
+                if label == 'current' and b'Linked ' not in result.stderr:
+                    raise RuntimeError(('Wrong output rejection', case, result.stderr))
+                print('PASS linked output:', label, case, 'preserved=', preserved, flush=True)
+                count += 1
+    return count
+
+
 def artifact_names():
     path = '.github/workflows/verify-build.yml'
     previous = original('8877581c104fbf4bba975596db5ef859468ebfb4').decode()
@@ -306,6 +369,7 @@ def main():
     count += shell_boundaries(original(OLD_BUILD), current_build)
     count += publication_boundaries(original(PREVIOUS_BUILD), current_build)
     count += artifact_names()
+    count += linked_outputs(original(PREVIOUS_BUILD), current_build)
     print(f'SUMMARY: {count} exact-old/current input, assertion, publication and cleanup cases; no native/Apple execution')
 
 
