@@ -10,6 +10,7 @@ import struct
 import subprocess
 import sys
 import wave
+import zipfile
 
 if not __debug__:
     raise SystemExit('Assertions must be enabled')
@@ -51,33 +52,64 @@ def patches():
         yield item['repository'], ROOT / 'Patches' / item['file']
 
 
+def tracked(repo, ref):
+    for record in git(repo, 'ls-tree', '-rz', ref).split(b'\0'):
+        if record:
+            meta, name = record.split(b'\t', 1)
+            yield (*meta.decode().split(), os.fsdecode(name))
+
+
+def clean_tracked(repo, sha):
+    assert git(repo, 'rev-parse', 'HEAD').decode().strip() == sha, 'Source HEAD changed: ' + str(repo)
+    git(repo, 'diff', '--cached', '--no-ext-diff', '--no-textconv',
+        '--ignore-submodules=none', '--exit-code', sha, '--')
+    # Compare raw files, not Git's configurable/possibly masked working-tree diff.
+    for mode, kind, blob, name in tracked(repo, sha):
+        if kind != 'blob':
+            continue  # Native submodule HEADs are checked through CONFIG['sources'].
+        path = repo / name
+        if path.is_symlink():
+            data, actual_mode = os.fsencode(os.readlink(path)), '120000'
+        else:
+            assert path.is_file(), 'Missing source input: ' + str(path)
+            data = path.read_bytes()
+            actual_mode = '100755' if path.stat().st_mode & 0o100 else '100644'
+        digest = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+        assert (actual_mode, digest) == (mode, blob), 'Changed source input: ' + str(path)
+
+
 def clean_native(core):
     for relative, sha in CONFIG['sources'].items():
         repo = core / relative
-        assert git(repo, 'rev-parse', 'HEAD').decode().strip() == sha, relative
-        git(repo, 'diff', '--cached', '--no-ext-diff', '--no-textconv',
-            '--ignore-submodules=none', '--exit-code', 'HEAD', '--')
-        # Compare raw files, not Git's configurable/possibly masked working-tree diff.
-        for record in git(repo, 'ls-tree', '-rz', 'HEAD').split(b'\0'):
-            if not record:
-                continue
-            meta, name = record.split(b'\t', 1)
-            mode, kind, blob = meta.decode().split()
-            if kind != 'blob':
-                continue  # Submodule HEADs are checked through CONFIG['sources'].
-            path = repo / os.fsdecode(name)
-            if path.is_symlink():
-                data, actual_mode = os.fsencode(os.readlink(path)), '120000'
-            else:
-                assert path.is_file(), 'Missing native input: ' + str(path)
-                data = path.read_bytes()
-                actual_mode = '100755' if path.stat().st_mode & 0o100 else '100644'
-            digest = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
-            assert (actual_mode, digest) == (mode, blob), 'Changed native input: ' + str(path)
+        clean_tracked(repo, sha)
         # Only known generated output roots are exempt, never ignored sources or Makefiles.
         outputs = (b'bin/', b'build/', b'HevSocks5Server.xcframework/', b'HevTaskSystem.xcframework/')
         assert all(not name or name.startswith(outputs) for name in
                    git(repo, 'ls-files', '--others', '-z').split(b'\0')), 'Untracked native input: ' + relative
+
+
+def archive(path, ref):
+    entries = list(tracked(ROOT, ref))
+    assert all(kind == 'blob' for _, kind, _, _ in entries), 'Unarchived source submodule'
+    expected = {name: (mode, blob) for mode, _, blob, name in entries}
+    directories = {str(parent) + '/' for name in expected for parent in Path(name).parents
+                   if str(parent) != '.'}
+    with zipfile.ZipFile(path) as source:
+        names = source.namelist()
+        assert len(names) == len(set(names)), 'Duplicate source archive entry'
+        assert {n for n in names if not n.endswith('/')} == set(expected), 'Source archive inventory differs'
+        assert all(n in directories and not source.read(n) for n in names if n.endswith('/')), 'Unexpected source archive directory'
+        for name, (mode, blob) in expected.items():
+            info = source.getinfo(name)
+            # Git ZIP stores ordinary non-executable files with DOS metadata.
+            permissions = info.external_attr >> 16
+            actual_mode = ('120000' if permissions & 0o170000 == 0o120000 else
+                           '100755' if permissions & 0o100 else '100644')
+            assert permissions & 0o170000 in (0, 0o100000, 0o120000), 'Invalid source archive type'
+            data = source.read(info)  # Also checks the entry's CRC.
+            digest = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+            assert (actual_mode, digest) == (mode, blob), 'Source archive differs: ' + name
+    print('PASS: source archive inventory, Git modes and raw bytes')
 
 
 def apply(core):
@@ -179,7 +211,12 @@ def package(app):
 
 if __name__ == '__main__':
     command = sys.argv[1]
-    if command == 'baseline':
+    if command == 'worktree':
+        clean_tracked(ROOT, sys.argv[2])
+        print('PASS: fixed application HEAD, index, raw bytes and Git modes')
+    elif command == 'archive':
+        archive(Path(sys.argv[2]), sys.argv[3])
+    elif command == 'baseline':
         baseline()
     elif command == 'apply':
         apply(Path(sys.argv[2]))

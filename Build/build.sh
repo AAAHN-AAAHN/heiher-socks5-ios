@@ -25,11 +25,14 @@ COMMIT=$(git rev-parse HEAD)
 python3 -c 'import sys; sys.exit(0 if __debug__ else "Assertions must be enabled.")'
 git diff --exit-code "$COMMIT" -- > "$OUT/input-worktree.log"
 git diff --cached --exit-code "$COMMIT" -- > "$OUT/input-index.log"
+python3 Build/check.py worktree "$COMMIT" > "$OUT/input-identity.log"
 python3 Build/check.py baseline > "$OUT/baseline-audit.log"
+python3 Tests/documentation_contract.py > "$OUT/documentation-contract.log" 2>&1
 python3 Tests/baseline_audit.py > "$OUT/baseline-driver.log" 2>&1
 python3 Tests/tcp_smoke_contract.py > "$OUT/smoke-contract.log" 2>&1
 printf '%s\n' "$COMMIT" > "$OUT/tested-commit.txt"
 git archive --format=zip "$COMMIT" -o "$OUT/source.zip"
+python3 Build/check.py archive "$OUT/source.zip" "$COMMIT" > "$OUT/archive-audit.log"
 test "$(git rev-parse HEAD)" = "$COMMIT"
 git bundle create "$OUT/history.bundle" HEAD
 SERVER_REF=$(python3 -c 'import json; print(json.load(open("Build/upstream.json"))["sources"]["."])')
@@ -97,7 +100,7 @@ if [ "$(uname -s)" = Darwin ]; then
     # Keep the committed baseline and all later source checks untouched.
     PRODUCT=$(mktemp -d "$ROOT/.build/$NAME-product-source.XXXXXX")
     trap 'rm -rf "$PRODUCT"' EXIT
-    git archive "$COMMIT" | tar -x -C "$PRODUCT"
+    unzip -q "$OUT/source.zip" -d "$PRODUCT"
     rm -rf "$PRODUCT/HevSocks5Server.xcframework"
     cp -R "$CORE/HevSocks5Server.xcframework" "$PRODUCT/"
     xcodebuild archive -project "$PRODUCT/Socks5.xcodeproj" -scheme Socks5 -configuration Release \
@@ -116,7 +119,7 @@ if [ "$(uname -s)" = Darwin ]; then
     (cd "$ROOT/.build/package-$NAME" && zip -qr "$OUT/Socks5-$NAME-unsigned.ipa" Payload)
     unzip -t "$OUT/Socks5-$NAME-unsigned.ipa" >> "$OUT/package.log"
     ditto -c -k --keepParent "$ROOT/.build/$NAME.xcarchive/dSYMs" "$OUT/Socks5-dSYMs.zip"
-    git archive --format=zip "$COMMIT" -o "$OUT/Socks5-$NAME-source.zip"
+    cp "$OUT/source.zip" "$OUT/Socks5-$NAME-source.zip"
     (cd "$OUT" && shasum -a 256 *.ipa > SHA256SUMS.txt)
     rm -rf "$PRODUCT"
     trap - EXIT
@@ -125,4 +128,5 @@ python3 Build/check.py reverse "$CORE" >> "$OUT/source-audit.log"
 test "$(git rev-parse HEAD)" = "$COMMIT" || { echo 'Source HEAD changed during build' >&2; exit 1; }
 git diff --exit-code "$COMMIT" -- > "$OUT/final-worktree.log"
 git diff --cached --exit-code "$COMMIT" -- > "$OUT/final-index.log"
+python3 Build/check.py worktree "$COMMIT" > "$OUT/final-identity.log"
 printf 'PASS: %s build and applicable checks completed\n' "$NAME" | tee "$OUT/SUCCESS.txt"

@@ -9,6 +9,9 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import struct
+import warnings
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 OLD_CHECK = '69f82a5b376aad46c97bf91fc92ac389eaf2a7bb'
@@ -101,7 +104,7 @@ def native_boundaries(old, current):
     for label, source in [('old', old), ('current', current)]:
         tree = ast.parse(source)
         functions = ast.Module(body=[n for n in tree.body if isinstance(n, ast.FunctionDef)
-                                     and n.name in ('git', 'patches', 'clean_native', 'apply', 'reverse')], type_ignores=[])
+                                     and n.name in ('git', 'patches', 'tracked', 'clean_tracked', 'clean_native', 'apply', 'reverse')], type_ignores=[])
         for operation in ('apply', 'reverse'):
             for case in cases:
                 with tempfile.TemporaryDirectory(prefix='baseline-native-input-') as folder:
@@ -259,6 +262,8 @@ def publication_boundaries(previous, current):
                     if case == 'repeat-product':
                         retained.parent.mkdir()
                         retained.write_text('Prior working directory.\n')
+                    subprocess.run(['git', '-C', str(root), 'archive', '--format=zip', head,
+                                    '-o', str(out / 'source.zip')], check=True)
                     setup = source[source.index('    PRODUCT='):source.index('    xcodebuild archive')]
                     setup += '\nprintf "%s\\n" "$PRODUCT"\n'
                     setup += 'cmp "$PRODUCT/src/probe.c" "$ROOT/src/probe.c"\n'
@@ -358,6 +363,103 @@ def artifact_names():
     return count
 
 
+def source_boundaries(current_check, current_build):
+    count = 0
+    previous_check = original('ad64d0d551689bf1f702ef0c6c2e27c98b9a1e8c')
+    previous_build = original('8b046dd79d8e0181fce227f658f75e0db1ac5d79')
+    for label, checker, build in (('previous', previous_check, previous_build),
+                                  ('current', current_check, current_build)):
+        for case in ('clean', 'assume-unchanged', 'skip-worktree', 'filemode', 'clean-filter'):
+            with tempfile.TemporaryDirectory(prefix='baseline-final-source-') as directory:
+                root = Path(directory)
+                initialize(root)
+                (root / 'Build').mkdir()
+                (root / 'Build/check.py').write_bytes(checker)
+                (root / 'Build/features.json').write_text(
+                    '{"name":"baseline","features":[],"patches":[],"sources":{}}\n')
+                git(root, 'add', '-f', 'Build')
+                git(root, '-c', 'user.name=Input fixture', '-c', 'user.email=audit@localhost',
+                    'commit', '-qm', 'Final boundary input')
+                head = git(root, 'rev-parse', 'HEAD').decode().strip()
+                alter(root, case)
+                out = root / 'artifacts/baseline'
+                out.mkdir(parents=True)
+                tail = build.decode().split('python3 Build/check.py reverse', 1)[1]
+                tail = 'python3 Build/check.py reverse' + tail
+                result = subprocess.run(['bash', '-euo', 'pipefail', '-c', tail], cwd=root,
+                                        env=dict(os.environ, ROOT=str(root), CORE=str(root),
+                                                 OUT=str(out), NAME='baseline', COMMIT=head),
+                                        capture_output=True, timeout=15)
+                accepted = label == 'previous' or case == 'clean'
+                if (result.returncode == 0) != accepted or (out / 'SUCCESS.txt').exists() != accepted:
+                    raise RuntimeError((label, 'final source', case, result.returncode, result.stderr))
+                if not accepted and b'Changed source input:' not in result.stderr:
+                    raise RuntimeError(('Wrong final-source rejection', case, result.stderr))
+                print('PASS final source:', label, case, 'accepted=', accepted, flush=True)
+                count += 1
+    functions = ast.Module(body=[n for n in ast.parse(current_check).body
+                                 if isinstance(n, ast.FunctionDef) and n.name in ('git', 'tracked', 'archive')],
+                           type_ignores=[])
+    for case in ('valid', 'export-ignore', 'export-subst', 'missing', 'bytes', 'mode',
+                 'symlink-type', 'extra', 'duplicate', 'directory', 'crc'):
+        with tempfile.TemporaryDirectory(prefix='baseline-source-archive-') as directory:
+            root = Path(directory)
+            initialize(root)
+            (root / 'src/probe.c').write_text('/* $Format:%H$ */\nint probe;\n')
+            (root / 'src/probe-link').symlink_to('probe.c')
+            (root / 'build-apple.sh').chmod(0o755)
+            git(root, 'add', '.')
+            git(root, '-c', 'user.name=Input fixture', '-c', 'user.email=audit@localhost',
+                'commit', '-qm', 'Archive modes and literal source')
+            if case.startswith('export-'):
+                (root / '.git/info/attributes').write_text('src/probe.c ' + case + '\n')
+            archive_path = root / 'source.zip'
+            archive_path.write_bytes(git(root, 'archive', '--format=zip', 'HEAD'))
+            if case not in ('valid', 'export-ignore', 'export-subst'):
+                with zipfile.ZipFile(archive_path) as source:
+                    entries = [(info, source.read(info)) for info in source.infolist()]
+                with zipfile.ZipFile(archive_path, 'w', compression=zipfile.ZIP_STORED) as target:
+                    for info, data in entries:
+                        if case == 'missing' and info.filename == 'src/probe.c':
+                            continue
+                        if case == 'bytes' and info.filename == 'src/probe.c':
+                            data += b'\nchanged\n'
+                        if ((case == 'mode' and info.filename == 'build-apple.sh') or
+                                (case == 'symlink-type' and info.filename == 'src/probe-link')):
+                            info.external_attr, info.create_system = 0, 0
+                        info.compress_type = zipfile.ZIP_STORED
+                        target.writestr(info, data)
+                    if case == 'extra':
+                        target.writestr('extra', b'extra')
+                    elif case == 'duplicate':
+                        with warnings.catch_warnings():
+                            warnings.simplefilter('ignore', UserWarning)
+                            target.writestr('src/probe.c', b'duplicate')
+                    elif case == 'directory':
+                        target.writestr('unexpected/', b'')
+                if case == 'crc':
+                    with zipfile.ZipFile(archive_path) as source:
+                        info = source.getinfo('src/probe.c')
+                    data = bytearray(archive_path.read_bytes())
+                    offset = info.header_offset
+                    name_size, extra_size = struct.unpack_from('<HH', data, offset + 26)
+                    data[offset + 30 + name_size + extra_size] ^= 1
+                    archive_path.write_bytes(data)
+            namespace = {'subprocess': subprocess, 'os': os, 'hashlib': hashlib,
+                         'zipfile': zipfile, 'Path': Path, 'ROOT': root}
+            exec(compile(functions, '<exact-source-archive-check>', 'exec'), namespace)
+            accepted = True
+            try:
+                namespace['archive'](archive_path, 'HEAD')
+            except (AssertionError, zipfile.BadZipFile):
+                accepted = False
+            if accepted != (case == 'valid'):
+                raise RuntimeError(('source archive', case, accepted))
+            print('PASS archive:', case, 'accepted=', accepted, flush=True)
+            count += 1
+    return count
+
+
 def main():
     if not __debug__:
         raise SystemExit('Assertions must be enabled')
@@ -370,6 +472,7 @@ def main():
     count += shell_boundaries(original(OLD_BUILD), current_build)
     count += publication_boundaries(original(PREVIOUS_BUILD), current_build)
     count += artifact_names()
+    count += source_boundaries(current, current_build)
     count += linked_outputs(original(PREVIOUS_BUILD), current_build)
     print(f'SUMMARY: {count} exact-old/current input, assertion, publication and cleanup cases; no native/Apple execution')
 
