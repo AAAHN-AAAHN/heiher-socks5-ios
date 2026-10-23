@@ -10,6 +10,10 @@ import threading
 import time
 
 
+if not __debug__:
+    raise SystemExit('Assertions must be enabled')
+
+
 def read(sock, count):
     data = b''
     while len(data) < count:

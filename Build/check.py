@@ -79,6 +79,8 @@ def formatting(core, formatter):
 
 
 def reverse(core):
+    for relative, sha in CONFIG['sources'].items():
+        assert git(core / relative, 'rev-parse', 'HEAD').decode().strip() == sha, 'Native HEAD changed: ' + relative
     for relative, patch in reversed(list(patches())):
         git(core / relative, 'apply', '-R', '--check', str(patch))
         git(core / relative, 'apply', '-R', str(patch))

@@ -8,7 +8,7 @@ This guide describes the common responsibilities shared by the branches. Each br
 
 ## Functional behavior
 
-The build validates input identity before native patching, applies each declared patch at its declared repository root, tests the resulting native engine, checks source formatting and reverses the patches to prove exact restoration. A rejected input or failed operation must not leave an overall success marker that can be reused as a valid verdict.
+The build validates input identity before native patching, applies each declared patch at its declared repository root, tests the resulting native engine, checks source formatting and reverses the patches to prove exact restoration. A rejected input or failed operation must not leave an overall success marker that can be reused as a valid verdict. Each attempt validates its output name before filesystem changes and removes previous products and provenance, while retaining diagnostic logs.
 
 On Linux, the applicable paths execute native networking, C fixtures and platform-independent Swift models. Statistics-enabled compositions exercise buffered and splice paths. Apple execution adds Darwin networking, the actual iPhoneOS SDK, resource compilation and the product or Simulator stages selected by the branch. Expected platform-specific skips remain skips, not successful executions.
 
@@ -20,7 +20,7 @@ Each result applies to its recorded source, toolchain and executed stage. The re
 
 `Build/features.json` supplies the composition name, features, native source revisions and ordered patch list. `Build/upstream.json` and `Build/baseline-framework.json` bind the common native inputs and committed unpatched framework. Build code selects behavior from declared features rather than a branch-name substring.
 
-`Build/check.py` owns baseline, patch-application, formatting, reversal, composition and resource checks. Whole tracked working-tree and index equality is required at native input and restoration boundaries. The source checkout is not overwritten by generated frameworks. The product is built from a disposable source copy with the exact declared generated framework substituted into that copy.
+`Build/check.py` owns baseline, patch-application, formatting, reversal, composition and resource checks. The declared native HEAD and whole tracked working-tree and index equality are required at native input and restoration boundaries. The build retains one application commit for source archives and rejects a changed HEAD before success. The source checkout is not overwritten by generated frameworks. The product is built from a unique disposable source copy with the exact declared generated framework substituted into that copy; completion and failure both remove that temporary copy.
 
 Source-composition checks compare feature-owned paths, contents and executable modes with their immutable owners. Documentation has its own current-parent contract in `docs/documentation.json`; it does not change executable source locks. Where a standalone feature's source predicate is inapplicable to the combined application, the original predicate runs in that feature's exact worktree. File equality and separate integrated checks connect the owned implementation to release.
 
