@@ -24,6 +24,9 @@ jobs:
           ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
           fetch-depth: 0
+      - name: Prepare this audit output
+        id: build
+        run: python3 Tests/udp_compat_audit.py --prepare
       - name: Install upstream formatter
         shell: bash
         run: |
@@ -61,7 +64,7 @@ jobs:
             Socks5/Socks5App.swift Socks5/ContentView.swift \
             > artifacts/udp-final-audit/ios-swift-typecheck.log 2>&1
       - name: Record native queue behavior and formatter output without changing code
-        if: always()
+        if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -73,8 +76,8 @@ jobs:
             clang-format-18 --style="file:$CORE/.clang-format" Tests/udp_sockaddr_unit.c > artifacts/udp-final-audit/expected-unit-format.c
           fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+        if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         with:
           name: UDP-final-audit-${{ runner.os }}
-          path: artifacts/
+          path: ${{ steps.build.outputs.artifact_path }}
           retention-days: 30
