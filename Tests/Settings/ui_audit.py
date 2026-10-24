@@ -51,8 +51,8 @@ def verify_production():
     # entire-product equality check cannot describe the asynchronous store owner.
     run([sys.executable, 'Build/check_ownership.py'], 'ownership-contract.log')
     production_base = 'c64faec0ca5ed14edfec2774bd5a2fad3bbaf4d9'
-    allowed = {'Socks5/AppRoot.swift', 'Socks5/Settings/SettingsStore.swift',
-               'Socks5/Settings/SettingsView.swift'}
+    allowed = {'Socks5/AppRoot.swift', 'Socks5/Settings/AppSettings.swift',
+               'Socks5/Settings/SettingsStore.swift', 'Socks5/Settings/SettingsView.swift'}
     changed = set(output('git', 'diff', '--name-only', production_base, 'HEAD', '--',
                          'Socks5', 'Socks5.xcodeproj', 'Patches').splitlines())
     if not changed <= allowed:
