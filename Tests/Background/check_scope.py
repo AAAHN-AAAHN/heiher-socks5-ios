@@ -178,7 +178,7 @@ def main():
     view = text('Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift')
     assert view.index('Text("Audio")') < view.index('Text("Location")')
     assert view.index('Section("Location state")') < view.index('Text("Periodic ping")')
-    assert root.count('@StateObject private var ping = PeriodicPingModel()') == 1
+    assert root.count('@StateObject private var ping = PeriodicPingModel(fileURL: PeriodicPingModel.standaloneURL)') == 1
     assert 'keepAlive: keepAlive, ping: ping,' in root
     assert 'private let audioEvents' not in view
     assert 'service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,' in service

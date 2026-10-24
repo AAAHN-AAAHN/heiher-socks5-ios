@@ -35,11 +35,16 @@ struct PeriodicPingTests {
         }
         _ = try PeriodicPingConfiguration(destinations: "127.0.0.1\n::1", period: " 1 ")
         _ = try PeriodicPingConfiguration(destinations: "::1%1", period: String(Int.max / 1_000_000))
-        let many = (1...64).map { "10.0.0.\($0)" }.joined(separator: ",")
+        let many = (0..<65_536).map { "10.1.\($0 / 256).\($0 % 256)" }.joined(separator: ",")
         let maximum = try PeriodicPingConfiguration(destinations: many, period: "1")
-        require(maximum.destinations.count == 64, "64 IPs")
-        do { _ = try PeriodicPingConfiguration(destinations: many + ",10.0.0.65", period: "1"); fatalError("too many accepted") }
+        require(maximum.destinations.count == 65_536, "65536 IPs")
+        do { _ = try PeriodicPingConfiguration(destinations: many + ",10.2.0.0", period: "1"); fatalError("too many accepted") }
         catch is PingInputError { }
+        let duplicates = String(repeating: "127.0.0.1,", count: 100_000) + "127.0.0.1"
+        let compacted = try PeriodicPingConfiguration(destinations: duplicates, period: "1")
+        require(compacted.destinations.count == 1 && duplicates.utf8.count > 8192, "no byte/token cap")
+        let repeatedMaximum = try PeriodicPingConfiguration(destinations: many + ",10.1.0.0", period: "1")
+        require(repeatedMaximum.destinations.count == 65_536, "duplicate at maximum")
         for sequence in UInt32(0)...65535 {
             let bytes = PingPacket.echo(ipv6: false, identifier: 0x1234, sequence: UInt16(sequence))
             var sum = stride(from: 0, to: 8, by: 2).reduce(UInt32(0)) { $0 + UInt32(bytes[$1]) * 256 + UInt32(bytes[$1 + 1]) }
@@ -91,6 +96,14 @@ struct PeriodicPingTests {
         let final = probe(2)
         Thread.sleep(forTimeInterval: 0.06)
         require(probe(2) == final && probe(0) == probe(1), "stale timer")
+        service!.configure(maximum) { reports.add($0) }
+        let begun = probe(2)
+        wait("large batch starts") { probe(2) > begun }
+        let off = DispatchSemaphore(value: 0)
+        let offStart = Date()
+        service!.configure(nil) { _ in off.signal() }
+        require(off.wait(timeout: .now() + 3) == .success, "large batch Off")
+        require(Date().timeIntervalSince(offStart) < 1, "large batch did not yield to Off")
         service!.configure(live) { reports.add($0) }
         wait("restart") { probe(0) > probe(1) }
         service = nil

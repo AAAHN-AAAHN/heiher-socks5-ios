@@ -4,7 +4,7 @@ import SwiftUI
 struct AppRoot: View {
     @State private var selectedTab = "server"
     @StateObject private var keepAlive = BackgroundKeepAlive()
-    @StateObject private var ping = PeriodicPingModel()
+    @StateObject private var ping = PeriodicPingModel(fileURL: PeriodicPingModel.standaloneURL)
     @AppStorage("background.continuousLocation") private var locationEnabled = false
     @AppStorage("background.silentAudio") private var audioEnabled = false
 

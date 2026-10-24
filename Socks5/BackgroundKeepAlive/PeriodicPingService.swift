@@ -71,7 +71,7 @@ struct PingDestination: Sendable {
 
 enum PingInputError: String, Error, LocalizedError {
     case address = "Enter numeric IPv4 or IPv6 addresses separated by commas."
-    case count = "Enter 1 to 64 different destination IPs (at most 8,192 bytes)."
+    case count = "Enter 1 to 65,536 different destination IPs."
     case period = "Period must be a positive whole number of milliseconds."
     var errorDescription: String? { rawValue }
 }
@@ -80,16 +80,26 @@ struct PeriodicPingConfiguration: Sendable {
     let destinations: [PingDestination]
     let periodMilliseconds: Int
 
-    init(destinations text: String, period: String) throws {
-        guard text.utf8.count <= 8_192 else { throw PingInputError.count }
-        let tokens = text.replacingOccurrences(of: "\n", with: ",")
-            .split(separator: ",", omittingEmptySubsequences: false)
+    static let maximumDestinations = 65_536
+
+    init(destinations text: String, period: String, isCancelled: () -> Bool = { false }) throws {
+        // Scan substrings without copying the whole input or allocating a token array.
+        var remaining = text[...]
+        var scanned = 0
         var seen = Set<String>()
         var addresses: [PingDestination] = []
-        for token in tokens {
-            let address = try PingDestination(String(token).trimmingCharacters(in: .whitespacesAndNewlines))
-            if seen.insert(address.name).inserted { addresses.append(address) }
-            guard addresses.count <= 64 else { throw PingInputError.count }
+        while true {
+            if scanned % 256 == 0, isCancelled() { throw CancellationError() }
+            let end = remaining.firstIndex { $0 == "," || $0 == "\n" } ?? remaining.endIndex
+            let token = remaining[..<end].trimmingCharacters(in: .whitespacesAndNewlines)
+            let address = try PingDestination(token)
+            if seen.insert(address.name).inserted {
+                guard addresses.count < Self.maximumDestinations else { throw PingInputError.count }
+                addresses.append(address)
+            }
+            scanned += 1
+            if end == remaining.endIndex { break }
+            remaining = remaining[remaining.index(after: end)...]
         }
         guard !addresses.isEmpty else { throw PingInputError.count }
         let digits = period.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -121,23 +131,73 @@ enum PingPacket {
     }
 }
 
-/// Public handle. The worker and every socket/timer mutation stay on one queue.
+/// Public handle. Requests coalesce before parsing; Off invalidates an in-flight batch.
 final class PeriodicPingService: Sendable {
     private let worker = PeriodicPingWorker()
 
     func configure(_ configuration: PeriodicPingConfiguration?, report: @escaping @Sendable (String) -> Void) {
+        submit(.parsed(configuration), report: report)
+    }
+
+    func configure(enabled: Bool, destinations: String, period: String,
+                   report: @escaping @Sendable (String) -> Void) {
+        submit(.text(enabled, destinations, period), report: report)
+    }
+
+    private func submit(_ input: PingRequests.Input, report: @escaping @Sendable (String) -> Void) {
         let owner = worker
-        owner.queue.async { owner.configure(configuration, report: report) }
+        if owner.requests.post(input, report: report) { owner.queue.async { owner.consume() } }
     }
 
     deinit {
         let owner = worker
-        owner.queue.async { owner.stop() }
+        if owner.requests.post(.parsed(nil), report: { _ in }) { owner.queue.async { owner.consume() } }
+    }
+}
+
+/// Only the latest request is retained. The lock also cancels parsing/sending
+/// without waiting behind a large batch on the worker queue.
+private final class PingRequests: @unchecked Sendable {
+    enum Input: Sendable {
+        case parsed(PeriodicPingConfiguration?)
+        case text(Bool, String, String)
+    }
+    struct Request: Sendable {
+        let id: UUID
+        let input: Input
+        let report: @Sendable (String) -> Void
+    }
+    private let lock = NSLock()
+    private var latest = UUID()
+    private var pending: Request?
+    private var scheduled = false
+
+    func post(_ input: Input, report: @escaping @Sendable (String) -> Void) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        latest = UUID()
+        pending = Request(id: latest, input: input, report: report)
+        if scheduled { return false }
+        scheduled = true
+        return true
+    }
+
+    func take() -> Request? {
+        lock.lock(); defer { lock.unlock() }
+        let value = pending
+        pending = nil
+        scheduled = false
+        return value
+    }
+
+    func current(_ id: UUID) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return latest == id
     }
 }
 
 /// Checked at the public boundary; mutable fields below are exclusively queue-confined.
 private final class PeriodicPingWorker: @unchecked Sendable {
+    let requests = PingRequests()
     let queue = DispatchQueue(label: "hev.Socks5.periodic-ping", qos: .utility)
     private var timer: DispatchSourceTimer?
     private var configuration: PeriodicPingConfiguration?
@@ -146,8 +206,36 @@ private final class PeriodicPingWorker: @unchecked Sendable {
     private var lastStatus: String?
     private let identifier = UInt16.random(in: .min ... .max)
     private var sequence: UInt16 = 0
+    private var requestID = UUID()
+    private var cursor: Int?
+    private var packets: [[UInt8]] = []
+    private var opened: [Int32: (Int32, Int32)] = [:]
+    private var failureCount = 0
+    private var failures: [String] = []
     private var generation = UUID()
     private var receiveBuffer = [UInt8](repeating: 0, count: 256)
+
+    func consume() {
+        guard let request = requests.take() else { return }
+        stop()
+        requestID = request.id
+        let next: PeriodicPingConfiguration?
+        do {
+            switch request.input {
+            case .parsed(let value): next = value
+            case .text(let enabled, let destinations, let period):
+                let parsed = try PeriodicPingConfiguration(destinations: destinations, period: period) {
+                    !self.requests.current(request.id)
+                }
+                next = enabled ? parsed : nil
+            }
+        } catch {
+            if requests.current(request.id) { request.report(error.localizedDescription) }
+            return
+        }
+        guard requests.current(request.id) else { return }
+        configure(next, report: request.report)
+    }
 
     func configure(_ next: PeriodicPingConfiguration?, report: @escaping @Sendable (String) -> Void) {
         stop()
@@ -174,6 +262,10 @@ private final class PeriodicPingWorker: @unchecked Sendable {
         timer?.cancel()
         timer = nil
         configuration = nil
+        cursor = nil
+        packets.removeAll(keepingCapacity: true)
+        opened.removeAll(keepingCapacity: true)
+        failures.removeAll(keepingCapacity: true)
         for socket in sockets.values { close(socket) }
         sockets.removeAll(keepingCapacity: true)
         report = nil
@@ -206,7 +298,7 @@ private final class PeriodicPingWorker: @unchecked Sendable {
     }
 
     private func tick() {
-        guard let configuration else { return }
+        guard configuration != nil, cursor == nil, requests.current(requestID) else { return }
         // No receive source, RTT history, blocking wait, or task per destination.
         // Discard bounded queued replies; this feature reports sends, not reachability.
         for socket in sockets.values {
@@ -214,17 +306,26 @@ private final class PeriodicPingWorker: @unchecked Sendable {
                 if recv(socket, &receiveBuffer, receiveBuffer.count, Int32(MSG_DONTWAIT)) < 0 { break }
             }
         }
-        let v4 = PingPacket.echo(ipv6: false, identifier: identifier, sequence: sequence)
-        let v6 = PingPacket.echo(ipv6: true, identifier: identifier, sequence: sequence)
+        packets = [PingPacket.echo(ipv6: false, identifier: identifier, sequence: sequence),
+                   PingPacket.echo(ipv6: true, identifier: identifier, sequence: sequence)]
         sequence &+= 1
-        var opened: [Int32: (Int32, Int32)] = [:]
-        var failures: [String] = []
-        for var destination in configuration.destinations {
+        opened.removeAll(keepingCapacity: true)
+        failures.removeAll(keepingCapacity: true)
+        failureCount = 0
+        cursor = 0
+        sendBatch()
+    }
+
+    private func sendBatch() {
+        guard let configuration, let start = cursor, requests.current(requestID) else { return }
+        let end = min(start + 256, configuration.destinations.count)
+        for index in start..<end {
+            var destination = configuration.destinations[index]
             let family = destination.family
             // A failed socket open is retried next period, not once per target.
             if opened[family] == nil { opened[family] = openSocket(family) }
             let (socket, openError) = opened[family]!
-            let packet = family == AF_INET ? v4 : v6
+            let packet = packets[family == AF_INET ? 0 : 1]
             var sent = -1
             var error = openError
             if socket >= 0 {
@@ -238,13 +339,27 @@ private final class PeriodicPingWorker: @unchecked Sendable {
                 error = sent < 0 ? errno : EIO
             }
             if sent != packet.count {
-                failures.append("\(destination.name): \(String(cString: strerror(error)))")
+                failureCount += 1
+                if failures.count < 3 {
+                    failures.append("\(destination.name): \(String(cString: strerror(error)))")
+                }
             }
         }
-        if failures.isEmpty {
+        if end < configuration.destinations.count {
+            cursor = end
+            let generation = self.generation
+            queue.async { [weak self] in
+                guard let self, self.generation == generation else { return }
+                self.sendBatch()
+            }
+            return
+        }
+        cursor = nil
+        if failureCount == 0 {
             publish("Sending ICMP to \(configuration.destinations.count) destination(s)")
         } else {
-            publish("Send error: " + failures.joined(separator: "; "))
+            publish("Send error: " + failures.joined(separator: "; ") +
+                    (failureCount > failures.count ? "; \(failureCount) destination(s) failed" : ""))
         }
     }
 }

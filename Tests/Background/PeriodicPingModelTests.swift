@@ -14,6 +14,68 @@ struct PeriodicPingModelTests {
         while !predicate(), Date() < limit { try await Task.sleep(nanoseconds: 2_000_000) }
         require(predicate(), reason)
     }
+    static func persistence() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let url = directory.appendingPathComponent("ping.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let first = PeriodicPingModel(fileURL: url)
+        try await first.flush()
+        require(tryValue(url) == PeriodicPingPreferences(), "default JSON not saved")
+        first.setDestinations("127.0.0.1, ::1")
+        first.setPeriod("37")
+        first.setEnabled(true)
+        try await first.flush()
+        let backup = try await first.exportData()
+        let reopened = PeriodicPingModel(fileURL: url)
+        try await reopened.flush()
+        try await wait("relaunch resumes saved On") { reopened.status == "Sending ICMP to 2 destination(s)" }
+        require(reopened.enabled && reopened.destinations == "127.0.0.1, ::1" && reopened.period == "37", "saved values not restored")
+        reopened.setEnabled(false)
+        try await reopened.flush()
+        try await reopened.importData(backup)
+        require(reopened.enabled && tryValue(url).enabled, "backup restore failed")
+        reopened.setEnabled(false)
+        first.setEnabled(false)
+        try await first.flush()
+        try await reopened.flush()
+        let large = (0..<65_536).map { "10.9.\($0 / 256).\($0 % 256)" }.joined(separator: ",")
+        reopened.setDestinations(large)
+        reopened.setPeriod("60000")
+        try await reopened.flush()
+        let bigBackup = try await reopened.exportData()
+        require(bigBackup.count > 8192 && bigBackup.count > 65_536, "large backup fixture")
+        let largeRestart = PeriodicPingModel(fileURL: url)
+        try await largeRestart.flush()
+        require(largeRestart.destinations == large && largeRestart.period == "60000" && !largeRestart.enabled, "large restart")
+        largeRestart.setDestinations("127.0.0.1")
+        try await largeRestart.importData(bigBackup)
+        require(largeRestart.destinations == large, "large import truncated")
+        let before = try Data(contentsOf: url)
+        do { try await largeRestart.importData(Data("{bad".utf8)); fatalError("corrupt import accepted") }
+        catch is DecodingError { }
+        let after = try Data(contentsOf: url)
+        require(before == after, "corrupt backup modified disk")
+        // A delayed initial read must not resurrect On over a newer unchanged Off.
+        let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+        let source = PeriodicPingPreferences(enabled: true, destinations: "127.0.0.1", period: "25")
+        let data = try JSONEncoder().encode(source)
+        var storage = PeriodicPingModel.Storage()
+        storage.read = { _ in entered.signal(); release.wait(); return data }
+        let slow = PeriodicPingModel(fileURL: directory.appendingPathComponent("slow.json"), storage: storage)
+        let enteredOK = await Task.detached { entered.wait(timeout: .now() + 3) == .success }.value
+        require(enteredOK, "load boundary not entered")
+        slow.setEnabled(false)
+        release.signal()
+        try await slow.flush()
+        require(!slow.enabled && slow.destinations == "127.0.0.1" && slow.period == "25", "delayed load overrode latest Off")
+        try await wait("final sockets close") { probe(0) == probe(1) }
+        print("PASS: standalone JSON default save, saved On restart, backup/restore, 65536-IP file, malformed import preservation, delayed-load Off")
+    }
+
+    static func tryValue(_ url: URL) -> PeriodicPingPreferences {
+        try! JSONDecoder().decode(PeriodicPingPreferences.self, from: Data(contentsOf: url))
+    }
+
     static func main() async throws {
         var owner: PeriodicPingModel? = PeriodicPingModel()
         weak var weakOwner: PeriodicPingModel?
@@ -26,7 +88,7 @@ struct PeriodicPingModelTests {
         owner!.setEnabled(true)
         try await wait("On") { owner!.status.hasPrefix("Sending ICMP") }
         owner!.setPeriod("invalid")
-        try await wait("invalid stops") { probe(0) == probe(1) }
+        try await wait("invalid stops") { probe(0) == probe(1) && owner!.status.contains("positive whole") }
         require(owner!.enabled && owner!.status.contains("positive whole"), "invalid intent or error")
         let paused = probe(2)
         try await Task.sleep(nanoseconds: 50_000_000)
@@ -52,6 +114,7 @@ struct PeriodicPingModelTests {
         try await wait("final start") { owner!.status.hasPrefix("Sending ICMP") }
         owner = nil
         try await wait("model lifetime") { weakOwner == nil && probe(0) == probe(1) }
+        try await persistence()
         print("PASS: defaults, disabled edits, input rejection/recovery, synchronous publication reentry, 100 On-Off pairs, stale status, root release cleanup")
         print("CONTROLLED_SYSCALLS opens=\(probe(0)) closes=\(probe(1)); no UIKit or physical ICMP execution")
     }
