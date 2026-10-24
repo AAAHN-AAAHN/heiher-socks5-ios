@@ -62,7 +62,11 @@ import Foundation
         let protected = SettingsStore(fileURL: url, legacy: legacy, storage: io)
         await protected.whenLoaded()
         let operation = Task { @MainActor in try await protected.importFile(input) }
-        let reached = await Task.detached { entered.wait(timeout: .now() + 3) == .success }.value
+        let reached: Bool = await withCheckedContinuation { receipt in
+            DispatchQueue.global().async {
+                receipt.resume(returning: entered.wait(timeout: .now() + 3) == .success)
+            }
+        }
         check(reached, "blocked import boundary")
         protected.set(\.background.periodicPing.enabled, false)
         release.signal()

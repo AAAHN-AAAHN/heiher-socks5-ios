@@ -6,7 +6,7 @@
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
-    "feature/settings-persistence": "7868a060693a2f7b42817acd57d64396abfaa618"
+    "feature/settings-persistence": "1379827b2f0838f4d658695ff657891f4f715b98"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -848,8 +848,8 @@
       "sha256": "e8ff370befa554546840a8dcb25c980b0049c191a524a49539f727497fbdb979"
     },
     "Tests/Settings/PeriodicPingPersistenceTests.swift": {
-      "commit": "819252a94ae274485395c53a3f8b14e1449a7a8f",
-      "sha256": "55d406890a7acc5b7fce25cc31d27f814d248f3c1008e628e2eff56f68c11838"
+      "commit": "59c4a022390b7ce09c359cbee5a783e3c7277bb0",
+      "sha256": "401cb16fc4918185b21d39a8f800f8e1eab7da72e0660f9ab36fb5a94dc2c6b2"
     }
   },
   "files": {
