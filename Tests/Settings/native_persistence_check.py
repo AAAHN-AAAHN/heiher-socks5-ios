@@ -63,7 +63,8 @@ def main():
                     udpListenAddress='127.0.0.1', udpListenPort='0', bindIPv4Address='0.0.0.0',
                     bindIPv6Address='::', bindInterface='', authUsername='user', authPassword='\u00e9', listenIPv6Only=False)
                 document = dict(version=1, server=options, serverRunning=True,
-                    background=dict(continuousLocation=False, silentAudio=False), selectedTab='background')
+                    background=dict(continuousLocation=False, silentAudio=False,
+                        periodicPing=dict(enabled=False, destinations='1.1.1.1', period='1000')), selectedTab='background')
                 external = case_dir / 'external.json'; external.write_text(json.dumps(document))
                 with (output / f'workers{workers}.log').open('wb') as log:
                     host = native.Host(executable, log)
