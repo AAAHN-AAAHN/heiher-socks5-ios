@@ -37,7 +37,7 @@ private final class DiskProbe: @unchecked Sendable {
         if block { wait() }
         if fail { throw CocoaError(.fileReadNoPermission) }
         let handle=try FileHandle(forReadingFrom:url); defer { try? handle.close() }
-        return try handle.read(upToCount:65_537) ?? Data()
+        return try handle.readToEnd() ?? Data()
     }
     func imported(_ url: URL) throws -> Data {
         enter(); defer { leave() }

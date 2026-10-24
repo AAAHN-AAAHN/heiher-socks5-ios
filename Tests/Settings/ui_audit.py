@@ -172,8 +172,9 @@ def main():
         expected = dict(version=1, server=dict(workers='2', listenAddress='::', listenPort='1080',
             udpListenAddress='', udpListenPort='1080', bindIPv4Address='0.0.0.0', bindIPv6Address='::',
             bindInterface='', authUsername='', authPassword='', listenIPv6Only=False),
-            serverRunning=False, background=dict(continuousLocation=False, silentAudio=False), selectedTab='settings')
-        if saved != expected or len(data) > 65536:
+            serverRunning=False, background=dict(continuousLocation=False, silentAudio=False,
+                periodicPing=dict(enabled=False, destinations="1.1.1.1", period="1000")), selectedTab='settings')
+        if saved != expected:
             raise RuntimeError('Actual app settings.json does not match the UI persistence postcondition')
         (OUT / 'actual-settings.json').write_bytes(data)
         files = sorted(p.name for p in settings_file.parent.iterdir())

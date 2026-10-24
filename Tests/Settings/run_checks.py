@@ -39,7 +39,8 @@ with tempfile.TemporaryDirectory() as name:
     for path in files:
         if baseline and path.endswith('ServerSettings.swift'):
             continue
-        ref = reference if baseline else (previous_ref if previous and path.endswith('SettingsStore.swift') else None)
+        ref = reference if baseline else (previous_ref if previous and path.endswith('SettingsStore.swift') else
+              'c1722e48f99e140b98cc436979b8ffc49ca0fa63' if previous and path.endswith('AppSettings.swift') else None)
         raw = (subprocess.check_output(['git', '-C', str(root), 'show', ref + ':' + path])
                if ref else (root / path).read_bytes())
         print('SOURCE', path, hashlib.sha256(raw).hexdigest(), flush=True)
@@ -60,6 +61,7 @@ with tempfile.TemporaryDirectory() as name:
               (['LoadAccessTests.swift'], provider, '6 access-boundary assertions; 1 failed')]
     if not baseline and not previous:
         groups.append((['FinalPersistenceTests.swift'], provider, None))
+        groups.append((['PeriodicPingPersistenceTests.swift'], provider, None))
         groups.append((['FinalCoordination.swift'], [], None))
     if baseline:
         groups = groups[2:3]

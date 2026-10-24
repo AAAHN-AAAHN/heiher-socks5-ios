@@ -94,7 +94,7 @@ import Foundation
         let compact = try JSONSerialization.data(withJSONObject: JSONSerialization.jsonObject(with: defaults.encoded()))
         let exact = compact + Data(repeating: 32, count: 65_536 - compact.count)
         check(try AppSettings.decoded(exact) == defaults, "Exactly 65536 input bytes accepted")
-        rejects({ _ = try AppSettings.decoded(exact + Data([32])) }, "65537 input bytes rejected")
+        check(try AppSettings.decoded(exact + Data([32])) == defaults, "65537 input bytes accepted without byte cap")
 
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let file = root.appendingPathComponent("settings.json")
@@ -141,12 +141,12 @@ import Foundation
               "Storage failure never blocks Stop or background Off")
         try FileManager.default.removeItem(at: file)
         try FileManager.default.moveItem(at: parked, to: file)
-        for bad in [Data("broken".utf8), exact + Data([32])] {
+        for bad in [Data("broken".utf8), Data(repeating: 65, count: 65_537)] {
             try bad.write(to: file)
             legacy.set(true, forKey: "background.silentAudio")
             let failed = await loadedSettings(fileURL: file, legacy: legacy)
             check(failed.errorMessage != nil && !failed.value.serverRunning && !failed.value.background.silentAudio,
-                  "Corrupt/oversized existing files fail closed instead of migrating enabled services")
+                  "Malformed existing files of any size fail closed instead of migrating enabled services")
             let disk = try Data(contentsOf: file)
             check(disk == bad && legacy.object(forKey: "background.silentAudio") != nil,
                   "Failed load preserves original file and legacy keys")
