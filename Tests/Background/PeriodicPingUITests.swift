@@ -27,11 +27,16 @@ final class PeriodicPingUITests: XCTestCase {
             XCTAssertTrue(period.isHittable)
         }
         @MainActor func replace(_ field: XCUIElement, _ value: String) {
-            // A centered tap can place the caret before right-aligned text.
-            // Place it at the trailing edge, then verify the actual edited value.
-            field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
-            let old = field.value as? String ?? ""
-            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count) + value)
+            // Select the whole field through the real edit menu; caret placement
+            // is not guaranteed by a tap, even at the trailing edge of a short value.
+            let point = field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5))
+            point.tap()
+            point.press(forDuration: 1)
+            let menuItem = app.menuItems["Select All"].firstMatch
+            let selectAll = menuItem.exists ? menuItem : app.buttons["Select All"].firstMatch
+            XCTAssertTrue(selectAll.waitForExistence(timeout: 5))
+            selectAll.tap()
+            field.typeText(value)
             XCTAssertEqual(field.value as? String, value)
             let done = app.buttons["background.pingDone"]
             XCTAssertTrue(done.waitForExistence(timeout: 5))
