@@ -11,7 +11,9 @@ ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 OUT = ROOT / 'artifacts/periodic-ping'
 COMBINE_DOUBLE = '''
-@MainActor public protocol ObservableObject: AnyObject {}
+public protocol ObservableObject: AnyObject {
+    var objectWillChange: ObservableObjectPublisher { get }
+}
 @MainActor public final class AnyCancellable {
     private let finish: () -> Void
     public init(_ finish: @escaping () -> Void) { self.finish = finish }

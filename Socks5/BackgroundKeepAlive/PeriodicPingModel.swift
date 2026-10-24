@@ -4,7 +4,7 @@ import Foundation
 /// App-root lifetime; tab changes never stop the sender. Controls are session-only
 /// so the existing portable Settings schema and restoration semantics stay unchanged.
 @MainActor
-final class PeriodicPingModel: ObservableObject {
+final class PeriodicPingModel: @MainActor ObservableObject {
     let objectWillChange = ObservableObjectPublisher()
     private(set) var enabled = false
     private(set) var destinations = "1.1.1.1"
