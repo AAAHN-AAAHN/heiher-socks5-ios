@@ -548,7 +548,7 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
  #include <stdlib.h>
  #include <signal.h>
  #include <string.h>
-@@ -49,20 +50,29 @@
+@@ -49,42 +50,55 @@
  
  static atomic_int tsync;
  static HevSocks5WorkerData *worker_list;
@@ -584,7 +584,35 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
  
      while ((nread = getline (&line, &len, fp)) != -1) {
          HevSocks5UserMark *user;
-@@ -84,7 +94,7 @@
+-        unsigned int nlen;
+-        unsigned int plen;
+-        char name[256];
+-        char pass[256];
+-        long mark = 0;
++        const char *name, *pass;
++        size_t nlen, plen;
++        unsigned long mark;
+         int res;
+ 
+-        res = sscanf (line, "%255s %255s %lx\n", name, pass, &mark);
+-        if (res < 2) {
++        if (memchr (line, '\0', nread)) {
+             LOG_E ("socks5 proxy user/pass format");
+             continue;
+         }
+-
+-        nlen = strlen (name);
+-        plen = strlen (pass);
++        name = line + strspn (line, " \t\r\n\v\f");
++        nlen = strcspn (name, " \t\r\n\v\f");
++        pass = name + nlen;
++        pass += strspn (pass, " \t\r\n\v\f");
++        plen = strcspn (pass, " \t\r\n\v\f");
++        if (!nlen || nlen > 255 || !plen || plen > 255) {
++            LOG_E ("socks5 proxy user/pass format");
++            continue;
++        }
++        mark = strtoul (pass + plen, NULL, 16);
          user = hev_socks5_user_mark_new (name, nlen, pass, plen, mark);
          if (!user) {
              LOG_E ("socks5 proxy user new");
@@ -593,11 +621,11 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
          }
          res = hev_socks5_authenticator_add (auth, HEV_SOCKS5_USER (user));
          if (res < 0) {
-@@ -93,17 +103,21 @@
+@@ -93,17 +107,21 @@
          }
      }
  
-+    result = feof (fp) ? 0 : -1;
++    result = feof (fp) && !ferror (fp) ? 0 : -1;
 +exit:
      free (line);
 -    fclose (fp);
@@ -620,7 +648,7 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
  
      LOG_D ("socks5 proxy load");
  
-@@ -112,21 +126,28 @@
+@@ -112,21 +130,28 @@
      pass = hev_config_get_auth_password ();
  
      if (!file && !name && !pass)
@@ -654,7 +682,7 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
      }
  
      workers = hev_config_get_workers ();
-@@ -136,13 +157,34 @@
+@@ -136,13 +161,34 @@
          hev_socks5_worker_reload (worker);
      }
  
@@ -692,7 +720,7 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
  }
  
  static void *
-@@ -163,6 +205,7 @@
+@@ -163,6 +209,7 @@
      res = hev_task_system_init ();
      if (res < 0) {
          LOG_E ("socks5 proxy worker task system");
@@ -700,7 +728,7 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
          goto exit;
      }
  
-@@ -170,6 +213,7 @@
+@@ -170,6 +217,7 @@
  
      hev_task_system_run ();
  
@@ -708,7 +736,7 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
      hev_task_system_fini ();
  exit:
      return NULL;
-@@ -186,6 +230,7 @@
+@@ -186,6 +234,7 @@
      int workers;
      int res;
      int i;
@@ -716,7 +744,7 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
  
      LOG_D ("socks5 proxy init");
  
-@@ -250,9 +295,27 @@
+@@ -250,9 +299,27 @@
      hev_socket_factory_destroy (factory);
      factory = NULL;
  
@@ -747,7 +775,7 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
      atomic_fetch_or (&tsync, SYNC_SEND);
  
      return 0;
-@@ -272,6 +335,11 @@
+@@ -272,6 +339,11 @@
  
      LOG_D ("socks5 proxy fini");
  
@@ -759,7 +787,7 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
  retry:
      res = atomic_fetch_and (&tsync, ~(SYNC_SEND | SYNC_STOP | SYNC_SENT));
      if (res & SYNC_WAIT) {
-@@ -295,6 +363,11 @@
+@@ -295,6 +367,11 @@
      }
  
      hev_task_system_fini ();
@@ -771,7 +799,7 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
  }
  
  void
-@@ -310,10 +383,12 @@
+@@ -310,10 +387,12 @@
      hev_socks5_worker_start (worker_list[0].worker);
  
      hev_task_system_run ();
@@ -788,7 +816,7 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
  {
      int res;
  
-@@ -335,9 +410,15 @@
+@@ -335,9 +414,15 @@
              for (i = 0; i < workers; i++)
                  hev_socks5_worker_stop (worker_list[i].worker);
          }
@@ -1014,3 +1042,57 @@ index f6897cc0251013802a1df63798ee02105a379364..ecc1675440e1a2d49b9bfa1ab0fcd486
      if (r < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
          if (yielder) {
              if (yielder (HEV_TASK_WAITIO, yielder_data))
+diff --git a/src/hev-config.c b/src/hev-config.c
+--- a/src/hev-config.c
++++ b/src/hev-config.c
+@@ -206,17 +206,21 @@
+         const char *key, *value;
+ 
+         if (!pair->key || !pair->value)
+-            continue;
++            return -1;
+ 
+         node = yaml_document_get_node (doc, pair->key);
+         if (!node || YAML_SCALAR_NODE != node->type)
+-            break;
++            return -1;
+         key = (const char *)node->data.scalar.value;
++        if (strlen (key) != node->data.scalar.length)
++            return -1;
+ 
+         node = yaml_document_get_node (doc, pair->value);
+         if (!node || YAML_SCALAR_NODE != node->type)
+-            break;
++            return -1;
+         value = (const char *)node->data.scalar.value;
++        if (strlen (value) != node->data.scalar.length)
++            return -1;
+ 
+         if (0 == strcmp (key, "username"))
+             user = value;
+@@ -226,11 +230,20 @@
+             file = value;
+     }
+ 
+-    if (file) {
+-        strncpy (auth_file, file, 1023);
+-    } else if (user && pass) {
+-        strncpy (username, user, 255);
+-        strncpy (password, pass, 255);
++    if (file && file[0]) {
++        if (strlen (file) >= sizeof (auth_file))
++            return -1;
++        strcpy (auth_file, file);
++    } else {
++        if ((user && user[0]) != (pass && pass[0]))
++            return -1;
++        if ((user && strlen (user) >= sizeof (username)) ||
++            (pass && strlen (pass) >= sizeof (password)))
++            return -1;
++        if (user)
++            strcpy (username, user);
++        if (pass)
++            strcpy (password, pass);
+     }
+ 
+     return 0;

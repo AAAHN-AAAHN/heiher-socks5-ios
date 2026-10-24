@@ -598,9 +598,12 @@ fixture_auth_startup_failure (int fault, int workers, int inline_user)
     assert (hev_socks5_server_main_from_str (config, length + extra) < 0);
     alarm (0);
     assert (!worker_list && !atomic_load (&fixture_starts));
-    assert (fixture_created == workers && fixture_joins == workers - 1);
+    int setup_workers = fault >= AUTH_EMPTY_NAME ? 0 : workers;
+    assert (fixture_created == setup_workers &&
+            fixture_joins == (setup_workers ? setup_workers - 1 : 0));
     assert (!(atomic_load (&tsync) & (SYNC_SEND | SYNC_WAIT | SYNC_STOP)));
-    assert (atomic_load (&fixture_auth_allocated) == (fault != AUTH_ALLOC));
+    assert (atomic_load (&fixture_auth_allocated) ==
+            (fault != AUTH_ALLOC && fault < AUTH_EMPTY_NAME));
     assert (atomic_load (&fixture_auth_freed) ==
             atomic_load (&fixture_auth_allocated));
     for (int i = 0; i < fixture_created * 3; i++) {
@@ -612,6 +615,75 @@ fixture_auth_startup_failure (int fault, int workers, int inline_user)
     printf ("proxy auth failure: PASS startup fault=%d workers=%d inline=%d "
             "started=0 refs=balanced descriptors=closed\n",
             fault, workers, inline_user);
+}
+
+static void
+fixture_auth_input_identity (void)
+{
+    static const char *bad[] = { "  username: u\n",
+                                 "  password: p\n",
+                                 "  username: [u]\n  password: p\n",
+                                 "  username: u\n  password: {x: p}\n",
+                                 "  username: \"u\\0x\"\n  password: p\n",
+                                 "  username: u\n  password: \"p\\0x\"\n",
+                                 "  file: \"x\\0y\"\n",
+                                 "  \"username\\0x\": u\n  password: p\n" };
+    char config[1600], name[257], pass[257], line[600];
+    memset (name, 'u', 256);
+    memset (pass, 'p', 256);
+    name[256] = pass[256] = '\0';
+    for (size_t i = 0; i < sizeof (bad) / sizeof (bad[0]); i++) {
+        int n = snprintf (config, sizeof (config), "auth:\n%s", bad[i]);
+        assert (hev_config_init_from_str ((void *)config, n) < 0);
+    }
+    for (int long_field = 0; long_field < 3; long_field++) {
+        int n;
+        if (long_field == 2) {
+            memset (line, 'x', sizeof (line));
+            n = snprintf (config, sizeof (config),
+                          "auth:\n  file: '%.*s%.*s'\n", 512, line, 512, line);
+        } else {
+            n = snprintf (config, sizeof (config),
+                          "auth:\n  username: '%.*s'\n  password: '%.*s'\n",
+                          long_field == 0 ? 256 : 255, name,
+                          long_field == 1 ? 256 : 255, pass);
+        }
+        assert (n > 0 && (size_t)n < sizeof (config));
+        assert (hev_config_init_from_str ((void *)config, n) < 0);
+    }
+    int n =
+        snprintf (config, sizeof (config),
+                  "auth:\n  file: ''\n  username: '%.*s'\n  password: '%.*s'\n",
+                  255, name, 255, pass);
+    assert (!hev_config_init_from_str ((void *)config, n));
+    assert (strlen (hev_config_get_auth_username ()) == 255 &&
+            strlen (hev_config_get_auth_password ()) == 255);
+    const unsigned char off[] = "auth:\n  username: ''\n  password: ''\n";
+    assert (!hev_config_init_from_str (off, sizeof (off) - 1));
+    assert (!hev_config_get_auth_username () &&
+            !hev_config_get_auth_password ());
+    for (int mode = 0; mode < 4; mode++) {
+        HevSocks5Authenticator *auth = hev_socks5_authenticator_new ();
+        assert (auth);
+        FILE *fp = fopen (fixture_auth_file, "wb");
+        assert (fp);
+        n = snprintf (line, sizeof (line), "%.*s %.*s 2a\n",
+                      mode == 1 ? 256 : 255, name, mode == 2 ? 256 : 255, pass);
+        if (mode == 3)
+            line[n - 4] = '\0';
+        assert (n > 0 && (size_t)n < sizeof (line));
+        assert (fwrite (line, 1, n, fp) == (size_t)n && !fclose (fp));
+        assert (!hev_socks5_proxy_load_file (auth, fixture_auth_file));
+        HevSocks5User *user = hev_socks5_authenticator_get (auth, name, 255);
+        assert (!!user == (mode == 0));
+        if (user) {
+            assert (user->pass_len == 255 && !memcmp (user->pass, pass, 255));
+            assert (HEV_SOCKS5_USER_MARK (user)->mark == 0x2a);
+        }
+        hev_object_unref (HEV_OBJECT (auth));
+    }
+    puts ("proxy auth input: PASS 11 rejected configurations, 2 valid controls "
+          "and 4 complete file-token cases");
 }
 
 int
@@ -670,6 +742,7 @@ main (int argc, char **argv)
         fixture_auth_startup_failure (AUTH_USER, workers, 1);
         fixture_case (FIX_STOP_ALL, workers);
     }
+    fixture_auth_input_identity ();
     assert (!unlink (fixture_auth_file));
     puts ("proxy lifecycle: PASS 24 original cases, 27 authentication startup "
           "failures, 15 reload failures and 3 recovery starts");
