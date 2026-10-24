@@ -18,8 +18,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/integrated/intent-boundaries'
 PREVIOUS = 'ed6b920cee4f3e5f0469807e521f19bf6f92f92e'
-ADDED_BACKGROUND = ('LoopAudioService.swift', 'PlaybackProgressMonitor.swift', 'RecoveryExecutionLease.swift',
-                    'PeriodicPingService.swift', 'PeriodicPingModel.swift')
+AUDIO_SOURCES = ('LoopAudioService.swift', 'PlaybackProgressMonitor.swift', 'RecoveryExecutionLease.swift')
+ADDED_BACKGROUND = AUDIO_SOURCES + ('PeriodicPingService.swift', 'PeriodicPingModel.swift')
 EXPECTED_SOURCES = {
     'Socks5/AppRoot.swift', 'Socks5/Socks5App.swift', 'Socks5/ContentView.swift',
     'Socks5/Server/ServerController.swift', 'Socks5/Server/ServerSettings.swift',
@@ -227,7 +227,7 @@ def main():
             production = []
             for name in ('Socks5/Server/ServerSettings.swift', 'Socks5/Settings/AppSettings.swift',
                          'Socks5/Settings/SettingsStore.swift',
-                         *('Socks5/BackgroundKeepAlive/' + name for name in ADDED_BACKGROUND)):
+                         *('Socks5/BackgroundKeepAlive/' + name for name in AUDIO_SOURCES)):
                 raw = (ROOT / name).read_bytes()
                 production_hashes[name] = hashlib.sha256(raw).hexdigest()
                 # Framework imports are the only production-source substitutions.
