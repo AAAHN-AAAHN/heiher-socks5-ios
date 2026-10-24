@@ -224,10 +224,11 @@ private final class PeriodicPingWorker: @unchecked Sendable {
             switch request.input {
             case .parsed(let value): next = value
             case .text(let enabled, let destinations, let period):
-                let parsed = try PeriodicPingConfiguration(destinations: destinations, period: period) {
-                    !self.requests.current(request.id)
-                }
-                next = enabled ? parsed : nil
+                if enabled {
+                    next = try PeriodicPingConfiguration(destinations: destinations, period: period) {
+                        !self.requests.current(request.id)
+                    }
+                } else { next = nil }
             }
         } catch {
             if requests.current(request.id) { request.report(error.localizedDescription) }
@@ -238,7 +239,6 @@ private final class PeriodicPingWorker: @unchecked Sendable {
     }
 
     func configure(_ next: PeriodicPingConfiguration?, report: @escaping @Sendable (String) -> Void) {
-        stop()
         self.report = report
         configuration = next
         lastStatus = nil
