@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 struct BackgroundKeepAliveView: View {
     @ObservedObject var keepAlive: BackgroundKeepAlive
+    @ObservedObject var ping: PeriodicPingModel
     @Binding var locationEnabled: Bool
     @Binding var audioEnabled: Bool
 
@@ -39,6 +40,31 @@ struct BackgroundKeepAliveView: View {
                     }
                     Text("Allow location access in Settings. Precise Location is not required.")
                         .font(.footnote)
+                }
+                Section {
+                    Toggle("Enabled", isOn: Binding(get: { ping.enabled }, set: ping.setEnabled))
+                        .accessibilityIdentifier("background.pingEnabled")
+                    LabeledContent("Destination ip") {
+                        TextField("1.1.1.1, 192.168.0.9", text: Binding(
+                            get: { ping.destinations }, set: ping.setDestinations))
+                            .keyboardType(.asciiCapable)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .multilineTextAlignment(.trailing)
+                            .accessibilityIdentifier("background.pingDestinations")
+                    }
+                    LabeledContent("Period (ms)") {
+                        TextField("1000", text: Binding(get: { ping.period }, set: ping.setPeriod))
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .accessibilityIdentifier("background.pingPeriod")
+                    }
+                    Text(ping.status).font(.footnote)
+                        .accessibilityIdentifier("background.pingState")
+                } header: {
+                    Text("Periodic ping")
+                } footer: {
+                    Text("Sends ICMP to each IP; separate IPs with commas. Invalid input pauses sending. Runs while iOS allows execution and resets to Off on app relaunch.")
                 }
                 Section {
                     Text("Background services are independent of Server Start/Stop. Recovery runs only while iOS allows the app to execute.")

@@ -5,6 +5,7 @@ struct AppRoot: View {
     @StateObject private var settings = SettingsStore()
     @StateObject private var server = ServerController()
     @StateObject private var keepAlive = BackgroundKeepAlive()
+    @StateObject private var ping = PeriodicPingModel()
     @State private var appliedSettingsChange: SettingsStore.Change?
 
     private var audioEnabled: Binding<Bool> {
@@ -91,7 +92,7 @@ struct AppRoot: View {
             }
                 .tabItem { Label("Server", systemImage: "network") }
                 .tag(AppSettings.Tab.server)
-            BackgroundKeepAliveView(keepAlive: keepAlive,
+            BackgroundKeepAliveView(keepAlive: keepAlive, ping: ping,
                                     locationEnabled: locationEnabled,
                                     audioEnabled: audioEnabled)
                 .tabItem { Label("Background", systemImage: "switch.2") }

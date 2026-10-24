@@ -56,6 +56,8 @@ def main():
                  'Socks5/BackgroundKeepAlive/LoopAudioService.swift',
                  'Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift',
                  'Socks5/BackgroundKeepAlive/RecoveryExecutionLease.swift',
+                 'Socks5/BackgroundKeepAlive/PeriodicPingService.swift',
+                 'Socks5/BackgroundKeepAlive/PeriodicPingModel.swift',
                  'Socks5/BackgroundKeepAlive/Silence.wav', 'docs/features/background.md'}
     assert set(base_paths) <= set(current_paths), 'A main file was removed'
     for path in set(current_paths) - set(base_paths):
@@ -138,7 +140,7 @@ def main():
     # lock are checked, while the AV adapter cannot cross queues as Sendable.
     swift_modules = list((ROOT / 'Socks5/BackgroundKeepAlive').glob('*.swift'))
     unchecked = [p.name for p in swift_modules if '@unchecked Sendable' in p.read_text()]
-    assert unchecked == ['LoopAudioService.swift'], unchecked
+    assert set(unchecked) == {'LoopAudioService.swift', 'PeriodicPingService.swift'}, unchecked
     assert service.count('@unchecked Sendable') == 1
     assert 'final class LoopAudioService: Sendable {' in service
     assert 'private final class LoopAudioQueueOwner: @unchecked Sendable {' in service
@@ -166,7 +168,8 @@ def main():
     # compiler input must all include each new module, not merely name a file.
     phase = project[project.index('/* Begin PBXSourcesBuildPhase section */'):project.index('/* End PBXSourcesBuildPhase section */')]
     sdk = text('Tests/Background/check_audio_sdk.sh')
-    for name in ('LoopAudioService.swift', 'PlaybackProgressMonitor.swift', 'RecoveryExecutionLease.swift'):
+    for name in ('LoopAudioService.swift', 'PlaybackProgressMonitor.swift', 'RecoveryExecutionLease.swift',
+                 'PeriodicPingService.swift', 'PeriodicPingModel.swift'):
         build = re.search(r'([A-F0-9]{24}) /\* ' + re.escape(name) + r' in Sources \*/ = \{isa = PBXBuildFile; fileRef = ([A-F0-9]{24})', project)
         assert build and build[1] + ' /* ' + name + ' in Sources */' in phase, name
         assert '/* ' + name + ' */ = {isa = PBXFileReference;' in project, name
@@ -174,6 +177,9 @@ def main():
     assert '-strict-concurrency=complete' in sdk and '-warnings-as-errors' in sdk
     view = text('Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift')
     assert view.index('Text("Audio")') < view.index('Text("Location")')
+    assert view.index('Section("Location state")') < view.index('Text("Periodic ping")')
+    assert root.count('@StateObject private var ping = PeriodicPingModel()') == 1
+    assert 'keepAlive: keepAlive, ping: ping,' in root
     assert 'private let audioEvents' not in view
     assert 'service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,' in service
     assert data('README.md') == data('docs/features/background.md')

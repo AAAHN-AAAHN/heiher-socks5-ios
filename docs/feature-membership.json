@@ -2,7 +2,7 @@
   "base_commit": "94cc35ba5b50bab177f7aa678aa5af8fd3b8481d",
   "branches": {
     "feature/app-icon": "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
-    "feature/background": "c6935dbfbc6fecb7d7f573db0d5149bb0afc61b9",
+    "feature/background": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
@@ -80,8 +80,8 @@
       "sha256": "bdd3f6ba42c5f1c99a240344a96db8fd42d00cc2a7a7bf94ea14c3fe00bde822"
     },
     "Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift": {
-      "commit": "6a4e46df0f436389572669230aa710d844339fe5",
-      "sha256": "a9b55a62cb0172f6b0323bc471dfab90fa8f025aed4ba0f5023befa47204bed0"
+      "commit": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
+      "sha256": "025434335bf385bb602bf66e0cbd0be23e1690518fe3d2c7b1fe9593371db267"
     },
     "Socks5/BackgroundKeepAlive/LoopAudioService.swift": {
       "commit": "0e2e73b68277a8391b61330a63e2a66c6e27ade5",
@@ -304,8 +304,8 @@
       "sha256": "36fc0de081599066c16f46a4cd727c7cd4bc9ade4b0df573d8ec24f264d42b58"
     },
     "Tests/Background/check_audio_sdk.sh": {
-      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
-      "sha256": "d9b4e562f62a2ec66424bd28bd8b2c28aad5263bef81e712c53943bfaef270e7"
+      "commit": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
+      "sha256": "c856795d2a060f7945be606ec7c245bec3519ed1ba07695fbf360b5b113398e5"
     },
     "Tests/Background/check_audit_integrity.py": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
@@ -332,8 +332,8 @@
       "sha256": "5e8cdf359c441c9bafe1589a07e4ae3c79534e2f8f453200ded8f70e838275fe"
     },
     "Tests/Background/check_scope.py": {
-      "commit": "c6935dbfbc6fecb7d7f573db0d5149bb0afc61b9",
-      "sha256": "c7d7dc219ca9582ad7039a77c6fd7d3ec8514eb71c6c47ba04c9020601b78782"
+      "commit": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
+      "sha256": "ecb13e3ce41557d941f2b3d0c0134b6529c99594681ec288ca1fec14e3a264aa"
     },
     "Tests/Background/check_session_ownership.py": {
       "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
@@ -352,8 +352,8 @@
       "sha256": "023153eb4aa08596f329db66fc477cab549969eccb32fab518ad4b8838efe0fa"
     },
     "Tests/Background/run_checks.py": {
-      "commit": "72f7ccf5333472bfd0c083dc34747d8006605b43",
-      "sha256": "d6105e5e130dcfb0ccc8c32c1e8c324426e330b04e4544b786e06417f88951fe"
+      "commit": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
+      "sha256": "3c5c03b011a8935c820ba511974e5896e123da3feeff7b62847bd902615d83ec"
     },
     "Tests/ServerControl/ConfigurationParity.swift": {
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
@@ -814,6 +814,30 @@
     "Tests/tcp_smoke_contract.py": {
       "commit": "180c66db23f5ad7c3ddb17af1568109244601927",
       "sha256": "ed07ae61d7e8a3aebf4879b6d42d142c545921f604b34a3123357855bfa0e2d6"
+    },
+    "Socks5/BackgroundKeepAlive/PeriodicPingModel.swift": {
+      "commit": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
+      "sha256": "19993ce05c5b11ebd09b033cbc4f460d8ee374459d779a873277f651b0703685"
+    },
+    "Socks5/BackgroundKeepAlive/PeriodicPingService.swift": {
+      "commit": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
+      "sha256": "350b141998f023df8f41476ca010bb5474816d5fb9fce5f30e45dcc43d86400c"
+    },
+    "Tests/Background/PeriodicPingIO.c": {
+      "commit": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
+      "sha256": "c20702f1d0d458145ffaa1a0559e47cd65a4099129b81f55712680a7a9c195de"
+    },
+    "Tests/Background/PeriodicPingModelTests.swift": {
+      "commit": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
+      "sha256": "e899a69acea5a2b8a4bbede955dc6eb485ebd113dbd3b8cb692d6951cc6333c8"
+    },
+    "Tests/Background/PeriodicPingTests.swift": {
+      "commit": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
+      "sha256": "851347b411c249322067f5d06fde6e992aa3004a6f654e88487723f743faae93"
+    },
+    "Tests/Background/check_periodic_ping.py": {
+      "commit": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
+      "sha256": "bc453da79ff304b05fe13609af9c67870f5ca0f11783167bb084244b583dcd90"
     }
   },
   "files": {

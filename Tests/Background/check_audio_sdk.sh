@@ -40,6 +40,8 @@ xcrun swiftc -typecheck -swift-version 5 -strict-concurrency=complete -warnings-
   Socks5/BackgroundKeepAlive/LoopAudioService.swift \
   Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift \
   Socks5/BackgroundKeepAlive/RecoveryExecutionLease.swift \
+  Socks5/BackgroundKeepAlive/PeriodicPingService.swift \
+  Socks5/BackgroundKeepAlive/PeriodicPingModel.swift \
   Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift > "$OUT/ios-sdk-typecheck.log" 2>&1
 git diff --exit-code HEAD -- >> "$OUT/working-tree.log"
 git diff --cached --exit-code HEAD -- >> "$OUT/index.log"

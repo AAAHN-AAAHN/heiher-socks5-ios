@@ -18,7 +18,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/integrated/intent-boundaries'
 PREVIOUS = 'ed6b920cee4f3e5f0469807e521f19bf6f92f92e'
-NEW_AUDIO = ('LoopAudioService.swift', 'PlaybackProgressMonitor.swift', 'RecoveryExecutionLease.swift')
+ADDED_BACKGROUND = ('LoopAudioService.swift', 'PlaybackProgressMonitor.swift', 'RecoveryExecutionLease.swift',
+                    'PeriodicPingService.swift', 'PeriodicPingModel.swift')
 EXPECTED_SOURCES = {
     'Socks5/AppRoot.swift', 'Socks5/Socks5App.swift', 'Socks5/ContentView.swift',
     'Socks5/Server/ServerController.swift', 'Socks5/Server/ServerSettings.swift',
@@ -27,7 +28,7 @@ EXPECTED_SOURCES = {
     'Socks5/Statistics/TrafficStatisticsView.swift',
     'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift',
     'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift',
-    *('Socks5/BackgroundKeepAlive/' + name for name in NEW_AUDIO),
+    *('Socks5/BackgroundKeepAlive/' + name for name in ADDED_BACKGROUND),
 }
 ROUTING = ('direct', 'repeated', 'echo', 'off-on', 'loading', 'failed-stop', 'origin',
            'location-reentry', 'audio-reentry', 'direct-reentry', 'start-reentry', 'readiness-reentry',
@@ -46,7 +47,7 @@ def require(condition, reason):
 
 def root_contract(code):
     for name, kind in (('settings', 'SettingsStore'), ('server', 'ServerController'),
-                       ('keepAlive', 'BackgroundKeepAlive')):
+                       ('keepAlive', 'BackgroundKeepAlive'), ('ping', 'PeriodicPingModel')):
         require(code.count('@StateObject private var ' + name + ' = ' + kind + '()') == 1,
                 'Root owner lifetime: ' + name)
     require(re.findall(r'\.tag\(AppSettings.Tab\.(\w+)\)', code) == [
@@ -70,7 +71,7 @@ def project_contract(project, original):
     sources = re.findall(r'[A-F0-9]{24} /\* Sources \*/ = \{(.*?)\n\s*\};', project, re.S)
     group = re.findall(r'[A-F0-9]{24} /\* BackgroundKeepAlive \*/ = \{(.*?)\n\s*\};', project, re.S)
     require(len(sources) == len(group) == 1, 'Ambiguous app source phase or background group')
-    for name in NEW_AUDIO:
+    for name in ADDED_BACKGROUND:
         escaped = re.escape(name)
         build = re.findall(r'([A-F0-9]{24}) /\* ' + escaped + r' in Sources \*/ = '
                            r'\{isa = PBXBuildFile; fileRef = ([A-F0-9]{24}) /\* ' + escaped + r' \*/; \};', project)
@@ -83,16 +84,16 @@ def project_contract(project, original):
         require(group[0].count(refs[0] + ' /* ' + name + ' */,') == 1,
                 'Missing background group source: ' + name)
     # All twelve existing target inputs and every build setting retain their
-    # original bytes. The only allowed project delta is these three source links.
+    # original bytes. The only allowed project delta is these five source links.
     kept = [line for line in project.splitlines(keepends=True)
             if not any('/* ' + name + ' */' in line or '/* ' + name + ' in Sources */' in line
-                       for name in NEW_AUDIO)]
-    require(''.join(kept) == original, 'Project changed beyond the three audio target registrations')
+                       for name in ADDED_BACKGROUND)]
+    require(''.join(kept) == original, 'Project changed beyond the five Background target registrations')
 
 
 def source_contract():
     paths = {p.relative_to(ROOT).as_posix() for p in (ROOT / 'Socks5').rglob('*.swift')}
-    require(paths == EXPECTED_SOURCES, 'Production Swift inventory is not the exact 12-to-15 composition')
+    require(paths == EXPECTED_SOURCES, 'Production Swift inventory is not the exact 12-to-17 composition')
     code = (ROOT / 'Socks5/AppRoot.swift').read_text()
     root_contract(code)
     original = subprocess.check_output(['git', '-C', str(ROOT), 'show',
@@ -226,7 +227,7 @@ def main():
             production = []
             for name in ('Socks5/Server/ServerSettings.swift', 'Socks5/Settings/AppSettings.swift',
                          'Socks5/Settings/SettingsStore.swift',
-                         *('Socks5/BackgroundKeepAlive/' + name for name in NEW_AUDIO)):
+                         *('Socks5/BackgroundKeepAlive/' + name for name in ADDED_BACKGROUND)):
                 raw = (ROOT / name).read_bytes()
                 production_hashes[name] = hashlib.sha256(raw).hexdigest()
                 # Framework imports are the only production-source substitutions.
