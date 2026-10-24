@@ -110,8 +110,7 @@ import Foundation
         }
         var oversized = AppSettings()
         oversized.server.authPassword = String(repeating: "x", count: 70_000)
-        do { _ = try oversized.encoded(); preconditionFailure("Unreloadable JSON exported") } catch {}
-        check(true, "An oversized configuration cannot be exported as a valid snapshot")
+        check(try AppSettings.decoded(oversized.encoded()) == oversized, "Large configuration JSON remains reloadable")
         print("SUMMARY: \(checks) settings checks passed")
     }
 }

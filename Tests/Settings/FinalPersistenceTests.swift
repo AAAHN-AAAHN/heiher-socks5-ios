@@ -41,23 +41,17 @@ import Foundation
         settings.selectedTab = .background
         try await store.importData(settings.encoded())
         let ordinary = try settings.encoded()
-        for count in [ordinary.count, 65_535, 65_536] {
+        for count in [ordinary.count, 65_535, 65_536, 65_537, 1_048_576] {
             var padded = ordinary
             padded.append(Data(repeating: 0x20, count: count - padded.count))
             try padded.write(to: input)
             try await store.importFile(input)
-            check(try store.value == settings && durable() == settings, "Bounded regular-file import \(count)")
+            check(try store.value == settings && durable() == settings, "Regular-file import \(count)")
             check(try Data(contentsOf: file) == ordinary, "Canonical output does not retain padding")
         }
-        var tooLarge = ordinary
-        tooLarge.append(Data(repeating: 0x20, count: 65_537 - tooLarge.count))
-        try await reject(tooLarge, "65537-byte direct import")
-        try tooLarge.write(to: input)
-        let initialBytes = try Data(contentsOf: file)
-        var failed = false
-        do { try await store.importFile(input) } catch { failed = true }
-        check(failed && store.value == settings, "65537-byte coordinated import rejected")
-        check(try Data(contentsOf: file) == initialBytes, "Oversize file import preserves disk")
+        let large = ordinary + Data(repeating: 0x20, count: 1_048_576)
+        try await store.importData(large)
+        check(try store.value == settings && durable() == settings, "Large direct import accepted without byte cap")
         let document = try JSONSerialization.jsonObject(with: ordinary) as! [String: Any]
         for key in ["version", "server", "serverRunning", "background", "selectedTab"] {
             var missing = document; missing.removeValue(forKey: key)
@@ -77,6 +71,7 @@ import Foundation
         try await store.importData(JSONSerialization.data(withJSONObject: future))
         check(try store.value == settings && durable() == settings, "Unknown fields do not change schema1 fields")
 
+        let initialBytes = try Data(contentsOf: file)
         // A clean unchanged setter/binding performs no writes or inode replacement.
         let stamp = Date(timeIntervalSince1970: 123)
         try fm.setAttributes([.modificationDate: stamp], ofItemAtPath: file.path)
