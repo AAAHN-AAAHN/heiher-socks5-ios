@@ -49,10 +49,11 @@ final class PeriodicPingUITests: XCTestCase {
         expect("Off")
         replace(destinations, "127.0.0.1, ::1")
         replace(period, "250")
+        // Tap the switch at the trailing edge, not the noninteractive row center.
         // Tab changes must not replace the app-root sender owner.
         app.tabBars.buttons["Server"].tap()
         revealPing()
-        toggle.tap()
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         XCTAssertEqual(toggle.value as? String, "1")
         expect("Sending ICMP to 2 destination(s)")
         let sending = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -69,7 +70,7 @@ final class PeriodicPingUITests: XCTestCase {
         app.tabBars.buttons["Server"].tap()
         revealPing()
         expect("Sending ICMP to 2 destination(s)")
-        toggle.tap()
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         XCTAssertEqual(toggle.value as? String, "0")
         expect("Off")
         let capture = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
