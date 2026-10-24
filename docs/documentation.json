@@ -1,6 +1,6 @@
 {
   "branch": "feature/traffic-statistics",
-  "frozen_source": "f14363bf1fbd5d9ec75a869195022da4fedc9fb1",
+  "frozen_source": "d1bcc286f84b63e0607cd29c9dc9a824b0d9af18",
   "parents": {
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003"
   },
