@@ -1,6 +1,7 @@
 import AVFAudio
 import Combine
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 struct BackgroundKeepAliveView: View {
@@ -8,6 +9,16 @@ struct BackgroundKeepAliveView: View {
     @ObservedObject var ping: PeriodicPingModel
     @Binding var locationEnabled: Bool
     @Binding var audioEnabled: Bool
+    // Integrated injects its single Settings owner; standalone uses the model's JSON.
+    var pingEnabled: Binding<Bool>? = nil
+    var pingDestinations: Binding<String>? = nil
+    var pingPeriod: Binding<String>? = nil
+    var pingStorageState: String? = nil
+    @State private var pingImporting = false
+    @State private var pingExporting = false
+    @State private var pingPreparingExport = false
+    @State private var pingDocument = PingDocument(data: Data())
+    @State private var pingFileError: String?
     private enum PingField: Hashable { case destinations, period }
     @FocusState private var pingField: PingField?
 
@@ -44,10 +55,10 @@ struct BackgroundKeepAliveView: View {
                         .font(.footnote)
                 }
                 Section {
-                    Toggle("Enabled", isOn: Binding(get: { ping.enabled }, set: { ping.setEnabled($0) }))
+                    Toggle("Enabled", isOn: pingEnabled ?? Binding(get: { ping.enabled }, set: { ping.setEnabled($0) }))
                         .accessibilityIdentifier("background.pingEnabled")
                     LabeledContent("Destination ip") {
-                        TextField("1.1.1.1, 192.168.0.9", text: Binding(
+                        TextField("1.1.1.1, 192.168.0.9", text: pingDestinations ?? Binding(
                             get: { ping.destinations }, set: { ping.setDestinations($0) }))
                             .keyboardType(.asciiCapable)
                             .textInputAutocapitalization(.never)
@@ -57,7 +68,7 @@ struct BackgroundKeepAliveView: View {
                             .focused($pingField, equals: .destinations)
                     }
                     LabeledContent("Period (ms)") {
-                        TextField("1000", text: Binding(get: { ping.period }, set: { ping.setPeriod($0) }))
+                        TextField("1000", text: pingPeriod ?? Binding(get: { ping.period }, set: { ping.setPeriod($0) }))
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .accessibilityIdentifier("background.pingPeriod")
@@ -65,10 +76,35 @@ struct BackgroundKeepAliveView: View {
                     }
                     Text(ping.status).font(.footnote)
                         .accessibilityIdentifier("background.pingState")
+                    Text(pingStorageState ?? ping.persistenceState).font(.footnote)
+                        .accessibilityIdentifier("background.pingStorageState")
+                    if ping.hasOwnStorage {
+                        Button("Export ping JSON") {
+                            pingPreparingExport = true
+                            Task { @MainActor in
+                                defer { pingPreparingExport = false }
+                                do {
+                                    pingDocument = PingDocument(data: try await ping.exportData())
+                                    pingExporting = true
+                                } catch { pingFileError = error.localizedDescription }
+                            }
+                        }
+                        .disabled(pingPreparingExport || !ping.canExport)
+                        Button("Import ping JSON") { pingImporting = true }
+                        if ping.storageError != nil {
+                            Button("Retry Save") {
+                                Task { @MainActor in
+                                    do { try await ping.flush() }
+                                    catch { pingFileError = error.localizedDescription }
+                                }
+                            }
+                        }
+                    }
+                    if let pingFileError { Text(pingFileError).font(.footnote) }
                 } header: {
                     Text("Periodic ping")
                 } footer: {
-                    Text("Sends ICMP to each IP; separate IPs with commas. Invalid input pauses sending. Runs while iOS allows execution and resets to Off on app relaunch.")
+                    Text("Sends ICMP to each IP; separate IPs with commas. Invalid input pauses sending. Supports up to 65,536 unique IPs. Settings are saved and restored on relaunch. Runs while iOS allows execution.")
                 }
                 Section {
                     Text("Background services are independent of Server Start/Stop. Recovery runs only while iOS allows the app to execute.")
@@ -76,6 +112,16 @@ struct BackgroundKeepAliveView: View {
                 }
             }
             .navigationTitle("Background")
+            .fileExporter(isPresented: $pingExporting, document: pingDocument,
+                          contentType: .json, defaultFilename: "periodic-ping") { result in
+                if case .failure(let error) = result { pingFileError = error.localizedDescription }
+            }
+            .fileImporter(isPresented: $pingImporting, allowedContentTypes: [.json]) { result in
+                Task { @MainActor in
+                    do { try await ping.importFile(result.get()); pingFileError = nil }
+                    catch { pingFileError = error.localizedDescription }
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     if pingField != nil {
@@ -97,5 +143,19 @@ struct BackgroundKeepAliveEvents: ViewModifier {
         content
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
                 .receive(on: RunLoop.main)) { _ in keepAlive.restore() }
+    }
+}
+
+/// Standalone backup only. Integrated uses the existing complete Settings document.
+private struct PingDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+    var data: Data
+    init(data: Data) { self.data = data }
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents else { throw CocoaError(.fileReadUnknown) }
+        self.data = data
+    }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: data)
     }
 }

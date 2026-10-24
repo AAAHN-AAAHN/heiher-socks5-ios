@@ -3,7 +3,7 @@ import UIKit
 
 /// Uses only loopback targets. Send status is not a claim that a peer replied.
 final class PeriodicPingUITests: XCTestCase {
-    @MainActor func testPeriodicPingControlsAndSessionLifetime() {
+    @MainActor func testPeriodicPingControlsAndPersistence() {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launch()
@@ -16,6 +16,11 @@ final class PeriodicPingUITests: XCTestCase {
         let destinations = app.textFields["background.pingDestinations"]
         let period = app.textFields["background.pingPeriod"]
         let state = app.staticTexts["background.pingState"]
+        let saved = app.staticTexts["background.pingStorageState"]
+        @MainActor func waitSaved() {
+            let check = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Settings saved"), object: saved)
+            XCTAssertEqual(XCTWaiter.wait(for: [check], timeout: 5), .completed)
+        }
         @MainActor func revealPing() {
             XCTAssertTrue(app.tabBars.buttons["Background"].waitForExistence(timeout: 10))
             app.tabBars.buttons["Background"].tap()
@@ -68,6 +73,14 @@ final class PeriodicPingUITests: XCTestCase {
         app.tabBars.buttons["Server"].tap()
         revealPing()
         XCTAssertEqual(toggle.value as? String, "1")
+        waitSaved()
+        app.terminate()
+        app.launch()
+        revealPing()
+        XCTAssertEqual(toggle.value as? String, "1")
+        XCTAssertEqual(destinations.value as? String, "127.0.0.1, ::1")
+        XCTAssertEqual(period.value as? String, "250")
+        expect("Sending ICMP to 2 destination(s)")
         replace(period, "0")
         expect("Period must be a positive whole number of milliseconds.")
         XCTAssertEqual(toggle.value as? String, "1")
@@ -82,12 +95,13 @@ final class PeriodicPingUITests: XCTestCase {
         capture.name = "periodic-ping-final-off"
         capture.lifetime = .keepAlways
         add(capture)
+        waitSaved()
         app.terminate()
         app.launch()
         revealPing()
         XCTAssertEqual(toggle.value as? String, "0")
-        XCTAssertEqual(destinations.value as? String, "1.1.1.1")
-        XCTAssertEqual(period.value as? String, "1000")
+        XCTAssertEqual(destinations.value as? String, "127.0.0.1, ::1")
+        XCTAssertEqual(period.value as? String, "250")
         expect("Off")
     }
 }

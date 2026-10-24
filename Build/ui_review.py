@@ -106,7 +106,8 @@ def main():
         container = Path(output('xcrun', 'simctl', 'get_app_container', identifier, 'hev.Socks5', 'data'))
         settings = json.loads((container / 'Library/Application Support/Socks5/settings.json').read_bytes())
         assert settings['serverRunning'] is False
-        assert settings['background'] == {'continuousLocation': False, 'silentAudio': False}
+        assert settings['background'] == {'continuousLocation': False, 'silentAudio': False,
+            'periodicPing': {'enabled': False, 'destinations': '127.0.0.1, ::1', 'period': '250'}}
         (OUT / 'final-settings.json').write_text(json.dumps(settings, indent=2))
         check_product()
         run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'source-preservation.log')

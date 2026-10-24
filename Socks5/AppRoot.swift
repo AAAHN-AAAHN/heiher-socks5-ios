@@ -16,6 +16,37 @@ struct AppRoot: View {
         Binding(get: { self.settings.value.background.continuousLocation }, set: { enabled in self.applyLocationIntent(enabled) })
     }
 
+    private var pingEnabled: Binding<Bool> {
+        Binding(get: { settings.value.background.periodicPing.enabled },
+                set: { applyPingIntent(\.background.periodicPing.enabled, $0) })
+    }
+
+    private var pingDestinations: Binding<String> {
+        Binding(get: { settings.value.background.periodicPing.destinations },
+                set: { applyPingIntent(\.background.periodicPing.destinations, $0) })
+    }
+
+    private var pingPeriod: Binding<String> {
+        Binding(get: { settings.value.background.periodicPing.period },
+                set: { applyPingIntent(\.background.periodicPing.period, $0) })
+    }
+
+    private func applyPingIntent<Value>(_ path: WritableKeyPath<AppSettings, Value>, _ value: Value) {
+        let previous = settings.pingChange
+        let off = path == \AppSettings.background.periodicPing.enabled && (value as? Bool) == false
+        // Off reaches the sender immediately, even before loading or after a disk error.
+        // On/edits use the fully loaded configuration, never provisional defaults.
+        if off { ping.setEnabled(false) }
+        else if settings.acceptsNewIntent && settings.loadState == .ready {
+            var next = settings.value
+            next[keyPath: path] = value
+            let controls = next.background.periodicPing
+            ping.restore(enabled: controls.enabled, destinations: controls.destinations, period: controls.period)
+        }
+        guard settings.pingChange == previous else { return }
+        settings.set(path, value)
+    }
+
     private func applyLocationIntent(_ enabled: Bool) {
         if !enabled {
             let previous = settings.locationChange
@@ -76,6 +107,9 @@ struct AppRoot: View {
         guard settings.loadState == .ready, settings.change == change else { return }
         keepAlive.syncAudio(value.background.silentAudio)
         guard settings.loadState == .ready, settings.change == change else { return }
+        let controls = value.background.periodicPing
+        ping.restore(enabled: controls.enabled, destinations: controls.destinations, period: controls.period)
+        guard settings.loadState == .ready, settings.change == change else { return }
         server.apply(value.server, running: value.serverRunning)
     }
 
@@ -94,7 +128,10 @@ struct AppRoot: View {
                 .tag(AppSettings.Tab.server)
             BackgroundKeepAliveView(keepAlive: keepAlive, ping: ping,
                                     locationEnabled: locationEnabled,
-                                    audioEnabled: audioEnabled)
+                                    audioEnabled: audioEnabled,
+                                    pingEnabled: pingEnabled, pingDestinations: pingDestinations, pingPeriod: pingPeriod,
+                                    pingStorageState: settings.errorMessage ?? (settings.loadState != .ready ? "Loading settings" :
+                                        settings.savePending ? "Saving settings" : "Settings saved"))
                 .tabItem { Label("Background", systemImage: "switch.2") }
                 .tag(AppSettings.Tab.background)
             SettingsView(settings: settings)
