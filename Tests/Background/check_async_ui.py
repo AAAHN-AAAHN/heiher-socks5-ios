@@ -67,7 +67,9 @@ def add_test_target(app):
     objects[root['mainGroup']]['children'].append(source)
     objects[root['productRefGroup']]['children'].append(product)
     path.write_bytes(plistlib.dumps(value, sort_keys=False))
-    shutil.copyfile(ROOT / 'Tests/Background/AsyncAudioUITests.swift', app / 'AsyncAudioUITests.swift')
+    (app / 'AsyncAudioUITests.swift').write_bytes(
+        (ROOT / 'Tests/Background/AsyncAudioUITests.swift').read_bytes() + b'\n' +
+        (ROOT / 'Tests/Background/PeriodicPingUITests.swift').read_bytes())
     scheme = project / 'xcshareddata/xcschemes/AsyncAudioAudit.xcscheme'
     scheme.parent.mkdir(parents=True, exist_ok=True)
     ref = lambda key, name, product: f'<BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="{key}" BuildableName="{product}" BlueprintName="{name}" ReferencedContainer="container:Socks5.xcodeproj"/>'
@@ -145,7 +147,7 @@ def main():
         if diagnostic_failure is not None:
             raise diagnostic_failure
         summary = json.loads((OUT / 'test-summary.json').read_text())
-        if summary.get('failedTests', 0) != 0 or summary.get('passedTests', 0) < 1:
+        if summary.get('failedTests', 0) != 0 or summary.get('passedTests', 0) != 2 or summary.get('skippedTests', 0) != 0:
             raise RuntimeError('Actual XCTest result is not a completed pass')
         # Inspect runtime issues as well as the console; do not disable their reporting.
         for name in ('ui-test.log', 'result-object.json'):
