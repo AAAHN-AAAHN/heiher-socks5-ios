@@ -48,7 +48,7 @@ def main():
         assert entry == mode, ('executable mode', path)
     # Entry point and platform declarations retain their exact prior bytes.
     # The root now owns direct intent/load readiness, and the project adds only
-    # the three Background-owned files to the existing app source phase.
+    # the five Background-owned files to the existing app source phase.
     for path in ('Socks5/Socks5App.swift', 'Socks5/Info.plist'):
         assert (ROOT / path).read_bytes() == git('show', INPUT + ':' + path), path
     subprocess.run([sys.executable, 'Tests/Integration/intent_boundaries.py', '--source-only'], check=True)
@@ -126,7 +126,7 @@ def main():
                            ('Build/check_swift_sdk.sh', ['sdk-success.txt'])]:
         blob = git('rev-parse', '2dcfce074e288c942bd6582b3b77d4763c516a25:' + entry).decode().strip()
         driver.check(entry, markers, blob, 'integrated')
-    print(f'PASS: {len(members["sources"])} exact owner files, {len(config["patches"])} ordered patches, direct root intent, exact 15-source target and preserved platform/failure controls')
+    print(f'PASS: {len(members["sources"])} exact owner files, {len(config["patches"])} ordered patches, direct root intent, exact 17-source target and preserved platform/failure controls')
 
 
 if __name__ == '__main__':
