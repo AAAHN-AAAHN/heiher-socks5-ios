@@ -62,7 +62,11 @@ struct PeriodicPingModelTests {
         var storage = PeriodicPingModel.Storage()
         storage.read = { _ in entered.signal(); release.wait(); return data }
         let slow = PeriodicPingModel(fileURL: directory.appendingPathComponent("slow.json"), storage: storage)
-        let enteredOK = await Task.detached { entered.wait(timeout: .now() + 3) == .success }.value
+        let enteredOK: Bool = await withCheckedContinuation { receipt in
+            DispatchQueue.global().async {
+                receipt.resume(returning: entered.wait(timeout: .now() + 3) == .success)
+            }
+        }
         require(enteredOK, "load boundary not entered")
         slow.setEnabled(false)
         release.signal()
