@@ -29,9 +29,9 @@ final class PeriodicPingUITests: XCTestCase {
         @MainActor func replace(_ field: XCUIElement, _ value: String) {
             // Select the whole field through the real edit menu; caret placement
             // is not guaranteed by a tap, even at the trailing edge of a short value.
-            let point = field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5))
-            point.tap()
-            point.press(forDuration: 1)
+            field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
+            XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+            field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).press(forDuration: 1)
             let menuItem = app.menuItems["Select All"].firstMatch
             let selectAll = menuItem.exists ? menuItem : app.buttons["Select All"].firstMatch
             XCTAssertTrue(selectAll.waitForExistence(timeout: 5))

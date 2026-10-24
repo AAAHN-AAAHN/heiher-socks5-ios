@@ -77,10 +77,11 @@ struct BackgroundKeepAliveView: View {
             }
             .navigationTitle("Background")
             .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { pingField = nil }
-                        .accessibilityIdentifier("background.pingDone")
+                ToolbarItem(placement: .topBarTrailing) {
+                    if pingField != nil {
+                        Button("Done") { pingField = nil }
+                            .accessibilityIdentifier("background.pingDone")
+                    }
                 }
             }
         }
