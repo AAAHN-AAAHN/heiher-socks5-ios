@@ -4,6 +4,7 @@ import SwiftUI
 struct AppRoot: View {
     @State private var selectedTab = "server"
     @StateObject private var keepAlive = BackgroundKeepAlive()
+    @StateObject private var ping = PeriodicPingModel()
     @AppStorage("background.continuousLocation") private var locationEnabled = false
     @AppStorage("background.silentAudio") private var audioEnabled = false
 
@@ -12,7 +13,7 @@ struct AppRoot: View {
             ScrollView { ContentView() }
                 .tabItem { Label("Server", systemImage: "network") }
                 .tag("server")
-            BackgroundKeepAliveView(keepAlive: keepAlive,
+            BackgroundKeepAliveView(keepAlive: keepAlive, ping: ping,
                                     locationEnabled: $locationEnabled,
                                     audioEnabled: Binding(get: { audioEnabled }, set: { value in
                                         keepAlive.setAudio(value)

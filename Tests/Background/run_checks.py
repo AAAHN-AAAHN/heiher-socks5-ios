@@ -12,5 +12,6 @@ if not __debug__:
 HERE = Path(__file__).resolve().parent
 history = runpy.run_path(str(HERE / 'historical_checks.py'))['run_historical']
 
+subprocess.run([sys.executable, str(HERE / 'check_periodic_ping.py')], check=True)
 history('run_checks.py')
 subprocess.run([sys.executable, str(HERE / 'check_loop_audio.py')], check=True)
