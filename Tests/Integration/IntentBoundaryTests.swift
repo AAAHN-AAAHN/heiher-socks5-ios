@@ -30,6 +30,12 @@ struct AppSettings: Equatable {
     struct Background: Equatable {
         var continuousLocation = false
         var silentAudio = false
+        struct PeriodicPing: Equatable {
+            var enabled = false
+            var destinations = "1.1.1.1"
+            var period = "1000"
+        }
+        var periodicPing = PeriodicPing()
     }
     enum Tab { case statistics, server, background, settings }
     var server = ServerSettings()
@@ -46,6 +52,7 @@ struct AppSettings: Equatable {
     var loadState = LoadState.ready
     var change = Change(revision: 0, origin: .load)
     var audioChange = Change(revision: 0, origin: .load)
+    var pingChange = Change(revision: 0, origin: .load)
     var locationChange = Change(revision: 0, origin: .load)
     var serverRunningChange = Change(revision: 0, origin: .load)
     var acceptsNewIntent = true
@@ -68,6 +75,9 @@ struct AppSettings: Equatable {
         if path == \AppSettings.self || path == \.background || path == \.background.continuousLocation {
             locationChange = change
         }
+        if path == \AppSettings.self || path == \.background || path == \.background.periodicPing ||
+           path == \.background.periodicPing.enabled || path == \.background.periodicPing.destinations ||
+           path == \.background.periodicPing.period { pingChange = change }
         if path == \AppSettings.self || path == \.serverRunning {
             serverRunningChange = change
             runningWrites.append(value.serverRunning)
@@ -199,6 +209,21 @@ private final class LeaseProbe: @unchecked Sendable {
         Trace.add("server.\(running).\(value.listenPort).\(retry)")
         let callback = onApply; onApply = nil
         callback?()
+    }
+}
+
+@MainActor final class PeriodicPingModel {
+    private(set) var enabled = false
+    private(set) var destinations = "1.1.1.1"
+    private(set) var period = "1000"
+    var onChange: (() -> Void)?
+    func setEnabled(_ value: Bool) {
+        enabled = value
+        let callback = onChange; onChange = nil; callback?()
+    }
+    func restore(enabled: Bool, destinations: String, period: String) {
+        self.enabled = enabled; self.destinations = destinations; self.period = period
+        let callback = onChange; onChange = nil; callback?()
     }
 }
 
@@ -413,6 +438,41 @@ private final class LeaseProbe: @unchecked Sendable {
             host.restoreServices()
             Trace.check(!settings.value.background.continuousLocation && !host.keepAlive.locationEnabled,
                 "TERMINAL_LOCATION_OFF")
+        case "ping-loading":
+            settings.loadState = .loading
+            host.pingDestinations.wrappedValue = "127.0.0.1, ::1"
+            host.pingPeriod.wrappedValue = "250"
+            host.pingEnabled.wrappedValue = true
+            host.restoreServices()
+            Trace.check(!host.ping.enabled, "PING_PROVISIONAL_ON")
+            settings.loadState = .ready
+            host.restoreServices()
+            Trace.check(host.ping.enabled && host.ping.destinations == "127.0.0.1, ::1" && host.ping.period == "250", "PING_LOADED_VALUES")
+        case "ping-failed-off":
+            host.pingEnabled.wrappedValue = true
+            settings.loadState = .failed
+            host.pingEnabled.wrappedValue = false
+            Trace.check(!host.ping.enabled && !settings.value.background.periodicPing.enabled, "PING_FAILED_OFF")
+        case "ping-reentry":
+            host.ping.onChange = { host.pingEnabled.wrappedValue = false }
+            host.pingEnabled.wrappedValue = true
+            Trace.check(!host.ping.enabled && !settings.value.background.periodicPing.enabled, "PING_REENTRANT_OFF")
+        case "ping-unrelated":
+            host.ping.onChange = { settings.set(\.selectedTab, .server) }
+            host.pingEnabled.wrappedValue = true
+            Trace.check(host.ping.enabled && settings.value.background.periodicPing.enabled, "PING_UNRELATED_EDIT")
+        case "ping-restored":
+            var snapshot = settings.value
+            snapshot.background.periodicPing = .init(enabled: true, destinations: "127.0.0.2", period: "500")
+            settings.set(\AppSettings.self, snapshot, origin: .imported)
+            host.restoreServices()
+            Trace.check(host.ping.enabled && host.ping.destinations == "127.0.0.2" && host.ping.period == "500", "PING_IMPORTED_SNAPSHOT")
+        case "ping-terminal":
+            host.pingEnabled.wrappedValue = true
+            settings.acceptsNewIntent = false
+            host.pingEnabled.wrappedValue = false
+            host.pingEnabled.wrappedValue = true
+            Trace.check(!host.ping.enabled && !settings.value.background.periodicPing.enabled, "PING_TERMINAL_OFF")
         default: fatalError("Unknown routing case: " + name)
         }
         print("PASS: AppRoot routing " + name)

@@ -17,18 +17,18 @@ struct AppRoot: View {
     }
 
     private var pingEnabled: Binding<Bool> {
-        Binding(get: { settings.value.background.periodicPing.enabled },
-                set: { applyPingIntent(\.background.periodicPing.enabled, $0) })
+        Binding(get: { self.settings.value.background.periodicPing.enabled },
+                set: { self.applyPingIntent(\.background.periodicPing.enabled, $0) })
     }
 
     private var pingDestinations: Binding<String> {
-        Binding(get: { settings.value.background.periodicPing.destinations },
-                set: { applyPingIntent(\.background.periodicPing.destinations, $0) })
+        Binding(get: { self.settings.value.background.periodicPing.destinations },
+                set: { self.applyPingIntent(\.background.periodicPing.destinations, $0) })
     }
 
     private var pingPeriod: Binding<String> {
-        Binding(get: { settings.value.background.periodicPing.period },
-                set: { applyPingIntent(\.background.periodicPing.period, $0) })
+        Binding(get: { self.settings.value.background.periodicPing.period },
+                set: { self.applyPingIntent(\.background.periodicPing.period, $0) })
     }
 
     private func applyPingIntent<Value>(_ path: WritableKeyPath<AppSettings, Value>, _ value: Value) {

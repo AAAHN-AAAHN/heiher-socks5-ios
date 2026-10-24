@@ -35,7 +35,8 @@ ROUTING = ('direct', 'repeated', 'echo', 'off-on', 'loading', 'failed-stop', 'or
            'direct-unrelated', 'direct-newer-unrelated', 'direct-identical-reentry',
            'start-unrelated', 'stop-unrelated', 'stop-newer-unrelated', 'start-identical-reentry',
            'terminal-on', 'terminal-start', 'terminal-off', 'location-loading', 'location-failed-off',
-           'location-unrelated', 'location-newer-unrelated', 'terminal-location')
+           'location-unrelated', 'location-newer-unrelated', 'terminal-location',
+           'ping-loading', 'ping-failed-off', 'ping-reentry', 'ping-unrelated', 'ping-restored', 'ping-terminal')
 LIVE = ('blocked-load', 'blocked-save', 'stale-import', 'invalid-import',
         'unrelated-reentry', 'same-field-reentry', 'whole-field-reentry', 'import-intent', 'location-reentry')
 
@@ -54,11 +55,13 @@ def root_contract(code):
         'statistics', 'server', 'background', 'settings'], 'Four-tab composition changed')
     require(code.count('.modifier(BackgroundKeepAliveEvents(keepAlive: keepAlive))') == 1,
             'Root event lifetime changed')
-    require('audioEnabled: audioEnabled)' in code and 'set: { enabled in self.applyAudioIntent(enabled) })' in code,
+    require('audioEnabled: audioEnabled,' in code and 'set: { enabled in self.applyAudioIntent(enabled) })' in code,
             'Audio toggle bypasses direct intent')
     require('locationEnabled: locationEnabled,' in code and 'set: { enabled in self.applyLocationIntent(enabled) })' in code,
             'Location toggle bypasses immediate Off')
-    require('.onChange(of: settings.change, initial: true)' in code,
+    require('pingEnabled: pingEnabled, pingDestinations: pingDestinations, pingPeriod: pingPeriod' in code,
+            'Ping controls bypass the Settings owner')
+    require('.onChange(of: settings.change, initial: true)'  in code,
             'Missing initial change observation')
     require('.onChange(of: settings.loadState)' in code, 'Missing load readiness observation')
     require('.onChange(of: settings.value' not in code, 'Value-only restoration returned')
@@ -103,7 +106,7 @@ def source_contract():
     # These are source guard controls; unlike runtime mutants they do not claim
     # an execution failure. Each damages the exact link the guard must protect.
     for label, changed in (
-        ('direct-binding', code.replace('audioEnabled: audioEnabled)',
+        ('direct-binding', code.replace('audioEnabled: audioEnabled,',
                                        'audioEnabled: settings.binding(\\.background.silentAudio))', 1)),
         ('location-binding', code.replace('locationEnabled: locationEnabled,',
                                          'locationEnabled: settings.binding(\\.background.continuousLocation),', 1)),
@@ -139,6 +142,7 @@ def host(methods):
     let settings: SettingsStore
     let server = ServerController()
     let keepAlive = BackgroundKeepAlive()
+    let ping = PeriodicPingModel()
     var appliedSettingsChange: SettingsStore.Change?
     init(settings: SettingsStore) { self.settings = settings }
 ''' + methods + '}\n'
