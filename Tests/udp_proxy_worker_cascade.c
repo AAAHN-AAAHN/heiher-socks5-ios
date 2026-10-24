@@ -15,6 +15,7 @@
 #include <hev-task-system.h>
 #include "hev-main.h"
 #include "hev-socks5-worker.h"
+#include "hev-socks5-user-mark.h"
 
 #include <sys/time.h>
 
@@ -26,6 +27,23 @@ enum
     FIX_AUTH_STARTUP_FAILURE
 };
 static int fixture_auth_mode;
+enum
+{
+    AUTH_OK,
+    AUTH_MISSING,
+    AUTH_READ,
+    AUTH_ALLOC,
+    AUTH_USER,
+    AUTH_CLOSE,
+    AUTH_EMPTY_NAME,
+    AUTH_EMPTY_PASS,
+};
+static int fixture_auth_fault, fixture_auth_lines, fixture_auth_discarded;
+static HevSocks5UserMark *fixture_user_new (const char *, unsigned int,
+                                            const char *, unsigned int,
+                                            unsigned int);
+static ssize_t fixture_getline (char **, size_t *, FILE *);
+static int fixture_fclose (FILE *);
 static char fixture_auth_file[] = "/tmp/hev-auth-lifecycle-XXXXXX";
 static pthread_t fixture_controller_thread;
 static void *fixture_auth_alloc (size_t, size_t);
@@ -52,7 +70,12 @@ static void *fixture_auth_controller (void *);
 static void *
 fixture_auth_alloc (size_t count, size_t size)
 {
-    void *result = calloc (count, size);
+    void *result;
+    if (fixture_auth_fault == AUTH_ALLOC) {
+        errno = ENOMEM;
+        return NULL;
+    }
+    result = calloc (count, size);
     if (result)
         atomic_fetch_add (&fixture_auth_allocated, 1);
     return result;
@@ -98,7 +121,13 @@ static int fixture_add (HevTask *, int, unsigned int);
 #define hev_task_system_init fixture_task_system_init
 #define hev_task_system_run fixture_task_system_run
 #define pthread_join fixture_thread_join
+#define hev_socks5_user_mark_new fixture_user_new
+#define getline fixture_getline
+#define fclose fixture_fclose
 #include "hev-socks5-proxy.c"
+#undef fclose
+#undef hev_socks5_user_mark_new
+#undef getline
 #undef hev_socks5_worker_new
 #undef hev_socks5_worker_start
 #undef hev_task_system_init
@@ -122,6 +151,40 @@ static int fixture_add (HevTask *, int, unsigned int);
 #undef SYNC_LOAD
 #undef SYNC_SENT_S
 #undef SYNC_SENT_R
+
+static HevSocks5UserMark *
+fixture_user_new (const char *name, unsigned int nlen, const char *pass,
+                  unsigned int plen, unsigned int mark)
+{
+    if (fixture_auth_fault == AUTH_USER) {
+        errno = ENOMEM;
+        return NULL;
+    }
+    return hev_socks5_user_mark_new (name, nlen, pass, plen, mark);
+}
+
+static int
+fixture_fclose (FILE *file)
+{
+    int result = fclose (file);
+    if (fixture_auth_fault == AUTH_CLOSE) {
+        errno = EIO;
+        return EOF;
+    }
+    return result;
+}
+
+static ssize_t
+fixture_getline (char **line, size_t *length, FILE *file)
+{
+    if (fixture_auth_fault == AUTH_READ && fixture_auth_lines++) {
+        /* A complete first user is followed by a read/allocation failure,
+         * not EOF. No partially built snapshot may become current. */
+        errno = EIO;
+        return -1;
+    }
+    return getline (line, length, file);
+}
 
 static int
 fixture_is_main (void)
@@ -320,6 +383,41 @@ fixture_auth_controller (void *unused)
             assert (!close (client));
         }
     }
+    for (int fault = AUTH_MISSING; fault <= AUTH_CLOSE; fault++) {
+        int allocated = atomic_load (&fixture_auth_allocated);
+        int freed = atomic_load (&fixture_auth_freed);
+        fixture_auth_fault = fault;
+        fixture_auth_lines = 0;
+        if (fault == AUTH_MISSING)
+            assert (!unlink (fixture_auth_file));
+        assert (hev_socks5_proxy_load () < 0);
+        fixture_auth_fault = AUTH_OK;
+        fixture_auth_write (8);
+        int discarded = atomic_load (&fixture_auth_allocated) - allocated;
+        assert (discarded == (fault != AUTH_ALLOC));
+        assert (atomic_load (&fixture_auth_freed) - freed == discarded);
+        fixture_auth_discarded += discarded;
+        for (int i = 0; i < fixture_workers; i++) {
+            int client = fixture_auth_client (i);
+            assert (fixture_authenticate (client, 8));
+            assert (!close (client));
+        }
+        printf ("proxy auth failure: PASS reload fault=%d workers=%d "
+                "discarded=%d prior-credentials=retained\n",
+                fault, fixture_workers, discarded);
+    }
+    fixture_auth_write (9);
+    assert (!hev_socks5_proxy_load ());
+    for (int i = 0; i < fixture_workers; i++) {
+        int accepted;
+        do {
+            int client = fixture_auth_client (i);
+            accepted = fixture_authenticate (client, 9);
+            assert (!close (client));
+            if (!accepted)
+                usleep (100);
+        } while (!accepted);
+    }
     hev_socks5_server_quit ();
     for (int i = 0; i < fixture_workers; i++) {
         assert (recv (retained[i], reply, 1, 0) == 0);
@@ -397,6 +495,7 @@ fixture_case (int mode, int workers)
     unsigned char config[384];
     int pending_auth = fixture_auth_mode == FIX_AUTH_STARTUP_FAILURE &&
                        workers == 1;
+    fixture_auth_discarded = 0;
     fixture_mode = mode;
     fixture_workers = workers;
     fixture_created = fixture_joins = 0;
@@ -426,15 +525,17 @@ fixture_case (int mode, int workers)
         hev_socks5_server_quit ();
     int result = hev_socks5_server_main_from_str (config, length);
     if (fixture_auth_mode) {
-        int expected = fixture_auth_mode == FIX_AUTH_RELOAD ? 9 : 1;
         if (fixture_auth_mode == FIX_AUTH_RELOAD)
             assert (!pthread_join (fixture_controller_thread, NULL));
+        int expected = fixture_auth_mode == FIX_AUTH_RELOAD ?
+                           10 + fixture_auth_discarded :
+                           1;
         assert (atomic_load (&fixture_auth_allocated) == expected);
         assert (atomic_load (&fixture_auth_freed) == expected);
         printf ("proxy auth: PASS workers=%d mode=%s allocated=%d freed=%d\n",
                 workers,
                 fixture_auth_mode == FIX_AUTH_RELOAD ?
-                    "8-reloads-retained-sessions" :
+                    "9-reloads-and-5-failures" :
                     "startup-failure",
                 expected, expected);
     }
@@ -458,6 +559,59 @@ fixture_case (int mode, int workers)
             names[mode], workers, atomic_load (&fixture_starts),
             atomic_load (&fixture_faults), fixture_joins, fixture_created * 3,
             atomic_load (&fixture_late));
+}
+
+static void
+fixture_auth_startup_failure (int fault, int workers, int inline_user)
+{
+    unsigned char config[384];
+    fixture_mode = FIX_STOP_ALL;
+    fixture_workers = workers;
+    fixture_created = fixture_joins = 0;
+    fixture_target = NULL;
+    fixture_auth_fault = fault;
+    fixture_auth_lines = 0;
+    atomic_store (&fixture_starts, 0);
+    atomic_store (&fixture_auth_allocated, 0);
+    atomic_store (&fixture_auth_freed, 0);
+    int length = snprintf ((char *)config, sizeof (config),
+                           "main:\n  workers: %d\n  port: 0\n"
+                           "  listen-address: '127.0.0.1'\n  udp-port: 0\n"
+                           "misc:\n  log-level: error\nauth:\n",
+                           workers);
+    assert (length > 0 && (size_t)length < sizeof (config));
+    int extra;
+    if (inline_user || fault >= AUTH_EMPTY_NAME) {
+        extra = snprintf ((char *)config + length, sizeof (config) - length,
+                          "  username: '%s'\n  password: '%s'\n",
+                          fault == AUTH_EMPTY_NAME ? "" : "u",
+                          fault == AUTH_EMPTY_PASS ? "" : "p");
+    } else {
+        fixture_auth_write (0);
+        if (fault == AUTH_MISSING)
+            assert (!unlink (fixture_auth_file));
+        extra = snprintf ((char *)config + length, sizeof (config) - length,
+                          "  file: '%s'\n", fixture_auth_file);
+    }
+    assert (extra > 0 && (size_t)extra < sizeof (config) - length);
+    alarm (5);
+    assert (hev_socks5_server_main_from_str (config, length + extra) < 0);
+    alarm (0);
+    assert (!worker_list && !atomic_load (&fixture_starts));
+    assert (fixture_created == workers && fixture_joins == workers - 1);
+    assert (!(atomic_load (&tsync) & (SYNC_SEND | SYNC_WAIT | SYNC_STOP)));
+    assert (atomic_load (&fixture_auth_allocated) == (fault != AUTH_ALLOC));
+    assert (atomic_load (&fixture_auth_freed) ==
+            atomic_load (&fixture_auth_allocated));
+    for (int i = 0; i < fixture_created * 3; i++) {
+        errno = 0;
+        assert (fcntl (fixture_descriptors[i], F_GETFD) == -1 &&
+                errno == EBADF);
+    }
+    fixture_auth_fault = AUTH_OK;
+    printf ("proxy auth failure: PASS startup fault=%d workers=%d inline=%d "
+            "started=0 refs=balanced descriptors=closed\n",
+            fault, workers, inline_user);
 }
 
 int
@@ -508,7 +662,16 @@ main (int argc, char **argv)
         atomic_store (&fixture_auth_freed, 0);
         fixture_case (workers == 1 ? FIX_STOP_ALL : FIX_TASK_INIT, workers);
     }
+    fixture_auth_mode = FIX_AUTH_OFF;
+    for (int workers = 1; workers <= 4; workers *= 2) {
+        for (int fault = AUTH_MISSING; fault <= AUTH_EMPTY_PASS; fault++)
+            fixture_auth_startup_failure (fault, workers, 0);
+        fixture_auth_startup_failure (AUTH_ALLOC, workers, 1);
+        fixture_auth_startup_failure (AUTH_USER, workers, 1);
+        fixture_case (FIX_STOP_ALL, workers);
+    }
     assert (!unlink (fixture_auth_file));
-    puts ("proxy lifecycle: PASS 24/24 cases in consecutive main invocations");
+    puts ("proxy lifecycle: PASS 24 original cases, 27 authentication startup "
+          "failures, 15 reload failures and 3 recovery starts");
     return 0;
 }

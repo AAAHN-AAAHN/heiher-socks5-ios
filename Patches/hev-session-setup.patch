@@ -538,7 +538,6 @@ index a2db80e34c33b65e924ee8f855a90ee819e75384..c947402b4dcf215fa00ed25b46b069dd
      hev_task_io_splice (cfd, cfd, fd, fd, 8192, task_io_yielder, self);
  
 diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
-index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..eee416859c7769f8d1c8dc5810c5d2a7877f18cb 100644
 --- a/src/hev-socks5-proxy.c
 +++ b/src/hev-socks5-proxy.c
 @@ -8,6 +8,7 @@
@@ -549,10 +548,12 @@ index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..eee416859c7769f8d1c8dc5810c5d2a7
  #include <stdlib.h>
  #include <signal.h>
  #include <string.h>
-@@ -49,6 +50,16 @@ struct _HevSocks5WorkerData
+@@ -49,20 +50,29 @@
  
  static atomic_int tsync;
  static HevSocks5WorkerData *worker_list;
+-
+-static void
 +static _Atomic (HevSocks5Worker *) signal_worker;
 +static atomic_int signal_users, signal_reload;
 +static struct sigaction signal_previous_reload, signal_previous_pipe;
@@ -563,19 +564,114 @@ index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..eee416859c7769f8d1c8dc5810c5d2a7
 +
 +/* Internal pool exits must not retain a public Stop for the next run. */
 +static void hev_socks5_proxy_stop_inner (int pending);
- 
- static void
++
++static int
  hev_socks5_proxy_load_file (HevSocks5Authenticator *auth, const char *file)
-@@ -140,9 +151,27 @@ hev_socks5_proxy_load (void)
+ {
+     char *line = NULL;
+     size_t len = 0;
+     ssize_t nread;
++    int result = -1;
+     FILE *fp;
+ 
+     fp = fopen (file, "r");
+-    if (!fp) {
+-        hev_object_unref (HEV_OBJECT (auth));
+-        return;
+-    }
++    if (!fp)
++        return -1;
+ 
+     while ((nread = getline (&line, &len, fp)) != -1) {
+         HevSocks5UserMark *user;
+@@ -84,7 +94,7 @@
+         user = hev_socks5_user_mark_new (name, nlen, pass, plen, mark);
+         if (!user) {
+             LOG_E ("socks5 proxy user new");
+-            continue;
++            goto exit;
+         }
+         res = hev_socks5_authenticator_add (auth, HEV_SOCKS5_USER (user));
+         if (res < 0) {
+@@ -93,17 +103,21 @@
+         }
+     }
+ 
++    result = feof (fp) ? 0 : -1;
++exit:
+     free (line);
+-    fclose (fp);
+-}
+-
+-static void
++    if (fclose (fp) != 0)
++        result = -1;
++    return result;
++}
++
++static int
+ hev_socks5_proxy_load (void)
+ {
+     HevSocks5Authenticator *auth;
+     const char *file, *name, *pass;
+     int workers;
+-    int i;
++    int i, result = -1;
+ 
+     LOG_D ("socks5 proxy load");
+ 
+@@ -112,21 +126,28 @@
+     pass = hev_config_get_auth_password ();
+ 
+     if (!file && !name && !pass)
+-        return;
++        return 0;
+ 
+     auth = hev_socks5_authenticator_new ();
+     if (!auth)
+-        return;
++        return -1;
+ 
+     if (file) {
+-        hev_socks5_proxy_load_file (auth, file);
++        if (hev_socks5_proxy_load_file (auth, file) < 0)
++            goto exit;
+     } else {
+         HevSocks5UserMark *user;
+ 
++        if (!name || !pass)
++            goto exit;
+         user = hev_socks5_user_mark_new (name, strlen (name), pass,
+                                          strlen (pass), 0);
+-        if (user)
+-            hev_socks5_authenticator_add (auth, HEV_SOCKS5_USER (user));
++        if (!user)
++            goto exit;
++        if (hev_socks5_authenticator_add (auth, HEV_SOCKS5_USER (user)) < 0) {
++            hev_object_unref (HEV_OBJECT (user));
++            goto exit;
++        }
+     }
+ 
+     workers = hev_config_get_workers ();
+@@ -136,13 +157,34 @@
+         hev_socks5_worker_reload (worker);
+     }
+ 
++    result = 0;
++exit:
+     hev_object_unref (HEV_OBJECT (auth));
++    return result;
  }
  
  static void
 -sigint_handler (int signum)
-+hev_socks5_proxy_reload_notify (void)
- {
+-{
 -    hev_socks5_proxy_load ();
-+    if (atomic_exchange (&signal_reload, 0))
-+        hev_socks5_proxy_load ();
++hev_socks5_proxy_reload_notify (void)
++{
++    if (atomic_exchange (&signal_reload, 0) && hev_socks5_proxy_load () < 0)
++        LOG_E ("socks5 proxy reload authentication");
 +}
 +
 +static void
@@ -596,7 +692,7 @@ index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..eee416859c7769f8d1c8dc5810c5d2a7
  }
  
  static void *
-@@ -163,6 +192,7 @@ retry:
+@@ -163,6 +205,7 @@
      res = hev_task_system_init ();
      if (res < 0) {
          LOG_E ("socks5 proxy worker task system");
@@ -604,7 +700,7 @@ index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..eee416859c7769f8d1c8dc5810c5d2a7
          goto exit;
      }
  
-@@ -170,6 +200,7 @@ retry:
+@@ -170,6 +213,7 @@
  
      hev_task_system_run ();
  
@@ -612,7 +708,7 @@ index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..eee416859c7769f8d1c8dc5810c5d2a7
      hev_task_system_fini ();
  exit:
      return NULL;
-@@ -186,6 +217,7 @@ hev_socks5_proxy_init (void)
+@@ -186,6 +230,7 @@
      int workers;
      int res;
      int i;
@@ -620,12 +716,17 @@ index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..eee416859c7769f8d1c8dc5810c5d2a7
  
      LOG_D ("socks5 proxy init");
  
-@@ -251,8 +283,23 @@ hev_socks5_proxy_init (void)
+@@ -250,9 +295,27 @@
+     hev_socket_factory_destroy (factory);
      factory = NULL;
  
-     hev_socks5_proxy_load ();
+-    hev_socks5_proxy_load ();
 -    signal (SIGPIPE, SIG_IGN);
 -    signal (SIGUSR1, sigint_handler);
++    if (hev_socks5_proxy_load () < 0) {
++        LOG_E ("socks5 proxy initial authentication");
++        goto exit;
++    }
 +    res = hev_socks5_worker_set_reload_notify (worker_list[0].worker,
 +                                               hev_socks5_proxy_reload_notify);
 +    if (res < 0)
@@ -646,7 +747,7 @@ index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..eee416859c7769f8d1c8dc5810c5d2a7
      atomic_fetch_or (&tsync, SYNC_SEND);
  
      return 0;
-@@ -272,6 +319,11 @@ hev_socks5_proxy_fini (void)
+@@ -272,6 +335,11 @@
  
      LOG_D ("socks5 proxy fini");
  
@@ -658,7 +759,7 @@ index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..eee416859c7769f8d1c8dc5810c5d2a7
  retry:
      res = atomic_fetch_and (&tsync, ~(SYNC_SEND | SYNC_STOP | SYNC_SENT));
      if (res & SYNC_WAIT) {
-@@ -295,6 +347,11 @@ retry:
+@@ -295,6 +363,11 @@
      }
  
      hev_task_system_fini ();
@@ -670,22 +771,24 @@ index 1cd4e4cbd3f6a928f4ba1806727f332090643bbd..eee416859c7769f8d1c8dc5810c5d2a7
  }
  
  void
-@@ -310,10 +367,12 @@ hev_socks5_proxy_run (void)
+@@ -310,10 +383,12 @@
      hev_socks5_worker_start (worker_list[0].worker);
  
      hev_task_system_run ();
-+
-+    hev_socks5_proxy_stop ();
- }
- 
+-}
+-
 -void
 -hev_socks5_proxy_stop (void)
++
++    hev_socks5_proxy_stop ();
++}
++
 +static void
 +hev_socks5_proxy_stop_inner (int pending)
  {
      int res;
  
-@@ -335,9 +394,15 @@ retry:
+@@ -335,9 +410,15 @@
              for (i = 0; i < workers; i++)
                  hev_socks5_worker_stop (worker_list[i].worker);
          }
