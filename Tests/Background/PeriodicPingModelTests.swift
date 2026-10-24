@@ -16,7 +16,8 @@ struct PeriodicPingModelTests {
     }
     static func main() async throws {
         var owner: PeriodicPingModel? = PeriodicPingModel()
-        weak var weakOwner = owner
+        weak var weakOwner: PeriodicPingModel?
+        weakOwner = owner
         require(owner!.enabled == false && owner!.destinations == "1.1.1.1" && owner!.period == "1000" && owner!.status == "Off", "defaults")
         owner!.setDestinations("127.0.0.1, ::1")
         owner!.setPeriod("10")
