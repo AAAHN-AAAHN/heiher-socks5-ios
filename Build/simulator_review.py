@@ -182,7 +182,8 @@ def main():
             settings_file = container / 'Library/Application Support/Socks5/settings.json'
             settings_file.parent.mkdir(parents=True, exist_ok=True)
             port = free_port()
-            settings = {'version': 1, 'serverRunning': False, 'background': {'continuousLocation': False, 'silentAudio': False},
+            settings = {'version': 1, 'serverRunning': False, 'background': {'continuousLocation': False, 'silentAudio': False,
+                'periodicPing': {'enabled': False, 'destinations': '1.1.1.1', 'period': '1000'}},
                         'selectedTab': 'statistics', 'server': {
                             'workers': '4', 'listenAddress': '127.0.0.1', 'listenPort': str(port),
                             'udpListenAddress': '', 'udpListenPort': '0', 'bindIPv4Address': '0.0.0.0',
