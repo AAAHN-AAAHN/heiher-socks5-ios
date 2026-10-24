@@ -3,9 +3,9 @@
   "branches": {
     "feature/app-icon": "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
     "feature/background": "c6935dbfbc6fecb7d7f573db0d5149bb0afc61b9",
-    "feature/udp-compat": "52387770234a4eaf450ef7ac6321aa9a59d5f09f",
+    "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
-    "feature/traffic-statistics": "fdc1ebb9b95890c1652c12707b401bd793a2ca8a",
+    "feature/traffic-statistics": "c26d30885ace7f92c2c6e8bfc409646a0dde6e01",
     "feature/settings-persistence": "c1722e48f99e140b98cc436979b8ffc49ca0fa63"
   },
   "sources": {
@@ -19,8 +19,8 @@
       "path": ".github/workflows/udp-compat-audit.yml"
     },
     "Build/inherited-workflows/traffic-statistics-verify-build.yml": {
-      "commit": "fdc1ebb9b95890c1652c12707b401bd793a2ca8a",
-      "sha256": "a59ce73eebc16bc8a0178f5dae2f95936955dfff92f092470bb4cdefcddb0a62",
+      "commit": "c26d30885ace7f92c2c6e8bfc409646a0dde6e01",
+      "sha256": "6837c9825f3fe66068dfd6634157459a066b976edd3bb3f798dc84e4c5bcc4af",
       "path": ".github/workflows/verify-build.yml"
     },
     "Patches/hev-netaddr-result.patch": {
@@ -32,8 +32,8 @@
       "sha256": "77b46a0a4a58d1fdb219d11cde4a99a085799ccf7027e7309ee42ba53eb314db"
     },
     "Patches/hev-session-setup.patch": {
-      "commit": "52387770234a4eaf450ef7ac6321aa9a59d5f09f",
-      "sha256": "52f6cbbc390eb8f2e1cf21addcfac80a02cb1550fc9c431e616bf56bb4a600da"
+      "commit": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
+      "sha256": "31e00f258d9c3f202a74c5554dd6ce6056f6893bc5b4a415a97224a3d45a1c1b"
     },
     "Patches/hev-socket-meter-core.patch": {
       "commit": "88312df3e7f626b5f291face33a8baea4825dae5",
@@ -620,8 +620,8 @@
       "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "fdc1ebb9b95890c1652c12707b401bd793a2ca8a",
-      "sha256": "57bfeb1e1219f04af2e398ae7312f761e64bfd9b1fc1a414d61eb3207b08bbbd"
+      "commit": "c26d30885ace7f92c2c6e8bfc409646a0dde6e01",
+      "sha256": "7a701523f0ab8c2867110ba3f140b058a0c44c5ee58c0c8ec3c49fab1186f279"
     },
     "Tests/Statistics/audit_driver_probe.py": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",
@@ -732,8 +732,8 @@
       "sha256": "3444451356f2a553b2de6f6fe1c4f735b214b7769b357006eeaea34edcf41637"
     },
     "Tests/udp_proxy_worker_cascade.c": {
-      "commit": "52387770234a4eaf450ef7ac6321aa9a59d5f09f",
-      "sha256": "8a960b98f60c136bd9ccc3f7f06c4f8fa510bceb9ea6ef9c8a6f0eabbca4c456"
+      "commit": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
+      "sha256": "f647c7eccd546fadce4f65178984e7e44114d444572b700f1ed82efb451692de"
     },
     "Tests/udp_queue_observation.py": {
       "commit": "84d47e88de993a8f4b4cc084f9240f29565c78ed",

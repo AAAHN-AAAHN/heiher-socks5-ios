@@ -1096,3 +1096,21 @@ diff --git a/src/hev-config.c b/src/hev-config.c
      }
  
      return 0;
+@@ -332,13 +345,15 @@
+         int res = 0;
+ 
+         if (!pair->key || !pair->value)
+-            continue;
++            return -1;
+ 
+         node = yaml_document_get_node (doc, pair->key);
+         if (!node || YAML_SCALAR_NODE != node->type)
+-            break;
++            return -1;
+ 
+         key = (const char *)node->data.scalar.value;
++        if (strlen (key) != node->data.scalar.length)
++            return -1;
+         node = yaml_document_get_node (doc, pair->value);
+ 
+         if (0 == strcmp (key, "main"))
