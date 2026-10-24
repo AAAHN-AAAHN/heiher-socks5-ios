@@ -44,11 +44,11 @@ struct BackgroundKeepAliveView: View {
                         .font(.footnote)
                 }
                 Section {
-                    Toggle("Enabled", isOn: Binding(get: { ping.enabled }, set: ping.setEnabled))
+                    Toggle("Enabled", isOn: Binding(get: { ping.enabled }, set: { ping.setEnabled($0) }))
                         .accessibilityIdentifier("background.pingEnabled")
                     LabeledContent("Destination ip") {
                         TextField("1.1.1.1, 192.168.0.9", text: Binding(
-                            get: { ping.destinations }, set: ping.setDestinations))
+                            get: { ping.destinations }, set: { ping.setDestinations($0) }))
                             .keyboardType(.asciiCapable)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
@@ -57,7 +57,7 @@ struct BackgroundKeepAliveView: View {
                             .focused($pingField, equals: .destinations)
                     }
                     LabeledContent("Period (ms)") {
-                        TextField("1000", text: Binding(get: { ping.period }, set: ping.setPeriod))
+                        TextField("1000", text: Binding(get: { ping.period }, set: { ping.setPeriod($0) }))
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .accessibilityIdentifier("background.pingPeriod")
