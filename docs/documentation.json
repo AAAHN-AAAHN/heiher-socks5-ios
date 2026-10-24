@@ -1,6 +1,6 @@
 {
   "branch": "feature/udp-compat",
-  "frozen_source": "ff3e358b07450e4ade365b48d23b52fc45700d39",
+  "frozen_source": "d71a96312f10cca18c221c2bd0c07727f5856192",
   "parents": {
     "main": "94cc35ba5b50bab177f7aa678aa5af8fd3b8481d"
   },
