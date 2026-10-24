@@ -636,6 +636,13 @@ fixture_auth_input_identity (void)
         int n = snprintf (config, sizeof (config), "auth:\n%s", bad[i]);
         assert (hev_config_init_from_str ((void *)config, n) < 0);
     }
+    const char *roots[] = {
+        "? [a, b]\n: ignored\nauth:\n  username: u\n  password: p\n",
+        "\"auth\\0ignored\": {username: u, password: p}\n"
+    };
+    for (size_t i = 0; i < sizeof (roots) / sizeof (roots[0]); i++)
+        assert (hev_config_init_from_str ((const unsigned char *)roots[i],
+                                          strlen (roots[i])) < 0);
     for (int long_field = 0; long_field < 3; long_field++) {
         int n;
         if (long_field == 2) {
@@ -682,7 +689,7 @@ fixture_auth_input_identity (void)
         }
         hev_object_unref (HEV_OBJECT (auth));
     }
-    puts ("proxy auth input: PASS 11 rejected configurations, 2 valid controls "
+    puts ("proxy auth input: PASS 13 rejected configurations, 2 valid controls "
           "and 4 complete file-token cases");
 }
 
