@@ -8,6 +8,8 @@ struct BackgroundKeepAliveView: View {
     @ObservedObject var ping: PeriodicPingModel
     @Binding var locationEnabled: Bool
     @Binding var audioEnabled: Bool
+    private enum PingField: Hashable { case destinations, period }
+    @FocusState private var pingField: PingField?
 
     var body: some View {
         NavigationStack {
@@ -52,12 +54,14 @@ struct BackgroundKeepAliveView: View {
                             .autocorrectionDisabled()
                             .multilineTextAlignment(.trailing)
                             .accessibilityIdentifier("background.pingDestinations")
+                            .focused($pingField, equals: .destinations)
                     }
                     LabeledContent("Period (ms)") {
                         TextField("1000", text: Binding(get: { ping.period }, set: ping.setPeriod))
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .accessibilityIdentifier("background.pingPeriod")
+                            .focused($pingField, equals: .period)
                     }
                     Text(ping.status).font(.footnote)
                         .accessibilityIdentifier("background.pingState")
@@ -72,6 +76,13 @@ struct BackgroundKeepAliveView: View {
                 }
             }
             .navigationTitle("Background")
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { pingField = nil }
+                        .accessibilityIdentifier("background.pingDone")
+                }
+            }
         }
     }
 }

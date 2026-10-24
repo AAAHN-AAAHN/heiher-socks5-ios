@@ -27,9 +27,16 @@ final class PeriodicPingUITests: XCTestCase {
             XCTAssertTrue(period.isHittable)
         }
         @MainActor func replace(_ field: XCUIElement, _ value: String) {
-            field.tap()
+            // A centered tap can place the caret before right-aligned text.
+            // Place it at the trailing edge, then verify the actual edited value.
+            field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
             let old = field.value as? String ?? ""
             field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count) + value)
+            XCTAssertEqual(field.value as? String, value)
+            let done = app.buttons["background.pingDone"]
+            XCTAssertTrue(done.waitForExistence(timeout: 5))
+            done.tap()
+            XCTAssertFalse(app.keyboards.firstMatch.exists)
         }
         @MainActor func expect(_ text: String) {
             let check = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", text), object: state)
@@ -42,11 +49,16 @@ final class PeriodicPingUITests: XCTestCase {
         expect("Off")
         replace(destinations, "127.0.0.1, ::1")
         replace(period, "250")
-        // Switching tabs dismisses editing without changing the app-root owner.
+        // Tab changes must not replace the app-root sender owner.
         app.tabBars.buttons["Server"].tap()
         revealPing()
         toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "1")
         expect("Sending ICMP to 2 destination(s)")
+        let sending = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        sending.name = "periodic-ping-sending"
+        sending.lifetime = .keepAlways
+        add(sending)
         app.tabBars.buttons["Server"].tap()
         revealPing()
         XCTAssertEqual(toggle.value as? String, "1")
@@ -58,6 +70,7 @@ final class PeriodicPingUITests: XCTestCase {
         revealPing()
         expect("Sending ICMP to 2 destination(s)")
         toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "0")
         expect("Off")
         let capture = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         capture.name = "periodic-ping-final-off"
