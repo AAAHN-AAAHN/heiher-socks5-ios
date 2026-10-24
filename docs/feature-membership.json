@@ -2,7 +2,7 @@
   "base_commit": "94cc35ba5b50bab177f7aa678aa5af8fd3b8481d",
   "branches": {
     "feature/app-icon": "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
-    "feature/background": "b80b8f7dad6ec13351b28d7f86311eac9682cf3b",
+    "feature/background": "e409eb85e6347efc62ec2204915816bf3e25edb3",
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
@@ -844,8 +844,8 @@
       "sha256": "71d638ad37e3ed04ea2575ae9ff20cd8993c008007327a0768d73a13e6ee1c09"
     },
     "Tests/Background/PeriodicPingUITests.swift": {
-      "commit": "e9e26179f320ddbdb49f0353a17e060b2bb3a7dc",
-      "sha256": "a058ef7aa6d1721328f2c2f73748f1cd6729236653ad8d6edc3ad2d8c60a86fd"
+      "commit": "cad6d9a651a53aae9709b24c0050a5774d7cc350",
+      "sha256": "6b0d96001593c41298793e67afc6f344ba40e792e88d28f38807348d3c892254"
     }
   },
   "files": {
