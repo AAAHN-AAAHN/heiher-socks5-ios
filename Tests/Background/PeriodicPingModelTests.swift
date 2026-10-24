@@ -116,6 +116,12 @@ struct PeriodicPingModelTests {
         owner!.setPeriod("10")
         try await wait("off settles") { owner!.status == "Off" }
         require(probe(0) == 0, "off creates no sockets")
+        owner!.setDestinations(String(repeating: "invalid,", count: 100_000))
+        owner!.setPeriod("invalid")
+        try await wait("disabled edits skip parsing") { owner!.status == "Off" }
+        require(probe(0) == 0, "disabled malformed input opened a socket")
+        owner!.setDestinations("127.0.0.1, ::1")
+        owner!.setPeriod("10")
         owner!.setEnabled(true)
         try await wait("On") { owner!.status.hasPrefix("Sending ICMP") }
         owner!.setPeriod("invalid")
