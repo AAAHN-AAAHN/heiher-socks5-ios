@@ -17,7 +17,7 @@
   "validation_files": {
     "Build/check.py": "041770092d3d47993d64451d0e8dca233d8a0ceb",
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
-    "Build/check_ownership.py": "3b234c9cc2c49647c9b9f0cad852f992a7194ce4",
+    "Build/check_ownership.py": "d063871f7d73d4caad662d7837734dfdfca294bd",
     "Tests/AppIcon/check_icon.py": "99c12340f6869c5ec6d919df78ae258343b34a51",
     "Tests/Background/check_scope.py": "64b7ad07fff91e2dfd22ab20f212d27cf0422c38",
     "Tests/Statistics/audit.py": "d246c4f5963712cd2091081a68bb5f0c3049db20",

@@ -84,6 +84,18 @@ def main():
         assert 'keepAlive.syncAudio(value.background.silentAudio)' in root
         assert 'keepAlive.setAudio(enabled)' in root
         assert 'keepAlive.setLocation(value.background.continuousLocation)' in root
+    if CONFIG['name'] == 'integrated':
+        # Only the two malformed credential cases reject before class/worker setup.
+        # All other canonical owner assertions and process/listener cleanup remain.
+        probe = 'Tests/ServerControl/auth_startup_probe.c'
+        expected_probe = show(manifest['branches']['feature/server-control'], probe).decode()
+        expected_probe = expected_probe.replace(
+            '        assert (classes_ready == 1);',
+            '        /* UDP validates incomplete credentials before native initialization. */\n'
+            '        assert (classes_ready == ((i == 3 || i == 4) ? 0 : 1));\n'
+            '        if (i == 3 || i == 4)\n'
+            '            assert (!auth_calls && !user_calls);', 1)
+        assert content(probe) == expected_probe, 'Unexpected authentication probe adaptation'
     checked = 0
     for ref in manifest.get('branches', {}).values():
         subprocess.run(['git', '-C', str(ROOT), 'merge-base', '--is-ancestor', ref, 'HEAD'], check=True)

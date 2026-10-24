@@ -407,10 +407,6 @@
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
       "sha256": "9c9303269def290daadf89be7c0397c866c509885e3799e38f14f4cb9fd3cb67"
     },
-    "Tests/ServerControl/auth_startup_probe.c": {
-      "commit": "8ce44ced1c7c21e3f8f2c5fe59ec42142c110d9f",
-      "sha256": "4b2d84bff9a576c0aff13ab9f31eb354fec1c2a4ae64baab5b478218716eb6ad"
-    },
     "Tests/ServerControl/configuration_probe.c": {
       "commit": "368aa4cf89436651414a8885a2a171f5cff9abd5",
       "sha256": "b7595cd1d6c1b042865e462a63c4306550e63692c1a2ddd4385d4aa507248203"
@@ -822,6 +818,7 @@
   },
   "files": {
     "Socks5/Settings/SettingsStore.swift": "d36b143f318b8b33e50ab8f42efd54ba3484f1af8705efdb2fbf43efe07b84d0",
-    "Tests/udp_buffer_network.py": "66fb430ab26f7d69c8b5d22a78f8d1d50428919f83bf4b354ea10c90e5fc7703"
+    "Tests/udp_buffer_network.py": "66fb430ab26f7d69c8b5d22a78f8d1d50428919f83bf4b354ea10c90e5fc7703",
+    "Tests/ServerControl/auth_startup_probe.c": "56ee52b3cec88671b266c7c5f564a71a4b1c09e6a9103f752eb950f31d5503db"
   }
 }

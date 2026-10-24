@@ -110,7 +110,10 @@ main (int argc, char **argv)
         hev_socks5_server_quit ();
         result = hev_socks5_server_main_from_str ((const unsigned char *)config,
                                                   strlen (config));
-        assert (classes_ready == 1);
+        /* UDP validates incomplete credentials before native initialization. */
+        assert (classes_ready == ((i == 3 || i == 4) ? 0 : 1));
+        if (i == 3 || i == 4)
+            assert (!auth_calls && !user_calls);
         if (result != expected[i]) {
             fprintf (stderr, "case %d: result %d, expected %d\n", i, result,
                      expected[i]);
