@@ -6,7 +6,7 @@
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
-    "feature/settings-persistence": "819252a94ae274485395c53a3f8b14e1449a7a8f"
+    "feature/settings-persistence": "7868a060693a2f7b42817acd57d64396abfaa618"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -508,8 +508,8 @@
       "sha256": "f210693840bf24587622d923f03b512b20195b843872a53a327446e86a80c3fb"
     },
     "Tests/Settings/native_persistence_check.py": {
-      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
-      "sha256": "be7e30168e945ee6092abb493c9679fabf32d37a677027675f3c1efb97c56e79"
+      "commit": "7868a060693a2f7b42817acd57d64396abfaa618",
+      "sha256": "03ba53c6d0208c67e3e170a796ee1ba914509c56b261aab9bbf39bdb8801c7e2"
     },
     "Tests/Settings/run_checks.py": {
       "commit": "819252a94ae274485395c53a3f8b14e1449a7a8f",
