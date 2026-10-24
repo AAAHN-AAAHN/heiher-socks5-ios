@@ -68,8 +68,39 @@ struct PeriodicPingModelTests {
         release.signal()
         try await slow.flush()
         require(!slow.enabled && slow.destinations == "127.0.0.1" && slow.period == "25", "delayed load overrode latest Off")
+        // Failed disk writes cannot block Off or be labelled durable. Retry writes
+        // the newest choices, not the earlier saved-On snapshot.
+        let failureURL = directory.appendingPathComponent("failure.json")
+        let failure = PeriodicPingModel(fileURL: failureURL)
+        try await failure.flush()
+        try FileManager.default.removeItem(at: failureURL)
+        try FileManager.default.createDirectory(at: failureURL, withIntermediateDirectories: true)
+        failure.setDestinations("127.0.0.2")
+        failure.setPeriod("47")
+        failure.setEnabled(true)
+        do { try await failure.flush(); fatalError("failed write reported saved") } catch { }
+        require(failure.storageError != nil && failure.savePending, "failed write status lost")
+        failure.setEnabled(false)
+        try await wait("Off during disk failure") { failure.status == "Off" }
+        do { try await failure.flush(); fatalError("failed Off write reported saved") } catch { }
+        try FileManager.default.removeItem(at: failureURL)
+        try await failure.flush()
+        require(tryValue(failureURL) == PeriodicPingPreferences(enabled: false, destinations: "127.0.0.2", period: "47"), "retry lost latest Off")
+        require(failure.storageError == nil && !failure.savePending, "retry not acknowledged")
+        let corruptURL = directory.appendingPathComponent("corrupt.json")
+        let corruptBytes = Data("{corrupt".utf8)
+        try corruptBytes.write(to: corruptURL)
+        let corrupt = PeriodicPingModel(fileURL: corruptURL)
+        do { try await corrupt.flush(); fatalError("corrupt initial JSON accepted") } catch { }
+        require(!corrupt.canExport && !corrupt.enabled, "failed load became ready")
+        let originalCorrupt = try Data(contentsOf: corruptURL)
+        require(originalCorrupt == corruptBytes, "corrupt file silently overwritten")
+        try await corrupt.importData(backup)
+        require(corrupt.enabled && corrupt.canExport, "explicit backup did not recover load")
+        corrupt.setEnabled(false)
+        try await corrupt.flush()
         try await wait("final sockets close") { probe(0) == probe(1) }
-        print("PASS: standalone JSON default save, saved On restart, backup/restore, 65536-IP file, malformed import preservation, delayed-load Off")
+        print("PASS: standalone JSON default save, saved On restart, backup/restore, 65536-IP file, malformed import preservation, delayed-load Off, failed-save latest-Off retry and corrupt-load recovery")
     }
 
     static func tryValue(_ url: URL) -> PeriodicPingPreferences {
