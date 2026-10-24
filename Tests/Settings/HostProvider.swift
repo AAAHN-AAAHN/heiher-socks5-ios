@@ -1,7 +1,7 @@
 import Foundation
 
 // Linux has no document provider API. These boundaries supply a regular URL;
-// production bounded reads, validation, atomic writes and rollback execute intact.
+// production reads, validation, atomic writes and rollback execute intact.
 #if os(Linux)
 final class NSFileCoordinator {
     init(filePresenter: Any?) {}

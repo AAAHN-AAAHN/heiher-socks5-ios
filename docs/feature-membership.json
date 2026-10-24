@@ -6,7 +6,7 @@
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
-    "feature/settings-persistence": "1379827b2f0838f4d658695ff657891f4f715b98"
+    "feature/settings-persistence": "6297a68f72f8eae7016906ca044a739fa54719cc"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -456,8 +456,8 @@
       "sha256": "f5f8e4279f433623945095523a0ea4befe8cfa0d65407c46138fea2645214f8b"
     },
     "Tests/Settings/HostProvider.swift": {
-      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
-      "sha256": "6e20d953a63057453055040c961e56a6638e6592cc81679352087b61a2e58e73"
+      "commit": "6a1f369bc43cc25281523ef13d17e98e3630de63",
+      "sha256": "bdd2c11d2d22a402c46175c42864bbdf293ceaf3c25bb143d1c513950b49f092"
     },
     "Tests/Settings/HostUI.swift": {
       "commit": "11ffc688cc4a1b02db63ae9d7e062ae88f0568ab",
@@ -516,8 +516,8 @@
       "sha256": "9c78201319c422fbfa9b9b4a443a0e850df871248670122a1e8510646c9d3cf7"
     },
     "Tests/Settings/ui_audit.py": {
-      "commit": "819252a94ae274485395c53a3f8b14e1449a7a8f",
-      "sha256": "5d9c21b5ea75486936f7edcf337a5de336ddd0881206b23bd80463ca57cc427a"
+      "commit": "6a1f369bc43cc25281523ef13d17e98e3630de63",
+      "sha256": "4c484ac9616a2c732a4356f14354fb7399b19e50c9e1f45b53682bb52fd4e59a"
     },
     "Tests/SocketIO/BridgeTests.swift": {
       "commit": "07798a80016b860b98929bc967271ed2b58bac85",

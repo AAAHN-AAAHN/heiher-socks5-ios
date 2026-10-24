@@ -66,12 +66,14 @@ def main():
         # optional bulk system-diagnostic collection that stalled after runner exit.
         test_failure = None
         try:
+            # Budget for a clean build and runner setup as well as all four UI
+            # cases. Individual assertion waits and cleanup gates stay unchanged.
             run(['xcodebuild', 'test', '-project', app / 'Socks5.xcodeproj', '-scheme', 'StatisticsUIAudit',
                  '-destination', 'platform=iOS Simulator,id=' + identifier, '-parallel-testing-enabled', 'NO',
                  '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
                  '-collect-test-diagnostics', 'never',
                  'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES',
-                 'MARKETING_VERSION=3.0.0', 'CURRENT_PROJECT_VERSION=1'], 'ui-test.log', timeout=900)
+                 'MARKETING_VERSION=3.0.0', 'CURRENT_PROJECT_VERSION=1'], 'ui-test.log', timeout=1800)
         except Exception as exc:
             test_failure = exc
         diagnostic_failure = None
