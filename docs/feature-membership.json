@@ -5,7 +5,7 @@
     "feature/background": "c6935dbfbc6fecb7d7f573db0d5149bb0afc61b9",
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
-    "feature/traffic-statistics": "c26d30885ace7f92c2c6e8bfc409646a0dde6e01",
+    "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
     "feature/settings-persistence": "c1722e48f99e140b98cc436979b8ffc49ca0fa63"
   },
   "sources": {
@@ -600,8 +600,8 @@
       "sha256": "fe513d012f0acd093815f5a2d0b864a6027cbbec76cc208281dad56f26690183"
     },
     "Tests/SocketIO/worker-native.json": {
-      "commit": "f43631b2cbfe82e44d6c0e3e1f2a4404da56a53e",
-      "sha256": "27314c2fde1289c6c6881f411fcf3eed8e993c172a18f9bb405f507b3efc95c6"
+      "commit": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
+      "sha256": "be2669122bb5251f50b080a798f0c554fe3bf745d4413602604ec2fe48687b43"
     },
     "Tests/SocketIO/worker_boundaries.c": {
       "commit": "8aa502780f9349bbc340fc43b84749d5cb2a1b1a",

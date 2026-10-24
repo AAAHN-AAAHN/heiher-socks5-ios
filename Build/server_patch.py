@@ -48,13 +48,15 @@ def apply(repo, patch, reverse=False):
     raw = patch.read_bytes()
     _require(patch.name == contract['patch'] and _sha256(raw) == contract['patch_sha256'],
              'Canonical ServerControl patch SHA256 or name differs')
-    old, new = (contract['context'][key].encode() for key in ('before', 'after'))
-    _require(all(block.endswith(b'\n') and block.splitlines() and
-                 all(line.startswith(b' ') for line in block.splitlines())
-                 for block in (old, new)) and len(old.splitlines()) == len(new.splitlines()),
-             'ServerControl projection must change only context lines with equal counts')
-    _require(raw.count(old) == 1, 'ServerControl context occurrence differs')
-    projected = raw.replace(old, new, 1)
+    # UDP already owns the stronger atomic authentication load. Preserve the
+    # canonical owner patch; omit only its exact superseded auth section.
+    sections = re.split(rb'(?=^diff --git )', raw, flags=re.M)
+    omitted = contract['superseded_sections']
+    _require(len(set(omitted)) == len(omitted) and all(
+        sum(_sha256(section) == digest for section in sections) == 1
+        for digest in omitted), 'Superseded ServerControl section differs')
+    projected = b''.join(section for section in sections
+                         if _sha256(section) not in omitted)
     _require(_sha256(projected) == contract['projected_patch_sha256'],
              'Projected ServerControl patch SHA256 differs')
     indices = [line.decode() for line in re.findall(rb'^index [^\n]+$', raw, re.M)]

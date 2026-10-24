@@ -21,6 +21,56 @@ def load(path):
     return module
 
 
+def projection_boundaries():
+    """Check exact composition guards; native patch execution is a separate gate."""
+    canonical = (ROOT / 'Patches/hev-server-startup-stop.patch').read_bytes()
+    original = json.loads((ROOT / 'Build/server-patch-context.json').read_bytes())
+    cases = ('forward', 'reverse', 'patch', 'section', 'duplicate-section',
+             'projected-hash', 'preimage', 'postimage', 'apply-check')
+    for case in cases:
+        with tempfile.TemporaryDirectory(prefix='server-projection-') as directory:
+            root = Path(directory)
+            adapter = root / 'server_patch.py'
+            adapter.write_bytes((ROOT / 'Build/server_patch.py').read_bytes())
+            spec = importlib.util.spec_from_file_location('projection_fixture', adapter)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            contract = json.loads(json.dumps(original))
+            patch = root / original['patch']
+            patch.write_bytes(canonical + (b'changed' if case == 'patch' else b''))
+            if case == 'section':
+                contract['superseded_sections'] = ['0' * 64]
+            elif case == 'duplicate-section':
+                contract['superseded_sections'] *= 2
+            elif case == 'projected-hash':
+                contract['projected_patch_sha256'] = '0' * 64
+            (root / 'server-patch-context.json').write_text(json.dumps(contract))
+            names = list(original['files'])
+            phases = ('after', 'before') if case == 'reverse' else ('before', 'after')
+            states = [original['files'][name][phase] for phase in phases for name in names]
+            if case in ('preimage', 'postimage'):
+                states[0 if case == 'preimage' else len(names)] = {}
+            failure = subprocess.CalledProcessError(1, ['git', 'apply', '--check'])
+            with mock.patch.object(module, '_state', side_effect=states), mock.patch.object(
+                    module.subprocess, 'run', side_effect=failure if case == 'apply-check' else None) as run:
+                accepted = True
+                try:
+                    module.apply(root, patch, reverse=case == 'reverse')
+                except (ValueError, subprocess.CalledProcessError):
+                    accepted = False
+                if accepted != (case in ('forward', 'reverse')):
+                    raise RuntimeError(('ServerControl projection verdict', case, accepted))
+                expected_calls = 2 if case in ('forward', 'reverse', 'postimage') else 1 if case == 'apply-check' else 0
+                if run.call_count != expected_calls:
+                    raise RuntimeError(('ServerControl projection ordering', case, run.call_count))
+                if accepted:
+                    for call in run.call_args_list:
+                        if hashlib.sha256(call.kwargs['input']).hexdigest() != original['projected_patch_sha256']:
+                            raise RuntimeError('Projected patch bytes changed')
+            print('PASS: exact ServerControl projection guard', case, 'accepted=', accepted)
+    return len(cases)
+
+
 def main():
     if not __debug__:
         raise SystemExit('Assertions must be enabled')
@@ -28,7 +78,7 @@ def main():
     originals = {
         'Build/build.sh': '4a6d2809a52ad7e71a71a68332147122cabf4e5e',
         'Build/check_swift_sdk.sh': 'f866730b0de75f9d2aaf17800b8fed9c2619ae79'}
-    count = 0
+    count = projection_boundaries()
     for entry in ('Build/build.sh', 'Build/check_swift_sdk.sh'):
         old = subprocess.check_output(['git', '-C', str(ROOT), 'show',
                                        originals[entry]])
