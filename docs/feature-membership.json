@@ -2,7 +2,7 @@
   "base_commit": "94cc35ba5b50bab177f7aa678aa5af8fd3b8481d",
   "branches": {
     "feature/app-icon": "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
-    "feature/background": "e409eb85e6347efc62ec2204915816bf3e25edb3",
+    "feature/background": "ce2fdeaa901daaac9b89ecf58dd02d171a02af30",
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
@@ -80,8 +80,8 @@
       "sha256": "bdd3f6ba42c5f1c99a240344a96db8fd42d00cc2a7a7bf94ea14c3fe00bde822"
     },
     "Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift": {
-      "commit": "786c258c7a075461a4c613b125667d7997d70d14",
-      "sha256": "e3097541983e83cd82d2bbd2d5145c88a9b7665bc9f2584cba6a598dc12aaa66"
+      "commit": "f1191c17f87309557faa1e185431cf03488c19a4",
+      "sha256": "36a8daeb544df4f08930a52215cbfd6cde540a056bd4704adc7819c45ef2079a"
     },
     "Socks5/BackgroundKeepAlive/LoopAudioService.swift": {
       "commit": "0e2e73b68277a8391b61330a63e2a66c6e27ade5",
@@ -844,8 +844,8 @@
       "sha256": "71d638ad37e3ed04ea2575ae9ff20cd8993c008007327a0768d73a13e6ee1c09"
     },
     "Tests/Background/PeriodicPingUITests.swift": {
-      "commit": "cad6d9a651a53aae9709b24c0050a5774d7cc350",
-      "sha256": "6b0d96001593c41298793e67afc6f344ba40e792e88d28f38807348d3c892254"
+      "commit": "f1191c17f87309557faa1e185431cf03488c19a4",
+      "sha256": "8c265aadcb0949aa65adff60f243b58f84b813ad07e083de423c17560684fc0c"
     }
   },
   "files": {
