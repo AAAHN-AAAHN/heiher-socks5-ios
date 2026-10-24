@@ -38,12 +38,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix='periodic-ping-') as folder:
         work = Path(folder)
 
-        def run(label, command):
+        def run(label, command, accepted=(0,)):
             result = subprocess.run(list(map(str, command)), cwd=ROOT, capture_output=True, text=True, timeout=120)
             (OUT / (label + '.log')).write_text(result.stdout + result.stderr)
             records.append({'label': label, 'command': list(map(str, command)), 'returncode': result.returncode})
             (OUT / 'commands.json').write_text(json.dumps(records, indent=2) + '\n')
-            result.check_returncode()
+            if result.returncode not in accepted:
+                result.check_returncode()
 
         io = work / 'io.o'
         run('compile-syscall-double', ['cc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-c', HERE / 'PeriodicPingIO.c', '-o', io])
@@ -62,7 +63,12 @@ def main():
                 inputs = [ROOT / 'Socks5/BackgroundKeepAlive/PeriodicPingModel.swift'] if model else []
                 run(mode + '-' + name + '-compile', common + inputs + [HERE / (name + '.swift'), io, *extra, '-o', output])
                 run(mode + '-' + name + '-run', [output])
-    (OUT / 'SUCCESS.txt').write_text('PASS: exact Swift sender/model; controlled syscalls, not device ICMP or SDK/UI verification.\n')
+        live = work / 'icmp-loopback'
+        run('loopback-compile', ['swiftc', '-swift-version', '5', '-strict-concurrency=complete',
+                                '-warnings-as-errors', '-O', ROOT / 'Socks5/BackgroundKeepAlive/PeriodicPingService.swift',
+                                HERE / 'PeriodicPingLoopback.swift', '-o', live])
+        run('loopback-run', [live], accepted=(0, 77) if platform.system() == 'Linux' else (0,))
+    (OUT / 'SUCCESS.txt').write_text('PASS: controlled sender/model tests; loopback result is separate (77 means NOT EXECUTED). No device/SDK/UI claim.\n')
     print(f'PASS: {len(records)} compile/runtime commands; controlled I/O, no product source changes')
 
 

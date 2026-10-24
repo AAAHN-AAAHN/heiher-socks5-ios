@@ -2,7 +2,7 @@
   "base_commit": "94cc35ba5b50bab177f7aa678aa5af8fd3b8481d",
   "branches": {
     "feature/app-icon": "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
-    "feature/background": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
+    "feature/background": "8912ec057d2f048182c788016024b78d0a5e53eb",
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
@@ -300,8 +300,8 @@
       "sha256": "a291a9ef4ea3ae8dc3241c94beaf179e3e946ccd50fa35a0b815924177bfff7c"
     },
     "Tests/Background/check_async_ui.py": {
-      "commit": "964ef52cb2340a57f7274d0f155ec580c4aade6a",
-      "sha256": "36fc0de081599066c16f46a4cd727c7cd4bc9ade4b0df573d8ec24f264d42b58"
+      "commit": "8912ec057d2f048182c788016024b78d0a5e53eb",
+      "sha256": "a1b977b4f5345b959e5c4aa66004f4fbfb269e951e9da704562bdad27a07f3c5"
     },
     "Tests/Background/check_audio_sdk.sh": {
       "commit": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
@@ -836,8 +836,16 @@
       "sha256": "851347b411c249322067f5d06fde6e992aa3004a6f654e88487723f743faae93"
     },
     "Tests/Background/check_periodic_ping.py": {
-      "commit": "a49f5fe69ea70e0c86112c484bb3505800f61df6",
-      "sha256": "bc453da79ff304b05fe13609af9c67870f5ca0f11783167bb084244b583dcd90"
+      "commit": "8912ec057d2f048182c788016024b78d0a5e53eb",
+      "sha256": "afa9a3498141439d995007dd7e394c0a2fb51ce0a1a38f6d328b02bac65dd82b"
+    },
+    "Tests/Background/PeriodicPingLoopback.swift": {
+      "commit": "8912ec057d2f048182c788016024b78d0a5e53eb",
+      "sha256": "71d638ad37e3ed04ea2575ae9ff20cd8993c008007327a0768d73a13e6ee1c09"
+    },
+    "Tests/Background/PeriodicPingUITests.swift": {
+      "commit": "8912ec057d2f048182c788016024b78d0a5e53eb",
+      "sha256": "a26d4ed781c1ece8612ddba46b43e60b4b904b5bea89eb7f05fe268987f158c8"
     }
   },
   "files": {
