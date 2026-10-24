@@ -1,6 +1,6 @@
 {
   "branch": "release/integrated",
-  "frozen_source": "058db88425e3012882213312b3fb537f430e3639",
+  "frozen_source": "e037e150995ef7ec74c707fc0ce1318b9f28881e",
   "parents": {
     "feature/app-icon": "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
     "feature/background": "ce2fdeaa901daaac9b89ecf58dd02d171a02af30",
