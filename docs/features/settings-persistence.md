@@ -44,7 +44,7 @@ Export serializes a configuration snapshot. Credentials are plaintext fields in 
 
 The export snapshot comes from the current live `settings.value`, not by rereading `settings.json`. Encoding runs off MainActor, then `SettingsDocument` exposes that snapshot to the system file exporter with the default filename `Socks5-settings`. Export is unavailable during initial loading or another export preparation. After an ordinary save failure, an export can contain live changes that are not durable yet. Successful file-picker presentation alone does not prove that a provider saved that file.
 
-The three ping choices are stored under `background.periodicPing` as `enabled`, `destinations` and `period`. Missing ping data in older version-1 documents decodes to Off, `1.1.1.1` and `1000`; a malformed present object is rejected. The owner preserves editable text rather than truncating or silently replacing it. It does not run the Background service. Release restores the complete ping snapshot after readiness and routes immediate Off before persistence, with a dedicated ping intent identity.
+The three ping choices are stored under `background.periodicPing` as `enabled`, `destinations` and `period`. Missing ping data in older version-1 documents decodes to Off, `1.1.1.1` and `1000`; a malformed present object is rejected. The owner preserves the exact UTF-8 bytes of editable ping text, including canonically equivalent strings with different byte sequences, rather than truncating or silently replacing it. It does not run the Background service. Release restores the complete ping snapshot after readiness and routes immediate Off before persistence, with a dedicated ping intent identity.
 
 ## Implementation and ownership
 

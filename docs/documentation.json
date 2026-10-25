@@ -1,6 +1,6 @@
 {
   "branch": "feature/settings-persistence",
-  "frozen_source": "6a1f369bc43cc25281523ef13d17e98e3630de63",
+  "frozen_source": "e82fac49c309f8a0dd7f4bdc7d83099d682eeb7b",
   "parents": {
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939"
   },
