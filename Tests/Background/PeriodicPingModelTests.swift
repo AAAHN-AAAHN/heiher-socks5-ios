@@ -118,6 +118,8 @@ struct PeriodicPingModelTests {
         require(tryValue(failureURL) == PeriodicPingPreferences(enabled: false, destinations: "127.0.0.2", period: "47"), "retry lost latest Off")
         require(failure.storageError == nil && !failure.savePending, "retry not acknowledged")
         try await supersededSave(directory)
+        try await settledSaveFailure(directory)
+        try await releasedSave(directory)
         let corruptURL = directory.appendingPathComponent("corrupt.json")
         let corruptBytes = Data("{corrupt".utf8)
         try corruptBytes.write(to: corruptURL)
@@ -131,7 +133,7 @@ struct PeriodicPingModelTests {
         corrupt.setEnabled(false)
         try await corrupt.flush()
         try await wait("final sockets close") { probe(0) == probe(1) }
-        print("PASS: standalone JSON default save, saved On restart, backup/restore, 65536-IP file, verbatim UTF-8, malformed import preservation, delayed-load Off, failed-save latest-Off retry, superseded-failure flush and corrupt-load recovery")
+        print("PASS: standalone JSON default save, saved On restart, backup/restore, 65536-IP file, verbatim UTF-8, malformed import preservation, delayed-load Off, failed-save latest-Off retry, superseded-failure flush, settled-failure recovery, both owner-release write orders and corrupt-load recovery")
     }
 
     static func supersededSave(_ directory: URL) async throws {
@@ -173,6 +175,99 @@ struct PeriodicPingModelTests {
         try await receipt.value
         require(!model.enabled && model.storageError == nil && !model.savePending &&
             tryValue(url) == original, "superseded failure did not settle latest durable Off")
+    }
+
+    static func settledSaveFailure(_ directory: URL) async throws {
+        // Off is accepted after the older failure settles, unlike supersededSave.
+        // A controlled write-then-throw tests uncertainty, not Foundation policy.
+        for (name, commit, imported) in [("ordinary", false, false),
+                                        ("committed", true, false), ("imported", true, true)] {
+            let url = directory.appendingPathComponent("settled-\(name).json")
+            let original = PeriodicPingPreferences(enabled: false, destinations: "127.0.0.1", period: "1000")
+            let data = try JSONEncoder().encode(original)
+            try data.write(to: url, options: .atomic)
+            let attempts = DispatchSemaphore(value: 0)
+            var storage = PeriodicPingModel.Storage()
+            let write = storage.write
+            storage.write = { data, target in
+                defer { attempts.signal() }
+                if try JSONDecoder().decode(PeriodicPingPreferences.self, from: data).enabled {
+                    if commit { try write(data, target) }
+                    throw CocoaError(.fileWriteUnknown)
+                }
+                try write(data, target)
+            }
+            let model = PeriodicPingModel(fileURL: url, storage: storage)
+            try await model.flush()
+            model.setEnabled(true)
+            do { try await model.flush(); fatalError("settled write failure reported saved") } catch { }
+            require(model.storageError != nil && model.savePending, "settled failure not recorded")
+            if imported { try await model.importData(data) }
+            else { model.setEnabled(false); try await model.flush() }
+            require(!model.enabled && model.storageError == nil && !model.savePending &&
+                tryValue(url) == original, "settled failure suppressed latest-Off recovery: \(name)")
+            require(attempts.wait(timeout: .now()) == .success && attempts.wait(timeout: .now()) == .success &&
+                attempts.wait(timeout: .now()) == .timedOut, "settled recovery did not use exactly two attempts")
+            try await model.flush()
+            require(attempts.wait(timeout: .now()) == .timedOut, "clean recovery flush duplicated a write")
+        }
+    }
+
+    static func waitForSignal(_ signal: DispatchSemaphore, _ reason: String) async {
+        let reached: Bool = await withCheckedContinuation { receipt in
+            DispatchQueue.global().async {
+                receipt.resume(returning: signal.wait(timeout: .now() + 3) == .success)
+            }
+        }
+        require(reached, reason)
+    }
+
+    static func releasedSave(_ directory: URL) async throws {
+        for blocked in [true, false] {
+            for revert in [true, false] {
+                let url = directory.appendingPathComponent("released-\(blocked)-\(revert).json")
+                let original = PeriodicPingPreferences(enabled: false, destinations: "127.0.0.1", period: "1000")
+                try JSONEncoder().encode(original).write(to: url, options: .atomic)
+                let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+                let processedOn = DispatchSemaphore(value: 0), attempts = DispatchSemaphore(value: 0)
+                var storage = PeriodicPingModel.Storage()
+                let write = storage.write
+                storage.write = { data, target in
+                    defer { attempts.signal() }
+                    let enabled = try JSONDecoder().decode(PeriodicPingPreferences.self, from: data).enabled
+                    if enabled && blocked {
+                        entered.signal()
+                        precondition(release.wait(timeout: .now() + 3) == .success, "release write boundary timed out")
+                    }
+                    try write(data, target)
+                    if enabled { processedOn.signal() }
+                }
+                var owner: PeriodicPingModel? = PeriodicPingModel(fileURL: url, storage: storage)
+                try await owner!.flush()
+                let lane = Mirror(reflecting: owner!).descendant("io") as! DispatchQueue
+                owner!.setEnabled(true)
+                if blocked { await waitForSignal(entered, "release write not entered") }
+                // Unblocked: On, latest Off and release share one actor turn.
+                if revert { owner!.setEnabled(false) }
+                weak var weakOwner: PeriodicPingModel?
+                weakOwner = owner
+                owner = nil
+                try await wait("blocked storage retained released owner") { weakOwner == nil }
+                if blocked { release.signal() }
+                // Observe old On before draining: an immediate barrier could run
+                // before a deferred submission and falsely credit old disk Off.
+                await waitForSignal(processedOn, "released old On write never processed")
+                await withCheckedContinuation { (receipt: CheckedContinuation<Void, Never>) in
+                    lane.async { receipt.resume() }
+                }
+                var expected = original
+                expected.enabled = !revert
+                require(tryValue(url) == expected, "owner release lost latest choice: blocked=\(blocked), revert=\(revert)")
+                require(attempts.wait(timeout: .now()) == .success, "released On was not written")
+                if revert { require(attempts.wait(timeout: .now()) == .success, "released Off was not written") }
+                require(attempts.wait(timeout: .now()) == .timedOut, "release duplicated an already submitted choice")
+            }
+        }
     }
 
     static func tryValue(_ url: URL) -> PeriodicPingPreferences {

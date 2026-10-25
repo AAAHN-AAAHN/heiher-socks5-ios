@@ -93,10 +93,8 @@ struct BackgroundKeepAliveView: View {
                         Button("Import ping JSON") { pingImporting = true }
                         if ping.storageError != nil {
                             Button("Retry Save") {
-                                Task { @MainActor in
-                                    do { try await ping.flush() }
-                                    catch { pingFileError = error.localizedDescription }
-                                }
+                                pingFileError = nil
+                                Task { @MainActor in try? await ping.flush() }
                             }
                         }
                     }
