@@ -10,11 +10,11 @@ import Combine
 @MainActor
 final class BackgroundKeepAlive: NSObject, @MainActor ObservableObject, @preconcurrency CLLocationManagerDelegate {
     let objectWillChange = ObservableObjectPublisher()
-    @Published private(set) var locationEnabled = false
+    private(set) var locationEnabled = false
     private(set) var audioEnabled = false
-    @Published private(set) var locationState = "Off"
-    @Published private(set) var readCount = 0
-    @Published private(set) var lastRead: Date?
+    private(set) var locationState = "Off"
+    private(set) var readCount = 0
+    private(set) var lastRead: Date?
     private(set) var audioState = "Off"
     private(set) var audioDetail = ""
 
@@ -23,6 +23,20 @@ final class BackgroundKeepAlive: NSObject, @MainActor ObservableObject, @preconc
     private var requestedPermission = false
     private let audio: LoopAudioService
     private var audioOwner: UInt64 = 0
+
+    private var locationValues: (Bool, String, Int, Date?) {
+        (locationEnabled, locationState, readCount, lastRead)
+    }
+
+    private func publishLocationChange(from previous: (Bool, String, Int, Date?)) {
+        // All values and effects agree before a subscriber can accept newer intent.
+        // No location write follows this synchronous publication.
+        if previous != locationValues { objectWillChange.send() }
+    }
+
+    private func isCurrentLocationManager(_ manager: CLLocationManager) -> Bool {
+        locationEnabled && manager === locationManager
+    }
 
     init(audioService: LoopAudioService? = nil) {
         audio = audioService ?? .shared
@@ -77,21 +91,27 @@ final class BackgroundKeepAlive: NSObject, @MainActor ObservableObject, @preconc
 
     /// Calling this repeatedly never creates another owner or subscription.
     func restore() {
+        let previous = locationValues
+        defer { publishLocationChange(from: previous) }
         if locationEnabled { openLocation() }
         if audioEnabled { audio.notify(.available) }
     }
 
     func setLocation(_ enabled: Bool) {
+        let previous = locationValues
+        defer { publishLocationChange(from: previous) }
         locationEnabled = enabled
         if enabled {
             openLocation()
         } else {
-            locationManager?.stopUpdatingLocation()
-            locationManager?.delegate = nil
+            let manager = locationManager
             locationManager = nil
             updating = false
             requestedPermission = false
             locationState = "Off"
+            // Reentrant callbacks cannot find or detach a later manager.
+            manager?.delegate = nil
+            manager?.stopUpdatingLocation()
         }
     }
 
@@ -99,6 +119,7 @@ final class BackgroundKeepAlive: NSObject, @MainActor ObservableObject, @preconc
         guard locationEnabled else { return }
         if locationManager == nil {
             let manager = CLLocationManager()
+            guard locationEnabled, locationManager == nil else { return }
             locationManager = manager
             // Coordinates are discarded; navigation-grade accuracy is unnecessary.
             manager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
@@ -107,22 +128,29 @@ final class BackgroundKeepAlive: NSObject, @MainActor ObservableObject, @preconc
             manager.showsBackgroundLocationIndicator = true
             manager.pausesLocationUpdatesAutomatically = false
             // A delegate may report authorization immediately; configure first.
+            guard isCurrentLocationManager(manager) else { return }
             manager.delegate = self
         }
         if let manager = locationManager { authorizeAndStart(manager) }
     }
 
     private func authorizeAndStart(_ manager: CLLocationManager) {
-        guard manager === locationManager, locationEnabled else { return }
-        switch manager.authorizationStatus {
+        guard isCurrentLocationManager(manager) else { return }
+        let authorization = manager.authorizationStatus
+        guard isCurrentLocationManager(manager) else { return }
+        switch authorization {
         case .notDetermined:
             // Authorization can return here after a reset or temporary grant.
+            locationState = "Waiting for location permission"
             if updating {
                 updating = false
                 manager.stopUpdatingLocation()
             }
-            locationState = "Waiting for location permission"
-            if !requestedPermission, UIApplication.shared.applicationState == .active {
+            guard isCurrentLocationManager(manager), !updating else { return }
+            let stillUndetermined = manager.authorizationStatus == .notDetermined
+            guard isCurrentLocationManager(manager), stillUndetermined else { return }
+            let active = UIApplication.shared.applicationState == .active
+            if isCurrentLocationManager(manager), !updating, !requestedPermission, active {
                 requestedPermission = true
                 manager.requestAlwaysAuthorization()
             }
@@ -131,8 +159,9 @@ final class BackgroundKeepAlive: NSObject, @MainActor ObservableObject, @preconc
             guard !updating else { return }
             // A new When-In-Use background session must be started in foreground.
             // Do not interrupt a session that was already started there.
-            if manager.authorizationStatus == .authorizedWhenInUse,
-               UIApplication.shared.applicationState != .active {
+            let active = UIApplication.shared.applicationState == .active
+            guard isCurrentLocationManager(manager), !updating else { return }
+            if authorization == .authorizedWhenInUse, !active {
                 locationState = "Return to the app to start the location session"
                 return
             }
@@ -140,37 +169,47 @@ final class BackgroundKeepAlive: NSObject, @MainActor ObservableObject, @preconc
             locationState = "Waiting for a location update"
             manager.startUpdatingLocation()
         case .denied, .restricted:
-            manager.stopUpdatingLocation()
             updating = false
             requestedPermission = false
             locationState = "Location access unavailable; enable it in Settings"
-        @unknown default:
             manager.stopUpdatingLocation()
+        @unknown default:
             updating = false
             locationState = "Location authorization unavailable"
+            manager.stopUpdatingLocation()
         }
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard isCurrentLocationManager(manager) else { return }
+        let previous = locationValues
+        defer { publishLocationChange(from: previous) }
         authorizeAndStart(manager)
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard manager === locationManager, locationEnabled, updating, !locations.isEmpty else { return }
+        let previous = locationValues
         // Keep only diagnostic count/time, never coordinates or a location history.
         readCount += 1
         lastRead = Date()
         locationState = "Continuous location active"
+        publishLocationChange(from: previous)
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        guard manager === locationManager, locationEnabled else { return }
-        if (error as? CLError)?.code == .denied {
-            manager.stopUpdatingLocation()
-            updating = false
-        }
+        guard isCurrentLocationManager(manager) else { return }
+        let previous = locationValues
+        defer { publishLocationChange(from: previous) }
+        let message = "Location error: \(error.localizedDescription)"
+        guard isCurrentLocationManager(manager) else { return }
+        // Commit diagnostics before a stop call can deliver a newer callback.
         // A temporary failure must not erase the user's saved preference.
-        locationState = "Location error: \(error.localizedDescription)"
+        locationState = message
+        if (error as? CLError)?.code == .denied {
+            updating = false
+            manager.stopUpdatingLocation()
+        }
     }
 
     func setAudio(_ enabled: Bool) {

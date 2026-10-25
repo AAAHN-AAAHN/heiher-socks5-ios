@@ -55,6 +55,32 @@ struct PeriodicPingModelTests {
         catch is DecodingError { }
         let after = try Data(contentsOf: url)
         require(before == after, "corrupt backup modified disk")
+        // Canonically equivalent drafts still have distinct bytes to preserve.
+        let rawURL = directory.appendingPathComponent("raw-text.json")
+        let raw = PeriodicPingModel(fileURL: rawURL)
+        try await raw.flush()
+        let composed = "\u{00e9}", decomposed = "e\u{0301}"
+        require(composed == decomposed && !composed.utf8.elementsEqual(decomposed.utf8), "raw text fixture")
+        raw.restore(enabled: false, destinations: composed, period: composed)
+        try await raw.flush()
+        raw.setDestinations(decomposed)
+        try await raw.flush()
+        require(raw.destinations.utf8.elementsEqual(decomposed.utf8) &&
+            tryValue(rawURL).destinations.utf8.elementsEqual(decomposed.utf8), "destination bytes not saved")
+        raw.setPeriod(decomposed)
+        try await raw.flush()
+        require(raw.period.utf8.elementsEqual(decomposed.utf8) &&
+            tryValue(rawURL).period.utf8.elementsEqual(decomposed.utf8), "period bytes not saved")
+        raw.restore(enabled: false, destinations: composed, period: composed)
+        try await raw.flush()
+        let rawBackup = try await raw.exportData()
+        let exported = try JSONDecoder().decode(PeriodicPingPreferences.self, from: rawBackup)
+        require(exported.destinations.utf8.elementsEqual(composed.utf8) &&
+            exported.period.utf8.elementsEqual(composed.utf8), "combined restore/export lost raw bytes")
+        let rawRestart = PeriodicPingModel(fileURL: rawURL)
+        try await rawRestart.flush()
+        require(rawRestart.destinations.utf8.elementsEqual(composed.utf8) &&
+            rawRestart.period.utf8.elementsEqual(composed.utf8), "relaunch lost raw bytes")
         // A delayed initial read must not resurrect On over a newer unchanged Off.
         let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
         let source = PeriodicPingPreferences(enabled: true, destinations: "127.0.0.1", period: "25")
@@ -91,6 +117,7 @@ struct PeriodicPingModelTests {
         try await failure.flush()
         require(tryValue(failureURL) == PeriodicPingPreferences(enabled: false, destinations: "127.0.0.2", period: "47"), "retry lost latest Off")
         require(failure.storageError == nil && !failure.savePending, "retry not acknowledged")
+        try await supersededSave(directory)
         let corruptURL = directory.appendingPathComponent("corrupt.json")
         let corruptBytes = Data("{corrupt".utf8)
         try corruptBytes.write(to: corruptURL)
@@ -104,7 +131,48 @@ struct PeriodicPingModelTests {
         corrupt.setEnabled(false)
         try await corrupt.flush()
         try await wait("final sockets close") { probe(0) == probe(1) }
-        print("PASS: standalone JSON default save, saved On restart, backup/restore, 65536-IP file, malformed import preservation, delayed-load Off, failed-save latest-Off retry and corrupt-load recovery")
+        print("PASS: standalone JSON default save, saved On restart, backup/restore, 65536-IP file, verbatim UTF-8, malformed import preservation, delayed-load Off, failed-save latest-Off retry, superseded-failure flush and corrupt-load recovery")
+    }
+
+    static func supersededSave(_ directory: URL) async throws {
+        let url = directory.appendingPathComponent("superseded-save.json")
+        let original = PeriodicPingPreferences(enabled: false, destinations: "127.0.0.1", period: "1000")
+        try JSONEncoder().encode(original).write(to: url, options: .atomic)
+        let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+        var storage = PeriodicPingModel.Storage()
+        let write = storage.write
+        storage.write = { data, target in
+            if try JSONDecoder().decode(PeriodicPingPreferences.self, from: data).enabled {
+                entered.signal()
+                precondition(release.wait(timeout: .now() + 3) == .success, "write boundary timed out")
+                throw CocoaError(.fileWriteUnknown)
+            }
+            try write(data, target)
+        }
+        let model = PeriodicPingModel(fileURL: url, storage: storage)
+        try await model.flush()
+        model.setEnabled(true)
+        let reached: Bool = await withCheckedContinuation { receipt in
+            DispatchQueue.global().async {
+                receipt.resume(returning: entered.wait(timeout: .now() + 3) == .success)
+            }
+        }
+        require(reached, "superseded write not entered")
+        model.setEnabled(false)
+        var completed = false
+        let receipt = Task { @MainActor in
+            defer { completed = true }
+            try await model.flush()
+        }
+        // Observe registration instead of assuming a yield scheduled the caller.
+        try await wait("flush waiter not registered") {
+            (Mirror(reflecting: model).descendant("waiters") as? [CheckedContinuation<Void, Error>])?.count == 1
+        }
+        release.signal()
+        try await wait("failed older write stranded latest-Off flush") { completed }
+        try await receipt.value
+        require(!model.enabled && model.storageError == nil && !model.savePending &&
+            tryValue(url) == original, "superseded failure did not settle latest durable Off")
     }
 
     static func tryValue(_ url: URL) -> PeriodicPingPreferences {

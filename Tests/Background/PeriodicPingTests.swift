@@ -25,7 +25,9 @@ struct PeriodicPingTests {
     static func main() throws {
         let config = try PeriodicPingConfiguration(destinations: "1.1.1.1, 192.168.0.9, ::1, 0:0:0:0:0:0:0:1, ::ffff:1.1.1.1", period: "1000")
         require(config.destinations.count == 3 && config.periodMilliseconds == 1000, "configuration")
-        for invalid in ["", "example.com", "127.1", "1.2.3.999", "127.0.0.1:80", "127.0.0.1,", "::1%", "::1%0", "::1%no-such-ping-interface", "1.1.1.1\0suffix", ",1.1.1.1"] {
+        for invalid in ["", "example.com", "127.1", "1.2.3.999", "127.0.0.1:80", "127.0.0.1,", "::1%", "::1%0", "::1%no-such-ping-interface", "1.1.1.1\0suffix", ",1.1.1.1",
+                        "\r\n127.0.0.1", "127.0.0.1\r\n", "127.0.0.1\r\n\r\n::1",
+                        "::1%1%2", "::1%%1", "::1" + String(repeating: "%", count: 4096)] {
             do { _ = try PeriodicPingConfiguration(destinations: invalid, period: "1000"); fatalError("invalid IP accepted") }
             catch is PingInputError { }
         }
@@ -33,17 +35,42 @@ struct PeriodicPingTests {
             do { _ = try PeriodicPingConfiguration(destinations: "1.1.1.1", period: invalid); fatalError("invalid period accepted") }
             catch is PingInputError { }
         }
-        _ = try PeriodicPingConfiguration(destinations: "127.0.0.1\n::1", period: " 1 ")
+        for newline in ["\n", "\r\n", "\r", "\u{0085}", "\u{2028}", "\u{2029}"] {
+            let separated = try PeriodicPingConfiguration(destinations: "127.0.0.1" + newline + "::1", period: " 1 ")
+            require(separated.destinations.map(\.name) == ["127.0.0.1", "::1"] && separated.periodMilliseconds == 1, "newline parsing")
+        }
         _ = try PeriodicPingConfiguration(destinations: "::1%1", period: String(Int.max / 1_000_000))
+        let scoped = try PeriodicPingConfiguration(destinations: "fe80::1%1,fe80:0:0:0:0:0:0:1%01,fe80::1%2", period: "1")
+        require(scoped.destinations.map(\.name) == ["fe80::1%1", "fe80::1%2"], "scope normalization and deduplication")
         let many = (0..<65_536).map { "10.1.\($0 / 256).\($0 % 256)" }.joined(separator: ",")
+        for period in ["", "0", String(Int.max / 1_000_000 + 1)] {
+            var checks = 0
+            do {
+                _ = try PeriodicPingConfiguration(destinations: many, period: period) { checks += 1; return false }
+                fatalError("invalid period accepted")
+            } catch let error as PingInputError { require(error == .period, "period error priority") }
+            require(checks == 1, "invalid period parsed the address list")
+        }
+        for period in ["0", "1"] {
+            do {
+                _ = try PeriodicPingConfiguration(destinations: many, period: period) { true }
+                fatalError("pre-cancelled input accepted")
+            } catch is CancellationError { }
+        }
+        var checks = 0
+        do {
+            _ = try PeriodicPingConfiguration(destinations: many, period: "1") { checks += 1; return checks == 2 }
+            fatalError("superseded parsing continued")
+        } catch is CancellationError { }
+        require(checks == 2, "parsing cancellation checkpoint")
         let maximum = try PeriodicPingConfiguration(destinations: many, period: "1")
         require(maximum.destinations.count == 65_536, "65536 IPs")
         do { _ = try PeriodicPingConfiguration(destinations: many + ",10.2.0.0", period: "1"); fatalError("too many accepted") }
-        catch is PingInputError { }
+        catch let error as PingInputError { require(error == .count, "distinct destination limit") }
         let duplicates = String(repeating: "127.0.0.1,", count: 100_000) + "127.0.0.1"
         let compacted = try PeriodicPingConfiguration(destinations: duplicates, period: "1")
         require(compacted.destinations.count == 1 && duplicates.utf8.count > 8192, "no byte/token cap")
-        let repeatedMaximum = try PeriodicPingConfiguration(destinations: many + ",10.1.0.0", period: "1")
+        let repeatedMaximum = try PeriodicPingConfiguration(destinations: many + ",10.1.0.0,::ffff:10.1.0.0", period: "1")
         require(repeatedMaximum.destinations.count == 65_536, "duplicate at maximum")
         for sequence in UInt32(0)...65535 {
             let bytes = PingPacket.echo(ipv6: false, identifier: 0x1234, sequence: UInt16(sequence))
