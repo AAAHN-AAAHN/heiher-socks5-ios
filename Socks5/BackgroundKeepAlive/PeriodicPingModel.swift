@@ -86,7 +86,8 @@ final class PeriodicPingModel: @MainActor ObservableObject {
         for waiter in waiters { waiter.resume(throwing: CancellationError()) }
         // Preserve the latest accepted edit after any already submitted write.
         // Releasing the sender never waits for disk I/O.
-        if ready, let fileURL, preferences != durable, preferences != saving {
+        let saved = durable
+        if ready, let fileURL, preferences != (saving ?? saved) {
             let snapshot = preferences, write = storage.write
             io.async { try? write(JSONEncoder().encode(snapshot), fileURL) }
         }
@@ -189,34 +190,37 @@ final class PeriodicPingModel: @MainActor ObservableObject {
         }
     }
 
-    private func save(force: Bool = false) {
+    private func save() {
         guard let fileURL, ready else { return }
         savePending = preferences != durable || saving != nil
-        guard saving == nil, force || preferences != durable else { return }
-        let snapshot = preferences, write = storage.write, lane = io
+        guard saving == nil, preferences != durable else { return }
+        let snapshot = preferences, write = storage.write
         saving = snapshot
         savePending = true
-        Task { @MainActor [weak self] in
-            let result: Result<Void, Error> = await withCheckedContinuation { receipt in
-                lane.async { receipt.resume(returning: Result { try write(JSONEncoder().encode(snapshot), fileURL) }) }
+        // Submit before returning so deinit can append the final edit after it.
+        io.async { [weak self] in
+            let result = Result { try write(JSONEncoder().encode(snapshot), fileURL) }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.saving = nil
+                switch result {
+                case .success:
+                    self.durable = snapshot
+                    self.storageError = nil
+                    self.savePending = self.preferences != snapshot
+                    if self.savePending { self.save() }
+                    else { self.completeWaiters() }
+                case .failure(let error):
+                    // A failed write leaves the disk snapshot uncertain.
+                    self.durable = nil
+                    self.storageError = error.localizedDescription
+                    self.savePending = true
+                    // A newer accepted edit gets its own attempt; never spin on failure.
+                    if self.preferences != snapshot { self.save() }
+                    else { self.completeWaiters(error) }
+                }
+                self.objectWillChange.send()
             }
-            guard let self else { return }
-            self.saving = nil
-            switch result {
-            case .success:
-                self.durable = snapshot
-                self.storageError = nil
-                self.savePending = self.preferences != snapshot
-                if self.savePending { self.save() }
-                else { self.completeWaiters() }
-            case .failure(let error):
-                self.storageError = error.localizedDescription
-                self.savePending = true
-                // A newer accepted edit gets its own attempt; never spin on failure.
-                if self.preferences != snapshot { self.save(force: true) }
-                else { self.completeWaiters(error) }
-            }
-            self.objectWillChange.send()
         }
     }
 

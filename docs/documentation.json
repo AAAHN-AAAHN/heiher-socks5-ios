@@ -3,7 +3,7 @@
   "frozen_source": "e8bb22125428853473fff883dd4dafe41881a7e8",
   "parents": {
     "feature/app-icon": "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
-    "feature/background": "3c17ae8b4053f4b5033fb9ebb0b15b67b88c6c61",
+    "feature/background": "e475b35a532f4244e27f860b84d8c48b2047f242",
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",

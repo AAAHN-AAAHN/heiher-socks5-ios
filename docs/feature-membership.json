@@ -2,7 +2,7 @@
   "base_commit": "94cc35ba5b50bab177f7aa678aa5af8fd3b8481d",
   "branches": {
     "feature/app-icon": "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
-    "feature/background": "3c17ae8b4053f4b5033fb9ebb0b15b67b88c6c61",
+    "feature/background": "e475b35a532f4244e27f860b84d8c48b2047f242",
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
@@ -80,8 +80,8 @@
       "sha256": "23f77795fd16ebd6cea09d95653630fd8b458ed03d19912dd53d7cbf73c0fcfb"
     },
     "Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift": {
-      "commit": "23e148f550d0ba8af197393d0e86c07cb7054031",
-      "sha256": "ae0085e36ceee936dfd62181e268e0ae206661f021db2f121e857657dc95fc89"
+      "commit": "e475b35a532f4244e27f860b84d8c48b2047f242",
+      "sha256": "268b01dc4e62b285b1022e1db4232a251f846f6c4c5e28cc5680cf80b8eeba56"
     },
     "Socks5/BackgroundKeepAlive/LoopAudioService.swift": {
       "commit": "0e2e73b68277a8391b61330a63e2a66c6e27ade5",
@@ -816,8 +816,8 @@
       "sha256": "ed07ae61d7e8a3aebf4879b6d42d142c545921f604b34a3123357855bfa0e2d6"
     },
     "Socks5/BackgroundKeepAlive/PeriodicPingModel.swift": {
-      "commit": "4d34668351ba778a677892d2910473fd5e855fb8",
-      "sha256": "49d2b90b4165bd4b7af7f44fb157b0e140be140385596edb4bc0a20409890506"
+      "commit": "e475b35a532f4244e27f860b84d8c48b2047f242",
+      "sha256": "7098082310ec7a4845ec40ea8a0e81d91e15d0f63f4e0adf6893ff2e9135d470"
     },
     "Socks5/BackgroundKeepAlive/PeriodicPingService.swift": {
       "commit": "4d34668351ba778a677892d2910473fd5e855fb8",
@@ -828,8 +828,8 @@
       "sha256": "c20702f1d0d458145ffaa1a0559e47cd65a4099129b81f55712680a7a9c195de"
     },
     "Tests/Background/PeriodicPingModelTests.swift": {
-      "commit": "4d34668351ba778a677892d2910473fd5e855fb8",
-      "sha256": "a2dba25c812f316e051256fab9ce711e28eab57e025aa96a952ec5302442d58d"
+      "commit": "e475b35a532f4244e27f860b84d8c48b2047f242",
+      "sha256": "51fad4f90eb217484de1e9d25c52283ce0434070029d72c7c70e46508185b820"
     },
     "Tests/Background/PeriodicPingTests.swift": {
       "commit": "4d34668351ba778a677892d2910473fd5e855fb8",
