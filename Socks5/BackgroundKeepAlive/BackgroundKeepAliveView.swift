@@ -19,6 +19,7 @@ struct BackgroundKeepAliveView: View {
     @State private var pingPreparingExport = false
     @State private var pingDocument = PingDocument(data: Data())
     @State private var pingFileError: String?
+    @State private var pingImportRequest: UUID?
     private enum PingField: Hashable { case destinations, period }
     @FocusState private var pingField: PingField?
 
@@ -80,6 +81,7 @@ struct BackgroundKeepAliveView: View {
                         .accessibilityIdentifier("background.pingStorageState")
                     if ping.hasOwnStorage {
                         Button("Export ping JSON") {
+                            pingImportRequest = nil
                             pingFileError = nil
                             pingPreparingExport = true
                             Task { @MainActor in
@@ -94,6 +96,7 @@ struct BackgroundKeepAliveView: View {
                         Button("Import ping JSON") { pingImporting = true }
                         if ping.storageError != nil {
                             Button("Retry Save") {
+                                pingImportRequest = nil
                                 pingFileError = nil
                                 Task { @MainActor in try? await ping.flush() }
                             }
@@ -116,9 +119,15 @@ struct BackgroundKeepAliveView: View {
                 if case .failure(let error) = result { pingFileError = error.localizedDescription }
             }
             .fileImporter(isPresented: $pingImporting, allowedContentTypes: [.json]) { result in
+                let request = UUID()
+                pingImportRequest = request
+                pingFileError = nil
                 Task { @MainActor in
-                    do { try await ping.importFile(result.get()); pingFileError = nil }
-                    catch { pingFileError = error.localizedDescription }
+                    do { try await ping.importFile(result.get()) }
+                    catch is CancellationError { }
+                    catch {
+                        if pingImportRequest == request { pingFileError = error.localizedDescription }
+                    }
                 }
             }
             .toolbar {

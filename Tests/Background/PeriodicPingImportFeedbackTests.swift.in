@@ -1,0 +1,228 @@
+import Foundation
+
+/// Only provider coordination is controlled. The injected importFile method is
+/// copied byte-for-byte from production's iOS-only block; model decode, UUID
+/// supersession, publication, serial storage, and flush are actual production.
+private final class ProviderBoundary: @unchecked Sendable {
+    static let shared = ProviderBoundary()
+    private let lock = NSLock()
+    private var path: String?
+    private var blocked = false
+    private var failing = false
+    let entered = DispatchSemaphore(value: 0)
+    let release = DispatchSemaphore(value: 0)
+    func configure(_ url: URL, blocked: Bool, failing: Bool) {
+        lock.lock(); path = url.path; self.blocked = blocked; self.failing = failing; lock.unlock()
+    }
+    func read(_ url: URL, error: UnsafeMutablePointer<NSError?>?, body: (URL) -> Void) {
+        lock.lock()
+        let matches = path == url.path
+        let blocked = matches && self.blocked, failing = matches && self.failing
+        lock.unlock()
+        if blocked {
+            entered.signal()
+            precondition(release.wait(timeout: .now() + 15) == .success, "PROVIDER_GATE_TIMEOUT")
+        }
+        if failing { error?.pointee = fault("Controlled older provider failure", 11) }
+        else { body(url) }
+    }
+}
+
+// Module-local name intentionally supplies the provider seam, even on macOS.
+final class NSFileCoordinator {
+    init(filePresenter: Any?) {}
+    func coordinate(readingItemAt url: URL, options: [Int],
+                    error: UnsafeMutablePointer<NSError?>?, byAccessor: (URL) -> Void) {
+        ProviderBoundary.shared.read(url, error: error, body: byAccessor)
+    }
+}
+#if !canImport(Darwin)
+extension URL {
+    func startAccessingSecurityScopedResource() -> Bool { false }
+    func stopAccessingSecurityScopedResource() {}
+}
+#endif
+
+private func fault(_ message: String, _ code: Int) -> NSError {
+    NSError(domain: "ImportFeedbackTests", code: code, userInfo: [NSLocalizedDescriptionKey: message])
+}
+
+private final class StorageBoundary: @unchecked Sendable {
+    private let lock = NSLock()
+    private var blocked = false
+    private var failing = false
+    private let write: @Sendable (Data, URL) throws -> Void
+    let entered = DispatchSemaphore(value: 0)
+    let release = DispatchSemaphore(value: 0)
+    init(_ write: @escaping @Sendable (Data, URL) throws -> Void) { self.write = write }
+    func configure(blocked: Bool, failing: Bool) {
+        lock.lock(); self.blocked = blocked; self.failing = failing; lock.unlock()
+    }
+    func save(_ data: Data, _ url: URL) throws {
+        let value = try JSONDecoder().decode(PeriodicPingPreferences.self, from: data)
+        lock.lock()
+        let matches = value.destinations == "127.0.0.2"
+        let blocked = matches && self.blocked, failing = matches && self.failing
+        lock.unlock()
+        if blocked {
+            entered.signal()
+            precondition(release.wait(timeout: .now() + 15) == .success, "STORAGE_GATE_TIMEOUT")
+        }
+        if failing { throw fault("Controlled older storage failure", 12) }
+        try write(data, url)
+    }
+}
+
+private struct PingDocument { var data: Data }
+
+/// Production action and completion bodies are inserted unchanged. Their
+/// original unstructured MainActor Task is awaited only to observe its outcome.
+@MainActor private final class FileActionHost {
+    let ping: PeriodicPingModel
+    var pingFileError: String?
+    var pingImportRequest: UUID?
+    var pingPreparingExport = false
+    var pingExporting = false
+    var pingDocument = PingDocument(data: Data())
+    init(_ model: PeriodicPingModel) { ping = model }
+    func importFile(_ result: Result<URL, Error>) async {
+        // IMPORT_ACTION
+    }
+    func export() async {
+        // EXPORT_ACTION
+    }
+    func retry() async {
+        // RETRY_ACTION
+    }
+    func completeExport(_ result: Result<URL, Error>) {
+        // EXPORT_COMPLETION
+    }
+}
+
+@main @MainActor struct ImportFeedbackTests {
+    static func check(_ value: Bool, _ marker: String) {
+        guard value else { fatalError(marker) }
+    }
+    static func wait(_ signal: DispatchSemaphore, _ marker: String) async {
+        let reached: Bool = await withCheckedContinuation { receipt in
+            DispatchQueue.global().async { receipt.resume(returning: signal.wait(timeout: .now() + 10) == .success) }
+        }
+        check(reached, marker)
+    }
+    static func main() async throws {
+        let mode = CommandLine.arguments[1]
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("import-feedback-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let target = root.appendingPathComponent("live.json")
+        let first = root.appendingPathComponent("first.json")
+        let second = root.appendingPathComponent("second.json")
+        let invalid = root.appendingPathComponent("invalid.json")
+        let original = PeriodicPingPreferences()
+        let a = PeriodicPingPreferences(enabled: false, destinations: "127.0.0.2", period: "250")
+        let b = PeriodicPingPreferences(enabled: false, destinations: "127.0.0.3", period: "500")
+        try JSONEncoder().encode(original).write(to: target)
+        try JSONEncoder().encode(a).write(to: first)
+        try JSONEncoder().encode(b).write(to: second)
+        try Data("{malformed newer import".utf8).write(to: invalid)
+        var storage = PeriodicPingModel.Storage()
+        let writes = StorageBoundary(storage.write)
+        storage.write = { data, url in try writes.save(data, url) }
+        let model = PeriodicPingModel(fileURL: target, storage: storage)
+        try await model.flush()
+        let host = FileActionHost(model)
+        func disk() throws -> PeriodicPingPreferences {
+            try JSONDecoder().decode(PeriodicPingPreferences.self, from: Data(contentsOf: target))
+        }
+        switch mode {
+        case "normal-success":
+            host.pingFileError = "Earlier operation error"
+            await host.importFile(.success(first))
+            check(host.pingFileError == nil, "NORMAL_SUCCESS_LEFT_ERROR")
+            check(try disk() == a, "NORMAL_SUCCESS_NOT_DURABLE")
+            check(model.storageError == nil && !model.savePending, "NORMAL_SUCCESS_STORAGE_STATE")
+        case "normal-invalid":
+            await host.importFile(.success(invalid))
+            check(host.pingFileError != nil, "NORMAL_INVALID_NOT_REPORTED")
+            check(try disk() == original, "NORMAL_INVALID_CHANGED_DISK")
+        case "normal-provider-failure":
+            ProviderBoundary.shared.configure(first, blocked: false, failing: true)
+            await host.importFile(.success(first))
+            check(host.pingFileError == "Controlled older provider failure", "NORMAL_PROVIDER_FAILURE_NOT_REPORTED")
+            check(try disk() == original, "NORMAL_PROVIDER_FAILURE_CHANGED_DISK")
+        case "normal-storage-failure", "normal-retry-success":
+            writes.configure(blocked: false, failing: true)
+            await host.importFile(.success(first))
+            check(host.pingFileError == "Controlled older storage failure", "NORMAL_STORAGE_FAILURE_NOT_REPORTED")
+            check(model.storageError != nil && model.savePending, "NORMAL_STORAGE_ERROR_HIDDEN")
+            if mode == "normal-retry-success" {
+                writes.configure(blocked: false, failing: false)
+                await host.importFile(.success(first))
+                check(host.pingFileError == nil && model.storageError == nil && !model.savePending,
+                      "NORMAL_IMPORT_RETRY_LEFT_ERROR")
+                check(try disk() == a, "NORMAL_IMPORT_RETRY_NOT_DURABLE")
+            }
+        case "old-success-new-invalid", "old-failure-new-invalid", "old-failure-new-export":
+            let failed = mode != "old-success-new-invalid"
+            writes.configure(blocked: true, failing: failed)
+            let older = Task { @MainActor in await host.importFile(.success(first)) }
+            await wait(writes.entered, "OLDER_IMPORT_STORAGE_NOT_ENTERED")
+            let newer: String
+            if mode == "old-failure-new-export" {
+                await host.export()
+                check(host.pingExporting && !host.pingPreparingExport, "NEW_EXPORT_NOT_PREPARED")
+                host.completeExport(.failure(fault("Newer export failed", 13)))
+                newer = "Newer export failed"
+            } else {
+                await host.importFile(.success(invalid))
+                guard let message = host.pingFileError else { fatalError("NEWER_INVALID_IMPORT_NOT_REPORTED") }
+                newer = message
+            }
+            writes.configure(blocked: false, failing: failed)
+            writes.release.signal()
+            await older.value
+            check(host.pingFileError == newer, failed ? "OLDER_IMPORT_FAILURE_REPLACED_NEWER_ERROR" : "OLDER_IMPORT_SUCCESS_ERASED_NEWER_ERROR")
+            if failed { check(model.storageError != nil && model.savePending, "OLDER_STORAGE_ERROR_NOT_RETAINED_BY_MODEL") }
+            else { check(try disk() == a && model.storageError == nil && !model.savePending, "OLDER_SUCCESS_DISK_STATE") }
+        case "old-provider-failure-new-success", "old-cancel-new-success", "old-provider-failure-new-export", "old-provider-failure-new-retry", "current-cancel-off":
+            let cancellation = mode == "old-cancel-new-success" || mode == "current-cancel-off"
+            if cancellation {
+                var on = a; on.enabled = true
+                try JSONEncoder().encode(on).write(to: first)
+            }
+            ProviderBoundary.shared.configure(first, blocked: true, failing: !cancellation)
+            let older = Task { @MainActor in await host.importFile(.success(first)) }
+            await wait(ProviderBoundary.shared.entered, "OLDER_IMPORT_PROVIDER_NOT_ENTERED")
+            if mode == "current-cancel-off" {
+                // This exact explicit unchanged Off changes the production model's
+                // intent UUID before its delayed importFile provider returns.
+                model.setEnabled(false)
+            } else if mode == "old-provider-failure-new-export" {
+                await host.export()
+                host.completeExport(.success(root.appendingPathComponent("exported.json")))
+            } else if mode == "old-provider-failure-new-retry" {
+                writes.configure(blocked: false, failing: true)
+                model.setDestinations("127.0.0.2")
+                do { try await model.flush(); fatalError("RETRY_PRECONDITION_DID_NOT_FAIL") } catch { }
+                check(model.storageError != nil, "RETRY_BUTTON_WOULD_BE_ABSENT")
+                writes.configure(blocked: false, failing: false)
+                await host.retry()
+                check(model.storageError == nil && !model.savePending, "RETRY_DID_NOT_RECOVER")
+            } else {
+                await host.importFile(.success(second))
+                check(try disk() == b, "NEWER_SUCCESS_NOT_DURABLE")
+            }
+            check(host.pingFileError == nil, "NEWER_ACTION_HAS_UNEXPECTED_ERROR")
+            ProviderBoundary.shared.release.signal()
+            await older.value
+            check(host.pingFileError == nil, cancellation ? "SUPERSEDED_IMPORT_CANCELLATION_DISPLAYED_AS_ERROR" : "OLDER_PROVIDER_FAILURE_REPLACED_NEWER_SUCCESS")
+            check(!model.enabled, "STALE_IMPORT_RESURRECTED_ON")
+            if mode == "current-cancel-off" { check(try disk() == original, "CANCELLED_IMPORT_CHANGED_DISK") }
+            if mode == "old-cancel-new-success" || mode == "old-provider-failure-new-success" {
+                check(try disk() == b, "OLDER_PROVIDER_CHANGED_NEWER_DISK")
+            }
+        default: fatalError("UNKNOWN_CASE")
+        }
+        print("PASS: import feedback \(mode); extracted production actions and actual model; controlled provider, no UIKit/physical provider claim")
+    }
+}
