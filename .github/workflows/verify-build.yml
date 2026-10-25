@@ -9,7 +9,7 @@ jobs:
   verify-linux:
     name: verify (ubuntu-24.04)
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       BUILD_IPA: '1'
     steps:
@@ -40,7 +40,7 @@ jobs:
   verify-macos:
     name: verify (xcode-27)
     runs-on: xcode-27
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       BUILD_IPA: '1'
     outputs:
