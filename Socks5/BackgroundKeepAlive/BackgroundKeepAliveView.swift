@@ -80,6 +80,7 @@ struct BackgroundKeepAliveView: View {
                         .accessibilityIdentifier("background.pingStorageState")
                     if ping.hasOwnStorage {
                         Button("Export ping JSON") {
+                            pingFileError = nil
                             pingPreparingExport = true
                             Task { @MainActor in
                                 defer { pingPreparingExport = false }
