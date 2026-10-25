@@ -46,7 +46,9 @@ final class PeriodicPingUITests: XCTestCase {
             let done = app.buttons["background.pingDone"]
             XCTAssertTrue(done.waitForExistence(timeout: 5))
             done.tap()
-            XCTAssertFalse(app.keyboards.firstMatch.exists)
+            // Focus clears before the keyboard dismissal animation finishes.
+            let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch)
+            XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 5), .completed)
         }
         @MainActor func expect(_ text: String) {
             let check = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", text), object: state)
