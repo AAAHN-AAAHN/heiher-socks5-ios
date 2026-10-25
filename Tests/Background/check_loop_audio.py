@@ -43,8 +43,8 @@ INGRESS_NEGATIVES = {
     'admit-inspect-invalidated': 'INVALIDATED_RESOURCE_ADMITTED_WITHOUT_REBUILD',
     'admit-reuse-invalidated': 'INVALIDATED_RESOURCE_ADMITTED_WITHOUT_REBUILD',
 }
-FACADE_CASES = ('reentry-intent', 'reentry-publication', 'echo', 'owner', 'notifications', 'inactive-source',
-                'scheduling', 'location')
+FACADE_CASES = ('reentry-intent', 'reentry-publication', 'echo', 'owner', 'blocked-owner-off', 'blocked-owner-restore',
+                'notifications', 'inactive-source', 'scheduling', 'location')
 API_BOUNDARIES = ('asset', 'session', 'category-get', 'mode-get', 'options-get', 'category-set',
                   'alerts', 'disconnect', 'activate', 'player-init', 'loops', 'delegate',
                   'prepare', 'play', 'playing-get', 'position-get', 'clock-get',

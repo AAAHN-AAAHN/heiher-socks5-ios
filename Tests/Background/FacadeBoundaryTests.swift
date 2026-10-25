@@ -13,6 +13,7 @@ private final class FacadeEndpoint: LoopAudioEndpoint, Sendable {
     struct State {
         var playing = false
         var failures = 0
+        var invalidAsset = false
         var starts: [Double] = []
         var stops = 0
         var inspections = 0
@@ -27,6 +28,7 @@ private final class FacadeEndpoint: LoopAudioEndpoint, Sendable {
             case .start:
                 guard context.mayStart() else { return .init(superseded: true) }
                 value.starts.append(now)
+                if value.invalidAsset { return .init(error: "Controlled invalid WAV", invalidAsset: true) }
                 if value.failures > 0 { value.failures -= 1; return .init(error: "Controlled activation rejection") }
                 value.playing = true
             case .inspect: value.inspections += 1
@@ -131,6 +133,44 @@ extension LoopAudioService {
             check(endpoint.state.use { $0.playing && $0.stops == 0 }, "OLD_OWNER_RELEASE_STOPPED_NEW_OWNER")
             second = nil
             try await until({ endpoint.state.use { !$0.playing && $0.stops == 1 } }, "LAST_OWNER_CLEANUP_MISSING")
+        case "blocked-owner-off", "blocked-owner-restore":
+            endpoint.state.use { $0.invalidAsset = true }
+            app!.setAudio(true)
+            func blocked(_ owner: BackgroundKeepAlive) -> Bool {
+                owner.audioState == "Waiting to resume: Controlled invalid WAV"
+            }
+            try await until({ blocked(app!) }, "BLOCKED_OWNER_INITIAL_FAILURE")
+            let second = BackgroundKeepAlive(audioService: service)
+            if name == "blocked-owner-off" {
+                second.setAudio(true)
+                try await until({ blocked(second) && endpoint.state.use { $0.starts.count == 2 } },
+                                "BLOCKED_OWNER_SECOND_RETRY")
+            }
+            let before = await diagnostics()
+            let counts = endpoint.state.use { ($0.starts.count, $0.stops, $0.inspections) }
+            check(before.operation == nil && !before.timerActive, "BLOCKED_OWNER_NOT_PARKED")
+            if name == "blocked-owner-off" { app!.setAudio(false) }
+            else { second.syncAudio(true) }
+            let after = await diagnostics() // The accepted owner change crossed control.
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+            check(endpoint.state.use { ($0.starts.count, $0.stops, $0.inspections) } == counts &&
+                  after.completedOperations == before.completedOperations &&
+                  after.operation == nil && !after.timerActive,
+                  "BLOCKED_OWNER_FEEDBACK_REOPENED_AUDIO_WORK")
+            if name == "blocked-owner-off" {
+                check(!app!.audioEnabled && app!.audioState == "Off" &&
+                      app!.audioDetail == "Shared playback is requested by another owner",
+                      "DEPARTING_BLOCKED_OWNER_NEVER_ACKNOWLEDGED_OFF")
+                check(second.audioEnabled && blocked(second), "BLOCKED_SURVIVING_OWNER_CHANGED")
+            } else {
+                check(second.audioEnabled && blocked(second), "RESTORED_BLOCKED_OWNER_NEVER_RECEIVED_CURRENT_STATE")
+                check(app!.audioEnabled && blocked(app!), "BLOCKED_ORIGINAL_OWNER_CHANGED")
+            }
+            second.setAudio(false)
+            try await stop()
+            try await until({ second.audioState == "Off" }, "BLOCKED_OWNER_FINAL_OFF")
         case "notifications":
             let delivered = FacadeValue([Notification.Name]())
             let names = BackgroundKeepAlive.audioNotifications
