@@ -7,6 +7,12 @@ struct PeriodicPingPreferences: Codable, Equatable, Sendable {
     var enabled = false
     var destinations = "1.1.1.1"
     var period = "1000"
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.enabled == rhs.enabled &&
+        lhs.destinations.utf8.elementsEqual(rhs.destinations.utf8) &&
+        lhs.period.utf8.elementsEqual(rhs.period.utf8)
+    }
 }
 
 /// App-root lifetime. Integrated uses SettingsStore as its only disk owner;
@@ -102,7 +108,7 @@ final class PeriodicPingModel: @MainActor ObservableObject {
     }
 
     func setDestinations(_ value: String) {
-        guard destinations != value else { return }
+        guard !destinations.utf8.elementsEqual(value.utf8) else { return }
         intent = UUID()
         earlyEdits.insert(.destinations)
         preferences.destinations = value
@@ -110,7 +116,7 @@ final class PeriodicPingModel: @MainActor ObservableObject {
     }
 
     func setPeriod(_ value: String) {
-        guard period != value else { return }
+        guard !period.utf8.elementsEqual(value.utf8) else { return }
         intent = UUID()
         earlyEdits.insert(.period)
         preferences.period = value
@@ -207,7 +213,7 @@ final class PeriodicPingModel: @MainActor ObservableObject {
                 self.storageError = error.localizedDescription
                 self.savePending = true
                 // A newer accepted edit gets its own attempt; never spin on failure.
-                if self.preferences != snapshot { self.save() }
+                if self.preferences != snapshot { self.save(force: true) }
                 else { self.completeWaiters(error) }
             }
             self.objectWillChange.send()

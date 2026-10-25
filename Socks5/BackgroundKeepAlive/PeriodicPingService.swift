@@ -34,7 +34,7 @@ struct PingDestination: Sendable {
             length = socklen_t(MemoryLayout<sockaddr_in>.size)
             name = String(cString: normalized)
         } else {
-            let parts = text.split(separator: "%", omittingEmptySubsequences: false)
+            let parts = text.split(separator: "%", maxSplits: 2, omittingEmptySubsequences: false)
             guard (1...2).contains(parts.count), inet_pton(AF_INET6, String(parts[0]), &v6) == 1 else {
                 throw PingInputError.address
             }
@@ -83,14 +83,20 @@ struct PeriodicPingConfiguration: Sendable {
     static let maximumDestinations = 65_536
 
     init(destinations text: String, period: String, isCancelled: () -> Bool = { false }) throws {
+        if isCancelled() { throw CancellationError() }
+        // Reject an invalid period before normalizing a potentially large address list.
+        let digits = period.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !digits.isEmpty, digits.utf8.allSatisfy({ (48...57).contains($0) }),
+              let milliseconds = Int(digits), milliseconds > 0,
+              milliseconds <= Int.max / 1_000_000 else { throw PingInputError.period }
         // Scan substrings without copying the whole input or allocating a token array.
         var remaining = text[...]
         var scanned = 0
         var seen = Set<String>()
         var addresses: [PingDestination] = []
         while true {
-            if scanned % 256 == 0, isCancelled() { throw CancellationError() }
-            let end = remaining.firstIndex { $0 == "," || $0 == "\n" } ?? remaining.endIndex
+            if scanned > 0, scanned % 256 == 0, isCancelled() { throw CancellationError() }
+            let end = remaining.firstIndex { $0 == "," || $0.isNewline } ?? remaining.endIndex
             let token = remaining[..<end].trimmingCharacters(in: .whitespacesAndNewlines)
             let address = try PingDestination(token)
             if seen.insert(address.name).inserted {
@@ -102,10 +108,6 @@ struct PeriodicPingConfiguration: Sendable {
             remaining = remaining[remaining.index(after: end)...]
         }
         guard !addresses.isEmpty else { throw PingInputError.count }
-        let digits = period.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !digits.isEmpty, digits.utf8.allSatisfy({ (48...57).contains($0) }),
-              let milliseconds = Int(digits), milliseconds > 0,
-              milliseconds <= Int.max / 1_000_000 else { throw PingInputError.period }
         destinations = addresses
         periodMilliseconds = milliseconds
     }
