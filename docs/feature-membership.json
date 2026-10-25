@@ -6,7 +6,7 @@
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
-    "feature/settings-persistence": "6297a68f72f8eae7016906ca044a739fa54719cc"
+    "feature/settings-persistence": "c8ee348db9cbc83ddb3f591c98d681474b701ecb"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -112,8 +112,8 @@
       "sha256": "e64a89cece6dc47cebe6ee910ba4e6a7d71b17837bc24f4354a30b1307bdd0fd"
     },
     "Socks5/Settings/AppSettings.swift": {
-      "commit": "819252a94ae274485395c53a3f8b14e1449a7a8f",
-      "sha256": "38e7702a69810255606445ea597a78bfc6c4467175a46dfa9fbc46007087f46a"
+      "commit": "c8ee348db9cbc83ddb3f591c98d681474b701ecb",
+      "sha256": "47def1b988e78f96aaebcbe85c1bef94fca5543740b9943f4c4d649401ceb2cc"
     },
     "Socks5/Settings/SettingsStore.swift": {
       "commit": "819252a94ae274485395c53a3f8b14e1449a7a8f",
@@ -848,8 +848,8 @@
       "sha256": "e8ff370befa554546840a8dcb25c980b0049c191a524a49539f727497fbdb979"
     },
     "Tests/Settings/PeriodicPingPersistenceTests.swift": {
-      "commit": "59c4a022390b7ce09c359cbee5a783e3c7277bb0",
-      "sha256": "401cb16fc4918185b21d39a8f800f8e1eab7da72e0660f9ab36fb5a94dc2c6b2"
+      "commit": "c8ee348db9cbc83ddb3f591c98d681474b701ecb",
+      "sha256": "48f2624b742a1b8d41c7502da0be4ac2bbb4da2bb57dec45ad9159bc9c770c56"
     }
   },
   "files": {

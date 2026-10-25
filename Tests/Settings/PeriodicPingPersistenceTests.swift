@@ -15,6 +15,19 @@ import Foundation
         let store = await loadedSettings(fileURL: url, legacy: legacy)
         try await store.flush()
         check(store.value.background.periodicPing == .init(), "defaults")
+        let composed = "\u{00e9}", decomposed = "e\u{0301}"
+        check(composed == decomposed && !composed.utf8.elementsEqual(decomposed.utf8), "raw text fixture")
+        let textPaths: [WritableKeyPath<AppSettings, String>] = [
+            \.background.periodicPing.destinations, \.background.periodicPing.period]
+        for path in textPaths {
+            store.set(path, composed)
+            try await store.flush()
+            store.set(path, decomposed)
+            try await store.flush()
+            let restored = await loadedSettings(fileURL: url, legacy: legacy)
+            check(store.value[keyPath: path].utf8.elementsEqual(decomposed.utf8), "latest raw text accepted")
+            check(restored.value[keyPath: path].utf8.elementsEqual(decomposed.utf8), "raw text durable after relaunch")
+        }
         let large = (0..<65_536).map { "10.8.\($0 / 256).\($0 % 256)" }.joined(separator: ",")
         store.set(\.background.periodicPing.destinations, large)
         store.set(\.background.periodicPing.period, "2500")

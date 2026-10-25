@@ -10,6 +10,12 @@ struct AppSettings: Codable, Equatable, Sendable {
             var enabled = false
             var destinations = "1.1.1.1"
             var period = "1000"
+
+            static func == (lhs: Self, rhs: Self) -> Bool {
+                lhs.enabled == rhs.enabled &&
+                lhs.destinations.utf8.elementsEqual(rhs.destinations.utf8) &&
+                lhs.period.utf8.elementsEqual(rhs.period.utf8)
+            }
         }
         var periodicPing = PeriodicPing()
 
