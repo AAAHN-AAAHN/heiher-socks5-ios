@@ -3,7 +3,7 @@
   "frozen_source": "887b9e114995532b78ed1f68371e8f6cbb8929c8",
   "parents": {
     "feature/app-icon": "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
-    "feature/background": "4d34668351ba778a677892d2910473fd5e855fb8",
+    "feature/background": "3c17ae8b4053f4b5033fb9ebb0b15b67b88c6c61",
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
@@ -19,7 +19,7 @@
     "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
     "Build/check_ownership.py": "d063871f7d73d4caad662d7837734dfdfca294bd",
     "Tests/AppIcon/check_icon.py": "99c12340f6869c5ec6d919df78ae258343b34a51",
-    "Tests/Background/check_scope.py": "df41e7975ae57d51068fd3a53d937498178583d1",
+    "Tests/Background/check_scope.py": "452c533f2cb02860e1da5f02272e876adfab35e8",
     "Tests/Statistics/audit.py": "d246c4f5963712cd2091081a68bb5f0c3049db20",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
