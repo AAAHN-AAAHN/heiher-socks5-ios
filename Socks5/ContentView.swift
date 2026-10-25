@@ -146,7 +146,9 @@ struct ContentView: View {
             HStack {
                 Button(action: {
                     isRunning = true
-                    DispatchQueue.global().async {
+                    DispatchQueue.global().async { [workersText, listenPortText, listenAddrText,
+                        udpListenPortText, udpListenAddrText, listenIpv6OnlyToggle,
+                        bindIpv4AddrText, bindIpv6AddrText, bindIfaceText, authUserText, authPassText] in
                         let conf = """
                             main:
                               workers: \(workersText)
@@ -163,7 +165,7 @@ struct ContentView: View {
                               password: '\(authPassText)'
                             """
                         let _ = hev_socks5_server_main_from_str(conf, UInt32(strlen(conf)))
-                        isRunning = false
+                        DispatchQueue.main.async { isRunning = false }
                     }
                 }) {
                     Text("Start")

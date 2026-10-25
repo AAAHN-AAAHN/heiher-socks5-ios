@@ -48,7 +48,7 @@ def main():
     base_paths = documents['code_paths'](ROOT, git('ls-tree', '-r', '--name-only', BASE).decode().splitlines())
     current_paths = documents['code_paths'](ROOT, git('ls-files').decode().splitlines())
     allowed = {'.github/workflows/verify-build.yml', 'Build/check.py',
-               'Build/features.json', 'README.md', 'Socks5/Socks5App.swift',
+               'Build/features.json', 'README.md', 'Socks5/Socks5App.swift', 'Socks5/ContentView.swift',
                'Socks5.xcodeproj/project.pbxproj'}
     additions = {'Socks5/AppRoot.swift', 'Socks5/Info.plist',
                  'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift',
@@ -69,6 +69,20 @@ def main():
             preserved.append(path)
     assert data('Socks5/Socks5App.swift') == original('Socks5/Socks5App.swift').replace(
         b'ContentView()', b'AppRoot()', 1), 'Unexpected app entry-point change'
+    # Only snapshot UI inputs before the worker and return completion to MainActor.
+    # Keep the baseline layout, YAML, native invocation and Stop behavior exact.
+    baseline_view = original('Socks5/ContentView.swift')
+    assert baseline_view.count(b'DispatchQueue.global().async {') == 1
+    assert baseline_view.count(b'                        isRunning = false\n') == 1
+    expected_view = baseline_view.replace(
+        b'DispatchQueue.global().async {',
+        b'DispatchQueue.global().async { [workersText, listenPortText, listenAddrText,\n'
+        b'                        udpListenPortText, udpListenAddrText, listenIpv6OnlyToggle,\n'
+        b'                        bindIpv4AddrText, bindIpv6AddrText, bindIfaceText, authUserText, authPassText] in', 1)
+    expected_view = expected_view.replace(
+        b'                        isRunning = false\n',
+        b'                        DispatchQueue.main.async { isRunning = false }\n', 1)
+    assert data('Socks5/ContentView.swift') == expected_view, 'Unexpected standalone UI actor-boundary change'
     baseline_config = json.loads(original('Build/features.json'))
     assert CONFIG['features'] == ['background'] and CONFIG['patches'] == []
     for key in ('sources', 'upstream_app'):
