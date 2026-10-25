@@ -2,7 +2,7 @@
   "base_commit": "94cc35ba5b50bab177f7aa678aa5af8fd3b8481d",
   "branches": {
     "feature/app-icon": "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
-    "feature/background": "48f7bec613b53ba728aeb79126ffc1456ae4e28f",
+    "feature/background": "b3f0429eb1bfb2b6cd2918b8ccbbaebb77f9c0ee",
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
@@ -844,8 +844,8 @@
       "sha256": "71d638ad37e3ed04ea2575ae9ff20cd8993c008007327a0768d73a13e6ee1c09"
     },
     "Tests/Background/PeriodicPingUITests.swift": {
-      "commit": "23e148f550d0ba8af197393d0e86c07cb7054031",
-      "sha256": "e8ff370befa554546840a8dcb25c980b0049c191a524a49539f727497fbdb979"
+      "commit": "b3f0429eb1bfb2b6cd2918b8ccbbaebb77f9c0ee",
+      "sha256": "ee003774108dd4cd6bf6cab7b5bf3335acbb639a9c07f68a09f5a98940d0084b"
     },
     "Tests/Settings/PeriodicPingPersistenceTests.swift": {
       "commit": "c8ee348db9cbc83ddb3f591c98d681474b701ecb",
