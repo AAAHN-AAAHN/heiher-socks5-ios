@@ -157,7 +157,8 @@ def optimization(old, current):
                 command = [sys.executable, *(['-O'] if optimized else []), 'Build/check.py', 'baseline']
                 result = subprocess.run(command, cwd=root, env=env, capture_output=True, timeout=15)
                 accepted = result.returncode == 0
-                if accepted != (label == 'old' and optimized):
+                if accepted != (label == 'old' and optimized) or (
+                        label == 'current' and optimized and b'Assertions must be enabled' not in result.stderr):
                     raise RuntimeError((label, optimized, result.returncode, result.stderr))
                 print('PASS assertions:', label, optimized, 'accepted=', accepted, flush=True)
                 count += 1
