@@ -21,6 +21,11 @@ python3 Tests/Background/check_scope.py > "$OUT/background-scope.json"
 python3 Tests/Background/audit_driver_check.py > "$OUT/audit-driver.log"
 python3 Tests/Background/check_audit_integrity.py > "$OUT/audit-integrity.log" 2>&1
 python3 Tests/Background/run_checks.py > "$OUT/controller-tests.log" 2>&1
+NAME=$(python3 -c 'import json; print(json.load(open("Build/features.json"))["name"])')
+# The current client tests copy the actual patched native public header. The
+# committed baseline framework intentionally retains the original ABI.
+HEADERS="$PWD/artifacts/$NAME/periodic-ping/compiled-headers"
+(cd "$HEADERS" && shasum -a 256 -c SHA256SUMS.txt) > "$OUT/native-headers.log"
 python3 Tests/Background/check_async_session.py > "$OUT/async-session-tests.log" 2>&1
 python3 Tests/Background/check_interruption_policy.py > "$OUT/interruption-policy.log" 2>&1
 python3 Tests/Background/check_subscription.py > "$OUT/subscription-tests.log" 2>&1
@@ -34,7 +39,7 @@ grep -n -A8 -B4 -E 'activateWithOptions:|deactivateWithOptions:|ResumptionContex
   "$SDK/System/Library/Frameworks/AVFAudio.framework/Headers/AVAudioSession.h" > "$OUT/session-api-declarations.txt"
 xcrun swiftc -typecheck -swift-version 5 -strict-concurrency=complete -warnings-as-errors \
   -sdk "$SDK" -target arm64-apple-ios17.2 \
-  -I HevSocks5Server.xcframework/ios-arm64/Headers \
+  -I "$HEADERS" \
   Socks5/Socks5App.swift Socks5/AppRoot.swift Socks5/ContentView.swift \
   Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift \
   Socks5/BackgroundKeepAlive/LoopAudioService.swift \

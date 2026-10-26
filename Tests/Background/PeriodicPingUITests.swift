@@ -1,7 +1,7 @@
 import XCTest
 import UIKit
 
-/// Uses only loopback targets. Send status is not a claim that a peer replied.
+/// Uses the actual native server with loopback targets. SENT is not a reply.
 final class PeriodicPingUITests: XCTestCase {
     @MainActor func testPeriodicPingControlsAndPersistence() {
         continueAfterFailure = false
@@ -53,6 +53,26 @@ final class PeriodicPingUITests: XCTestCase {
             let check = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", text), object: state)
             XCTAssertEqual(XCTWaiter.wait(for: [check], timeout: 5), .completed)
         }
+        @MainActor func startServer() {
+            app.tabBars.buttons["Server"].tap()
+            let start = app.buttons["Start"].firstMatch
+            XCTAssertTrue(start.waitForExistence(timeout: 5))
+            XCTAssertTrue(start.isEnabled)
+            start.tap()
+            revealPing()
+            expect("Sending ICMP to 2 destination(s)")
+        }
+        @MainActor func stopServer() {
+            app.tabBars.buttons["Server"].tap()
+            let stop = app.buttons["Stop"].firstMatch
+            XCTAssertTrue(stop.waitForExistence(timeout: 5))
+            XCTAssertTrue(stop.isEnabled)
+            stop.tap()
+            let start = app.buttons["Start"].firstMatch
+            let idle = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == YES"), object: start)
+            XCTAssertEqual(XCTWaiter.wait(for: [idle], timeout: 5), .completed)
+            revealPing()
+        }
         revealPing()
         XCTAssertEqual(toggle.value as? String, "0")
         XCTAssertEqual(destinations.value as? String, "1.1.1.1")
@@ -66,7 +86,8 @@ final class PeriodicPingUITests: XCTestCase {
         revealPing()
         toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         XCTAssertEqual(toggle.value as? String, "1")
-        expect("Sending ICMP to 2 destination(s)")
+        expect("Waiting for native ICMP server")
+        startServer()
         let sending = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         sending.name = "periodic-ping-sending"
         sending.lifetime = .keepAlways
@@ -74,6 +95,8 @@ final class PeriodicPingUITests: XCTestCase {
         app.tabBars.buttons["Server"].tap()
         revealPing()
         XCTAssertEqual(toggle.value as? String, "1")
+        stopServer()
+        expect("Waiting for native ICMP server")
         waitSaved()
         app.terminate()
         app.launch()
@@ -81,7 +104,8 @@ final class PeriodicPingUITests: XCTestCase {
         XCTAssertEqual(toggle.value as? String, "1")
         XCTAssertEqual(destinations.value as? String, "127.0.0.1, ::1")
         XCTAssertEqual(period.value as? String, "250")
-        expect("Sending ICMP to 2 destination(s)")
+        expect("Waiting for native ICMP server")
+        startServer()
         replace(period, "0")
         expect("Period must be a positive whole number of milliseconds.")
         XCTAssertEqual(toggle.value as? String, "1")
@@ -91,6 +115,8 @@ final class PeriodicPingUITests: XCTestCase {
         expect("Sending ICMP to 2 destination(s)")
         toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         XCTAssertEqual(toggle.value as? String, "0")
+        expect("Off")
+        stopServer()
         expect("Off")
         let capture = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         capture.name = "periodic-ping-final-off"

@@ -140,7 +140,7 @@ struct PeriodicPingModelTests {
         require(corrupt.enabled && corrupt.canExport, "explicit backup did not recover load")
         corrupt.setEnabled(false)
         try await corrupt.flush()
-        try await wait("final sockets close") { probe(0) == probe(1) }
+        try await wait("final native clients close") { probe(0) == probe(1) }
         print("PASS: standalone JSON default save, saved On restart, backup/restore, 65536-IP file, verbatim UTF-8, malformed import preservation, delayed-load Off, failed-save latest-Off retry, superseded-failure flush, settled-failure recovery, both owner-release write orders and corrupt-load edits/recovery")
     }
 
@@ -290,11 +290,11 @@ struct PeriodicPingModelTests {
         owner!.setDestinations("127.0.0.1, ::1")
         owner!.setPeriod("10")
         try await wait("off settles") { owner!.status == "Off" }
-        require(probe(0) == 0, "off creates no sockets")
+        require(probe(0) == 0, "off creates no native clients")
         owner!.setDestinations(String(repeating: "invalid,", count: 100_000))
         owner!.setPeriod("invalid")
         try await wait("disabled edits skip parsing") { owner!.status == "Off" }
-        require(probe(0) == 0, "disabled malformed input opened a socket")
+        require(probe(0) == 0, "disabled malformed input opened a native client")
         owner!.setDestinations("127.0.0.1, ::1")
         owner!.setPeriod("10")
         owner!.setEnabled(true)
@@ -328,6 +328,6 @@ struct PeriodicPingModelTests {
         try await wait("model lifetime") { weakOwner == nil && probe(0) == probe(1) }
         try await persistence()
         print("PASS: defaults, disabled edits, input rejection/recovery, synchronous publication reentry, 100 On-Off pairs, stale status, root release cleanup")
-        print("CONTROLLED_SYSCALLS opens=\(probe(0)) closes=\(probe(1)); no UIKit or physical ICMP execution")
+        print("CONTROLLED_NATIVE_API clients=\(probe(0)) freed=\(probe(1)); no UIKit or physical ICMP execution")
     }
 }
