@@ -20,8 +20,9 @@ def main():
     def git(*args):
         return subprocess.check_output(['git', '-C', str(ROOT), *args], env=env)
     git('merge-base', '--is-ancestor', base, 'HEAD')
-    for path in ('Build/build.sh', 'Build/check.py', 'Tests/baseline_audit.py',
-                 'Tests/tcp_smoke.py'):
+    for path in ('Build/build.sh', 'Build/build-tunnel.sh', 'Build/check.py',
+                 'Build/native_sources.py', 'Tests/baseline_audit.py',
+                 'Tests/native_sources_contract.py', 'Tests/tcp_smoke.py'):
         if (ROOT / path).read_bytes() != git('show', base + ':' + path):
             raise RuntimeError('Inherited baseline implementation differs: ' + path)
     with tempfile.TemporaryDirectory(prefix='shared-baseline-') as temporary:
@@ -29,6 +30,8 @@ def main():
         git('worktree', 'add', '--detach', str(worktree), base)
         try:
             subprocess.run([sys.executable, 'Tests/baseline_audit.py'], cwd=worktree,
+                           env=env, check=True, timeout=180)
+            subprocess.run([sys.executable, 'Tests/native_sources_contract.py'], cwd=worktree,
                            env=env, check=True, timeout=180)
         finally:
             git('worktree', 'remove', '--force', str(worktree))

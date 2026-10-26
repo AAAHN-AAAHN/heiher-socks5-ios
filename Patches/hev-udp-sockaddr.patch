@@ -38,10 +38,10 @@ index 2b5e12231ac551ac689a9e4d52bad01df02ca281..ca122f8d009a5aef033d11a08226e394
      res = hev_socks5_name_resolve_ipv4 (name, saddr);
      if (res == 0) {
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index f6afc3752175f28e0733543a0172f94fddf851a1..d1e3e74205e86fa2f449678568f6bce21d3cc793 100644
+index d51e8569570054293b73a647dd25ba9c838dd5da..d20efb7b28f26a20dabe0b3e02a6b881d2ec2bf1 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
-@@ -25,6 +25,27 @@
+@@ -27,6 +27,27 @@
  
  #define UDP_BUF_SIZE 1500
  
@@ -69,7 +69,7 @@ index f6afc3752175f28e0733543a0172f94fddf851a1..d1e3e74205e86fa2f449678568f6bce2
  static int
  task_io_yielder (HevTaskYieldType type, void *data)
  {
-@@ -271,9 +292,8 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -376,9 +397,8 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
      }
  
      if (!HEV_SOCKS5 (self)->udp_associated) {
@@ -81,7 +81,7 @@ index f6afc3752175f28e0733543a0172f94fddf851a1..d1e3e74205e86fa2f449678568f6bce2
              return -1;
          HEV_SOCKS5 (self)->udp_associated = 1;
      }
-@@ -399,6 +419,9 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
+@@ -516,6 +536,9 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
  {
      int i, res;
  
@@ -91,7 +91,7 @@ index f6afc3752175f28e0733543a0172f94fddf851a1..d1e3e74205e86fa2f449678568f6bce2
      res = hev_task_io_socket_recvmmsg (fd, svec, num, MSG_DONTWAIT,
                                         task_io_yielder, self);
      if (res > 0) {
-@@ -409,6 +432,7 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
+@@ -526,6 +549,7 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
              dvec[i].buf = svec[i].msg_hdr.msg_iov->iov_base;
              dvec[i].len = svec[i].msg_len;
              dvec[i].addr = (HevSocks5Addr *)&saddr[i];
