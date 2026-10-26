@@ -1,8 +1,9 @@
 import Foundation
 
-/// Only provider coordination is controlled. The injected importFile method is
-/// copied byte-for-byte from production's iOS-only block; model decode, UUID
-/// supersession, publication, serial storage, and flush are actual production.
+/// Provider/storage completion and export-encoding timing have controlled seams.
+/// The injected importFile method is copied byte-for-byte from the iOS-only
+/// production block; decode, UUID supersession, publication, storage policy and
+/// flush execute actual production code.
 private final class ProviderBoundary: @unchecked Sendable {
     static let shared = ProviderBoundary()
     private let lock = NSLock()
@@ -75,16 +76,32 @@ private final class StorageBoundary: @unchecked Sendable {
 
 private struct PingDocument { var data: Data }
 
+/// Test-only timing seam around production export encoding. It delegates the
+/// actual JSONEncoder call unchanged after the gate; it implements no UI policy.
+final class PingExportBoundary: @unchecked Sendable {
+    static let shared = PingExportBoundary()
+    private let lock = NSLock()
+    private var blocked = false
+    let entered = DispatchSemaphore(value: 0)
+    let release = DispatchSemaphore(value: 0)
+    func block() { lock.lock(); blocked = true; lock.unlock() }
+    func encode(_ snapshot: PeriodicPingPreferences) throws -> Data {
+        lock.lock(); let held = blocked; blocked = false; lock.unlock()
+        if held {
+            entered.signal()
+            precondition(release.wait(timeout: .now() + 15) == .success, "EXPORT_GATE_TIMEOUT")
+        }
+        return try JSONEncoder().encode(snapshot)
+    }
+}
+
 /// Production action and completion bodies are inserted unchanged. Their
 /// original unstructured MainActor Task is awaited only to observe its outcome.
 @MainActor private final class FileActionHost {
     let ping: PeriodicPingModel
-    var pingFileError: String?
-    var pingImportRequest: UUID?
-    var pingPreparingExport = false
-    var pingExporting = false
-    var pingDocument = PingDocument(data: Data())
+    // STATE_DECLARATIONS
     init(_ model: PeriodicPingModel) { ping = model }
+    // FILE_REQUEST_HELPER
     func importFile(_ result: Result<URL, Error>) async {
         // IMPORT_ACTION
     }
@@ -97,11 +114,20 @@ private struct PingDocument { var data: Data }
     func completeExport(_ result: Result<URL, Error>) {
         // EXPORT_COMPLETION
     }
+    func openImportPicker() {
+        // IMPORT_OPEN_ACTION
+    }
 }
 
 @main @MainActor struct ImportFeedbackTests {
+    private static var cleanup: (() -> Bool)?
     static func check(_ value: Bool, _ marker: String) {
-        guard value else { fatalError(marker) }
+        guard value else {
+            let clean = cleanup?() ?? true
+            print("FAIL: \(marker)")
+            print("CLEANUP: \(clean ? "PASS" : "FAIL")")
+            exit(clean ? 74 : 75)
+        }
     }
     static func wait(_ signal: DispatchSemaphore, _ marker: String) async {
         let reached: Bool = await withCheckedContinuation { receipt in
@@ -113,7 +139,11 @@ private struct PingDocument { var data: Data }
         let mode = CommandLine.arguments[1]
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("import-feedback-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: root) }
+        cleanup = {
+            try? FileManager.default.removeItem(at: root)
+            return !FileManager.default.fileExists(atPath: root.path)
+        }
+        defer { _ = cleanup?(); cleanup = nil }
         let target = root.appendingPathComponent("live.json")
         let first = root.appendingPathComponent("first.json")
         let second = root.appendingPathComponent("second.json")
@@ -135,6 +165,26 @@ private struct PingDocument { var data: Data }
             try JSONDecoder().decode(PeriodicPingPreferences.self, from: Data(contentsOf: target))
         }
         switch mode {
+        case "delayed-export-alone", "delayed-export-new-import-picker":
+            PingExportBoundary.shared.block()
+            let export = Task { @MainActor in await host.export() }
+            await wait(PingExportBoundary.shared.entered, "EXPORT_ENCODING_NOT_ENTERED")
+            check(host.pingPreparingExport && !host.pingExporting, "DELAYED_EXPORT_NOT_PENDING")
+            let before = host.pingDocument.data
+            if mode == "delayed-export-new-import-picker" {
+                host.openImportPicker()
+                check(host.pingImporting, "NEW_IMPORT_PICKER_NOT_OPEN")
+            }
+            PingExportBoundary.shared.release.signal()
+            await export.value
+            check(!host.pingPreparingExport, "DELAYED_EXPORT_PREPARING_NOT_CLEARED")
+            if mode == "delayed-export-new-import-picker" {
+                check(!host.pingExporting && host.pingDocument.data == before && host.pingImporting,
+                      "STALE_PING_EXPORT_PRESENTED_OVER_NEW_IMPORT_PICKER")
+            } else {
+                let exported = try JSONDecoder().decode(PeriodicPingPreferences.self, from: host.pingDocument.data)
+                check(host.pingExporting && exported == original, "CURRENT_DELAYED_PING_EXPORT_NOT_PRESENTED")
+            }
         case "normal-success":
             host.pingFileError = "Earlier operation error"
             await host.importFile(.success(first))
@@ -223,6 +273,8 @@ private struct PingDocument { var data: Data }
             }
         default: fatalError("UNKNOWN_CASE")
         }
+        check(cleanup?() == true, "SUCCESS_CLEANUP_FAILED")
+        print("CLEANUP: PASS")
         print("PASS: import feedback \(mode); extracted production actions and actual model; controlled provider, no UIKit/physical provider claim")
     }
 }

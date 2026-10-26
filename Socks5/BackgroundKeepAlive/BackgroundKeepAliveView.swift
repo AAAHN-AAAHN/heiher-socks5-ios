@@ -19,9 +19,16 @@ struct BackgroundKeepAliveView: View {
     @State private var pingPreparingExport = false
     @State private var pingDocument = PingDocument(data: Data())
     @State private var pingFileError: String?
-    @State private var pingImportRequest: UUID?
+    @State private var pingFileRequest: UUID?
     private enum PingField: Hashable { case destinations, period }
     @FocusState private var pingField: PingField?
+
+    private func beginPingFileRequest() -> UUID {
+        let request = UUID()
+        pingFileRequest = request
+        pingFileError = nil
+        return request
+    }
 
     var body: some View {
         NavigationStack {
@@ -81,23 +88,28 @@ struct BackgroundKeepAliveView: View {
                         .accessibilityIdentifier("background.pingStorageState")
                     if ping.hasOwnStorage {
                         Button("Export ping JSON") {
-                            pingImportRequest = nil
-                            pingFileError = nil
+                            let request = beginPingFileRequest()
                             pingPreparingExport = true
                             Task { @MainActor in
                                 defer { pingPreparingExport = false }
                                 do {
-                                    pingDocument = PingDocument(data: try await ping.exportData())
+                                    let data = try await ping.exportData()
+                                    guard pingFileRequest == request else { return }
+                                    pingDocument = PingDocument(data: data)
                                     pingExporting = true
-                                } catch { pingFileError = error.localizedDescription }
+                                } catch {
+                                    if pingFileRequest == request { pingFileError = error.localizedDescription }
+                                }
                             }
                         }
                         .disabled(pingPreparingExport || !ping.canExport)
-                        Button("Import ping JSON") { pingImporting = true }
+                        Button("Import ping JSON") {
+                            _ = beginPingFileRequest()
+                            pingImporting = true
+                        }
                         if ping.storageError != nil {
                             Button("Retry Save") {
-                                pingImportRequest = nil
-                                pingFileError = nil
+                                _ = beginPingFileRequest()
                                 Task { @MainActor in try? await ping.flush() }
                             }
                         }
@@ -119,14 +131,12 @@ struct BackgroundKeepAliveView: View {
                 if case .failure(let error) = result { pingFileError = error.localizedDescription }
             }
             .fileImporter(isPresented: $pingImporting, allowedContentTypes: [.json]) { result in
-                let request = UUID()
-                pingImportRequest = request
-                pingFileError = nil
+                let request = beginPingFileRequest()
                 Task { @MainActor in
                     do { try await ping.importFile(result.get()) }
                     catch is CancellationError { }
                     catch {
-                        if pingImportRequest == request { pingFileError = error.localizedDescription }
+                        if pingFileRequest == request { pingFileError = error.localizedDescription }
                     }
                 }
             }
