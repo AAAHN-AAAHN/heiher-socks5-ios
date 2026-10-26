@@ -24,12 +24,21 @@ struct SettingsView: View {
     @State private var preparingExport = false
     @State private var document = SettingsDocument(data: Data())
     @State private var message: String?
+    @State private var fileRequest: UUID?
+
+    private func beginFileRequest() -> UUID {
+        let request = UUID()
+        fileRequest = request
+        message = nil
+        return request
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     Button("Export JSON") {
+                        let request = beginFileRequest()
                         let snapshot = settings.value
                         preparingExport = true
                         Task { @MainActor in
@@ -38,13 +47,19 @@ struct SettingsView: View {
                                 let data = try await Task.detached(priority: .utility) {
                                     try snapshot.encoded()
                                 }.value
+                                guard fileRequest == request else { return }
                                 document = SettingsDocument(data: data)
                                 exporting = true
-                            } catch { message = error.localizedDescription }
+                            } catch {
+                                if fileRequest == request { message = error.localizedDescription }
+                            }
                         }
                     }
                     .disabled(preparingExport || settings.loadState == .loading)
-                    Button("Import JSON") { importing = true }
+                    Button("Import JSON") {
+                        _ = beginFileRequest()
+                        importing = true
+                    }
                 } header: {
                     Text("Configuration")
                 } footer: {
@@ -59,9 +74,12 @@ struct SettingsView: View {
                     Section("Storage error") {
                         Text(error)
                         Button("Retry Save") {
+                            let request = beginFileRequest()
                             Task { @MainActor in
                                 do { try await settings.flush() }
-                                catch { message = error.localizedDescription }
+                                catch {
+                                    if fileRequest == request { message = error.localizedDescription }
+                                }
                             }
                         }
                     }
@@ -73,9 +91,13 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
+                let request = beginFileRequest()
                 Task { @MainActor in
                     do { try await settings.importFile(result.get()) }
-                    catch { message = error.localizedDescription }
+                    catch is CancellationError { }
+                    catch {
+                        if fileRequest == request { message = error.localizedDescription }
+                    }
                 }
             }
             .fileExporter(isPresented: $exporting, document: document, contentType: .json,

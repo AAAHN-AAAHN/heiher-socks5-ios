@@ -1,0 +1,276 @@
+import Foundation
+
+private func fault(_ message: String, _ code: Int) -> NSError {
+    NSError(domain: "SettingsFeedbackAudit", code: code,
+            userInfo: [NSLocalizedDescriptionKey: message])
+}
+
+/// Only the existing Storage seams are controlled. SettingsStore's complete
+/// actual implementation, cancellation/revisions, JSON, files and serial lane run.
+private final class Boundary: @unchecked Sendable {
+    private let lock = NSLock()
+    private var blockedPath: String?
+    private var providerFailure = false
+    private var writeFailure = false
+    let entered = DispatchSemaphore(value: 0)
+    let release = DispatchSemaphore(value: 0)
+    private let ordinaryWrite: @Sendable (Data, URL) throws -> Void
+    init(_ ordinaryWrite: @escaping @Sendable (Data, URL) throws -> Void) {
+        self.ordinaryWrite = ordinaryWrite
+    }
+    func block(_ url: URL, failure: Bool) {
+        lock.lock(); blockedPath = url.path; providerFailure = failure; lock.unlock()
+    }
+    func failWrites(_ value: Bool) {
+        lock.lock(); writeFailure = value; lock.unlock()
+    }
+    func imported(_ url: URL) throws -> Data {
+        lock.lock()
+        let blocked = blockedPath == url.path
+        let failing = blocked && providerFailure
+        lock.unlock()
+        if blocked {
+            entered.signal()
+            precondition(release.wait(timeout: .now() + 15) == .success, "PROVIDER_GATE_TIMEOUT")
+        }
+        if failing { throw fault("Controlled older provider failure", 41) }
+        return try Data(contentsOf: url)
+    }
+    func write(_ data: Data, _ url: URL) throws {
+        lock.lock(); let failing = writeFailure; lock.unlock()
+        if failing { throw fault("Controlled current storage failure", 42) }
+        try ordinaryWrite(data, url)
+    }
+}
+
+private struct SettingsDocument { var data: Data }
+
+/// Test-only timing seam around the exact snapshot.encoded() call. It delegates
+/// actual production encoding unchanged after the gate; no view logic is mocked.
+private final class ExportBoundary: @unchecked Sendable {
+    static let shared = ExportBoundary()
+    private let lock = NSLock()
+    private var blocked = false
+    let entered = DispatchSemaphore(value: 0)
+    let release = DispatchSemaphore(value: 0)
+    func block() { lock.lock(); blocked = true; lock.unlock() }
+    func encode(_ snapshot: AppSettings) throws -> Data {
+        lock.lock(); let held = blocked; blocked = false; lock.unlock()
+        if held {
+            entered.signal()
+            precondition(release.wait(timeout: .now() + 15) == .success, "EXPORT_GATE_TIMEOUT")
+        }
+        return try snapshot.encoded()
+    }
+}
+
+/// Production action bodies are copied verbatim. Awaiting each original
+/// unstructured Task's value adds observation only, not cancellation or ordering.
+/// One documented export-encoding expression is wrapped by the timing seam above.
+@MainActor private final class FileActionHost {
+    let settings: SettingsStore
+    // STATE_DECLARATIONS
+    init(_ settings: SettingsStore) { self.settings = settings }
+    // FILE_REQUEST_HELPER
+    func importFile(_ result: Result<URL, Error>) async {
+        // IMPORT_ACTION
+    }
+    func export() async {
+        // EXPORT_ACTION
+    }
+    func retry() async {
+        // RETRY_ACTION
+    }
+    func completeExport(_ result: Result<URL, Error>) {
+        // EXPORT_COMPLETION
+    }
+    func openImportPicker() {
+        // IMPORT_OPEN_ACTION
+    }
+}
+
+@main @MainActor struct SettingsFeedbackTests {
+    private static var cleanup: (() -> Bool)?
+    static func check(_ condition: Bool, _ marker: String) {
+        guard condition else {
+            let clean = cleanup?() ?? true
+            print("FAIL: \(marker)")
+            print("CLEANUP: \(clean ? "PASS" : "FAIL")")
+            exit(clean ? 74 : 75)
+        }
+    }
+    static func wait(_ condition: @escaping @MainActor () -> Bool, _ marker: String) async throws {
+        for _ in 0..<2000 {
+            if condition() { return }
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        fatalError(marker)
+    }
+    static func wait(_ signal: DispatchSemaphore, _ marker: String) async {
+        let reached = await withCheckedContinuation { receipt in
+            DispatchQueue.global().async {
+                receipt.resume(returning: signal.wait(timeout: .now() + 10) == .success)
+            }
+        }
+        check(reached, marker)
+    }
+    static func field(_ store: SettingsStore, _ name: String) -> String {
+        guard let child = Mirror(reflecting: store).children.first(where: { $0.label == name }) else {
+            fatalError("MISSING_STORE_OBSERVATION_FIELD_" + name)
+        }
+        return String(describing: child.value)
+    }
+    static func main() async throws {
+        let mode = CommandLine.arguments[1]
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("settings-feedback-" + UUID().uuidString)
+        let suite = "SettingsFeedbackAudit." + UUID().uuidString
+        let legacy = UserDefaults(suiteName: suite)!
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        cleanup = {
+            try? FileManager.default.removeItem(at: root)
+            legacy.removePersistentDomain(forName: suite)
+            return !FileManager.default.fileExists(atPath: root.path) &&
+                (legacy.persistentDomain(forName: suite)?.isEmpty ?? true)
+        }
+        defer { _ = cleanup?(); cleanup = nil }
+        let target = root.appendingPathComponent("settings.json")
+        let first = root.appendingPathComponent("first.json")
+        let second = root.appendingPathComponent("second.json")
+        let invalid = root.appendingPathComponent("invalid.json")
+        let original = AppSettings()
+        var a = original
+        a.background.periodicPing = .init(enabled: true, destinations: "127.0.0.2", period: "250")
+        var b = original
+        b.background.periodicPing = .init(enabled: false, destinations: "127.0.0.3", period: "500")
+        try original.encoded().write(to: target)
+        try a.encoded().write(to: first)
+        try b.encoded().write(to: second)
+        try Data("{malformed newer import".utf8).write(to: invalid)
+        var storage = SettingsStore.Storage()
+        let boundary = Boundary(storage.write)
+        storage.write = { data, url in try boundary.write(data, url) }
+        storage.imported = { url in try boundary.imported(url) }
+        let store = SettingsStore(fileURL: target, legacy: legacy, storage: storage)
+        await store.whenLoaded()
+        try await store.flush()
+        let host = FileActionHost(store)
+        func disk() throws -> AppSettings { try AppSettings.decoded(Data(contentsOf: target)) }
+        switch mode {
+        case "delayed-export-alone", "delayed-export-new-import-picker":
+            ExportBoundary.shared.block()
+            let export = Task { @MainActor in await host.export() }
+            await wait(ExportBoundary.shared.entered, "EXPORT_ENCODING_NOT_ENTERED")
+            check(host.preparingExport && !host.exporting, "DELAYED_EXPORT_NOT_PENDING")
+            let before = host.document.data
+            if mode == "delayed-export-new-import-picker" {
+                host.openImportPicker()
+                check(host.importing, "NEW_IMPORT_PICKER_NOT_OPEN")
+            }
+            ExportBoundary.shared.release.signal()
+            await export.value
+            check(!host.preparingExport, "DELAYED_EXPORT_PREPARING_NOT_CLEARED")
+            if mode == "delayed-export-new-import-picker" {
+                check(!host.exporting && host.document.data == before && host.importing,
+                      "STALE_EXPORT_PRESENTED_OVER_NEW_IMPORT_PICKER")
+            } else {
+                let exported = try AppSettings.decoded(host.document.data)
+                check(host.exporting && exported == original,
+                      "CURRENT_DELAYED_EXPORT_NOT_PRESENTED")
+            }
+        case "normal-import-success-clears-error":
+            host.message = "Earlier operation error"
+            await host.importFile(.success(second))
+            check(try disk() == b && store.value == b, "NORMAL_IMPORT_NOT_DURABLE")
+            check(host.message == nil, "NORMAL_IMPORT_SUCCESS_LEFT_STALE_ERROR")
+        case "normal-import-invalid":
+            await host.importFile(.success(invalid))
+            check(host.message != nil, "CURRENT_INVALID_IMPORT_ERROR_HIDDEN")
+            check(try disk() == original && store.value == original, "INVALID_IMPORT_CHANGED_STATE")
+        case "normal-provider-error":
+            await host.importFile(.failure(fault("Current picker error", 43)))
+            check(host.message == "Current picker error", "CURRENT_PICKER_ERROR_HIDDEN")
+            check(try disk() == original, "PICKER_ERROR_CHANGED_DISK")
+        case "normal-export-clears-error", "normal-export-error":
+            host.message = "Earlier operation error"
+            await host.export()
+            check(host.exporting && !host.preparingExport, "EXPORT_NOT_PREPARED")
+            check(try AppSettings.decoded(host.document.data) == original, "EXPORT_SNAPSHOT_MISMATCH")
+            if mode == "normal-export-error" {
+                host.completeExport(.failure(fault("Current exporter error", 44)))
+                check(host.message == "Current exporter error", "CURRENT_EXPORTER_ERROR_HIDDEN")
+            } else { check(host.message == nil, "NORMAL_EXPORT_LEFT_STALE_ERROR") }
+        case "normal-retry-success-clears-error", "normal-retry-error":
+            boundary.failWrites(true)
+            store.set(\.background.periodicPing.period, "251")
+            do { try await store.flush(); fatalError("STORAGE_FAILURE_PRECONDITION_MISSED") } catch { }
+            check(store.errorMessage != nil && store.savePending, "RETRY_BUTTON_WOULD_BE_ABSENT")
+            host.message = "Earlier operation error"
+            if mode == "normal-retry-success-clears-error" { boundary.failWrites(false) }
+            await host.retry()
+            if mode == "normal-retry-success-clears-error" {
+                let saved = try disk()
+                check(store.errorMessage == nil && !store.savePending && saved == store.value,
+                      "RETRY_NOT_DURABLE")
+                check(host.message == nil, "NORMAL_RETRY_SUCCESS_LEFT_STALE_ERROR")
+            } else {
+                check(host.message == "Controlled current storage failure", "CURRENT_RETRY_ERROR_HIDDEN")
+            }
+        case "current-import-cancelled-off", "old-provider-error-new-import-success", "old-cancel-new-import-success",
+             "old-provider-error-new-invalid", "old-provider-error-new-export-success", "old-provider-error-new-export-error",
+             "old-provider-error-new-retry-success":
+            let cancellation = mode == "current-import-cancelled-off" || mode == "old-cancel-new-import-success"
+            if mode == "old-provider-error-new-retry-success" {
+                boundary.failWrites(true)
+                store.set(\.background.periodicPing.period, "251")
+                do { try await store.flush(); fatalError("RETRY_PRECONDITION_MISSED") } catch { }
+                boundary.failWrites(false)
+            }
+            boundary.block(first, failure: !cancellation)
+            let older = Task { @MainActor in await host.importFile(.success(first)) }
+            await wait(boundary.entered, "OLDER_PROVIDER_NOT_ENTERED")
+            var newer: Task<Void, Never>?
+            if mode == "current-import-cancelled-off" {
+                store.set(\.background.periodicPing.enabled, false)
+            } else if mode.contains("new-export") {
+                await host.export()
+                check(host.exporting && !host.preparingExport, "NEW_EXPORT_NOT_PREPARED")
+                if mode.hasSuffix("error") {
+                    host.completeExport(.failure(fault("Newer exporter error", 45)))
+                } else { host.completeExport(.success(root.appendingPathComponent("export.json"))) }
+            } else if mode == "old-provider-error-new-retry-success" {
+                check(store.errorMessage != nil, "RETRY_BUTTON_WOULD_BE_ABSENT")
+                store.set(\.background.periodicPing.period, "252")
+                newer = Task { @MainActor in await host.retry() }
+                try await wait({ field(store, "flushWaiters") != "[]" }, "NEW_RETRY_NOT_WAITING")
+            } else {
+                let next = mode == "old-provider-error-new-invalid" ? invalid : second
+                newer = Task { @MainActor in await host.importFile(.success(next)) }
+                try await wait({ field(store, "pendingImport") != "nil" }, "NEW_IMPORT_NOT_ACCEPTED")
+            }
+            boundary.release.signal()
+            await older.value
+            if let newer { await newer.value }
+            try await store.flush()
+            if mode == "old-provider-error-new-invalid" {
+                check(host.message != nil && host.message != "Controlled older provider failure",
+                      "LATEST_INVALID_IMPORT_ERROR_LOST")
+                check(try disk() == original, "INVALID_NEW_IMPORT_CHANGED_DISK")
+            } else if mode == "old-provider-error-new-export-error" {
+                check(host.message == "Newer exporter error", "OLDER_IMPORT_REPLACED_NEWER_EXPORT_ERROR")
+            } else {
+                check(host.message == nil, cancellation ? "EXPECTED_IMPORT_CANCELLATION_SHOWN_AS_ERROR" : "OLDER_PROVIDER_FAILURE_LEFT_STALE_ERROR")
+            }
+            check(!store.value.background.periodicPing.enabled, "STALE_IMPORT_RESURRECTED_ON")
+            if mode.contains("new-import-success") { check(try disk() == b, "LATEST_IMPORT_NOT_DURABLE") }
+            if mode == "current-import-cancelled-off" { check(try disk() == original, "CANCELLED_IMPORT_CHANGED_DISK") }
+            if mode == "old-provider-error-new-retry-success" {
+                check((try disk()).background.periodicPing.period == "252" && store.errorMessage == nil && !store.savePending,
+                      "LATEST_RETRY_NOT_DURABLE")
+            }
+        default: fatalError("UNKNOWN_MODE")
+        }
+        check(cleanup?() == true, "SUCCESS_CLEANUP_FAILED")
+        print("CLEANUP: PASS")
+        print("PASS: settings feedback \(mode); exact action bodies and actual SettingsStore; controlled storage provider; no UIKit/device claim")
+    }
+}
