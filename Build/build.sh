@@ -3,6 +3,11 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
+case "${1:-server}" in
+    server) ;;
+    tunnel) exec bash Build/build-tunnel.sh ;;
+    *) echo 'Unknown native build target' >&2; exit 1 ;;
+esac
 NAME=$(python3 -c '
 import json, re
 name = json.load(open("Build/features.json"))["name"]
@@ -10,7 +15,7 @@ if not isinstance(name, str) or re.fullmatch(r"[a-z][a-z0-9-]*", name) is None:
     raise SystemExit("Invalid composition name")
 print(name)')
 OUT="$ROOT/artifacts/$NAME"
-CORE="$ROOT/.build/core"
+CORE="$ROOT/.build/server"
 for path in "$ROOT/artifacts" "$OUT" "$ROOT/.build" "$CORE" "$ROOT/.build/$NAME.xcarchive" "$ROOT/.build/integrated-product-source"; do
     [ ! -L "$path" ] || { echo 'Linked build input/output path' >&2; exit 1; }
 done
@@ -22,7 +27,9 @@ LINKED_OUTPUT=$(find "$OUT" -type l -print -quit)
 rm -f "$OUT/sdk-success.txt" "$OUT/package-review.json" "$OUT/built-framework.json" \
     "$OUT/SUCCESS.txt" "$OUT/Socks5-$NAME-unsigned.ipa" "$OUT/Socks5-dSYMs.zip" \
     "$OUT/Socks5-$NAME-source.zip" "$OUT/SHA256SUMS.txt" "$OUT/source.zip" \
-    "$OUT/history.bundle" "$OUT/tested-commit.txt" "$OUT/features.json" "$OUT/build-info.txt"
+    "$OUT/history.bundle" "$OUT/tested-commit.txt" "$OUT/features.json" "$OUT/build-info.txt" \
+    "$OUT/native-inputs.json"
+rm -rf "$OUT/compiled-headers"
 # Only this attempt's prepared directory may be uploaded, even after failure.
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
     printf 'composition=%s\nartifact_path=artifacts/%s\n' "$NAME" "$NAME" >> "$GITHUB_OUTPUT"
@@ -35,6 +42,7 @@ python3 Build/check.py worktree "$COMMIT" > "$OUT/input-identity.log"
 python3 Build/check.py baseline > "$OUT/baseline-audit.log"
 python3 Tests/documentation_contract.py > "$OUT/documentation-contract.log" 2>&1
 python3 Tests/baseline_audit.py > "$OUT/baseline-driver.log" 2>&1
+python3 Tests/native_sources_contract.py > "$OUT/native-lock-contract.log" 2>&1
 python3 Tests/tcp_smoke_contract.py > "$OUT/smoke-contract.log" 2>&1
 printf '%s\n' "$COMMIT" > "$OUT/tested-commit.txt"
 git archive --format=zip "$COMMIT" -o "$OUT/source.zip"
@@ -48,12 +56,7 @@ python3 Tests/Integration/intent_boundaries.py > "$OUT/intent-boundaries.log" 2>
 python3 Tests/Integration/input_boundaries.py > "$OUT/input-boundaries.log" 2>&1
 python3 Tests/Integration/package_boundaries.py > "$OUT/package-boundaries.log" 2>&1
 python3 Tests/Integration/package_metadata.py > "$OUT/package-metadata.log" 2>&1
-SERVER_REF=$(python3 -c 'import json; print(json.load(open("Build/upstream.json"))["sources"]["."])')
-if [ ! -d "$CORE/.git" ]; then
-    git clone --no-checkout https://github.com/heiher/hev-socks5-server.git "$CORE"
-    git -C "$CORE" checkout --detach "$SERVER_REF"
-    git -C "$CORE" submodule update --init --recursive
-fi
+python3 Build/native_sources.py checkout server "$CORE" > "$OUT/native-inputs.json"
 python3 Build/check.py apply "$CORE" > "$OUT/source-audit.log"
 CF=$(command -v clang-format-18 || command -v clang-format)
 "$CF" --version | grep -E 'version 18\.'
@@ -73,6 +76,7 @@ feature() { python3 -c 'import json,sys; sys.exit(sys.argv[1] not in json.load(o
 # retained UDP/statistics probes instead of inferring modes from CFLAGS labels.
 python3 Build/native_checks.py "$CORE" "$OUT/native" > "$OUT/native-checks.log" 2>&1
 make -C "$CORE" clean > "$OUT/native-clean.log" 2>&1
+export HEV_NATIVE_CORE="$CORE"
 if feature background; then
     python3 Tests/Background/run_checks.py > "$OUT/background.log" 2>&1
     python3 Tests/Background/check_async_session.py > "$OUT/background-async.log" 2>&1
@@ -94,10 +98,10 @@ fi
 if [ "$(uname -s)" = Darwin ]; then
     MODULE="$OUT/compiled-headers"
     mkdir -p "$MODULE"
-    cp "$CORE/src/hev-main.h" "$MODULE/hev-main.h"
+    cp "$CORE/src/hev-main.h" "$CORE/src/hev-socks5-icmp.h" "$MODULE/"
     printf 'module HevSocks5Server { header "hev-main.h" export * }\n' > "$MODULE/module.modulemap"
     printf '%s\n' "$COMMIT" > "$MODULE/source-commit.txt"
-    (cd "$MODULE" && shasum -a 256 hev-main.h module.modulemap > SHA256SUMS.txt)
+    (cd "$MODULE" && shasum -a 256 hev-main.h hev-socks5-icmp.h module.modulemap > SHA256SUMS.txt)
 fi
 if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
     (cd "$CORE" && ./build-apple.sh) > "$OUT/core-apple.log" 2>&1
