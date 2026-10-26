@@ -1,0 +1,36 @@
+name: Verify and build locked upstream tunnel
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  tunnel:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, xcode-27]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Validate locked inputs and compile native tunnel
+        id: build
+        shell: bash
+        run: bash Build/build.sh tunnel
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ always() && steps.build.outputs.artifact_path != '' }}
+        with:
+          name: HevSocks5Tunnel-baseline-${{ runner.os }}
+          path: ${{ steps.build.outputs.artifact_path }}
+          retention-days: 30
