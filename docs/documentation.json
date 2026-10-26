@@ -2,13 +2,13 @@
   "branch": "release/integrated",
   "frozen_source": "a2eac0e49747782869b2ca858d8895060552e30d",
   "parents": {
-    "feature/app-icon": "6abae4ef1ba25e333fff162c7ec43f65b43c3565",
-    "feature/background": "981a3311ad41adfbdb45de2123ded0539d377133",
-    "feature/udp-compat": "6a5f473f8a47913048ebf6b664d509ad5f983a1d",
-    "feature/icmp-relay": "e7aefa47f616411a349f97ff36e9da65e4258013",
-    "feature/server-control": "e1364066c860c7ffda35f2adaf31acc38e16e9af",
-    "feature/traffic-statistics": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
-    "feature/settings-persistence": "8798c53f19fb0661777e51992b48b928297f84aa"
+    "feature/app-icon": "68c5c2f5f984b1e8554a3485c2ff95876533023a",
+    "feature/background": "705da3c4e4ee19615c439ce97949dcb362b9621a",
+    "feature/udp-compat": "ddae121f88fe48260810b75a0a5d3b3ea5cf6894",
+    "feature/icmp-relay": "50646fd6c1f000b5c9f7548204f074b90497c9fd",
+    "feature/server-control": "da8c50a15842ba210c02efdbe0994d4ef97a2f56",
+    "feature/traffic-statistics": "a31508f79669cceb18929ab5fb9dd7955b489740",
+    "feature/settings-persistence": "326eadc5e28110dc028af30e19acd959ef324e31"
   },
   "owned_documents": [
     "README.md",
@@ -21,7 +21,7 @@
     "Build/check_ownership.py": "cb5a9e72b9262083774b5e2b457575079a2cc7ac",
     "Tests/AppIcon/check_icon.py": "cbfce1b6ed6343cb0ae4028d40bc1be592fd2507",
     "Tests/Background/check_scope.py": "9200dcc1c1085457ff12b0fbfc02873dcfb2cf10",
-    "Tests/Statistics/audit.py": "bdae70925f5338535d05eccc7e48c8ef648a210c",
+    "Tests/Statistics/audit.py": "5c8eb4998462f27dd222f9831a54514fa6261fae",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }

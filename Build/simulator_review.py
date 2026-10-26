@@ -159,7 +159,7 @@ def main():
     runtime = next(r for r in runtimes if r['isAvailable'] and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-27'))
     types = json.loads(run('xcrun', 'simctl', 'list', 'devicetypes', '-j'))['devicetypes']
     device_type = next(t['identifier'] for t in types if t['name'] == 'iPhone 16')
-    device = run('xcrun', 'simctl', 'create', 'Integrated Eight Branch Review', device_type, runtime['identifier'])
+    device = run('xcrun', 'simctl', 'create', 'Integrated Release Review', device_type, runtime['identifier'])
     (OUT / 'environment.json').write_text(json.dumps({'runtime': runtime, 'device_type': device_type,
         'scope': 'Production app on Simulator, preseeded JSON. No physical device, installer, UI tap or background-delivery claim.'}, indent=2))
     outcomes = []
