@@ -20,6 +20,10 @@ CORE = Path(sys.argv[1]).resolve()
 OUT = Path(sys.argv[2]).resolve()
 FEATURES = set(json.loads((ROOT / 'Build/features.json').read_text())['features'])
 OUT.mkdir(parents=True, exist_ok=True)
+# Standalone ABI probes copy their owner's entry header. Resolve its public
+# dependencies against the same verified composed native source.
+if 'icmp' in FEATURES:
+    os.environ['CPATH'] = os.pathsep.join(filter(None, (str(CORE / 'src'), os.environ.get('CPATH'))))
 
 
 def run(args, name, timeout=180, cwd=ROOT, env=None):
