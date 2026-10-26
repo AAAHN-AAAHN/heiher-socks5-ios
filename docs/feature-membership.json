@@ -2,7 +2,7 @@
   "base_commit": "94cc35ba5b50bab177f7aa678aa5af8fd3b8481d",
   "branches": {
     "feature/app-icon": "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
-    "feature/background": "cf084bf365555ea30196c1831ab2c18b30e81d12",
+    "feature/background": "ab3f0aa46f92693c9ed55c20bd5144c31fc04052",
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
@@ -80,8 +80,8 @@
       "sha256": "23f77795fd16ebd6cea09d95653630fd8b458ed03d19912dd53d7cbf73c0fcfb"
     },
     "Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift": {
-      "commit": "48f7bec613b53ba728aeb79126ffc1456ae4e28f",
-      "sha256": "06f77df1884ebfe0cfe21339a7a2e7d63af1a29622d05148301160262f315c6a"
+      "commit": "ab3f0aa46f92693c9ed55c20bd5144c31fc04052",
+      "sha256": "c9de39a17d76abcc1a5a466ea32e68da1be11e29a6884b82901b63139f6ffc4d"
     },
     "Socks5/BackgroundKeepAlive/LoopAudioService.swift": {
       "commit": "48f7bec613b53ba728aeb79126ffc1456ae4e28f",
@@ -816,8 +816,8 @@
       "sha256": "ed07ae61d7e8a3aebf4879b6d42d142c545921f604b34a3123357855bfa0e2d6"
     },
     "Socks5/BackgroundKeepAlive/PeriodicPingModel.swift": {
-      "commit": "e475b35a532f4244e27f860b84d8c48b2047f242",
-      "sha256": "7098082310ec7a4845ec40ea8a0e81d91e15d0f63f4e0adf6893ff2e9135d470"
+      "commit": "ab3f0aa46f92693c9ed55c20bd5144c31fc04052",
+      "sha256": "50725ab3b8e67d7a6e1d4d822fc28105a37ba0ec6252747182ad17a6ac2caf30"
     },
     "Socks5/BackgroundKeepAlive/PeriodicPingService.swift": {
       "commit": "4d34668351ba778a677892d2910473fd5e855fb8",
@@ -828,16 +828,16 @@
       "sha256": "c20702f1d0d458145ffaa1a0559e47cd65a4099129b81f55712680a7a9c195de"
     },
     "Tests/Background/PeriodicPingModelTests.swift": {
-      "commit": "e475b35a532f4244e27f860b84d8c48b2047f242",
-      "sha256": "51fad4f90eb217484de1e9d25c52283ce0434070029d72c7c70e46508185b820"
+      "commit": "ab3f0aa46f92693c9ed55c20bd5144c31fc04052",
+      "sha256": "04986b091875871528b748a2f414b50e5783ae8cfccf6efa494336151d478fdf"
     },
     "Tests/Background/PeriodicPingTests.swift": {
       "commit": "4d34668351ba778a677892d2910473fd5e855fb8",
       "sha256": "e9e3ecfb86972931a49f793396ecb74b11b273c799b79184747764e20f42dd84"
     },
     "Tests/Background/check_periodic_ping.py": {
-      "commit": "48f7bec613b53ba728aeb79126ffc1456ae4e28f",
-      "sha256": "7dcddf9153b292a3341f4ef10e067c733946d40a814c72c1c5b25f9eee5d20e4"
+      "commit": "ab3f0aa46f92693c9ed55c20bd5144c31fc04052",
+      "sha256": "5301fb71a5c712b129ade2a8fe3f64675dad796363aa630822a82045d3bba8c0"
     },
     "Tests/Background/PeriodicPingLoopback.swift": {
       "commit": "8912ec057d2f048182c788016024b78d0a5e53eb",
@@ -852,8 +852,8 @@
       "sha256": "48f2624b742a1b8d41c7502da0be4ac2bbb4da2bb57dec45ad9159bc9c770c56"
     },
     "Tests/Background/PeriodicPingImportFeedbackTests.swift.in": {
-      "commit": "48f7bec613b53ba728aeb79126ffc1456ae4e28f",
-      "sha256": "5835dd822caf2880550d835d3376ffc903325d5ae466a573c90b8584bc09566e"
+      "commit": "ab3f0aa46f92693c9ed55c20bd5144c31fc04052",
+      "sha256": "3eaeecbc8b8f9072f6a858583e154c0c45fcd157cf1d9cb56b56b8bfe04e3828"
     },
     "Tests/Settings/SettingsFeedbackTests.swift.in": {
       "commit": "d1d945cbe252dd625c6d9f1f1dced5e0efd85351",

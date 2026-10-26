@@ -126,6 +126,14 @@ struct PeriodicPingModelTests {
         let corrupt = PeriodicPingModel(fileURL: corruptURL)
         do { try await corrupt.flush(); fatalError("corrupt initial JSON accepted") } catch { }
         require(!corrupt.canExport && !corrupt.enabled, "failed load became ready")
+        corrupt.setDestinations("127.0.0.9")
+        require(corrupt.status == "Settings could not be loaded", "failed-load destination edit claimed loading")
+        corrupt.setPeriod("501")
+        require(corrupt.status == "Settings could not be loaded", "failed-load period edit claimed loading")
+        corrupt.setEnabled(true)
+        require(corrupt.status == "Settings could not be loaded", "failed-load On claimed loading")
+        corrupt.setEnabled(false)
+        require(corrupt.status == "Settings could not be loaded", "failed-load Off claimed loading")
         let originalCorrupt = try Data(contentsOf: corruptURL)
         require(originalCorrupt == corruptBytes, "corrupt file silently overwritten")
         try await corrupt.importData(backup)
@@ -133,7 +141,7 @@ struct PeriodicPingModelTests {
         corrupt.setEnabled(false)
         try await corrupt.flush()
         try await wait("final sockets close") { probe(0) == probe(1) }
-        print("PASS: standalone JSON default save, saved On restart, backup/restore, 65536-IP file, verbatim UTF-8, malformed import preservation, delayed-load Off, failed-save latest-Off retry, superseded-failure flush, settled-failure recovery, both owner-release write orders and corrupt-load recovery")
+        print("PASS: standalone JSON default save, saved On restart, backup/restore, 65536-IP file, verbatim UTF-8, malformed import preservation, delayed-load Off, failed-save latest-Off retry, superseded-failure flush, settled-failure recovery, both owner-release write orders and corrupt-load edits/recovery")
     }
 
     static func supersededSave(_ directory: URL) async throws {

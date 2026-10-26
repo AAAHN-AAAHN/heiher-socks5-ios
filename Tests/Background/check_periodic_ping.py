@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Exact-source ping tests: real Dispatch, controlled ICMP syscalls, no device claim."""
+import hashlib
 import json
 import platform
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -32,7 +34,7 @@ public protocol ObservableObject: AnyObject {
 
 
 def import_feedback_sources(work):
-    """Exercise exact UI actions and iOS import code with a controlled provider."""
+    """Exact UI/iOS-import bodies, controlled provider and one export timing seam."""
     def end(text, opening):
         depth = 0
         for index in range(opening, len(text)):
@@ -43,11 +45,24 @@ def import_feedback_sources(work):
 
     view = (ROOT / 'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift').read_text()
     fixture = (HERE / 'PeriodicPingImportFeedbackTests.swift.in').read_text()
+    state = re.findall(r'^    @State private var ([^\n]+)$', view, flags=re.M)
+    assert state and fixture.count('// STATE_DECLARATIONS') == 1
+    fixture = fixture.replace('// STATE_DECLARATIONS', '\n    '.join('var ' + value for value in state))
+    helper_anchor = '    private func beginPingFileRequest() -> UUID {'
+    helper = ''
+    assert view.count(helper_anchor) <= 1
+    if helper_anchor in view:
+        first = view.index(helper_anchor)
+        helper = view[first:end(view, first + len(helper_anchor) - 1) + 1]
+    fixture = fixture.replace('// FILE_REQUEST_HELPER', helper)
+    manifest = {'view_sha256': hashlib.sha256(view.encode()).hexdigest(), 'state_declarations': state,
+                'helper_sha256': hashlib.sha256(helper.encode()).hexdigest(), 'helper_exact': helper, 'actions': {}}
     for marker, anchor, callback in [
         ('IMPORT_ACTION', '.fileImporter(isPresented: $pingImporting, allowedContentTypes: [.json]) {', True),
         ('EXPORT_ACTION', 'Button("Export ping JSON") {', False),
         ('RETRY_ACTION', 'Button("Retry Save") {', False),
         ('EXPORT_COMPLETION', 'defaultFilename: "periodic-ping") {', True),
+        ('IMPORT_OPEN_ACTION', 'Button("Import ping JSON") {', False),
     ]:
         assert view.count(anchor) == 1 and fixture.count('// ' + marker) == 1
         opening = view.index(anchor) + len(anchor) - 1
@@ -55,7 +70,8 @@ def import_feedback_sources(work):
         if callback:
             assert action.startswith(' result in')
             action = action[len(' result in'):]
-        if marker != 'EXPORT_COMPLETION':
+        manifest['actions'][marker] = {'sha256': hashlib.sha256(action.encode()).hexdigest(), 'exact_body': action}
+        if marker not in ('EXPORT_COMPLETION', 'IMPORT_OPEN_ACTION'):
             assert action.count('Task { @MainActor in') == 1
             start = action.index('Task { @MainActor in')
             finish = end(action, action.index('{', start)) + 1
@@ -64,14 +80,25 @@ def import_feedback_sources(work):
     test = work / 'PeriodicPingImportFeedbackTests.swift'
     test.write_text(fixture)
     text = (ROOT / 'Socks5/BackgroundKeepAlive/PeriodicPingModel.swift').read_text()
+    manifest['model_sha256'] = hashlib.sha256(text.encode()).hexdigest()
     anchor = '    func importFile(_ url: URL) async throws {'
     assert text.count(anchor) == 1
     opening = text.index(anchor) + len(anchor) - 1
     method = text[text.index(anchor):end(text, opening) + 1]
+    export_anchor = '    func exportData() async throws -> Data {'
+    assert text.count(export_anchor) == 1
+    first = text.index(export_anchor)
+    export = text[first:end(text, first + len(export_anchor) - 1) + 1]
+    before, after = 'try JSONEncoder().encode(snapshot)', 'try PingExportBoundary.shared.encode(snapshot)'
+    assert export.count(before) == 1
+    text = text.replace(export, export.replace(before, after), 1)
+    manifest['export_timing_substitution'] = {'original': before, 'replacement': after, 'count': 1}
+    manifest['import_method_sha256'] = hashlib.sha256(method.encode()).hexdigest()
     model = work / 'PeriodicPingModel-with-importFile.swift'
     # Same-file extension preserves private access. The original model remains
     # intact and its exact iOS method is exposed only for this non-iOS harness.
     model.write_text(text + '\n#if !os(iOS)\nextension PeriodicPingModel {\n' + method + '\n}\n#endif\n')
+    (work / 'import-feedback-source-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     return model, test
 
 
@@ -113,6 +140,7 @@ def main():
             feedback_binary = work / (mode + '-import-feedback')
             run(mode + '-import-feedback-compile', common + [*feedback, io, *extra, '-o', feedback_binary])
             for case in [
+                'delayed-export-alone', 'delayed-export-new-import-picker',
                 'normal-success', 'normal-invalid', 'normal-provider-failure', 'normal-storage-failure', 'normal-retry-success',
                 'old-success-new-invalid', 'old-failure-new-invalid', 'old-failure-new-export',
                 'old-provider-failure-new-success', 'old-cancel-new-success', 'old-provider-failure-new-export',
