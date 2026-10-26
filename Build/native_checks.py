@@ -47,6 +47,11 @@ for mode in (('buffered', 'splice') if sys.platform == 'linux' and 'statistics' 
         audit.native_checks(mode)
         udp_fixture_flags = audit.UDP_FIXTURE_FLAGS
         worker_baseline = audit.worker_baseline_sha256()
+        if 'icmp' in FEATURES and 'server' in FEATURES:
+            # Lifecycle's narrow Stop guard is compared to the actual composed
+            # worker immediately before the canonical ServerControl projection.
+            projection = json.loads((ROOT / 'Build/server-patch-context.json').read_bytes())
+            worker_baseline = projection['files']['src/hev-socks5-worker.c']['before']['sha256']
     else:
         run(['make', 'clean'], mode + '-clean.log', cwd=CORE)
         run(['make', '-j3', 'ENABLE_IO_SPLICE_SYSCALL=0', 'static', 'exec'],
