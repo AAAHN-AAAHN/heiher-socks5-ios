@@ -22,14 +22,16 @@ PRINCIPLES_SOURCE = '75335d201cb1e541bb153e9899badbc11ccf1973'
 PARENTS = {
     'main': ['upstream'],
     'feature/app-icon': ['main'],
-    'feature/background': ['main'],
+    'feature/background': ['feature/icmp-relay'],
     'feature/server-control': ['main'],
     'feature/settings-persistence': ['feature/server-control'],
     'feature/traffic-statistics': ['feature/udp-compat'],
     'feature/udp-compat': ['main'],
+    'feature/icmp-relay': ['feature/udp-compat'],
     'release/integrated': ['feature/app-icon', 'feature/background',
                            'feature/server-control', 'feature/settings-persistence',
-                           'feature/traffic-statistics', 'feature/udp-compat'],
+                           'feature/traffic-statistics', 'feature/udp-compat',
+                           'feature/icmp-relay'],
 }
 HEADINGS = ['Purpose and scope', 'Functional behavior', 'Implementation and ownership',
             'Design rationale and resource cost', 'Verification contract',

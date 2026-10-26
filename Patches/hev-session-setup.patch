@@ -1,0 +1,1116 @@
+diff --git a/src/core/src/hev-socks5-misc.c b/src/core/src/hev-socks5-misc.c
+index 3ba5c7fc03ddb281bbce729d17351784024740ce..d2714f0f3cc2bcd4d41deff69aa84b5396601857 100644
+--- a/src/core/src/hev-socks5-misc.c
++++ b/src/core/src/hev-socks5-misc.c
+@@ -37,23 +37,16 @@ hev_socks5_task_io_yielder (HevTaskYieldType type, void *data)
+ {
+     HevSocks5 *self = data;
+ 
+-    if (type == HEV_TASK_YIELD) {
+-        hev_task_yield (HEV_TASK_YIELD);
+-        return 0;
+-    }
+-
+-    if (self->timeout < 0) {
+-        hev_task_yield (HEV_TASK_WAITIO);
+-    } else {
+-        int timeout = self->timeout;
+-        timeout = hev_task_sleep (timeout);
+-        if (timeout <= 0) {
+-            LOG_I ("%p io timeout", self);
+-            return -1;
+-        }
++    if (!self->timeout)
++        return -1;
++    if (type == HEV_TASK_YIELD || self->timeout < 0) {
++        hev_task_yield (type);
++    } else if (!hev_task_sleep (self->timeout)) {
++        hev_socks5_set_timeout (self, 0);
++        LOG_I ("%p io timeout", self);
++        return -1;
+     }
+-
+-    return 0;
++    return self->timeout ? 0 : -1;
+ }
+ 
+ int
+@@ -73,8 +66,10 @@ hev_socks5_socket (int type)
+     }
+ 
+     res = hev_task_add_fd (task, fd, POLLIN | POLLOUT);
+-    if (res < 0)
+-        hev_task_mod_fd (task, fd, POLLIN | POLLOUT);
++    if (res < 0 && hev_task_mod_fd (task, fd, POLLIN | POLLOUT) < 0) {
++        close (fd);
++        return -1;
++    }
+ 
+     if (type == SOCK_DGRAM) {
+         res = udp_recv_buffer_size;
+diff --git a/src/core/src/hev-socks5-server.c b/src/core/src/hev-socks5-server.c
+index ec4f2904abe9e6b5b9d149a57fe259f7c15105e9..f4198b25ae138c580b1b3a1614e44eaf82c078c4 100644
+--- a/src/core/src/hev-socks5-server.c
++++ b/src/core/src/hev-socks5-server.c
+@@ -113,7 +113,7 @@ hev_socks5_server_write_auth_method (HevSocks5Server *self, int auth_method)
+ 
+     res = hev_task_io_socket_send (HEV_SOCKS5 (self)->fd, &auth, 2, MSG_WAITALL,
+                                    task_io_yielder, self);
+-    if (res <= 0) {
++    if (res != 2) {
+         LOG_I ("%p socks5 server write auth method", self);
+         return -1;
+     }
+@@ -206,7 +206,7 @@ hev_socks5_server_write_auth_user (HevSocks5Server *self, int auth_res)
+ 
+     res = hev_task_io_socket_send (HEV_SOCKS5 (self)->fd, buf, 2, MSG_WAITALL,
+                                    task_io_yielder, self);
+-    if (res <= 0) {
++    if (res != 2) {
+         LOG_I ("%p socks5 server write auth user", self);
+         return -1;
+     }
+@@ -221,8 +221,10 @@ hev_socks5_server_auth (HevSocks5Server *self)
+     int res;
+ 
+     method = hev_socks5_server_read_auth_method (self);
++    if (!HEV_SOCKS5 (self)->timeout)
++        return -1;
+     res = hev_socks5_server_write_auth_method (self, method);
+-    if (res < 0)
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout)
+         return -1;
+ 
+     switch (method) {
+@@ -230,6 +232,8 @@ hev_socks5_server_auth (HevSocks5Server *self)
+         break;
+     case HEV_SOCKS5_AUTH_METHOD_USER:
+         res = hev_socks5_server_read_auth_user (self);
++        if (!HEV_SOCKS5 (self)->timeout)
++            return -1;
+         res |= hev_socks5_server_write_auth_user (self, res);
+         if (res < 0)
+             return -1;
+@@ -259,9 +263,10 @@ hev_socks5_server_read_request (HevSocks5Server *self, int *cmd, int *rep,
+         return -1;
+     }
+ 
+-    if (req.ver != HEV_SOCKS5_VERSION_5) {
++    if (req.ver != HEV_SOCKS5_VERSION_5 || req.rsv) {
+         *rep = HEV_SOCKS5_RES_REP_FAIL;
+-        LOG_I ("%p socks5 server req.ver %u", self, req.ver);
++        LOG_I ("%p socks5 server req.ver %u req.rsv %u", self, req.ver,
++               req.rsv);
+         return 0;
+     }
+ 
+@@ -330,6 +335,7 @@ hev_socks5_server_write_response (HevSocks5Server *self, int rep,
+ {
+     HevSocks5ReqRes res;
+     int ret;
++    int len;
+ 
+     LOG_D ("%p socks5 server write response", self);
+ 
+@@ -337,10 +343,10 @@ hev_socks5_server_write_response (HevSocks5Server *self, int rep,
+     res.rep = rep;
+     res.rsv = 0;
+ 
+-    ret = hev_socks5_addr_from_sockaddr6 (&res.addr, addr);
+-    ret = hev_task_io_socket_send (HEV_SOCKS5 (self)->fd, &res, 3 + ret,
++    len = 3 + hev_socks5_addr_from_sockaddr6 (&res.addr, addr);
++    ret = hev_task_io_socket_send (HEV_SOCKS5 (self)->fd, &res, len,
+                                    MSG_WAITALL, task_io_yielder, self);
+-    if (ret <= 0) {
++    if (ret != len) {
+         LOG_I ("%p socks5 server write response", self);
+         return -1;
+     }
+@@ -366,7 +372,7 @@ hev_socks5_server_connect (HevSocks5Server *self, struct sockaddr_in6 *addr)
+ 
+     klass = HEV_OBJECT_GET_CLASS (self);
+     res = klass->binder (HEV_SOCKS5 (self), fd, (struct sockaddr *)addr);
+-    if (res < 0) {
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout) {
+         LOG_W ("%p socks5 server bind", self);
+         hev_task_del_fd (hev_task_self (), fd);
+         close (fd);
+@@ -429,7 +435,7 @@ hev_socks5_server_bind (HevSocks5Server *self, struct sockaddr_in6 *addr)
+     }
+ 
+     res = sskptr->binder (self, fd, addr);
+-    if (res < 0) {
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout) {
+         LOG_W ("%p socks5 server bind", self);
+         hev_task_del_fd (hev_task_self (), fd);
+         close (fd);
+@@ -484,27 +490,34 @@ hev_socks5_server_handshake (HevSocks5Server *self)
+ 
+     LOG_D ("%p socks5 server handshake", self);
+ 
++    if (!HEV_SOCKS5 (self)->timeout)
++        return -1;
+     memset (&addr, 0, sizeof (addr));
+     timeout = hev_socks5_get_tcp_timeout ();
+     hev_socks5_set_timeout (HEV_SOCKS5 (self), timeout);
+ 
+     res = hev_socks5_server_auth (self);
+-    if (res < 0)
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout)
+         return -1;
+ 
+     rep = HEV_SOCKS5_RES_REP_SUCC;
+     res = hev_socks5_server_read_request (self, &cmd, &rep, &addr);
+-    if (res < 0)
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout)
+         return -1;
+ 
+     if (rep == HEV_SOCKS5_RES_REP_SUCC) {
+         switch (cmd) {
+-        case HEV_SOCKS5_REQ_CMD_CONNECT:
++        case HEV_SOCKS5_REQ_CMD_CONNECT: {
++            socklen_t addrlen = sizeof (addr);
+             res = hev_socks5_server_connect (self, &addr);
+             if (res < 0)
+                 rep = HEV_SOCKS5_RES_REP_HOST;
++            else if (getsockname (self->fds[0], (struct sockaddr *)&addr,
++                                  &addrlen) < 0)
++                rep = HEV_SOCKS5_RES_REP_FAIL;
+             HEV_SOCKS5 (self)->type = HEV_SOCKS5_TYPE_TCP;
+             break;
++        }
+         case HEV_SOCKS5_REQ_CMD_UDP_ASC:
+             res = hev_socks5_server_bind (self, &addr);
+             if (res < 0)
+@@ -523,8 +536,11 @@ hev_socks5_server_handshake (HevSocks5Server *self)
+         }
+     }
+ 
++    if (!HEV_SOCKS5 (self)->timeout)
++        return -1;
+     res = hev_socks5_server_write_response (self, rep, &addr);
+-    if ((res < 0) || (rep != HEV_SOCKS5_RES_REP_SUCC))
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout ||
++        rep != HEV_SOCKS5_RES_REP_SUCC)
+         return -1;
+ 
+     return 0;
+@@ -539,19 +555,15 @@ hev_socks5_server_service (HevSocks5Server *self)
+ 
+     switch (HEV_SOCKS5 (self)->type) {
+     case HEV_SOCKS5_TYPE_TCP:
+-        hev_socks5_tcp_splice (HEV_SOCKS5_TCP (self), self->fds[0]);
+-        break;
++        return hev_socks5_tcp_splice (HEV_SOCKS5_TCP (self), self->fds[0]);
+     case HEV_SOCKS5_TYPE_UDP_IN_UDP:
+     case HEV_SOCKS5_TYPE_UDP_IN_TCP:
+         timeout = hev_socks5_get_udp_timeout ();
+         hev_socks5_set_timeout (HEV_SOCKS5 (self), timeout);
+-        hev_socks5_udp_splice (HEV_SOCKS5_UDP (self), self->fds[0]);
+-        break;
++        return hev_socks5_udp_splice (HEV_SOCKS5_UDP (self), self->fds[0]);
+     default:
+         return -1;
+     }
+-
+-    return 0;
+ }
+ 
+ int
+@@ -565,8 +577,8 @@ hev_socks5_server_run (HevSocks5Server *self)
+ 
+     fd = HEV_SOCKS5 (self)->fd;
+     res = hev_task_add_fd (task, fd, POLLIN | POLLOUT);
+-    if (res < 0)
+-        hev_task_mod_fd (task, fd, POLLIN | POLLOUT);
++    if (res < 0 && hev_task_mod_fd (task, fd, POLLIN | POLLOUT) < 0)
++        return -1;
+ 
+     res = hev_socks5_server_handshake (self);
+     if (res < 0)
+diff --git a/src/hev-socks5-session.c b/src/hev-socks5-session.c
+index ef8556619e498b8217b16d75d16a2973b73ac62a..0cd870a0761396bfa01340c498d5d7e4698f0fb6 100644
+--- a/src/hev-socks5-session.c
++++ b/src/hev-socks5-session.c
+@@ -74,7 +74,7 @@ hev_socks5_session_bind (HevSocks5 *self, int fd, const struct sockaddr *dest)
+ 
+         memset (&addr, 0, sizeof (addr));
+         res = hev_netaddr_resolve (&addr, saddr, NULL);
+-        if (res < 0)
++        if (res < 0 || !self->timeout)
+             return -1;
+ 
+         res = bind (fd, (struct sockaddr *)&addr, sizeof (addr));
+@@ -145,7 +145,7 @@ hev_socks5_session_udp_bind (HevSocks5Server *self, int sock,
+         res = hev_netaddr_resolve (&addr, saddr, NULL);
+     else
+         res = getsockname (fd, (struct sockaddr *)&addr, &alen);
+-    if (res < 0)
++    if (res < 0 || !HEV_SOCKS5 (self)->timeout)
+         return -1;
+ 
+     addr.sin6_port = htons (sport);
+@@ -187,7 +187,7 @@ hev_socks5_session_udp_bind (HevSocks5Server *self, int sock,
+         sport = src->sin6_port;
+         res = hev_netaddr_resolve (src, saddr, NULL);
+         src->sin6_port = sport;
+-        if (res < 0)
++        if (res < 0 || !HEV_SOCKS5 (self)->timeout)
+             return -1;
+     }
+ 
+diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c
+index 683a773999569784b2a42d1bab136ef1c44a8101..052bdf5f41fcd632777b847412d755dfd7217baa 100644
+--- a/src/hev-socks5-worker.c
++++ b/src/hev-socks5-worker.c
+@@ -8,6 +8,7 @@
+  */
+ 
+ #include <assert.h>
++#include <errno.h>
+ #include <stdlib.h>
+ #include <unistd.h>
+ #include <stdatomic.h>
+@@ -47,7 +48,8 @@ struct _HevSocks5Worker
+     HevTask *task_worker;
+     HevList session_set;
+     HevSocks5Authenticator *auth_curr;
+-    HevSocks5Authenticator *auth_next;
++    _Atomic (HevSocks5Authenticator *) auth_next;
++    void (*reload_notify) (void);
+ };
+ 
+ static int
+@@ -63,20 +65,19 @@ task_io_yielder (HevTaskYieldType type, void *data)
+ static void
+ hev_socks5_worker_load (HevSocks5Worker *self)
+ {
+-    atomic_intptr_t *ptr;
+-    intptr_t prev;
++    HevSocks5Authenticator *prev;
+ 
+     LOG_D ("%p works worker load", self);
+ 
+-    ptr = (atomic_intptr_t *)&self->auth_next;
+-    prev = atomic_exchange_explicit (ptr, 0, memory_order_relaxed);
++    prev =
++        atomic_exchange_explicit (&self->auth_next, NULL, memory_order_acquire);
+     if (!prev)
+         return;
+ 
+     if (self->auth_curr)
+         hev_object_unref (HEV_OBJECT (self->auth_curr));
+ 
+-    self->auth_curr = HEV_SOCKS5_AUTHENTICATOR (prev);
++    self->auth_curr = prev;
+ }
+ 
+ static void
+@@ -103,32 +104,36 @@ hev_socks5_worker_task_entry (void *data)
+     LOG_D ("socks5 worker task run");
+ 
+     fd = self->fd;
+-    hev_task_add_fd (task, fd, POLLIN);
++    if (hev_task_add_fd (task, fd, POLLIN) < 0) {
++        LOG_E ("socks5 worker listen fd");
++        hev_socks5_worker_stop (self);
++        return;
++    }
+     stack_size = hev_config_get_misc_task_stack_size ();
+ 
+-    for (;;) {
++    while (READ_ONCE (self->run)) {
+         HevSocks5Session *s;
+         HevTask *task;
+         int nfd;
+ 
+         nfd = hev_task_io_socket_accept (fd, NULL, NULL, task_io_yielder, self);
+-        if (nfd == -1) {
++        if (nfd < 0) {
++            if (!READ_ONCE (self->run))
++                break;
+             LOG_E ("socks5 proxy accept");
+-            continue;
+-        } else if (nfd < 0) {
+-            break;
++            goto retry;
+         }
+ 
+         s = hev_socks5_session_new (nfd);
+         if (!s) {
+             close (nfd);
+-            continue;
++            goto retry;
+         }
+ 
+         task = hev_task_new (stack_size);
+         if (!task) {
+             hev_object_unref (HEV_OBJECT (s));
+-            continue;
++            goto retry;
+         }
+ 
+         if (self->auth_curr)
+@@ -138,6 +143,11 @@ hev_socks5_worker_task_entry (void *data)
+         s->data = self;
+         hev_list_add_tail (&self->session_set, &s->node);
+         hev_task_run (task, hev_socks5_session_task_entry, s);
++        continue;
++
++    retry:
++        /* Let existing sessions release resources; Stop can wake this wait. */
++        hev_task_sleep (10);
+     }
+ 
+     node = hev_list_first (&self->session_set);
+@@ -160,7 +170,8 @@ hev_socks5_event_task_entry (void *data)
+ 
+     LOG_D ("socks5 event task run");
+ 
+-    hev_task_add_fd (task, self->event_fds[0], POLLIN);
++    if (hev_task_add_fd (task, self->event_fds[0], POLLIN) < 0)
++        goto exit;
+ 
+     res = atomic_fetch_and (&self->tsync, ~SYNC_LOAD);
+     if (res & SYNC_LOAD)
+@@ -171,11 +182,13 @@ hev_socks5_event_task_entry (void *data)
+ 
+         res = hev_task_io_read (self->event_fds[0], &val, sizeof (val), NULL,
+                                 NULL);
+-        if (res < sizeof (val))
+-            continue;
++        if (res != sizeof (val))
++            break;
+ 
+         if (val == 'r') {
+             atomic_fetch_and (&self->tsync, ~SYNC_SENT_R);
++            if (self->reload_notify)
++                self->reload_notify ();
+             hev_socks5_worker_load (self);
+         } else {
+             atomic_fetch_and (&self->tsync, ~SYNC_SENT_S);
+@@ -183,8 +196,11 @@ hev_socks5_event_task_entry (void *data)
+         }
+     }
+ 
++exit:
++    atomic_fetch_and (&self->tsync, ~SYNC_SEND);
+     WRITE_ONCE (self->run, 0);
+-    hev_task_wakeup (self->task_worker);
++    if (hev_task_get_state (self->task_worker) != HEV_TASK_STOPPED)
++        hev_task_wakeup (self->task_worker);
+ 
+     hev_task_del_fd (task, self->event_fds[0]);
+ }
+@@ -196,6 +212,9 @@ hev_socks5_worker_new (int fd)
+     int nonblock = 1;
+     int res;
+ 
++    /* Complete session classes before the proxy starts worker threads. */
++    hev_socks5_session_class ();
++
+     self = hev_malloc0 (sizeof (HevSocks5Worker));
+     if (!self)
+         return NULL;
+@@ -205,6 +224,7 @@ hev_socks5_worker_new (int fd)
+     self->fd = -1;
+     self->event_fds[0] = -1;
+     self->event_fds[1] = -1;
++    atomic_init (&self->auth_next, NULL);
+ 
+     res = socketpair (PF_LOCAL, SOCK_STREAM, 0, self->event_fds);
+     if (res < 0) {
+@@ -243,6 +263,8 @@ exit:
+ void
+ hev_socks5_worker_destroy (HevSocks5Worker *self)
+ {
++    HevSocks5Authenticator *next;
++
+     LOG_D ("%p works worker destroy", self);
+ 
+ retry:
+@@ -253,8 +275,10 @@ retry:
+ 
+     if (self->auth_curr)
+         hev_object_unref (HEV_OBJECT (self->auth_curr));
+-    if (self->auth_next)
+-        hev_object_unref (HEV_OBJECT (self->auth_next));
++    next =
++        atomic_exchange_explicit (&self->auth_next, NULL, memory_order_acquire);
++    if (next)
++        hev_object_unref (HEV_OBJECT (next));
+ 
+     if (self->task_worker)
+         hev_task_unref (self->task_worker);
+@@ -279,6 +303,8 @@ hev_socks5_worker_start (HevSocks5Worker *self)
+     if (atomic_fetch_and (&self->tsync, ~SYNC_STOP) & SYNC_STOP)
+         return;
+ 
++    /* Install initial authentication before either task can accept. */
++    hev_socks5_worker_load (self);
+     WRITE_ONCE (self->run, 1);
+     hev_task_ref (self->task_event);
+     hev_task_run (self->task_event, hev_socks5_event_task_entry, self);
+@@ -316,7 +342,9 @@ retry:
+     if (res & SYNC_SEND) {
+         res = atomic_fetch_or (&self->tsync, sent);
+         if (!(res & sent)) {
+-            res = write (self->event_fds[1], &val, sizeof (val));
++            do {
++                res = write (self->event_fds[1], &val, sizeof (val));
++            } while ((res < 0) && (errno == EINTR));
+             assert (res > 0 && "socks5 worker write event");
+         }
+     } else {
+@@ -342,22 +370,51 @@ hev_socks5_worker_reload (HevSocks5Worker *self)
+     hev_socks5_worker_send (self, SYNC_LOAD);
+ }
+ 
++int
++hev_socks5_worker_set_reload_notify (HevSocks5Worker *self,
++                                     void (*notify) (void))
++{
++    int nonblock = 1;
++
++    if (ioctl (self->event_fds[1], FIONBIO, (char *)&nonblock) < 0)
++        return -1;
++    self->reload_notify = notify;
++    return 0;
++}
++
++void
++hev_socks5_worker_signal_reload (HevSocks5Worker *self)
++{
++    const char val = 'r';
++    int state = atomic_load (&self->tsync);
++    int res;
++
++    do {
++        if (!(state & SYNC_SEND) || (state & SYNC_SENT_R))
++            return;
++    } while (!atomic_compare_exchange_weak (&self->tsync, &state,
++                                            state | SYNC_SENT_R));
++
++    /* Stop and Reload each have at most one queued byte. Never enter the
++     * normal sender gate: the signal may have interrupted its owner. */
++    do {
++        res = write (self->event_fds[1], &val, sizeof (val));
++    } while ((res < 0) && (errno == EINTR));
++    if (res < 0)
++        atomic_fetch_and (&self->tsync, ~SYNC_SENT_R);
++}
++
+ void
+ hev_socks5_worker_set_auth (HevSocks5Worker *self, HevSocks5Authenticator *auth)
+ {
+-    atomic_intptr_t *ptr;
+-    intptr_t prev;
++    HevSocks5Authenticator *prev;
+ 
+     LOG_D ("%p works worker set auth", self);
+ 
+     hev_object_ref (HEV_OBJECT (auth));
+ 
+-    if (self->auth_curr)
+-        ptr = (atomic_intptr_t *)&self->auth_next;
+-    else
+-        ptr = (atomic_intptr_t *)&self->auth_curr;
+-
+-    prev = atomic_exchange (ptr, (intptr_t)auth);
++    prev =
++        atomic_exchange_explicit (&self->auth_next, auth, memory_order_acq_rel);
+     if (prev)
+         hev_object_unref (HEV_OBJECT (prev));
+ }
+diff --git a/src/core/src/hev-socks5-tcp.c b/src/core/src/hev-socks5-tcp.c
+index a2db80e34c33b65e924ee8f855a90ee819e75384..c947402b4dcf215fa00ed25b46b069ddb3542e63 100644
+--- a/src/core/src/hev-socks5-tcp.c
++++ b/src/core/src/hev-socks5-tcp.c
+@@ -29,8 +29,8 @@ hev_socks5_tcp_splicer (HevSocks5TCP *self, int fd)
+         return -1;
+ 
+     res = hev_task_add_fd (task, fd, POLLIN | POLLOUT);
+-    if (res < 0)
+-        hev_task_mod_fd (task, fd, POLLIN | POLLOUT);
++    if (res < 0 && hev_task_mod_fd (task, fd, POLLIN | POLLOUT) < 0)
++        return -1;
+ 
+     hev_task_io_splice (cfd, cfd, fd, fd, 8192, task_io_yielder, self);
+ 
+diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
+--- a/src/hev-socks5-proxy.c
++++ b/src/hev-socks5-proxy.c
+@@ -8,6 +8,7 @@
+  */
+ 
+ #include <stdio.h>
++#include <errno.h>
+ #include <stdlib.h>
+ #include <signal.h>
+ #include <string.h>
+@@ -49,42 +50,55 @@
+ 
+ static atomic_int tsync;
+ static HevSocks5WorkerData *worker_list;
+-
+-static void
++static _Atomic (HevSocks5Worker *) signal_worker;
++static atomic_int signal_users, signal_reload;
++static struct sigaction signal_previous_reload, signal_previous_pipe;
++static int signal_installed;
++
++_Static_assert (ATOMIC_POINTER_LOCK_FREE == 2 && ATOMIC_INT_LOCK_FREE == 2,
++                "Signal dispatch requires lock-free atomics");
++
++/* Internal pool exits must not retain a public Stop for the next run. */
++static void hev_socks5_proxy_stop_inner (int pending);
++
++static int
+ hev_socks5_proxy_load_file (HevSocks5Authenticator *auth, const char *file)
+ {
+     char *line = NULL;
+     size_t len = 0;
+     ssize_t nread;
++    int result = -1;
+     FILE *fp;
+ 
+     fp = fopen (file, "r");
+-    if (!fp) {
+-        hev_object_unref (HEV_OBJECT (auth));
+-        return;
+-    }
++    if (!fp)
++        return -1;
+ 
+     while ((nread = getline (&line, &len, fp)) != -1) {
+         HevSocks5UserMark *user;
+-        unsigned int nlen;
+-        unsigned int plen;
+-        char name[256];
+-        char pass[256];
+-        long mark = 0;
++        const char *name, *pass;
++        size_t nlen, plen;
++        unsigned long mark;
+         int res;
+ 
+-        res = sscanf (line, "%255s %255s %lx\n", name, pass, &mark);
+-        if (res < 2) {
++        if (memchr (line, '\0', nread)) {
+             LOG_E ("socks5 proxy user/pass format");
+             continue;
+         }
+-
+-        nlen = strlen (name);
+-        plen = strlen (pass);
++        name = line + strspn (line, " \t\r\n\v\f");
++        nlen = strcspn (name, " \t\r\n\v\f");
++        pass = name + nlen;
++        pass += strspn (pass, " \t\r\n\v\f");
++        plen = strcspn (pass, " \t\r\n\v\f");
++        if (!nlen || nlen > 255 || !plen || plen > 255) {
++            LOG_E ("socks5 proxy user/pass format");
++            continue;
++        }
++        mark = strtoul (pass + plen, NULL, 16);
+         user = hev_socks5_user_mark_new (name, nlen, pass, plen, mark);
+         if (!user) {
+             LOG_E ("socks5 proxy user new");
+-            continue;
++            goto exit;
+         }
+         res = hev_socks5_authenticator_add (auth, HEV_SOCKS5_USER (user));
+         if (res < 0) {
+@@ -93,17 +107,21 @@
+         }
+     }
+ 
++    result = feof (fp) && !ferror (fp) ? 0 : -1;
++exit:
+     free (line);
+-    fclose (fp);
+-}
+-
+-static void
++    if (fclose (fp) != 0)
++        result = -1;
++    return result;
++}
++
++static int
+ hev_socks5_proxy_load (void)
+ {
+     HevSocks5Authenticator *auth;
+     const char *file, *name, *pass;
+     int workers;
+-    int i;
++    int i, result = -1;
+ 
+     LOG_D ("socks5 proxy load");
+ 
+@@ -112,21 +130,28 @@
+     pass = hev_config_get_auth_password ();
+ 
+     if (!file && !name && !pass)
+-        return;
++        return 0;
+ 
+     auth = hev_socks5_authenticator_new ();
+     if (!auth)
+-        return;
++        return -1;
+ 
+     if (file) {
+-        hev_socks5_proxy_load_file (auth, file);
++        if (hev_socks5_proxy_load_file (auth, file) < 0)
++            goto exit;
+     } else {
+         HevSocks5UserMark *user;
+ 
++        if (!name || !pass)
++            goto exit;
+         user = hev_socks5_user_mark_new (name, strlen (name), pass,
+                                          strlen (pass), 0);
+-        if (user)
+-            hev_socks5_authenticator_add (auth, HEV_SOCKS5_USER (user));
++        if (!user)
++            goto exit;
++        if (hev_socks5_authenticator_add (auth, HEV_SOCKS5_USER (user)) < 0) {
++            hev_object_unref (HEV_OBJECT (user));
++            goto exit;
++        }
+     }
+ 
+     workers = hev_config_get_workers ();
+@@ -136,13 +161,34 @@
+         hev_socks5_worker_reload (worker);
+     }
+ 
++    result = 0;
++exit:
+     hev_object_unref (HEV_OBJECT (auth));
++    return result;
+ }
+ 
+ static void
+-sigint_handler (int signum)
+-{
+-    hev_socks5_proxy_load ();
++hev_socks5_proxy_reload_notify (void)
++{
++    if (atomic_exchange (&signal_reload, 0) && hev_socks5_proxy_load () < 0)
++        LOG_E ("socks5 proxy reload authentication");
++}
++
++static void
++reload_signal_handler (int signum)
++{
++    HevSocks5Worker *worker;
++    int saved_errno = errno;
++
++    /* Count before loading the pointer so fini can drain every old user. */
++    atomic_fetch_add (&signal_users, 1);
++    worker = atomic_load (&signal_worker);
++    if (worker) {
++        atomic_store (&signal_reload, 1);
++        hev_socks5_worker_signal_reload (worker);
++    }
++    atomic_fetch_sub (&signal_users, 1);
++    errno = saved_errno;
+ }
+ 
+ static void *
+@@ -163,6 +209,7 @@
+     res = hev_task_system_init ();
+     if (res < 0) {
+         LOG_E ("socks5 proxy worker task system");
++        hev_socks5_proxy_stop_inner (0);
+         goto exit;
+     }
+ 
+@@ -170,6 +217,7 @@
+ 
+     hev_task_system_run ();
+ 
++    hev_socks5_proxy_stop_inner (0);
+     hev_task_system_fini ();
+ exit:
+     return NULL;
+@@ -186,6 +234,7 @@
+     int workers;
+     int res;
+     int i;
++    struct sigaction action = { 0 };
+ 
+     LOG_D ("socks5 proxy init");
+ 
+@@ -250,9 +299,27 @@
+     hev_socket_factory_destroy (factory);
+     factory = NULL;
+ 
+-    hev_socks5_proxy_load ();
+-    signal (SIGPIPE, SIG_IGN);
+-    signal (SIGUSR1, sigint_handler);
++    if (hev_socks5_proxy_load () < 0) {
++        LOG_E ("socks5 proxy initial authentication");
++        goto exit;
++    }
++    res = hev_socks5_worker_set_reload_notify (worker_list[0].worker,
++                                               hev_socks5_proxy_reload_notify);
++    if (res < 0)
++        goto exit;
++
++    sigemptyset (&action.sa_mask);
++    action.sa_handler = SIG_IGN;
++    if (sigaction (SIGPIPE, &action, &signal_previous_pipe) < 0)
++        goto exit;
++    signal_installed = 1;
++    action.sa_handler = reload_signal_handler;
++    action.sa_flags = SA_RESTART;
++    atomic_store (&signal_reload, 0);
++    atomic_store (&signal_worker, worker_list[0].worker);
++    if (sigaction (SIGUSR1, &action, &signal_previous_reload) < 0)
++        goto exit;
++    signal_installed |= 2;
+     atomic_fetch_or (&tsync, SYNC_SEND);
+ 
+     return 0;
+@@ -272,6 +339,11 @@
+ 
+     LOG_D ("socks5 proxy fini");
+ 
++    atomic_store (&signal_worker, NULL);
++    while (atomic_load (&signal_users))
++        usleep (500);
++    atomic_store (&signal_reload, 0);
++
+ retry:
+     res = atomic_fetch_and (&tsync, ~(SYNC_SEND | SYNC_STOP | SYNC_SENT));
+     if (res & SYNC_WAIT) {
+@@ -295,6 +367,11 @@
+     }
+ 
+     hev_task_system_fini ();
++    if (signal_installed & 2)
++        sigaction (SIGUSR1, &signal_previous_reload, NULL);
++    if (signal_installed & 1)
++        sigaction (SIGPIPE, &signal_previous_pipe, NULL);
++    signal_installed = 0;
+ }
+ 
+ void
+@@ -310,10 +387,12 @@
+     hev_socks5_worker_start (worker_list[0].worker);
+ 
+     hev_task_system_run ();
+-}
+-
+-void
+-hev_socks5_proxy_stop (void)
++
++    hev_socks5_proxy_stop ();
++}
++
++static void
++hev_socks5_proxy_stop_inner (int pending)
+ {
+     int res;
+ 
+@@ -335,9 +414,15 @@
+             for (i = 0; i < workers; i++)
+                 hev_socks5_worker_stop (worker_list[i].worker);
+         }
+-    } else {
++    } else if (pending) {
+         atomic_fetch_or (&tsync, SYNC_STOP | SYNC_ABRT);
+     }
+ 
+     atomic_fetch_and (&tsync, ~SYNC_WAIT);
+ }
++
++void
++hev_socks5_proxy_stop (void)
++{
++    hev_socks5_proxy_stop_inner (1);
++}
+diff --git a/Makefile b/Makefile
+index 7c03e3ed701b80ae97d18ef1bf607d2f477e8360..534d4966c1a84ca70cae3ff2f1336800741877b3 100644
+--- a/Makefile
++++ b/Makefile
+@@ -32,7 +32,7 @@ $(SHARED_TARGET) : LDFLAGS+=-shared -pthread
+ 
+ -include build.mk
+ CCFLAGS+=$(VERSION_CFLAGS)
+-TPFLAGS=ENABLE_STACK_OVERFLOW_DETECTOR=1
++TPFLAGS=ENABLE_STACK_OVERFLOW_DETECTOR=0
+ CCSRCS=$(filter %.c,$(SRCFILES))
+ ASSRCS=$(filter %.S,$(SRCFILES))
+ LDOBJS=$(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(CCSRCS)) \
+diff --git a/src/hev-socks5-worker.h b/src/hev-socks5-worker.h
+index 199fbf64494e77ec89fba4761c97c340895ddd44..7b2ba690258286190f39bf1d2013ae0962a3f3e7 100644
+--- a/src/hev-socks5-worker.h
++++ b/src/hev-socks5-worker.h
+@@ -21,6 +21,12 @@ void hev_socks5_worker_start (HevSocks5Worker *self);
+ void hev_socks5_worker_stop (HevSocks5Worker *self);
+ void hev_socks5_worker_reload (HevSocks5Worker *self);
+ 
++/* Configure before start; also makes signal notification nonblocking. */
++int hev_socks5_worker_set_reload_notify (HevSocks5Worker *self,
++                                         void (*notify) (void));
++/* Requires the setup above and retained worker/event-descriptor lifetime. */
++void hev_socks5_worker_signal_reload (HevSocks5Worker *self);
++
+ void hev_socks5_worker_set_auth (HevSocks5Worker *self,
+                                  HevSocks5Authenticator *auth);
+ 
+diff --git a/third-part/hev-task-system/src/lib/object/hev-object-atomic.c b/third-part/hev-task-system/src/lib/object/hev-object-atomic.c
+index 4d93ba720b0a06209a3a87bbf3fa15b4af74b3b2..326e755fae4472bd38943f28877a164d01c3b0f6 100644
+--- a/third-part/hev-task-system/src/lib/object/hev-object-atomic.c
++++ b/third-part/hev-task-system/src/lib/object/hev-object-atomic.c
+@@ -47,7 +47,7 @@ _hev_object_atomic_ref (HevObject *base, int ref)
+         return;
+     }
+ 
+-    rc = atomic_fetch_sub_explicit (rcp, 1, memory_order_relaxed);
++    rc = atomic_fetch_sub_explicit (rcp, 1, memory_order_acq_rel);
+     if (rc > 1)
+         return;
+ 
+diff --git a/third-part/hev-task-system/src/lib/io/basic/hev-task-io.c b/third-part/hev-task-system/src/lib/io/basic/hev-task-io.c
+index af36b19f09b82a6a1f2a3ccc7c6938d2761cdaba..b62ade5fc7630cef792dcf1811a73067b3d501ae 100644
+--- a/third-part/hev-task-system/src/lib/io/basic/hev-task-io.c
++++ b/third-part/hev-task-system/src/lib/io/basic/hev-task-io.c
+@@ -130,6 +130,8 @@
+ 
+ retry:
+     s = read (fd, buf, count);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -151,6 +153,8 @@
+ 
+ retry:
+     s = readv (fd, iov, iovcnt);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -172,6 +176,8 @@
+ 
+ retry:
+     s = write (fd, buf, count);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -193,6 +199,8 @@
+ 
+ retry:
+     s = writev (fd, iov, iovcnt);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -255,8 +263,10 @@
+     int res;
+     ssize_t s;
+ 
+-    s = splice (fd_in, NULL, self->fd[1], NULL, self->blen,
+-                SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
++    do {
++        s = splice (fd_in, NULL, self->fd[1], NULL, self->blen,
++                    SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
++    } while (s == -1 && errno == EINTR);
+     if (0 >= s) {
+         if ((0 > s) && (EAGAIN == errno))
+             res = 0;
+@@ -268,8 +278,10 @@
+     }
+ 
+     if (self->wlen) {
+-        s = splice (self->fd[0], NULL, fd_out, NULL, self->blen,
+-                    SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
++        do {
++            s = splice (self->fd[0], NULL, fd_out, NULL, self->blen,
++                        SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
++        } while (s == -1 && errno == EINTR);
+         if (0 >= s) {
+             if ((0 > s) && (EAGAIN == errno))
+                 res = 0;
+@@ -313,7 +325,10 @@
+ 
+     iovc = hev_circular_buffer_writing (self->buf, iov);
+     if (iovc) {
+-        ssize_t s = readv (fd_in, iov, iovc);
++        ssize_t s;
++        do {
++            s = readv (fd_in, iov, iovc);
++        } while (s == -1 && errno == EINTR);
+         if (0 >= s) {
+             if ((0 > s) && (EAGAIN == errno))
+                 res = 0;
+@@ -326,7 +341,10 @@
+ 
+     iovc = hev_circular_buffer_reading (self->buf, iov);
+     if (iovc) {
+-        ssize_t s = writev (fd_out, iov, iovc);
++        ssize_t s;
++        do {
++            s = writev (fd_out, iov, iovc);
++        } while (s == -1 && errno == EINTR);
+         if (0 >= s) {
+             if ((0 > s) && (EAGAIN == errno))
+                 res = 0;
+diff --git a/third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.c b/third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.c
+index f6897cc0251013802a1df63798ee02105a379364..ecc1675440e1a2d49b9bfa1ab0fcd48664af2bdc 100644
+--- a/third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.c
++++ b/third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.c
+@@ -148,6 +148,8 @@
+ 
+ retry:
+     s = recv (fd, buf + size, len - size, flags & ~MSG_WAITALL);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -180,6 +182,8 @@
+ 
+ retry:
+     s = send (fd, buf + size, len - size, flags & ~MSG_WAITALL);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -214,6 +218,8 @@
+ retry:
+     s = recvfrom (fd, buf + size, len - size, flags & ~MSG_WAITALL, addr,
+                   addr_len);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -248,6 +254,8 @@
+ retry:
+     s = sendto (fd, buf + size, len - size, flags & ~MSG_WAITALL, addr,
+                 addr_len);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -295,6 +303,8 @@
+ 
+ retry:
+     s = recvmsg (fd, &mh, flags & ~MSG_WAITALL);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -356,6 +366,8 @@
+ 
+ retry:
+     s = sendmsg (fd, &mh, flags & ~MSG_WAITALL);
++    if (s == -1 && errno == EINTR)
++        goto retry;
+     if (s < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -410,6 +422,8 @@
+         r = 1;
+     }
+ #endif
++    if (r == -1 && errno == EINTR)
++        goto retry;
+     if (r < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+@@ -450,6 +464,8 @@
+         r = 1;
+     }
+ #endif
++    if (r == -1 && errno == EINTR)
++        goto retry;
+     if (r < 0 && errno == EAGAIN && !(flags & MSG_DONTWAIT)) {
+         if (yielder) {
+             if (yielder (HEV_TASK_WAITIO, yielder_data))
+diff --git a/src/hev-config.c b/src/hev-config.c
+--- a/src/hev-config.c
++++ b/src/hev-config.c
+@@ -206,17 +206,21 @@
+         const char *key, *value;
+ 
+         if (!pair->key || !pair->value)
+-            continue;
++            return -1;
+ 
+         node = yaml_document_get_node (doc, pair->key);
+         if (!node || YAML_SCALAR_NODE != node->type)
+-            break;
++            return -1;
+         key = (const char *)node->data.scalar.value;
++        if (strlen (key) != node->data.scalar.length)
++            return -1;
+ 
+         node = yaml_document_get_node (doc, pair->value);
+         if (!node || YAML_SCALAR_NODE != node->type)
+-            break;
++            return -1;
+         value = (const char *)node->data.scalar.value;
++        if (strlen (value) != node->data.scalar.length)
++            return -1;
+ 
+         if (0 == strcmp (key, "username"))
+             user = value;
+@@ -226,11 +230,20 @@
+             file = value;
+     }
+ 
+-    if (file) {
+-        strncpy (auth_file, file, 1023);
+-    } else if (user && pass) {
+-        strncpy (username, user, 255);
+-        strncpy (password, pass, 255);
++    if (file && file[0]) {
++        if (strlen (file) >= sizeof (auth_file))
++            return -1;
++        strcpy (auth_file, file);
++    } else {
++        if ((user && user[0]) != (pass && pass[0]))
++            return -1;
++        if ((user && strlen (user) >= sizeof (username)) ||
++            (pass && strlen (pass) >= sizeof (password)))
++            return -1;
++        if (user)
++            strcpy (username, user);
++        if (pass)
++            strcpy (password, pass);
+     }
+ 
+     return 0;
+@@ -332,13 +345,15 @@
+         int res = 0;
+ 
+         if (!pair->key || !pair->value)
+-            continue;
++            return -1;
+ 
+         node = yaml_document_get_node (doc, pair->key);
+         if (!node || YAML_SCALAR_NODE != node->type)
+-            break;
++            return -1;
+ 
+         key = (const char *)node->data.scalar.value;
++        if (strlen (key) != node->data.scalar.length)
++            return -1;
+         node = yaml_document_get_node (doc, pair->value);
+ 
+         if (0 == strcmp (key, "main"))
