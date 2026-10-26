@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'artifacts/integrated/owner-controls'
 CHECKS = {
     'feature/udp-compat': ['Tests/udp_audit_driver_regression.py'],
+    'feature/icmp-relay': ['Build/check_documentation.py', 'Tests/native_sources_contract.py'],
     'feature/traffic-statistics': ['Tests/Statistics/input_probe.py',
                                  'Tests/Statistics/udp_inheritance_regression.py'],
     'feature/server-control': ['Tests/ServerControl/input_integrity_check.py'],

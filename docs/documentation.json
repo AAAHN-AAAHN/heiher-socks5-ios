@@ -2,12 +2,13 @@
   "branch": "release/integrated",
   "frozen_source": "ef450b2fb97e3448b2821c212f6135000ab36737",
   "parents": {
-    "feature/app-icon": "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
-    "feature/background": "25330a671a317bd345e60fc7b8b95976f030e0de",
-    "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
-    "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
-    "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
-    "feature/settings-persistence": "3f9bb85ee502d525d2ca42ca52480c85cc2fe5ba"
+    "feature/app-icon": "6abae4ef1ba25e333fff162c7ec43f65b43c3565",
+    "feature/background": "2561a81dd2ed9524c8c5c5320e29c439d8321c18",
+    "feature/udp-compat": "6a5f473f8a47913048ebf6b664d509ad5f983a1d",
+    "feature/icmp-relay": "e7aefa47f616411a349f97ff36e9da65e4258013",
+    "feature/server-control": "e1364066c860c7ffda35f2adaf31acc38e16e9af",
+    "feature/traffic-statistics": "624b2403880b06caa922833e19f1b222fc314d88",
+    "feature/settings-persistence": "8798c53f19fb0661777e51992b48b928297f84aa"
   },
   "owned_documents": [
     "README.md",
@@ -15,12 +16,12 @@
   ],
   "readme_mirror": "docs/features/integrated.md",
   "validation_files": {
-    "Build/check.py": "041770092d3d47993d64451d0e8dca233d8a0ceb",
-    "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
-    "Build/check_ownership.py": "d063871f7d73d4caad662d7837734dfdfca294bd",
-    "Tests/AppIcon/check_icon.py": "99c12340f6869c5ec6d919df78ae258343b34a51",
-    "Tests/Background/check_scope.py": "452c533f2cb02860e1da5f02272e876adfab35e8",
-    "Tests/Statistics/audit.py": "d246c4f5963712cd2091081a68bb5f0c3049db20",
+    "Build/check.py": "3618e6802b3157e20ec6d7f641fbdc2c789842fd",
+    "Build/check_documentation.py": "c0b7a48119db19cda94d78cd23d482280dcc69ce",
+    "Build/check_ownership.py": "cb5a9e72b9262083774b5e2b457575079a2cc7ac",
+    "Tests/AppIcon/check_icon.py": "cbfce1b6ed6343cb0ae4028d40bc1be592fd2507",
+    "Tests/Background/check_scope.py": "9200dcc1c1085457ff12b0fbfc02873dcfb2cf10",
+    "Tests/Statistics/audit.py": "bdae70925f5338535d05eccc7e48c8ef648a210c",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }

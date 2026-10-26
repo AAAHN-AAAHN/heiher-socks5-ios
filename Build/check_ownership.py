@@ -23,8 +23,7 @@ def content(path):
     return (ROOT / path).read_text()
 
 
-def main():
-    subprocess.run([sys.executable, str(ROOT / 'Build/check_documentation.py')], check=True)
+def source_contract():
     assert 'server' in FEATURES
     manifest = json.loads((ROOT / 'docs/feature-membership.json').read_bytes())
     model = content('Socks5/Server/ServerSettings.swift')
@@ -60,7 +59,7 @@ def main():
     root = content('Socks5/AppRoot.swift')
     assert root.count('@StateObject private var server = ServerController()') == 1
     if 'settings' in FEATURES:
-        assert 'Socks5/Settings/SettingsStore.swift' in manifest.get('files', {}), 'Store changes must be explicitly hash-locked'
+        assert 'Socks5/Settings/SettingsStore.swift' in manifest.get('sources', {}), 'Settings store must retain its exact owner source'
         if CONFIG['name'] == 'integrated':
             # Settings owns its asynchronous API and Sendable value model. Exact
             # owner bytes replace the former synchronous implementation boundary.
@@ -110,6 +109,11 @@ def main():
     own_doc = {'server-control': 'server-control', 'settings-persistence': 'settings-persistence', 'integrated': 'integrated'}[CONFIG['name']]
     assert (ROOT / 'README.md').read_bytes() == (ROOT / 'docs/features' / (own_doc + '.md')).read_bytes()
     print(f'PASS: server independent of storage; audited behavior preserved; {checked} exact owner files and pinned ancestors')
+
+
+def main():
+    subprocess.run([sys.executable, str(ROOT / 'Build/check_documentation.py')], check=True)
+    source_contract()
 
 
 if __name__ == '__main__':
