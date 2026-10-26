@@ -2,11 +2,12 @@
 """Test the real iOS27 async audio path in a temporary Simulator app; never an IPA.
 
 The isolated test-project construction follows the existing verified UI audit.
-No sibling feature is imported, no application project/source is rewritten, and no
-host/installer behavior is inferred from this Simulator execution.
+The framework comes from the declared native parent; application project/source
+edits stay in the temporary app. No host/installer behavior is inferred.
 """
 import hashlib
 import json
+import os
 from pathlib import Path
 import plistlib
 import shutil
@@ -88,6 +89,33 @@ def add_test_target(app):
     shutil.copyfile(path, OUT / 'generated-test-project.pbxproj')
 
 
+def install_native_framework(app):
+    core = Path(os.environ.get('HEV_NATIVE_CORE', ROOT / '.build/server')).resolve()
+    framework = core / 'HevSocks5Server.xcframework'
+    if not (framework / 'Info.plist').is_file():
+        raise RuntimeError('Build the declared native ICMP framework before the Simulator audit: ' + str(framework))
+    inventory = plistlib.loads((framework / 'Info.plist').read_bytes())['AvailableLibraries']
+    for library in inventory:
+        headers = framework / library['LibraryIdentifier'] / library['HeadersPath']
+        for name in ('hev-main.h', 'hev-socks5-icmp.h'):
+            if (headers / name).read_bytes() != (core / 'src' / name).read_bytes():
+                raise RuntimeError('Generated native public header differs: ' + str(headers / name))
+    files = {}
+    for path in framework.rglob('*'):
+        if path.is_symlink():
+            raise RuntimeError('Linked native framework input: ' + str(path))
+        if path.is_file():
+            files[str(path.relative_to(framework))] = hashlib.sha256(path.read_bytes()).hexdigest()
+    destination = app / framework.name
+    shutil.rmtree(destination)
+    shutil.copytree(framework, destination)
+    copied = {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest()
+              for p in destination.rglob('*') if p.is_file()}
+    if copied != files:
+        raise RuntimeError('Copied native framework differs from generated input')
+    (OUT / 'native-framework-sha256.json').write_text(json.dumps(files, indent=2) + '\n')
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for marker in ('SUCCESS.txt', 'advisory-check.txt', 'app-sha256.txt'):
@@ -108,6 +136,7 @@ def main():
     app.mkdir(parents=True)
     with zipfile.ZipFile(OUT / 'source.zip') as source:
         source.extractall(app)
+    install_native_framework(app)
     add_test_target(app)
     runtimes = json.loads(output('xcrun', 'simctl', 'list', 'runtimes', '-j'))['runtimes']
     runtime = next(r for r in runtimes if r.get('isAvailable') and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-27-'))

@@ -4,6 +4,8 @@ import Foundation
 @_silgen_name("ping_probe_value") private func probe(_ key: Int32) -> Int32
 @_silgen_name("ping_probe_mode") private func mode(_ value: Int32)
 @_silgen_name("ping_probe_span") private func span() -> Double
+@_silgen_name("ping_probe_server") private func server(_ enabled: Int32)
+@_silgen_name("ping_probe_budget") private func budget(_ value: Int32)
 
 private final class Reports: @unchecked Sendable {
     private let lock = NSLock()
@@ -72,23 +74,21 @@ struct PeriodicPingTests {
         require(compacted.destinations.count == 1 && duplicates.utf8.count > 8192, "no byte/token cap")
         let repeatedMaximum = try PeriodicPingConfiguration(destinations: many + ",10.1.0.0,::ffff:10.1.0.0", period: "1")
         require(repeatedMaximum.destinations.count == 65_536, "duplicate at maximum")
-        for sequence in UInt32(0)...65535 {
-            let bytes = PingPacket.echo(ipv6: false, identifier: 0x1234, sequence: UInt16(sequence))
-            var sum = stride(from: 0, to: 8, by: 2).reduce(UInt32(0)) { $0 + UInt32(bytes[$1]) * 256 + UInt32(bytes[$1 + 1]) }
-            while sum > 65535 { sum = (sum & 65535) + (sum >> 16) }
-            require(sum == 65535 && bytes[0] == 8, "checksum")
-        }
-        require(PingPacket.echo(ipv6: true, identifier: 0x1234, sequence: 0xffff) == [128, 0, 0, 0, 18, 52, 255, 255], "ICMPv6")
         let reports = Reports()
         var service: PeriodicPingService? = PeriodicPingService()
         Thread.sleep(forTimeInterval: 0.03)
-        require(probe(0) == 0, "default allocated a socket")
+        require(probe(0) == 0, "default allocated a native client")
         let live = try PeriodicPingConfiguration(destinations: "127.0.0.1,127.0.0.2,::1", period: "20")
+        server(0)
         service!.configure(live) { reports.add($0) }
-        wait("periodic sends") { probe(3) >= 15 }
-        require(probe(0) == 2 && probe(1) == 0 && probe(5) == 0, "resource bound or packet")
+        wait("native readiness") { reports.values.last == "Waiting for native ICMP server" }
+        Thread.sleep(forTimeInterval: 0.06)
+        require(probe(0) == 0 && probe(2) == 0, "unavailable server caused fallback I/O")
+        server(1)
+        wait("periodic native sends") { probe(3) >= 15 }
+        require(probe(0) == 1 && probe(1) == 0 && probe(5) == 0, "client bound or native request")
         require(probe(257) >= 5 && probe(258) >= 5 && probe(511) >= 5, "multi-destination")
-        require(reports.values == ["Sending ICMP to 3 destination(s)"], "UI publication per tick")
+        require(reports.values == ["Waiting for native ICMP server", "Sending ICMP to 3 destination(s)"], "UI publication per tick")
         require(span() >= 0.06, "period ignored")
         mode(3)
         wait("single destination error") { reports.values.last?.contains("127.0.0.2:") == true }
@@ -96,22 +96,44 @@ struct PeriodicPingTests {
         wait("other destination must continue") { probe(257) >= before + 3 }
         mode(0)
         wait("recover next period") { reports.values.last == "Sending ICMP to 3 destination(s)" }
-        mode(4)
-        let reads = probe(4)
-        wait("bounded receive flood") { probe(4) > reads }
+        for state in [Int32(8), Int32(9)] {
+            mode(state)
+            let count = reports.values.count, sent = probe(3)
+            wait("terminal or duplicate event after SENT") { probe(3) >= sent + 9 }
+            require(reports.values.count == count, "reply/timeout/duplicate changed send status")
+        }
         mode(0)
+        server(0)
+        wait("server stop releases client") { reports.values.last == "Waiting for native ICMP server" && probe(0) == probe(1) }
+        let waiting = probe(2)
+        Thread.sleep(forTimeInterval: 0.05)
+        require(probe(2) == waiting, "stopped server still received requests")
+        server(1)
+        wait("new server generation") { reports.values.last == "Sending ICMP to 3 destination(s)" && probe(0) == 2 }
         service!.configure(nil) { reports.add($0) }
-        wait("off acknowledgement") { reports.values.last == "Off" }
-        let stopped = probe(2)
+        wait("off acknowledgement") { reports.values.last == "Off" && probe(0) == probe(1) }
+        let stopped = probe(3)
         Thread.sleep(forTimeInterval: 0.08)
-        require(probe(2) == stopped && probe(0) == probe(1), "Off leaked work")
+        require(probe(3) == stopped && probe(8) == 0, "Off leaked native work")
         mode(1)
         service!.configure(live) { reports.add($0) }
-        wait("open failure") { reports.values.last?.contains("Send error:") == true }
+        wait("native client failure") { reports.values.last?.contains("Send error:") == true }
         mode(0)
-        wait("open recovery") { reports.values.last == "Sending ICMP to 3 destination(s)" }
+        wait("client recovery") { reports.values.last == "Sending ICMP to 3 destination(s)" }
         mode(5)
-        wait("partial send rejection") { reports.values.last?.contains("Send error:") == true }
+        wait("native send rejection") { reports.values.last?.contains("Send error:") == true }
+        mode(0)
+        service!.configure(nil) { reports.add($0) }
+        wait("before pressure") { reports.values.last == "Off" && probe(0) == probe(1) }
+        mode(4)
+        let slow = try PeriodicPingConfiguration(destinations: "127.0.0.1,::1", period: "1000")
+        service!.configure(slow) { reports.add($0) }
+        wait("explicit capacity wait") { reports.values.last == "Waiting for native ICMP capacity; 0/2 destinations processed" }
+        let full = probe(2)
+        Thread.sleep(forTimeInterval: 0.08)
+        require(probe(2) == full, "full native queue caused a retry loop")
+        service!.configure(nil) { reports.add($0) }
+        wait("after pressure") { reports.values.last == "Off" && probe(0) == probe(1) }
         mode(0)
         for _ in 0..<100 {
             service!.configure(live) { reports.add($0) }
@@ -123,20 +145,117 @@ struct PeriodicPingTests {
         let final = probe(2)
         Thread.sleep(forTimeInterval: 0.06)
         require(probe(2) == final && probe(0) == probe(1), "stale timer")
+        mode(6)
         service!.configure(maximum) { reports.add($0) }
-        let begun = probe(2)
-        wait("large batch starts") { probe(2) > begun }
+        wait("one bounded batch") { probe(8) == 256 }
+        let held = probe(2)
+        Thread.sleep(forTimeInterval: 0.06)
+        require(probe(2) == held && probe(6) <= 256, "held native batch accumulated timer work")
         let off = DispatchSemaphore(value: 0)
-        let offStart = Date()
+        let offStart = Date(), cancellations = probe(7)
         service!.configure(nil) { _ in off.signal() }
+        require(probe(7) > cancellations && probe(8) == 0, "Off delayed native cancellation")
         require(off.wait(timeout: .now() + 3) == .success, "large batch Off")
         require(Date().timeIntervalSince(offStart) < 1, "large batch did not yield to Off")
+        mode(0)
+        let chunked = try PeriodicPingConfiguration(destinations: (0..<600).map {
+            "10.2.\($0 / 256).\($0 % 256)"
+        }.joined(separator: ","), period: "20")
+        budget(300)
+        let chunkStart = probe(3)
+        service!.configure(chunked) { reports.add($0) }
+        wait("capacity preserves a partial round") {
+            reports.values.last == "Waiting for native ICMP capacity; 300/600 destinations processed"
+        }
+        require(probe(3) == chunkStart + 300 && probe(11) == 299, "partial native round")
+        budget(300)
+        wait("capacity resumes at the next destination") {
+            reports.values.contains("Sending ICMP to 600 destination(s)")
+        }
+        require(probe(3) == chunkStart + 600 && probe(11) == 599, "capacity restarted or starved later destinations")
+        require(probe(6) <= 256, "multiple batches exceeded one bounded native batch")
+        service!.configure(nil) { reports.add($0) }
+        wait("after complete round") { reports.values.last == "Off" && probe(0) == probe(1) }
+        budget(17)
+        service!.configure(chunked) { reports.add($0) }
+        wait("partial round before editing") {
+            reports.values.last == "Waiting for native ICMP capacity; 17/600 destinations processed"
+        }
+        let edited = try PeriodicPingConfiguration(destinations: "10.3.0.9,10.3.0.10", period: "20")
+        service!.configure(edited) { reports.add($0) }
+        wait("editing resets pending cursor") {
+            reports.values.last == "Waiting for native ICMP capacity; 0/2 destinations processed"
+        }
+        budget(1)
+        wait("edited list begins at its first destination") {
+            reports.values.last == "Waiting for native ICMP capacity; 1/2 destinations processed"
+        }
+        require(probe(11) == 9, "editing retained the previous list cursor")
+        service!.configure(nil) { reports.add($0) }
+        wait("Off while waiting for capacity") { reports.values.last == "Off" && probe(0) == probe(1) }
+        let capacityOff = probe(2), capacitySent = probe(3)
+        budget(100)
+        Thread.sleep(forTimeInterval: 0.06)
+        require(probe(2) == capacityOff && probe(3) == capacitySent, "Off resumed a pending capacity round")
+        budget(7)
+        service!.configure(chunked) { reports.add($0) }
+        wait("partial round before restart") {
+            reports.values.last == "Waiting for native ICMP capacity; 7/600 destinations processed"
+        }
+        server(0)
+        wait("capacity wait observes server stop") {
+            reports.values.last == "Waiting for native ICMP server" && probe(0) == probe(1)
+        }
+        server(1)
+        wait("server generation resets pending cursor") {
+            reports.values.last == "Waiting for native ICMP capacity; 0/600 destinations processed"
+        }
+        budget(9)
+        wait("new generation begins a fresh round") {
+            reports.values.last == "Waiting for native ICMP capacity; 9/600 destinations processed"
+        }
+        require(probe(11) == 8, "new generation resumed old generation's round")
+        service!.configure(nil) { reports.add($0) }
+        wait("before admission race") { reports.values.last == "Off" && probe(0) == probe(1) }
+        budget(-1)
+        mode(7)
+        let entered = probe(10)
         service!.configure(live) { reports.add($0) }
-        wait("restart") { probe(0) > probe(1) }
+        wait("native submission boundary") { probe(10) > entered }
+        let returned = DispatchSemaphore(value: 0), acknowledged = DispatchSemaphore(value: 0)
+        let owner = service!
+        DispatchQueue.global().async {
+            owner.configure(nil) { _ in acknowledged.signal() }
+            returned.signal()
+        }
+        require(returned.wait(timeout: .now() + 0.05) == .timedOut, "Off returned across held native admission")
+        mode(0)
+        require(returned.wait(timeout: .now() + 3) == .success, "Off admission gate did not finish")
+        require(acknowledged.wait(timeout: .now() + 3) == .success, "Off after admission race")
+        let afterRace = probe(3)
+        Thread.sleep(forTimeInterval: 0.06)
+        require(probe(3) == afterRace && probe(0) == probe(1), "post-Off request entered a fresh cancellation epoch")
+        mode(6)
+        service!.configure(live) { reports.add($0) }
+        wait("held old generation") { probe(8) == 3 }
+        server(0)
+        server(1)
+        mode(0)
+        wait("old generation callbacks discarded") { reports.values.last == "Sending ICMP to 3 destination(s)" && probe(8) == 0 }
         service = nil
-        wait("deinit cleanup") { probe(0) == probe(1) }
-        require(probe(5) == 0, "wire mismatch")
-        print("PASS: numeric parsing, 65536 IPv4 checksums, ICMPv6, multi-IP scheduling, errors, recovery, publication, Off, rapid changes, deinit")
-        print("CONTROLLED_SYSCALLS opens=\(probe(0)) closes=\(probe(1)) send_calls=\(probe(2)); not a network reachability test")
+        // The local owner above remains until this scope ends; explicitly Off it
+        // before independently testing the public handle's deinit boundary.
+        owner.configure(nil) { reports.add($0) }
+        wait("owner Off") { probe(0) == probe(1) }
+        var released: PeriodicPingService? = PeriodicPingService()
+        mode(6)
+        released!.configure(live) { reports.add($0) }
+        wait("deinit with native work") { probe(8) == 3 }
+        released = nil
+        wait("deinit cleanup") { probe(0) == probe(1) && probe(8) == 0 }
+        mode(0)
+        require(probe(5) == 0, "direct ICMP I/O or native ABI mismatch")
+        print("PASS: numeric input, bounded native client/batches, readiness/generation, actual SENT status, failures/backpressure, stale events, Off admission, deinit")
+        print("CONTROLLED_NATIVE_API clients=\(probe(0)) freed=\(probe(1)) requests=\(probe(2)); no device or direct ICMP execution")
     }
 }

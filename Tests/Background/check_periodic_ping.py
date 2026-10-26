@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Exact-source ping tests: real Dispatch, controlled ICMP syscalls, no device claim."""
+"""Exact-source client tests and real native loopback; no device claim."""
+import argparse
 import hashlib
 import json
+import os
 import platform
 from pathlib import Path
 import re
@@ -108,6 +110,22 @@ def main():
         raise SystemExit('Assertions must be enabled')
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / 'SUCCESS.txt').unlink(missing_ok=True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--core', type=Path, default=Path(os.environ.get('HEV_NATIVE_CORE', ROOT / '.build/server')))
+    core = parser.parse_args().core.resolve()
+    headers = ['hev-main.h', 'hev-socks5-icmp.h']
+    if any(not (core / 'src' / name).is_file() for name in headers):
+        raise SystemExit('Prepare the declared native ICMP sources first; expected actual public headers in ' + str(core / 'src'))
+    if 'hev_socks5_server_icmp_client_new' not in (core / 'src/hev-socks5-icmp.h').read_text():
+        raise SystemExit('Prepared native sources do not expose the ICMP client API')
+    module = OUT / 'compiled-headers'
+    module.mkdir(exist_ok=True)
+    for name in headers:
+        (module / name).write_bytes((core / 'src' / name).read_bytes())
+    (module / 'module.modulemap').write_text('module HevSocks5Server { header "hev-main.h" export * }\n')
+    (module / 'SHA256SUMS.txt').write_text(''.join(
+        hashlib.sha256((module / name).read_bytes()).hexdigest() + '  ' + name + '\n'
+        for name in [*headers, 'module.modulemap']))
     records = []
     with tempfile.TemporaryDirectory(prefix='periodic-ping-') as folder:
         work = Path(folder)
@@ -121,19 +139,21 @@ def main():
                 result.check_returncode()
 
         io = work / 'io.o'
-        run('compile-syscall-double', ['cc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-c', HERE / 'PeriodicPingIO.c', '-o', io])
-        extra = []
+        run('compile-native-api-double', ['cc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-pthread',
+                                         '-I', module, '-c', HERE / 'PeriodicPingIO.c', '-o', io])
+        extra = ['-I', module, '-Xlinker', '-lpthread']
         if platform.system() == 'Linux':
             stub = work / 'Combine.swift'
             stub.write_text(COMBINE_DOUBLE)
             run('compile-publisher-double', ['swiftc', '-warnings-as-errors', '-emit-module', '-emit-library', '-module-name', 'Combine', stub,
                                            '-o', work / 'libCombine.so'])
-            extra = ['-I', work, '-L', work, '-lCombine', '-Xlinker', '-rpath', '-Xlinker', work]
+            extra += ['-I', work, '-L', work, '-lCombine', '-Xlinker', '-rpath', '-Xlinker', work,
+                      '-Xlinker', '-ldl']
         feedback = import_feedback_sources(work)
         (OUT / 'import-feedback-source-manifest.json').write_bytes(
             (work / 'import-feedback-source-manifest.json').read_bytes())
         for flag, mode in [('-Onone', 'debug'), ('-O', 'optimized')]:
-            common = ['swiftc', '-swift-version', '5', '-strict-concurrency=complete', '-warnings-as-errors', flag,
+            common = ['swiftc', '-swift-version', '6', '-strict-concurrency=complete', '-warnings-as-errors', flag,
                       ROOT / 'Socks5/BackgroundKeepAlive/PeriodicPingService.swift']
             for name, model in [('PeriodicPingTests', False), ('PeriodicPingModelTests', True)]:
                 output = work / (mode + '-' + name)
@@ -151,12 +171,16 @@ def main():
             ]:
                 run(mode + '-import-feedback-' + case, [feedback_binary, case])
         live = work / 'icmp-loopback'
-        run('loopback-compile', ['swiftc', '-swift-version', '5', '-strict-concurrency=complete',
-                                '-warnings-as-errors', '-O', ROOT / 'Socks5/BackgroundKeepAlive/PeriodicPingService.swift',
-                                HERE / 'PeriodicPingLoopback.swift', '-o', live])
+        run('native-library-build', ['make', '-C', core, '-j3', 'ENABLE_IO_SPLICE_SYSCALL=0', 'static'])
+        libraries = [core / 'bin/libhev-socks5-server.a', core / 'third-part/yaml/bin/libyaml.a',
+                     core / 'third-part/hev-task-system/bin/libhev-task-system.a']
+        run('loopback-compile', ['swiftc', '-swift-version', '6', '-strict-concurrency=complete',
+                                '-warnings-as-errors', '-O', '-I', module,
+                                ROOT / 'Socks5/BackgroundKeepAlive/PeriodicPingService.swift',
+                                HERE / 'PeriodicPingLoopback.swift', *libraries, '-Xlinker', '-lpthread', '-o', live])
         run('loopback-run', [live], accepted=(0, 77) if platform.system() == 'Linux' else (0,))
-    (OUT / 'SUCCESS.txt').write_text('PASS: controlled sender/model tests; loopback result is separate (77 means NOT EXECUTED). No device/SDK/UI claim.\n')
-    print(f'PASS: {len(records)} compile/runtime commands; controlled I/O, no product source changes')
+    (OUT / 'SUCCESS.txt').write_text('PASS: controlled native client/model tests; actual native loopback result is separate (77 means NOT EXECUTED). No device/SDK/UI claim.\n')
+    print(f'PASS: {len(records)} compile/runtime commands; actual native header/ABI, controlled callbacks and separate real loopback')
 
 
 if __name__ == '__main__':

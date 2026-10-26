@@ -1,5 +1,6 @@
 import Dispatch
 import Foundation
+import HevSocks5Server
 #if canImport(Darwin)
 import Darwin
 #else
@@ -113,23 +114,162 @@ struct PeriodicPingConfiguration: Sendable {
     }
 }
 
-/// The IPv4 checksum is supplied by us; Darwin computes the ICMPv6 checksum.
-enum PingPacket {
-    static func echo(ipv6: Bool, identifier: UInt16, sequence: UInt16) -> [UInt8] {
-        var bytes: [UInt8] = [ipv6 ? 128 : 8, 0, 0, 0,
-                             UInt8(identifier >> 8), UInt8(identifier & 255),
-                             UInt8(sequence >> 8), UInt8(sequence & 255)]
-        if !ipv6 {
-            var sum: UInt32 = 0
-            for i in stride(from: 0, to: bytes.count, by: 2) {
-                sum += UInt32(bytes[i]) << 8 | UInt32(bytes[i + 1])
-            }
-            while sum > 0xffff { sum = (sum & 0xffff) + (sum >> 16) }
-            let checksum = ~UInt16(sum)
-            bytes[2] = UInt8(checksum >> 8)
-            bytes[3] = UInt8(checksum & 255)
+private struct PingBatchResult: Sendable {
+    var processed = 0
+    var waiting = false
+    var failed = 0
+    var failures: [(Int, Int32)] = []
+}
+
+/// One bounded batch, with one completion instead of one queued Swift job per
+/// native event. Reply/timeout events after SENT do not change send status.
+private final class PingNativeInbox: @unchecked Sendable {
+    private final class Batch {
+        let first: UInt64
+        var pending: [Bool]
+        var remaining: Int
+        var result: PingBatchResult
+        let completion: @Sendable (PingBatchResult) -> Void
+
+        init(first: UInt64, count: Int, completion: @escaping @Sendable (PingBatchResult) -> Void) {
+            self.first = first
+            pending = Array(repeating: true, count: count)
+            remaining = count
+            result = PingBatchResult(processed: count)
+            self.completion = completion
         }
-        return bytes
+    }
+    private let lock = NSLock()
+    private var batch: Batch?
+
+    func begin(first: UInt64, count: Int, completion: @escaping @Sendable (PingBatchResult) -> Void) {
+        let next = Batch(first: first, count: count, completion: completion)
+        lock.lock(); defer { lock.unlock() }
+        precondition(batch == nil && (1...256).contains(count))
+        batch = next
+    }
+
+    func complete(_ id: UInt64, error: Int32) {
+        lock.lock()
+        guard let current = batch, id >= current.first,
+              id - current.first < UInt64(current.pending.count) else {
+            lock.unlock()
+            return
+        }
+        let index = Int(id - current.first)
+        guard current.pending[index] else { lock.unlock(); return }
+        current.pending[index] = false
+        current.remaining -= 1
+        if error != 0 {
+            current.result.failed += 1
+            if current.result.failures.count < 3 { current.result.failures.append((index, error)) }
+        }
+        if current.remaining == 0 {
+            batch = nil
+            lock.unlock()
+            current.completion(current.result)
+        } else {
+            lock.unlock()
+        }
+    }
+
+    func cancel() {
+        lock.lock(); batch = nil; lock.unlock()
+    }
+
+    func pause(at id: UInt64) {
+        lock.lock()
+        guard let current = batch, id >= current.first,
+              id - current.first < UInt64(current.pending.count) else { lock.unlock(); return }
+        let index = Int(id - current.first)
+        current.result.processed = index
+        current.result.waiting = true
+        for slot in index..<current.pending.count where current.pending[slot] {
+            current.pending[slot] = false
+            current.remaining -= 1
+        }
+        if current.remaining == 0 {
+            batch = nil
+            lock.unlock()
+            current.completion(current.result)
+        } else {
+            lock.unlock()
+        }
+    }
+}
+
+private func receivePingResult(_ result: UnsafePointer<HevSocks5IcmpResult>?,
+                               _ context: UnsafeMutableRawPointer?) {
+    guard let result, let context else { return }
+    let event = result.pointee.event
+    guard event == HEV_SOCKS5_ICMP_SENT || event == HEV_SOCKS5_ICMP_ERROR else { return }
+    Unmanaged<PingNativeInbox>.fromOpaque(context).takeUnretainedValue().complete(
+        result.pointee.request_id, error: event == HEV_SOCKS5_ICMP_SENT ? 0 : result.pointee.error)
+}
+
+/// The native handle owns no Swift queue. Native free quiesces callbacks before
+/// releasing their retained inbox; cancel may run at the public Off boundary.
+private final class PingNativeClient: @unchecked Sendable {
+    let generation: UInt64
+    private let handle: OpaquePointer
+    private let inbox: PingNativeInbox
+    private let context: UnsafeMutableRawPointer
+    private let admission = NSLock()
+    private var cancelled = false
+    private var nextID: UInt64 = 1 // Accessed only by the periodic-ping queue.
+
+    init?(generation: UInt64) {
+        let inbox = PingNativeInbox()
+        let context = Unmanaged.passRetained(inbox).toOpaque()
+        guard let handle = hev_socks5_server_icmp_client_new(generation, receivePingResult, context) else {
+            let error = errno
+            Unmanaged<PingNativeInbox>.fromOpaque(context).release()
+            errno = error
+            return nil
+        }
+        self.generation = generation
+        self.inbox = inbox
+        self.context = context
+        self.handle = handle
+    }
+
+    func submit(_ targets: ArraySlice<PingDestination>, isCurrent: () -> Bool,
+                completion: @escaping @Sendable (PingBatchResult) -> Void) {
+        guard nextID <= UInt64.max - UInt64(targets.count) else {
+            completion(PingBatchResult(processed: targets.count, failed: targets.count, failures: [(0, EOVERFLOW)]))
+            return
+        }
+        let first = nextID
+        nextID += UInt64(targets.count)
+        admission.lock()
+        guard !cancelled else { admission.unlock(); return }
+        inbox.begin(first: first, count: targets.count, completion: completion)
+        admission.unlock()
+        for (index, value) in targets.enumerated() {
+            var target = value
+            let id = first + UInt64(index)
+            admission.lock()
+            guard !cancelled, isCurrent() else { admission.unlock(); cancel(); return }
+            let status = withUnsafePointer(to: &target.address) { pointer in
+                pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    hev_socks5_server_icmp_ping(handle, id, $0, target.length, 1000)
+                }
+            }
+            admission.unlock()
+            if status == -EAGAIN { inbox.pause(at: id); return }
+            if status != 0 { inbox.complete(id, error: -status) }
+        }
+    }
+
+    func cancel() {
+        admission.lock(); cancelled = true; admission.unlock()
+        inbox.cancel()
+        hev_socks5_server_icmp_cancel(handle)
+    }
+
+    deinit {
+        hev_socks5_server_icmp_client_free(handle)
+        Unmanaged<PingNativeInbox>.fromOpaque(context).release()
     }
 }
 
@@ -173,14 +313,21 @@ private final class PingRequests: @unchecked Sendable {
     private var latest = UUID()
     private var pending: Request?
     private var scheduled = false
+    private var client: PingNativeClient?
 
     func post(_ input: Input, report: @escaping @Sendable (String) -> Void) -> Bool {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
         latest = UUID()
         pending = Request(id: latest, input: input, report: report)
-        if scheduled { return false }
+        let old = client
+        client = nil
+        let enqueue = !scheduled
         scheduled = true
-        return true
+        lock.unlock()
+        // Never hold the Swift lock while native cancel waits on its send gate.
+        // The strong local reference also serializes native free after this use.
+        old?.cancel()
+        return enqueue
     }
 
     func take() -> Request? {
@@ -195,6 +342,13 @@ private final class PingRequests: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return latest == id
     }
+
+    func install(_ next: PingNativeClient?, for id: UUID) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard latest == id else { return false }
+        client = next
+        return true
+    }
 }
 
 /// Checked at the public boundary; mutable fields below are exclusively queue-confined.
@@ -203,19 +357,15 @@ private final class PeriodicPingWorker: @unchecked Sendable {
     let queue = DispatchQueue(label: "hev.Socks5.periodic-ping", qos: .utility)
     private var timer: DispatchSourceTimer?
     private var configuration: PeriodicPingConfiguration?
-    private var sockets: [Int32: Int32] = [:]
+    private var client: PingNativeClient?
     private var report: (@Sendable (String) -> Void)?
     private var lastStatus: String?
-    private let identifier = UInt16.random(in: .min ... .max)
-    private var sequence: UInt16 = 0
     private var requestID = UUID()
     private var cursor: Int?
-    private var packets: [[UInt8]] = []
-    private var opened: [Int32: (Int32, Int32)] = [:]
+    private var waitingCapacity = false
     private var failureCount = 0
     private var failures: [String] = []
     private var generation = UUID()
-    private var receiveBuffer = [UInt8](repeating: 0, count: 256)
 
     func consume() {
         guard let request = requests.take() else { return }
@@ -265,11 +415,9 @@ private final class PeriodicPingWorker: @unchecked Sendable {
         timer = nil
         configuration = nil
         cursor = nil
-        packets.removeAll(keepingCapacity: true)
-        opened.removeAll(keepingCapacity: true)
+        waitingCapacity = false
         failures.removeAll(keepingCapacity: true)
-        for socket in sockets.values { close(socket) }
-        sockets.removeAll(keepingCapacity: true)
+        releaseClient()
         report = nil
     }
 
@@ -279,39 +427,36 @@ private final class PeriodicPingWorker: @unchecked Sendable {
         report?(status)
     }
 
-    private func openSocket(_ family: Int32) -> (Int32, Int32) {
-        if let socket = sockets[family] { return (socket, 0) }
-        #if canImport(Darwin)
-        let kind = SOCK_DGRAM
-        #else
-        let kind = Int32(SOCK_DGRAM.rawValue)
-        #endif
-        let socket = socket(family, kind, family == AF_INET ? Int32(IPPROTO_ICMP) : Int32(IPPROTO_ICMPV6))
-        guard socket >= 0 else { return (-1, errno) }
-        let flags = fcntl(socket, F_GETFL, 0)
-        guard flags >= 0, fcntl(socket, F_SETFL, flags | O_NONBLOCK) == 0,
-              fcntl(socket, F_SETFD, FD_CLOEXEC) == 0 else {
-            let error = errno
-            close(socket)
-            return (-1, error)
-        }
-        sockets[family] = socket
-        return (socket, 0)
+    private func releaseClient() {
+        _ = requests.install(nil, for: requestID)
+        client?.cancel()
+        client = nil
     }
 
     private func tick() {
-        guard configuration != nil, cursor == nil, requests.current(requestID) else { return }
-        // No receive source, RTT history, blocking wait, or task per destination.
-        // Discard bounded queued replies; this feature reports sends, not reachability.
-        for socket in sockets.values {
-            for _ in 0..<64 {
-                if recv(socket, &receiveBuffer, receiveBuffer.count, Int32(MSG_DONTWAIT)) < 0 { break }
-            }
+        guard configuration != nil, cursor == nil || waitingCapacity, requests.current(requestID) else { return }
+        let active = hev_socks5_server_icmp_generation()
+        if client?.generation != active {
+            releaseClient()
+            cursor = nil
+            waitingCapacity = false
         }
-        packets = [PingPacket.echo(ipv6: false, identifier: identifier, sequence: sequence),
-                   PingPacket.echo(ipv6: true, identifier: identifier, sequence: sequence)]
-        sequence &+= 1
-        opened.removeAll(keepingCapacity: true)
+        guard active != 0 else { publish("Waiting for native ICMP server"); return }
+        if client == nil {
+            guard let opened = PingNativeClient(generation: active) else {
+                let error = errno
+                publish(hev_socks5_server_icmp_generation() == active ?
+                    "Send error: " + String(cString: strerror(error)) : "Waiting for native ICMP server")
+                return
+            }
+            guard requests.install(opened, for: requestID) else { opened.cancel(); return }
+            client = opened
+        }
+        if cursor != nil {
+            waitingCapacity = false
+            sendBatch()
+            return
+        }
         failures.removeAll(keepingCapacity: true)
         failureCount = 0
         cursor = 0
@@ -319,33 +464,38 @@ private final class PeriodicPingWorker: @unchecked Sendable {
     }
 
     private func sendBatch() {
-        guard let configuration, let start = cursor, requests.current(requestID) else { return }
+        guard let configuration, let client, let start = cursor, requests.current(requestID) else { return }
         let end = min(start + 256, configuration.destinations.count)
-        for index in start..<end {
-            var destination = configuration.destinations[index]
-            let family = destination.family
-            // A failed socket open is retried next period, not once per target.
-            if opened[family] == nil { opened[family] = openSocket(family) }
-            let (socket, openError) = opened[family]!
-            let packet = packets[family == AF_INET ? 0 : 1]
-            var sent = -1
-            var error = openError
-            if socket >= 0 {
-                sent = packet.withUnsafeBytes { bytes in
-                    withUnsafePointer(to: &destination.address) { pointer in
-                        pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                            sendto(socket, bytes.baseAddress, bytes.count, Int32(MSG_DONTWAIT), $0, destination.length)
-                        }
-                    }
-                }
-                error = sent < 0 ? errno : EIO
+        let generation = self.generation
+        client.submit(configuration.destinations[start..<end], isCurrent: { self.requests.current(self.requestID) }) { [weak self] result in
+            guard let self else { return }
+            self.queue.async {
+                guard self.generation == generation, self.requests.current(self.requestID) else { return }
+                self.completeBatch(result, start: start)
             }
-            if sent != packet.count {
-                failureCount += 1
-                if failures.count < 3 {
-                    failures.append("\(destination.name): \(String(cString: strerror(error)))")
-                }
-            }
+        }
+    }
+
+    private func completeBatch(_ result: PingBatchResult, start: Int) {
+        guard let configuration else { return }
+        guard client?.generation == hev_socks5_server_icmp_generation() else {
+            releaseClient()
+            cursor = nil
+            waitingCapacity = false
+            publish("Waiting for native ICMP server")
+            return
+        }
+        failureCount += result.failed
+        for (index, error) in result.failures where failures.count < 3 {
+            failures.append("\(configuration.destinations[start + index].name): \(String(cString: strerror(error)))")
+        }
+        let end = start + result.processed
+        if result.waiting {
+            cursor = end
+            waitingCapacity = true
+            publish("Waiting for native ICMP capacity; \(end)/\(configuration.destinations.count) destinations processed" +
+                    (failureCount == 0 ? "" : "; \(failureCount) send failure(s)"))
+            return
         }
         if end < configuration.destinations.count {
             cursor = end
