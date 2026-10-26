@@ -73,6 +73,8 @@ The retained `traffic_statistics_model.swift` and per-IP model tests cover elaps
 
 `Tests/Statistics/ui_audit.py` retains the Simulator test builder and checks the preserved table, formatter and sample method while enforcing the visible/active display gate and next-boundary delay. Its XCTest exchanges real IPv4/IPv6 SOCKS/UDP traffic, derives expected peer directions from the independent client's wire buffers and destination echo, and checks Total/IP tables, scrolling, orientation and Stop/Start retention. The first measured greeting reuses the readiness connection because closing it without a greeting can produce a counted rejection reply. Simulator execution requires the actual Apple toolchain; source checks or Linux model passes do not substitute for it.
 
+`Tests/SocketIO/generic_io.c` exercises the public adapter with completed byte counts and the actual registry. It checks zero-byte suppression, peer directions, IPv4-mapped normalization, scoped IPv6 identity, Unattributed, preserved `errno` and totals retained after worker release. It verifies the shared accounting path; ICMP transport execution belongs to the composed native feature checks.
+
 `Tests/SocketIO/udp_gso_accounting.c` uses the actual native encoder and loopback sockets for IPv4 and IPv6. It verifies single and grouped sends, mixed lengths, empty payloads, the 64-message boundary, large ordinary datagrams, exact contents/order, no duplicates, per-IP totals and overall totals. Linux additionally traces actual successful sendmmsg lengths and segmentation control messages without replacing the syscall. The inherited UDP GSO fixture separately checks suspended descriptors, prefix/cancellation/error results and worker-local capability hints.
 
 ## Operation and limitations

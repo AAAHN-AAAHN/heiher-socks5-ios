@@ -354,9 +354,8 @@ def main():
     run([sys.executable, 'Tests/Statistics/audit_driver_probe.py'], 'audit-driver.log')
     run([sys.executable, 'Tests/Statistics/udp_inheritance_regression.py'], 'udp-inheritance.log')
     run([sys.executable, 'Tests/Statistics/input_probe.py'], 'input-probe.log')
-    run(['git', 'clone', '--no-checkout', 'https://github.com/heiher/hev-socks5-server.git', CORE], 'clone.log')
-    run(['git', 'checkout', '--detach', CONFIG['sources']['.']], 'checkout.log', CORE)
-    run(['git', 'submodule', 'update', '--init', '--recursive'], 'submodules.log', CORE)
+    run([sys.executable, 'Build/native_sources.py', 'checkout', 'server', CORE], 'native-inputs.json')
+    run([sys.executable, 'Build/check.py', 'native', 'server', CORE], 'native-identity.log')
     run([sys.executable, 'Build/check.py', 'apply', CORE], 'apply.log')
     # Preserve the actual patched native sources for offline inspection; no build
     # product, credentials or .git metadata is included in this source-only archive.
