@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Test actual JSON/storage code; no app archive or IPA. Host access tests are unprivileged."""
 import hashlib
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -114,7 +115,8 @@ with tempfile.TemporaryDirectory() as name:
             result.check_returncode()
 
 if not baseline and not previous:
+    composition = json.loads((root / 'Build/features.json').read_bytes())['name']
     subprocess.run([sys.executable, str(Path(__file__).with_name('async_storage_check.py'))], check=True)
     subprocess.run([sys.executable, str(Path(__file__).with_name('rollback_storage_check.py'))], check=True)
     subprocess.run([sys.executable, str(Path(__file__).with_name('check_file_feedback.py')),
-                    '--source', str(root), '--out', str(root / 'artifacts/settings-file-feedback')], check=True)
+                    '--source', str(root), '--out', str(root / 'artifacts' / composition / 'settings-file-feedback')], check=True)
