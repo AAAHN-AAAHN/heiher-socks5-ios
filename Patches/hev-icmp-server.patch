@@ -13,10 +13,10 @@ index 730252df7cd6e81005e8ae72f98e733a84ab4814..a421e77abc88aa259ffdf9d833bb3cec
      -library ./apple_xcframework/iphoneos-arm64/libhev-socks5-server.a -headers $INCLUDE_DIR \
 diff --git a/src/hev-icmp-server.c b/src/hev-icmp-server.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..e29e91f15be5bb235dc56d0316696c4f19de3622
+index 0000000000000000000000000000000000000000..95515835c8268e13415931575c4d04994e076536
 --- /dev/null
 +++ b/src/hev-icmp-server.c
-@@ -0,0 +1,593 @@
+@@ -0,0 +1,600 @@
 +#define _GNU_SOURCE
 +#include <errno.h>
 +#include <fcntl.h>
@@ -456,7 +456,7 @@ index 0000000000000000000000000000000000000000..e29e91f15be5bb235dc56d0316696c4f
 +    pthread_mutex_unlock (&gate);
 +    for (;;) {
 +        unsigned int i;
-+        int running, queued;
++        int running, queued, blocked = 0;
 +        char bytes[64];
 +        while (read (s->fds[0], bytes, sizeof (bytes)) > 0)
 +            ;
@@ -473,9 +473,6 @@ index 0000000000000000000000000000000000000000..e29e91f15be5bb235dc56d0316696c4f
 +                pthread_mutex_unlock (&gate);
 +                break;
 +            }
-+            s->first = submission->next;
-+            if (!s->first)
-+                s->last = NULL;
 +            request = submission->request;
 +            if (!atomic_load (&permitted))
 +                s->running = 0;
@@ -486,6 +483,14 @@ index 0000000000000000000000000000000000000000..e29e91f15be5bb235dc56d0316696c4f
 +                res = -ECANCELED;
 +            else
 +                res = hev_icmp_engine_send (s->engine, request);
++            if (res == HEV_ICMP_DEFERRED) {
++                blocked = 1;
++                pthread_mutex_unlock (&gate);
++                break;
++            }
++            s->first = submission->next;
++            if (!s->first)
++                s->last = NULL;
 +            pthread_mutex_unlock (&gate);
 +            notify (s, submission,
 +                    res ? HEV_SOCKS5_ICMP_ERROR : HEV_SOCKS5_ICMP_SENT,
@@ -501,11 +506,13 @@ index 0000000000000000000000000000000000000000..e29e91f15be5bb235dc56d0316696c4f
 +        pthread_mutex_unlock (&gate);
 +        if (!running && !queued)
 +            break;
-+        if (queued) {
++        if (queued && !blocked) {
 +            hev_task_yield (HEV_TASK_YIELD);
 +        } else {
 +            int timeout = hev_icmp_engine_timeout (s->engine);
-+            if (timeout < 0)
++            if (queued && timeout < 0)
++                hev_task_yield (HEV_TASK_YIELD);
++            else if (timeout < 0)
 +                hev_task_yield (HEV_TASK_WAITIO);
 +            else
 +                hev_task_sleep (timeout);
@@ -640,10 +647,10 @@ index 37a3c8ce0db9f734f07bfc57b3b59df8559562e6..46c915af117641bad25e55afef100ab2
  #endif /* __HEV_MAIN_H__ */
 diff --git a/src/hev-socks5-icmp.h b/src/hev-socks5-icmp.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..4aea45fe21679379265ed542b6e5d8021e97ca6c
+index 0000000000000000000000000000000000000000..ba5116ce6ba0749cef7b46f512e09f90311d498d
 --- /dev/null
 +++ b/src/hev-socks5-icmp.h
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,90 @@
 +#ifndef HEV_SOCKS5_ICMP_PUBLIC_H
 +#define HEV_SOCKS5_ICMP_PUBLIC_H
 +
@@ -723,7 +730,9 @@ index 0000000000000000000000000000000000000000..4aea45fe21679379265ed542b6e5d802
 +
 +/* Configure while stopped. Called synchronously on worker 0 immediately after
 + * positive OS I/O, before reply validation/cancellation. NULL disables it.
-+ * Internal API transfers are never counted. Returns -EBUSY while running. */
++ * The observer must not block or reenter any ICMP API: send observation may
++ * hold the native admission lock. Internal API transfers are never counted.
++ * Returns -EBUSY while running. */
 +int hev_socks5_server_icmp_set_io_observer (HevSocks5IcmpObserver observer,
 +                                            void *context);
 +

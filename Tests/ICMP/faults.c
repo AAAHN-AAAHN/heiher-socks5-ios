@@ -25,6 +25,7 @@ atomic_int icmp_test_truncate;
 atomic_int icmp_test_wrong_id;
 atomic_int icmp_test_open_error;
 atomic_int icmp_test_short_send;
+atomic_int icmp_test_defer;
 atomic_int icmp_test_opened;
 atomic_int icmp_test_live;
 
@@ -36,6 +37,16 @@ int __real_getsockname (int, struct sockaddr *, socklen_t *);
 ssize_t __real_sendto (int, const void *, size_t, int, const struct sockaddr *,
                        socklen_t);
 ssize_t __real_recvmsg (int, struct msghdr *, int);
+
+int __real_hev_icmp_engine_send (HevIcmpEngine *, HevIcmpRequest *);
+
+int
+__wrap_hev_icmp_engine_send (HevIcmpEngine *engine, HevIcmpRequest *request)
+{
+    if (atomic_exchange (&icmp_test_defer, 0))
+        return HEV_ICMP_DEFERRED;
+    return __real_hev_icmp_engine_send (engine, request);
+}
 
 static Endpoint *
 endpoint (int fd)
