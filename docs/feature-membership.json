@@ -2,11 +2,11 @@
   "base_commit": "0181c7a3a0e19dc45eaad8b4f9767efb8d094abe",
   "branches": {
     "feature/app-icon": "6abae4ef1ba25e333fff162c7ec43f65b43c3565",
-    "feature/background": "47afee9e1034188d4abce6e0918b99157522683b",
+    "feature/background": "981a3311ad41adfbdb45de2123ded0539d377133",
     "feature/udp-compat": "6a5f473f8a47913048ebf6b664d509ad5f983a1d",
     "feature/icmp-relay": "e7aefa47f616411a349f97ff36e9da65e4258013",
     "feature/server-control": "e1364066c860c7ffda35f2adaf31acc38e16e9af",
-    "feature/traffic-statistics": "624b2403880b06caa922833e19f1b222fc314d88",
+    "feature/traffic-statistics": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
     "feature/settings-persistence": "8798c53f19fb0661777e51992b48b928297f84aa"
   },
   "sources": {
@@ -15,17 +15,17 @@
       "sha256": "8bb2aa2d8da52154962516d16012f61f6c05fc91b4c4905453c1663954a072b3"
     },
     "Build/inherited-workflows/traffic-statistics-udp-compat-audit.yml": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "fa5ce93537f63871386fed315cf3b9575a9cf6c71ca2dbe80be5e860049f5bce",
       "path": ".github/workflows/udp-compat-audit.yml"
     },
     "Build/inherited-workflows/traffic-statistics-verify-build.yml": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "a14d7574764d3ec29c139bedee768b20a9fd6af2f569831c62f3463cea3d7241",
       "path": ".github/workflows/verify-build.yml"
     },
     "Build/inherited-workflows/traffic-statistics-verify-tunnel.yml": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "f65c41c96665c92f1c62cb730f907b0001c86e070b5419df422ea1ac0061cffe",
       "path": ".github/workflows/verify-tunnel.yml"
     },
@@ -50,15 +50,15 @@
       "sha256": "31e00f258d9c3f202a74c5554dd6ce6056f6893bc5b4a415a97224a3d45a1c1b"
     },
     "Patches/hev-socket-meter-core.patch": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "78f3ec0e069e1148173ac6b6bcf0ed9e920431db9d3c99d004d364fbc580d326"
     },
     "Patches/hev-socket-meter-server.patch": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "3165b659a4a60ed9a5ba306c07dea7a19d4f0f0bf3823c0096665dd8de2ea52b"
     },
     "Patches/hev-socket-meter-task.patch": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "2f3ab4d3f392ee30cf03bd56999de98234a7a277cee562fa0b9e37e09e7c289c"
     },
     "Patches/hev-udp-domain.patch": {
@@ -90,35 +90,35 @@
       "sha256": "852920cb36e95beb53771138a4b8195a16fcce1cc31250632f246081cc638f9a"
     },
     "Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "23f77795fd16ebd6cea09d95653630fd8b458ed03d19912dd53d7cbf73c0fcfb"
     },
     "Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
-      "sha256": "c9de39a17d76abcc1a5a466ea32e68da1be11e29a6884b82901b63139f6ffc4d"
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
+      "sha256": "6df7832d275195498c4cb05756b147cac3872eee1430918717e930387317e007"
     },
     "Socks5/BackgroundKeepAlive/LoopAudioService.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "206fae13f85213fd57c8b7c7abd028089cea094302b66becbe8c8dddce621d5d"
     },
     "Socks5/BackgroundKeepAlive/PeriodicPingModel.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "50725ab3b8e67d7a6e1d4d822fc28105a37ba0ec6252747182ad17a6ac2caf30"
     },
     "Socks5/BackgroundKeepAlive/PeriodicPingService.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "c795283816298e78e5319b65e153ed60b77f8e72fb810340fc1135d3fab28a3e"
     },
     "Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "d2d08c919f55190f8c5b162ed8077939752d9b44f8094aa9955719968793f8c1"
     },
     "Socks5/BackgroundKeepAlive/RecoveryExecutionLease.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "35d97c2c7809efff76edc048a7b91e68fb1bd728af9397a42fe28058fbc141c9"
     },
     "Socks5/BackgroundKeepAlive/Silence.wav": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "26131825c935435301fb05d3549d815bc93b1e717d6228d890ee9578dd00025e"
     },
     "Socks5/ContentView.swift": {
@@ -146,12 +146,12 @@
       "sha256": "61136a0cc98d3dfcb3c55657ae118370f614d1b8e040dfcd13ef1436ed8f6767"
     },
     "Socks5/Statistics/TrafficStatistics.swift": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "468467795387dade9a7f8052a9854c7b914a18ea414cafdde12d382a480b1646"
     },
     "Socks5/Statistics/TrafficStatisticsView.swift": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
-      "sha256": "b0bb1c4e2aedab4bfa865fd7b36231ac106e41ff5d89c9ee6671ac917892ec93"
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
+      "sha256": "d1411cfeef8b3a8eea44982a8d99a7656cfe7deeeb47a8cad247fb1b53708c30"
     },
     "Tests/AppIcon/DecodeImages.swift": {
       "commit": "6abae4ef1ba25e333fff162c7ec43f65b43c3565",
@@ -186,247 +186,247 @@
       "sha256": "8a5a0fce2529221acc42f299aeaa16186246c57bbd39b1c53b4b29952a61ca29"
     },
     "Tests/Background/ApplicationProviderAccess.swift.inc": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "84bae84d4401dfb293dcab00596dcff9f4dd722483cb318c45dd319e6179318d"
     },
     "Tests/Background/ApplicationProviderBoundaryTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "1306def5167d40b41508a34db9346e86f725beb96ef2f0c654075a5a2fecab33"
     },
     "Tests/Background/AssetEpisodeRecoveryTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "887f63731c511bd9c27599c67796827438e7ae3d9e29e8b422ea6f4eeb331a51"
     },
     "Tests/Background/AssetRetryAdmissionTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "3617e6e58c2269fa684b4d255ee345d9cd2715f2260f84cb39d002e12174f7be"
     },
     "Tests/Background/AssetRetrySignalTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "97a1b2b14c58179731c72397d491f4d5bbbbc0fa443a8b65eca70c9f094b7f06"
     },
     "Tests/Background/AsyncAudioUITests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "14cfa19dbd0c8a167b3ea0f1d7412456a74449cbdd3843e8a15f46d03c34f260"
     },
     "Tests/Background/AsyncSessionTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "9f9fd9fec39de5f52be0465f61c857c3fb34d49bdbff1450442a8e35ffe12dd1"
     },
     "Tests/Background/AudioEndpointBoundaryTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "da42d95eade96a51ef00ab0ad96e3809d94041936a1da1416df17af12494a320"
     },
     "Tests/Background/AudioEndpointMocks.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "3e49866fc7b8ed9118175abefb89cc4b06f418d056bc06dd53cad65351e499ad"
     },
     "Tests/Background/AuthorizationResetTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "fca7068e1e22a1c9df49525cbc4b5eae9ae4bec81a8e53a16692dee0c2e4647d"
     },
     "Tests/Background/CallbackLifetimeTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "e06c6842715d9066068ad113ef28f2a7b6049693133d799f5431c93867fcd909"
     },
     "Tests/Background/ControllerTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "47128d67a3fba8014be3f24febf1474ef5d12b2fb4a382cdbe5ee06fdd07e27d"
     },
     "Tests/Background/DelegateTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "2bd51d070c552a5a4dc9afa9768df60d9f1c3611bead356b1abac5dad5971a44"
     },
     "Tests/Background/EarlyRelapseTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "5b8db0c7598954d9cb297b92749a727aa29df94370a0e22dac15de1087b2ee91"
     },
     "Tests/Background/FacadeBoundaryTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "387bea36f024b51ccb29539394590ff35ff44bf1c28659fb92df8cbd20907ead"
     },
     "Tests/Background/FacadePlatformMocks.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "af2dd326a3a9f324958624a95a180c852d0ce9f12444ef020c4788e760679e52"
     },
     "Tests/Background/FinalRecoveryTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "eaa58786fa2ebe93f2b9660534c9aadca0c3cffa6f288d7a1bcc3ac9c1dfc71e"
     },
     "Tests/Background/IngressReplayAccess.swift.inc": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "241bf1f3aab5cecfea146569f348455edf420e6c856142cc73c1dfb0a8e82687"
     },
     "Tests/Background/IngressReplayTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "e2dd4be775724330b6d9a8e6a3623c492fcc00b5d397f2954cfc84cc3a00e4f6"
     },
     "Tests/Background/InterruptionPolicyTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "c557e4e708d06e8b0c0fd5b82e976e8b4009c0f8223de7779b6e2b2a36ac0d10"
     },
     "Tests/Background/KnownFailurePrecedenceTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "a68d8709542eade49e1b93b83b855f03df6bc6db5a2b95bd7385569dbe901ad3"
     },
     "Tests/Background/LeaseLifecycleTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "17f22974797e47fda1304b9653aa9621577035ff08b914e9e987fb2b1153b496"
     },
     "Tests/Background/LifecycleTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "31bfe7a4b118c6500406b09e7936afff07fab0632ba93e86852d2068ef881b40"
     },
     "Tests/Background/LoopAudioServiceTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "1059f83765016a40df3aeca5e07f5cfc07bbf31b65579c80a551258b8a0b4c9c"
     },
     "Tests/Background/MixedNotificationTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "a94542f4aecde7edb601f4e265b0f9bc531f8fc0ff326999c232d55a92f7cc4f"
     },
     "Tests/Background/PeriodicPingIO.c": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "bcf6d1ade7fa9c0d32d1c8478c94ade127f20989dd17af4c91f67d48c912709a"
     },
     "Tests/Background/PeriodicPingImportFeedbackTests.swift.in": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "3eaeecbc8b8f9072f6a858583e154c0c45fcd157cf1d9cb56b56b8bfe04e3828"
     },
     "Tests/Background/PeriodicPingLoopback.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "2f4bf3a25b42597b05704262331385d41a6e23ce9a2e8614d246c4aea4db370f"
     },
     "Tests/Background/PeriodicPingModelTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "aa6e2cb4adf8084eba27d0b03649f467f365fbb4b9a8b5f9952b3fe482fc9ff2"
     },
     "Tests/Background/PeriodicPingTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "7aaa684e6aa8b322a26d25ed0f168ec003904783a1096074f9022a4e14d2b2dc"
     },
     "Tests/Background/PeriodicPingUITests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "aae2e3f8af690d692458008daa590d1f48bb7cea12cf1aaf7d164b643e447b47"
     },
     "Tests/Background/PlatformMocks.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "59f9aed88294a478bd54c1d5a548a213b2d8c38c37bce6b7d800806d1a678648"
     },
     "Tests/Background/PlaybackProgressTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "eeac7ee35296dd77de8a504025f40b8c9c4115e4124bbe3e8925dcf897012401"
     },
     "Tests/Background/PreparationTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "31f5c4fbbfc45f342563e3ae5d540c56c74e72012871453684be224c96d8a587"
     },
     "Tests/Background/RecoveryAdmissionAccess.swift.inc": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "03bf409601e2b616a84169c60afc08b45e84bda5e17a4bb43fccfa863627fa32"
     },
     "Tests/Background/RecoveryBoundaryTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "fd9c5c9022ea4dd9953eed3d132c9ba2f11bc2373d0ef162dc80953d8769a8c9"
     },
     "Tests/Background/RecoveryFinalizationAccess.swift.inc": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "ada099550403362afbc0102a278d8e77cc27b7251167ea781d07b28758c61bfc"
     },
     "Tests/Background/RecoveryFinalizationTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "1254a3ccd55185ea3c57b51a55e95e87b6dc479fd05c1a99e0b57e1aaa8d5b95"
     },
     "Tests/Background/RecoveryTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "26e0f73672f116cc5643ce8921d31245bafda7be5f3e3059b70ba107180b8e36"
     },
     "Tests/Background/ReentryClosureTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "b40910c6604577342fd956959edc2d78e3c2eec9bfcfe3ce463711343195a5f4"
     },
     "Tests/Background/RetrySignalPacingTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "69decfa79c204cc7eed672a885490992c39ecdf7a37569929902550b3ef319ec"
     },
     "Tests/Background/SessionOwnershipTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "7c3e2d79a4e47f7651b15b55519fc79741e0fcbcbc000df4dd0e373448e4474b"
     },
     "Tests/Background/StandaloneRootIntentTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "dd439f518bc0f1fcdcb68cbd3b293849bf53ab2fd25cf32411d0ceba67855193"
     },
     "Tests/Background/StoppedStartRecoveryTests.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "2bd2e3262485ff4bbcbd844d90d187dde234b1995f4d9e1b6c9fbed8a4d18a75"
     },
     "Tests/Background/audit_driver_check.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "a41a3cdc7dfbbd9d426d6652ba855d493638a321fd683558512aebca6c15db60"
     },
     "Tests/Background/check_async_session.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "a291a9ef4ea3ae8dc3241c94beaf179e3e946ccd50fa35a0b815924177bfff7c"
     },
     "Tests/Background/check_async_ui.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "b2c10ec1bb6a391af046bab35cbbecb36e7e1e9c2dcb8ae3f20a76afd61fd120"
     },
     "Tests/Background/check_audio_sdk.sh": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "054ba3759e6bf170ed25c742f871720a00a46ff83d98bec77f12b3c794ca9d65"
     },
     "Tests/Background/check_audit_integrity.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "62506cf80dc6293d2772ada00b8da38c3bc1a64befaf787cfcf2de209731afa3"
     },
     "Tests/Background/check_final_recovery.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "7287f1019a1b2a1f8ed2432e78f4310388ebf5ff4d9b9261fa8e9d7b414777aa"
     },
     "Tests/Background/check_interruption_policy.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "76f0754ac9ae0cf2e09ab048b5a7c3f5d97835cdfa91ba866efa1ea88de0f6d5"
     },
     "Tests/Background/check_live_scheduling.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "88ccb4b2f628d20d899277f85c7fb061e0f4ed1c6718312af1b0431dfa25e454"
     },
     "Tests/Background/check_loop_audio.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "f6e99e5830ce9a71012526c880400c45ebfe1d6965567fc893914f43e7a2317f"
     },
     "Tests/Background/check_mixed_notifications.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "5e8cdf359c441c9bafe1589a07e4ae3c79534e2f8f453200ded8f70e838275fe"
     },
     "Tests/Background/check_periodic_ping.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "f561df818e230f4c606765b9fe6cd667581fd8ae500425d811b7893c598fc999"
     },
     "Tests/Background/check_scope.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "60798b54b45aefd42f1745b42bc0c5bad28a627f1e90bdee64a8c21a5228aed7"
     },
     "Tests/Background/check_session_ownership.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "4eaa5ebcb1fb019cd6a281dc90589058a5313ff73b534432fedbbc90f90a7a8e"
     },
     "Tests/Background/check_silence.swift": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "7244abd16efdc1c18d91b99a0474166d840b68771cea3d029a039c216dc9bd19"
     },
     "Tests/Background/check_subscription.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "8277df873399f280aca89959546dd4ce5dc51940dd2648e82a8d3a5b71c809d4"
     },
     "Tests/Background/historical_checks.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "023153eb4aa08596f329db66fc477cab549969eccb32fab518ad4b8838efe0fa"
     },
     "Tests/Background/run_checks.py": {
-      "commit": "47afee9e1034188d4abce6e0918b99157522683b",
+      "commit": "981a3311ad41adfbdb45de2123ded0539d377133",
       "sha256": "3c5c03b011a8935c820ba511974e5896e123da3feeff7b62847bd902615d83ec"
     },
     "Tests/ICMP/audit.py": {
@@ -634,147 +634,147 @@
       "sha256": "fff43be2684adb6428cad7f7f4e82a04f97c6d87db9bc3f75f12eec2459bedc3"
     },
     "Tests/SocketIO/BridgeTests.swift": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "2c3f7125e079c54835f738b575b5ab3243bf0a024e7d152194d128d32881aa58"
     },
     "Tests/SocketIO/accept_reset.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "46f5b2e0b30fc5fb7e85a8805e26e5b8987ea79f5cbad0d739fe7d8fa370096f"
     },
     "Tests/SocketIO/connected_peer.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "a8337c4d4d5176c881f8113f3afac2a9930f0b772782606f8b3237025897dbcd"
     },
     "Tests/SocketIO/contract.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "484cbef7a5841119ee7ad90f2b6cee421a674fbadf6fbfd8d199cc32319ff341"
     },
     "Tests/SocketIO/generic_io.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "9dd6bd68d539460a767ca2b05b7e34edafbebfe0143253bbc2fd0a08c86f6d57"
     },
     "Tests/SocketIO/integration.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "c735400a1197b3985c822d930f3011851456498c2be20793b6f656acaea9e73b"
     },
     "Tests/SocketIO/loopback.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "863695d52166b4f94bb2b43f1f14e90867bc1b2e6be2a6b20f19416ec798db12"
     },
     "Tests/SocketIO/loopback_check.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "9b7cbdd25b9fccf6f0a525d15cc578935d3c0059f07b0087181debce1b390e7b"
     },
     "Tests/SocketIO/meter_host.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "a8f4f3c1f89990c3b5cadc712c5340bccdfca4f7b00f55bd373541b3b837546d"
     },
     "Tests/SocketIO/meter_pool_failure.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "6f20f328bf2f0fd07d77a95758c863d9379e9596fabf7ede7a914c5d1693f3b2"
     },
     "Tests/SocketIO/pair_example.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "d872ba23804097103edfb21d383e36914b0e65977b9eea58ec5983522e8e788e"
     },
     "Tests/SocketIO/registry.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "864ff658166c293c3e29964c5ce2f88beb94e08909505c908d2d55a033aeaf95"
     },
     "Tests/SocketIO/restart.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "d5ad9d08e8aaa5e1dd303ecad3d4fb8aa6e15379d706e18157750c6cbbb7fec1"
     },
     "Tests/SocketIO/restart_host.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "97acd9467b1f33cb6579ea7ccdf9c1ab0b5774bf47a6e466f53ed275bd0fa5c8"
     },
     "Tests/SocketIO/run.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "877e234e9e7b04f0d6afe9826ceeb143ff2f259bdafc1253c62ec54057a23be0"
     },
     "Tests/SocketIO/snapshot_rows.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "80e353fe0b88f3deffe0f3f9f48b62d59905fd7763f046aec41e69fcf46f26a2"
     },
     "Tests/SocketIO/socket_observer.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "af33a850c9051f7d7896ba976e2131f893d59992f9862cb6b27efaf88f1773d9"
     },
     "Tests/SocketIO/stream_matrix.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "6d57476f28d2f05577d4c7876f9a23207a352f4af38387e610d31006cfc4476c"
     },
     "Tests/SocketIO/udp_fixture_main.h": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "3397126eacbaaffba105caf47e4ec238086436537b37ca42998f2fa86d39ed28"
     },
     "Tests/SocketIO/udp_gso_accounting.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "fe513d012f0acd093815f5a2d0b864a6027cbbec76cc208281dad56f26690183"
     },
     "Tests/SocketIO/worker-native.json": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "62d8d287e64b337d47a59e0f441b40a76904babdad419e207a44c0da3f75627f"
     },
     "Tests/SocketIO/worker_boundaries.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "beb1dedb10e0941561c75195c25136d01e82027d850eb04ce879d640536c07c3"
     },
     "Tests/Statistics/SamplingContractTests.swift": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "c5d9900388f056647395aebc65c1ef09e0a17b212ea4155a64f5779bc11bf9bd"
     },
     "Tests/Statistics/SamplingTaskTests.swift": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "5de5f9cef4b582d7a2033082dd0fa5e301697678b1b106801a8d1d5bacccbbe6"
     },
     "Tests/Statistics/StatisticsUITests.swift": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
     },
     "Tests/Statistics/audit.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "d3627437c73503898d6d56cfb4e8fc9719d63ab3d4eee7b9fd46da0fc09c1eaf"
     },
     "Tests/Statistics/audit_driver_probe.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "230bdb3bee81d26ce7ae5c64085484f3d0c7fa93430caf206fe96a6ad1c289ca"
     },
     "Tests/Statistics/client_model.swift": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "793278d9ef110789583832f96ff91a2571f04701ed9297c36d6946098073a408"
     },
     "Tests/Statistics/input_probe.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "4c50493522a54bdc98a7aefe8f79ceedc8c0cd70bfac7af51dc7986163956fb3"
     },
     "Tests/Statistics/sampling_contract.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "e1761c942a9ce602a51a67f99e147707731b99ddd0d74852bfa87e6b5cc97c68"
     },
     "Tests/Statistics/udp_inheritance_regression.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "c41980fccc66dacb9bddff470050fb0e24a1c658d1537568c8ed23a0cfe076d2"
     },
     "Tests/Statistics/ui_audit.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "6bf29eb455c1133a27e07db921cfa764e9c70481fd356e064bfa034f10b2b91e"
     },
     "Tests/baseline_audit.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "6284ab161119061957e842b7a84fe370efe5dc5040303ae95ac698aac4550d6b"
     },
     "Tests/check_baseline_owner.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "62a926a9b090438983c15b29ab0f0c28a479fa3da006f5f210e1dcac523ca596"
     },
     "Tests/documentation_contract.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "7e31f337dcda0331fc81fd63ad8034e4e7401987b3485a5978ca5d0e47cdfc31"
     },
     "Tests/native_sources_contract.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "f3200eac445bbbbaa274309ca185a71f3ceb7afe2712300a9edac30f52b19b0b"
     },
     "Tests/server_lifecycle_host.c": {
@@ -786,123 +786,123 @@
       "sha256": "6705e3f54c41ec3e61929d2062cb3eae1d8b64841c40c170059bbe5d6ccd941d"
     },
     "Tests/tcp_smoke.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "89b8ed7d3cad1e39f9e032e4efffcda49cc173b9f2d16b4cdcc62edf00ce5bde"
     },
     "Tests/tcp_smoke_contract.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "ed07ae61d7e8a3aebf4879b6d42d142c545921f604b34a3123357855bfa0e2d6"
     },
     "Tests/traffic_statistics_model.swift": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "3de79ec3a7f7d43ff0df5bcda72fa4411c2ac9cc42c041144ca8886995917823"
     },
     "Tests/udp_address_conversion.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "3486b13ea458420215154996f077ca46128262b60e1e860bdcf2f943333abd48"
     },
     "Tests/udp_audit_driver_regression.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "026b7807f9564f19f5beb6aceb9eec87c077ca6ff88a9a7e1b7465dfcbabc570"
     },
     "Tests/udp_buffer_benchmark.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "f90965c90d9a44bf558b9b27f048c374182293b112a3868c3743db30f5a59eb5"
     },
     "Tests/udp_buffer_io.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "df382396fade5054cfb354bb30243d4c2be77d945f75eba1426d099978e643be"
     },
     "Tests/udp_buffer_live_hold.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "f8502cb333641ba69e42b7023baeb20ab0921c0b1cfa3bf85f049c885b39149f"
     },
     "Tests/udp_buffer_network.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "66fb430ab26f7d69c8b5d22a78f8d1d50428919f83bf4b354ea10c90e5fc7703"
     },
     "Tests/udp_buffer_send.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "7c6c4cafa46333d909a10b9d69580ecfe142b35828b29f96c18d1ffec87d1f19"
     },
     "Tests/udp_buffer_timer.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "404b0051804817045a6ececf06100707078d7fd9b9003042fbf06a14d99a8e6b"
     },
     "Tests/udp_buffer_unit.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "6f80bb0d9832068ac64adedd13872f4931d8a719c3b040606475e990519f80d5"
     },
     "Tests/udp_compat_audit.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "b141e2481910d5d2338714c20164918b55369417ac631cbc30bf08b4a0a83743"
     },
     "Tests/udp_dns_lifecycle.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "9d15328ac42752be4c6bb4d2f3d37181d52945116fd4f49ab1bac6332b15e6f0"
     },
     "Tests/udp_gso.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "71d42aa082883b1222dff2020de06000cb5c44aacbd4c43eb17cfe61d8b4fe2a"
     },
     "Tests/udp_header_regression.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "0ed56e1ce6d91b0da189080d6f9a53a68a59c2c8e31df4048974de8a71ce6ddf"
     },
     "Tests/udp_netaddr_errors.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "ddf16641f44adf3d8d98f14584f864ecfd89cff30444d93885c60666b8a9fd1f"
     },
     "Tests/udp_peer_regression.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "3444451356f2a553b2de6f6fe1c4f735b214b7769b357006eeaea34edcf41637"
     },
     "Tests/udp_proxy_worker_cascade.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "f647c7eccd546fadce4f65178984e7e44114d444572b700f1ed82efb451692de"
     },
     "Tests/udp_queue_observation.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "9a6d95b3b140adb243722897be97973f67a7ab38e4219c01536e7aaabbf663a7"
     },
     "Tests/udp_reactor_resources.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "4e8b4d0082f7bf2ee42178406aa4deb1965f503aad7a1212825ddbb5e7723921"
     },
     "Tests/udp_session_setup.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "2099dcb40af077b99d937051d9202e04f32ea21d6dfd0a658227af6d08ac34fd"
     },
     "Tests/udp_signal_lifecycle.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "19b99cbda033b0527360fecee8a7912a65384868bb56392e71fed71cd7ed4d6e"
     },
     "Tests/udp_sockaddr_regression.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "18e8fdfba42b807c06fb8aa755a3cc98eeeaf4df0dc9529464caa2ec9ce2fa36"
     },
     "Tests/udp_sockaddr_unit.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "a20563838ca2469c65b2bccc89bf299089916484cf0e56fbb8b3fd50d5147878"
     },
     "Tests/udp_socket_interrupt.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "75686b09217f2c6226efdce6c5aaf5da70145e093d989ac9b61951b514142620"
     },
     "Tests/udp_splicer_lifetime.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "7d1fe4e42261415b6c6a23de6f44cee925c47611e520a521a3f76dcc9c5b6548"
     },
     "Tests/udp_stream_boundaries.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "c18e6a8d2da06634fbf001b7f4f0ec36bbf416d9580d1d769ff1b8db2ad75b93"
     },
     "Tests/udp_worker_failures.c": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "26cb4506652806a369574ac52193199eddea2844a72451c3a418c38c57e938e9"
     },
     "Tests/udp_worker_resources.py": {
-      "commit": "624b2403880b06caa922833e19f1b222fc314d88",
+      "commit": "b6243e5bb01520e0fc099be6a0f869ef22a244a3",
       "sha256": "0d6d66b9f943396b7cdaaa994213a2043b99800db655381bde468cb291c49f61"
     }
   },

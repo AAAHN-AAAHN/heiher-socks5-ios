@@ -48,7 +48,7 @@ struct TrafficStatisticsView: View {
                     Section {
                         Text("Spd.: average successful socket I/O over the actual sampling interval, in bits per second; not link capacity.")
                             .accessibilityIdentifier("measurement-speed")
-                        Text("Vol.: successful server-owned TCP/UDP socket bytes since this process started. Server Stop/Start retains totals. Both client and destination peers are included.")
+                        Text("Vol.: successful server-owned socket bytes since this process started. Server Stop/Start retains totals. Both client and destination peers are included.")
                             .accessibilityIdentifier("measurement-volume")
                         Text("Peer viewpoint: In is bytes the OS accepted toward that IP; Out is bytes this server consumed from that IP. Includes SOCKS negotiation, authentication, framing and consumed rejected input. A write is not proof of remote delivery.")
                         Text("Total sums peer endpoints, not unique relayed content. LAN and Internet peers use the same rules. Direct traffic bypassing this server is not observed. IPs are endpoints, not device identities. Unresolved peer IPs appear as Unattributed. Independent live snapshots can briefly differ.")
