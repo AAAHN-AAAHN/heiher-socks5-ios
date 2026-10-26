@@ -96,7 +96,7 @@ Before terminating a process to test durability, the fixture observes the actual
 
 ## Operation and limitations
 
-Use the settings-persistence branch for server configuration plus durable storage, or the integrated release for all six features. The feature workflow and `Build/features.json` identify its exact server dependency. Parent server documents are retained unchanged; the current document reference does not change the frozen executable dependency.
+Use the settings-persistence branch for server configuration plus durable storage, or the integrated release for all declared features. The feature workflow and `Build/features.json` identify its exact server dependency. Parent server documents are retained unchanged; the current document reference does not change the frozen executable dependency.
 
 Save errors are visible. Before relying on persistence across reinstall, signing identity or container changes, confirm which container will be retained and preserve an explicit export when needed. Exported JSON includes credentials. An unsigned IPA or a remapped Simulator container does not establish real SideStore or LiveContainer data continuity.
 
