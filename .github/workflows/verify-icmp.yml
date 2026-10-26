@@ -1,0 +1,65 @@
+name: Audit native ICMP Echo relay
+on:
+  push:
+    branches: [feature/icmp-relay]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, xcode-27]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Prepare this audit output
+        id: build
+        run: python3 Tests/ICMP/audit.py --prepare
+      - name: Install upstream formatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y clang-format-18
+          else
+            brew install llvm@18
+            mkdir -p "$RUNNER_TEMP/format-only"
+            ln -s "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
+            echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
+          fi
+      - name: Permit unprivileged ICMP in this ephemeral Linux test runner
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo sysctl -w net.ipv4.ping_group_range='0 2147483647'
+          sysctl net.ipv4.ping_group_range | tee artifacts/icmp-native-audit/icmp-policy.txt
+      - name: Record the actual iOS 27 toolchain
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version | tee artifacts/icmp-native-audit/toolchain.txt
+          xcrun --sdk iphoneos --show-sdk-version | tee -a artifacts/icmp-native-audit/toolchain.txt | grep -E '^27\.'
+          sw_vers >> artifacts/icmp-native-audit/toolchain.txt
+      - name: Verify exact native sources, Echo behavior, lifecycle and transport compatibility
+        run: python3 Tests/ICMP/audit.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ always() && steps.build.outputs.artifact_path != '' }}
+        with:
+          name: ICMP-native-audit-${{ runner.os }}
+          path: ${{ steps.build.outputs.artifact_path }}
+          retention-days: 30
