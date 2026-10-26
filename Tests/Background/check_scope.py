@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit the Background delta without re-auditing or modifying the main engine.
+"""Audit the Background delta while preserving its complete native parent.
 
 This checks source/configuration contracts, not an installed app or OS permission.
 Run against a complete Git checkout; source archives do not prove ancestry.
@@ -17,7 +17,8 @@ if not __debug__:
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = json.loads((ROOT / 'Build/features.json').read_bytes())
 BASE = CONFIG['base_commit']
-assert BASE == '94cc35ba5b50bab177f7aa678aa5af8fd3b8481d'
+assert BASE == '0181c7a3a0e19dc45eaad8b4f9767efb8d094abe'
+PARENT = json.loads((ROOT / 'docs/documentation.json').read_bytes())['parents']['feature/icmp-relay']
 
 
 def git(*args):
@@ -33,7 +34,7 @@ def text(path):
 
 
 def original(path):
-    return git('show', BASE + ':' + path)
+    return git('show', PARENT + ':' + path)
 
 
 def fields(project, name):
@@ -45,7 +46,8 @@ def main():
     documents = runpy.run_path(str(ROOT / 'Build/check_documentation.py'))
     documents['check'](ROOT)
     git('merge-base', '--is-ancestor', BASE, 'HEAD')
-    base_paths = documents['code_paths'](ROOT, git('ls-tree', '-r', '--name-only', BASE).decode().splitlines())
+    git('merge-base', '--is-ancestor', PARENT, 'HEAD')
+    base_paths = documents['code_paths'](ROOT, git('ls-tree', '-r', '--name-only', PARENT).decode().splitlines())
     current_paths = documents['code_paths'](ROOT, git('ls-files').decode().splitlines())
     allowed = {'.github/workflows/verify-build.yml', 'Build/check.py',
                'Build/features.json', 'README.md', 'Socks5/Socks5App.swift', 'Socks5/ContentView.swift',
@@ -59,13 +61,14 @@ def main():
                  'Socks5/BackgroundKeepAlive/PeriodicPingService.swift',
                  'Socks5/BackgroundKeepAlive/PeriodicPingModel.swift',
                  'Socks5/BackgroundKeepAlive/Silence.wav', 'docs/features/background.md'}
-    assert set(base_paths) <= set(current_paths), 'A main file was removed'
+    assert set(base_paths) <= set(current_paths), 'An inherited native-parent file was removed'
     for path in set(current_paths) - set(base_paths):
         assert path in additions or path.startswith('Tests/Background/'), path
     preserved = []
     for path in base_paths:
         if path not in allowed:
-            assert data(path) == original(path), 'Main implementation changed: ' + path
+            assert data(path) == original(path), 'Inherited native-parent implementation changed: ' + path
+            assert git('ls-files', '--stage', path).split()[0] == git('ls-tree', PARENT, path).split()[0], path
             preserved.append(path)
     assert data('Socks5/Socks5App.swift') == original('Socks5/Socks5App.swift').replace(
         b'ContentView()', b'AppRoot()', 1), 'Unexpected app entry-point change'
@@ -84,8 +87,10 @@ def main():
         b'                        DispatchQueue.main.async { isRunning = false }\n', 1)
     assert data('Socks5/ContentView.swift') == expected_view, 'Unexpected standalone UI actor-boundary change'
     baseline_config = json.loads(original('Build/features.json'))
-    assert CONFIG['features'] == ['background'] and CONFIG['patches'] == []
-    for key in ('sources', 'upstream_app'):
+    assert CONFIG['name'] == 'background'
+    assert CONFIG['features'] == baseline_config['features'] + ['background']
+    assert CONFIG['patches'] == baseline_config['patches']
+    for key in ('base_commit', 'sources', 'upstream_app'):
         assert CONFIG[key] == baseline_config[key]
     # Feature validation may evolve; native patch/format/reverse/package logic may not.
     old_checks = ast.parse(original('Build/check.py'))
@@ -194,17 +199,24 @@ def main():
     assert view.index('Section("Location state")') < view.index('Text("Periodic ping")')
     assert root.count('@StateObject private var ping = PeriodicPingModel(fileURL: PeriodicPingModel.standaloneURL)') == 1
     assert 'keepAlive: keepAlive, ping: ping,' in root
+    ping = text('Socks5/BackgroundKeepAlive/PeriodicPingService.swift')
+    assert ping.count('DispatchSource.makeTimerSource(') == 1
+    for function in ('generation', 'client_new', 'ping', 'cancel', 'client_free'):
+        assert 'hev_socks5_server_icmp_' + function + '(' in ping, function
+    assert all(token not in ping for token in ('socket(', 'sendto(', 'recv(', 'PingPacket',
+                                               'ServerController', 'isRunning', 'hev_meter_', 'Statistics'))
+    assert 'Waiting for native ICMP server' in ping and 'Waiting for native ICMP capacity' in ping
     assert 'private let audioEvents' not in view
     assert 'service.observeAudioNotifications(BackgroundKeepAlive.audioNotifications,' in service
     assert data('README.md') == data('docs/features/background.md')
     assert hashlib.sha256(data('Socks5/BackgroundKeepAlive/Silence.wav')).hexdigest() == (
         '26131825c935435301fb05d3549d815bc93b1e717d6228d890ee9578dd00025e')
     print(json.dumps({
-        'base_main': BASE, 'tested_commit': git('rev-parse', 'HEAD').decode().strip(),
-        'main_files_byte_preserved': preserved,
-        'main_modified_paths_reviewed': sorted(allowed),
+        'base_main': BASE, 'native_parent': PARENT, 'tested_commit': git('rev-parse', 'HEAD').decode().strip(),
+        'native_parent_files_preserved': preserved,
+        'inherited_modified_paths_reviewed': sorted(allowed),
         'background_additions': sorted(set(current_paths) - set(base_paths)),
-        'result': 'PASS: main boundary, source pins, entry/root/settings, project, plist, assets and README',
+        'result': 'PASS: complete native-parent boundary, source pins, native client, entry/root/settings, project, plist, assets and README',
         'scope': 'Source contracts only; no IPA, installed signing, LiveContainer runtime, or device permissions.'
     }, indent=2))
 

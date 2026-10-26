@@ -53,19 +53,26 @@ final class PeriodicPingUITests: XCTestCase {
             let check = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", text), object: state)
             XCTAssertEqual(XCTWaiter.wait(for: [check], timeout: 5), .completed)
         }
-        @MainActor func startServer() {
+        @MainActor func serverControl(_ title: String) -> XCUIElement {
             app.tabBars.buttons["Server"].tap()
-            let start = app.buttons["Start"].firstMatch
-            XCTAssertTrue(start.waitForExistence(timeout: 5))
+            let control = app.buttons[title].firstMatch
+            XCTAssertTrue(control.waitForExistence(timeout: 5))
+            for _ in 0..<6 {
+                if control.isHittable { break }
+                app.swipeUp()
+            }
+            XCTAssertTrue(control.isHittable)
+            return control
+        }
+        @MainActor func startServer() {
+            let start = serverControl("Start")
             XCTAssertTrue(start.isEnabled)
             start.tap()
             revealPing()
             expect("Sending ICMP to 2 destination(s)")
         }
         @MainActor func stopServer() {
-            app.tabBars.buttons["Server"].tap()
-            let stop = app.buttons["Stop"].firstMatch
-            XCTAssertTrue(stop.waitForExistence(timeout: 5))
+            let stop = serverControl("Stop")
             XCTAssertTrue(stop.isEnabled)
             stop.tap()
             let start = app.buttons["Start"].firstMatch
