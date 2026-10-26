@@ -19,7 +19,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/server-control-ui-audit'
 WORK = ROOT / '.build/server-control-ui-audit'
-CORE = ROOT / '.build/core'
+CORE = ROOT / '.build/server'
 
 
 def run(args, log, cwd=ROOT, timeout=180):
@@ -34,7 +34,7 @@ def output(*args):
 
 def verify_production():
     baseline = '6cffa8a71b45796eacca3f5a941106646932ec05'
-    source_base = '94cc35ba5b50bab177f7aa678aa5af8fd3b8481d'
+    source_base = '0181c7a3a0e19dc45eaad8b4f9767efb8d094abe'
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
     expected = json.loads(output('git', 'show', baseline + ':Build/features.json'))
     shared = json.loads(output('git', 'show', source_base + ':Build/features.json'))
