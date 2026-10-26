@@ -121,7 +121,7 @@ struct BackgroundKeepAliveView: View {
                     Text("Sends ICMP to each IP; separate IPs with commas. Invalid input pauses sending. Supports up to 65,536 unique IPs. Settings are saved and restored on relaunch. Runs while iOS allows execution.")
                 }
                 Section {
-                    Text("Background services are independent of Server Start/Stop. Recovery runs only while iOS allows the app to execute.")
+                    Text("Silent audio and continuous location are independent of Server Start/Stop. Periodic ping waits until the server is ready. Recovery runs only while iOS allows the app to execute.")
                         .font(.footnote)
                 }
             }
