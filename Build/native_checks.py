@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the declared native composition; retain branch audits as separate evidence.
 
-Adapted from 0ab3c33a's dispatcher after duplicate-branch comparison. Updated to the finalized six owners with combined lifecycle/persistence cases. Production modules and standalone audit gates
+Adapted from 0ab3c33a's dispatcher after duplicate-branch comparison. Updated to the declared owners with combined lifecycle/persistence cases. Production modules and standalone audit gates
 are preserved; this entry point reuses their real native cases for compositions.
 """
 import importlib.util
@@ -53,6 +53,15 @@ for mode in (('buffered', 'splice') if sys.platform == 'linux' and 'statistics' 
             mode + '-build.log', timeout=300, cwd=CORE)
     libraries = [CORE / 'bin/libhev-socks5-server.a', CORE / 'third-part/yaml/bin/libyaml.a',
                  CORE / 'third-part/hev-task-system/bin/libhev-task-system.a']
+    if 'icmp' in FEATURES:
+        run([sys.executable, 'Tests/ICMP/run.py', CORE], mode + '-icmp.log')
+        if 'statistics' in FEATURES:
+            executable = OUT / ('icmp-statistics-' + mode)
+            run(['cc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-pthread',
+                 '-I' + str(CORE / 'src'), '-I' + str(CORE / 'src/core/include'),
+                 'Tests/Integration/icmp_statistics.c', *libraries, '-o', executable],
+                mode + '-icmp-statistics-build.log')
+            run([executable], mode + '-icmp-statistics.log', timeout=30)
     run([sys.executable, 'Tests/tcp_smoke.py', CORE / 'bin/hev-socks5-server'], mode + '-tcp.log')
     if 'udp' in FEATURES:
         audit = module('composition_udp', 'Tests/udp_compat_audit.py')

@@ -24,6 +24,12 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y clang-format-18
+      - name: Allow ICMP datagram sockets for this disposable runner group
+        shell: bash
+        run: |
+          set -euo pipefail
+          group=$(id -g)
+          sudo sysctl -w "net.ipv4.ping_group_range=$group $group"
       - name: Exact latest composition, native and model checks
         id: build
         run: bash Build/build.sh
