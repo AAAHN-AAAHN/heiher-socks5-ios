@@ -1,0 +1,855 @@
+diff --git a/build-apple.sh b/build-apple.sh
+index 730252df7cd6e81005e8ae72f98e733a84ab4814..a421e77abc88aa259ffdf9d833bb3cecb217b69d 100755
+--- a/build-apple.sh
++++ b/build-apple.sh
+@@ -61,7 +61,7 @@ mergeStatic appletvsimulator x86_64 arm64
+ 
+ INCLUDE_DIR="$XCFRAMEWORK_DIR/include"
+ mkdir -p $INCLUDE_DIR
+-cp ./src/hev-main.h $INCLUDE_DIR
++cp ./src/hev-main.h ./src/hev-socks5-icmp.h $INCLUDE_DIR
+ cp ./module.modulemap $INCLUDE_DIR
+ xcodebuild -create-xcframework \
+     -library ./apple_xcframework/iphoneos-arm64/libhev-socks5-server.a -headers $INCLUDE_DIR \
+diff --git a/src/hev-icmp-server.c b/src/hev-icmp-server.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..e29e91f15be5bb235dc56d0316696c4f19de3622
+--- /dev/null
++++ b/src/hev-icmp-server.c
+@@ -0,0 +1,593 @@
++#define _GNU_SOURCE
++#include <errno.h>
++#include <fcntl.h>
++#include <pthread.h>
++#include <stdatomic.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include <arpa/inet.h>
++#include <net/if.h>
++
++#include <hev-task.h>
++#include <hev-icmp-engine.h>
++#include "hev-main.h"
++#include "hev-config.h"
++#include "hev-misc.h"
++#include "hev-icmp-server.h"
++
++#define CLIENT_LIMIT 1024
++#define QUEUE_BATCH 256
++
++typedef struct _Submission Submission;
++typedef struct _IcmpServer IcmpServer;
++
++struct _HevSocks5IcmpClient
++{
++    uint64_t generation;
++    uint64_t epoch;
++    unsigned int refs;
++    unsigned int callbacks;
++    int closed;
++    HevSocks5IcmpCallback callback;
++    void *context;
++};
++
++struct _Submission
++{
++    Submission *next;
++    HevSocks5IcmpClient *client;
++    HevIcmpRequest *request;
++    uint64_t request_id;
++    uint64_t epoch;
++};
++
++struct _IcmpServer
++{
++    uint64_t generation;
++    int running;
++    int ready;
++    int wake_pending;
++    int fds[2];
++    size_t requests;
++    size_t bytes;
++    Submission *first;
++    Submission *last;
++    HevIcmpEngine *engine;
++    HevSocks5IcmpObserver observer;
++    void *observer_context;
++    struct sockaddr_storage bind[2];
++    int bind_error[2];
++    unsigned int interface;
++    const char *interface_name;
++    int mark;
++};
++
++static pthread_mutex_t gate = PTHREAD_MUTEX_INITIALIZER;
++static pthread_cond_t callbacks_done = PTHREAD_COND_INITIALIZER;
++static IcmpServer *current;
++static uint64_t generations;
++static unsigned int clients;
++static atomic_int permitted;
++static HevSocks5IcmpObserver configured_observer;
++static void *configured_context;
++
++static void
++client_unref (HevSocks5IcmpClient *client)
++{
++    if (!--client->refs) {
++        clients--;
++        free (client);
++    }
++}
++
++static void
++wake_locked (IcmpServer *s)
++{
++    const char byte = 1;
++    ssize_t n;
++    if (s->wake_pending)
++        return;
++    s->wake_pending = 1;
++    do {
++        n = write (s->fds[1], &byte, 1);
++    } while (n < 0 && errno == EINTR);
++    /* A full nonblocking pipe is already readable. Its lifetime is protected
++     * by gate, so the write cannot race a close/reused descriptor. */
++}
++
++uint64_t
++hev_socks5_server_icmp_generation (void)
++{
++    uint64_t generation;
++    pthread_mutex_lock (&gate);
++    generation = current && current->ready && current->running &&
++                         atomic_load (&permitted) ?
++                     current->generation :
++                     0;
++    pthread_mutex_unlock (&gate);
++    return generation;
++}
++
++HevSocks5IcmpClient *
++hev_socks5_server_icmp_client_new (uint64_t generation,
++                                   HevSocks5IcmpCallback callback,
++                                   void *context)
++{
++    HevSocks5IcmpClient *client = NULL;
++    pthread_mutex_lock (&gate);
++    if (!generation || !callback) {
++        errno = EINVAL;
++    } else if (!atomic_load (&permitted) || !current || !current->running ||
++               !current->ready || current->generation != generation) {
++        errno = ENOTCONN;
++    } else if (clients >= CLIENT_LIMIT) {
++        errno = ENOBUFS;
++    } else if ((client = calloc (1, sizeof (*client)))) {
++        client->generation = generation;
++        client->refs = 1;
++        client->callback = callback;
++        client->context = context;
++        clients++;
++    }
++    pthread_mutex_unlock (&gate);
++    return client;
++}
++
++int
++hev_socks5_server_icmp_submit (HevSocks5IcmpClient *client, uint64_t request_id,
++                               const struct sockaddr *source,
++                               socklen_t source_len,
++                               const struct sockaddr *destination,
++                               socklen_t destination_len, const void *echo,
++                               size_t echo_len, uint32_t timeout_ms)
++{
++    HevIcmpRequest *request;
++    Submission *submission;
++    IcmpServer *s;
++    int error = 0;
++    if (!client)
++        return -EINVAL;
++    pthread_mutex_lock (&gate);
++    s = current;
++    if (client->closed || !atomic_load (&permitted) || !s || !s->running ||
++        !s->ready || client->generation != s->generation) {
++        error = ENOTCONN;
++        goto exit;
++    }
++    if (echo_len > HEV_ICMP_BYTE_LIMIT ||
++        s->requests >= HEV_ICMP_REQUEST_LIMIT ||
++        echo_len > HEV_ICMP_BYTE_LIMIT - s->bytes) {
++        error = EAGAIN;
++        goto exit;
++    }
++    submission = calloc (1, sizeof (*submission));
++    if (!submission) {
++        error = ENOMEM;
++        goto exit;
++    }
++    request = hev_icmp_request_new (source, source_len, destination,
++                                    destination_len, echo, echo_len, timeout_ms,
++                                    submission);
++    if (!request) {
++        error = errno;
++        free (submission);
++        goto exit;
++    }
++    submission->client = client;
++    submission->epoch = client->epoch;
++    submission->request_id = request_id;
++    submission->request = request;
++    client->refs++;
++    s->requests++;
++    s->bytes += echo_len;
++    if (s->last)
++        s->last->next = submission;
++    else
++        s->first = submission;
++    s->last = submission;
++    wake_locked (s);
++exit:
++    pthread_mutex_unlock (&gate);
++    return -error;
++}
++
++int
++hev_socks5_server_icmp_ping (HevSocks5IcmpClient *client, uint64_t request_id,
++                             const struct sockaddr *destination,
++                             socklen_t destination_len, uint32_t timeout_ms)
++{
++    struct sockaddr_storage address;
++    unsigned char echo[8];
++    int len = hev_icmp_address (&address, destination, destination_len);
++    if (len <= 0)
++        return len ? len : -EINVAL;
++    hev_icmp_echo (echo, address.ss_family, request_id);
++    return hev_socks5_server_icmp_submit (client, request_id, NULL, 0,
++                                          (void *)&address, len, echo,
++                                          sizeof (echo), timeout_ms);
++}
++
++void
++hev_socks5_server_icmp_cancel (HevSocks5IcmpClient *client)
++{
++    if (!client)
++        return;
++    pthread_mutex_lock (&gate);
++    client->epoch++;
++    if (current && current->generation == client->generation)
++        wake_locked (current);
++    pthread_mutex_unlock (&gate);
++}
++
++void
++hev_socks5_server_icmp_client_free (HevSocks5IcmpClient *client)
++{
++    if (!client)
++        return;
++    pthread_mutex_lock (&gate);
++    client->closed = 1;
++    client->epoch++;
++    if (current && current->generation == client->generation)
++        wake_locked (current);
++    while (client->callbacks)
++        pthread_cond_wait (&callbacks_done, &gate);
++    client_unref (client);
++    pthread_mutex_unlock (&gate);
++}
++
++int
++hev_socks5_server_icmp_set_io_observer (HevSocks5IcmpObserver observer,
++                                        void *context)
++{
++    int res = 0;
++    pthread_mutex_lock (&gate);
++    if (current || atomic_load (&permitted)) {
++        res = -EBUSY;
++    } else {
++        configured_observer = observer;
++        configured_context = context;
++    }
++    pthread_mutex_unlock (&gate);
++    return res;
++}
++
++static void
++observe (const struct sockaddr *peer, socklen_t peer_len, size_t bytes,
++         int writing, void *context)
++{
++    IcmpServer *s = context;
++    int saved_errno = errno;
++    if (s->observer)
++        s->observer (peer, peer_len, bytes, writing, s->observer_context);
++    errno = saved_errno;
++}
++
++static int
++active (void *context)
++{
++    Submission *submission = context;
++    HevSocks5IcmpClient *c = submission->client;
++    int result;
++    pthread_mutex_lock (&gate);
++    result = !c->closed && c->epoch == submission->epoch && current &&
++             current->running && atomic_load (&permitted) &&
++             c->generation == current->generation;
++    pthread_mutex_unlock (&gate);
++    return result;
++}
++
++static void
++notify (IcmpServer *s, Submission *submission, int event, int error,
++        const struct sockaddr *peer, socklen_t peer_len,
++        const struct sockaddr *local, socklen_t local_len,
++        const unsigned char *echo, size_t len)
++{
++    HevSocks5IcmpClient *client = submission->client;
++    HevSocks5IcmpResult result = { 0 };
++    int deliver;
++    result.request_id = submission->request_id;
++    result.event = event;
++    result.error = error;
++    result.echo = echo;
++    result.echo_len = len;
++    if (peer && peer_len <= sizeof (result.source)) {
++        memcpy (&result.source, peer, peer_len);
++        result.source_len = peer_len;
++    }
++    if (local && local_len <= sizeof (result.destination)) {
++        memcpy (&result.destination, local, local_len);
++        result.destination_len = local_len;
++    }
++    pthread_mutex_lock (&gate);
++    deliver = !client->closed;
++    if (event != HEV_SOCKS5_ICMP_SENT &&
++        (client->epoch != submission->epoch || !s->running)) {
++        result.event = HEV_SOCKS5_ICMP_ERROR;
++        result.error = s->running ? ECANCELED : ESHUTDOWN;
++        result.echo = NULL;
++        result.echo_len = 0;
++    }
++    if (deliver)
++        client->callbacks++;
++    pthread_mutex_unlock (&gate);
++    if (deliver)
++        client->callback (&result, client->context);
++    pthread_mutex_lock (&gate);
++    if (deliver) {
++        client->callbacks--;
++        pthread_cond_broadcast (&callbacks_done);
++    }
++    if (event != HEV_SOCKS5_ICMP_SENT) {
++        s->requests--;
++        s->bytes -= submission->request->len;
++        client_unref (client);
++        free (submission);
++    }
++    pthread_mutex_unlock (&gate);
++}
++
++static void
++complete (HevIcmpRequest *request, int error, const struct sockaddr *peer,
++          socklen_t peer_len, const struct sockaddr *local, socklen_t local_len,
++          const unsigned char *echo, size_t len, void *context)
++{
++    notify (context, request->context,
++            error ? HEV_SOCKS5_ICMP_ERROR : HEV_SOCKS5_ICMP_REPLY, error, peer,
++            peer_len, local, local_len, echo, len);
++}
++
++static void
++prepare_bind (IcmpServer *s)
++{
++    int i;
++    s->interface_name = hev_config_get_bind_interface ();
++    if (s->interface_name)
++        s->interface = if_nametoindex (s->interface_name);
++    s->mark = hev_config_get_socket_mark ();
++    for (i = 0; i < 2; i++) {
++        const char *name = hev_config_get_bind_address (i ? AF_INET6 : AF_INET);
++        struct sockaddr_in6 address = { 0 };
++        if (i)
++            ((struct sockaddr_in6 *)&s->bind[i])->sin6_family = AF_INET6;
++        else
++            ((struct sockaddr_in *)&s->bind[i])->sin_family = AF_INET;
++        if (!name)
++            continue;
++        if (hev_netaddr_resolve (&address, name, NULL) < 0 ||
++            !!IN6_IS_ADDR_V4MAPPED (&address.sin6_addr) == !!i) {
++            s->bind_error[i] = EADDRNOTAVAIL;
++        } else if (i) {
++            memcpy (&s->bind[i], &address, sizeof (address));
++        } else {
++            struct sockaddr_in *v4 = (void *)&s->bind[i];
++            memcpy (&v4->sin_addr, &address.sin6_addr.s6_addr[12], 4);
++        }
++    }
++}
++
++static int
++bind_socket (int fd, int family, uint16_t identifier, void *context)
++{
++    IcmpServer *s = context;
++    int index = family == AF_INET6;
++    struct sockaddr_storage address = s->bind[index];
++    socklen_t len = index ? sizeof (struct sockaddr_in6) :
++                            sizeof (struct sockaddr_in);
++#ifdef __APPLE__
++    if (index)
++        ((struct sockaddr_in6 *)&address)->sin6_len = len;
++    else
++        ((struct sockaddr_in *)&address)->sin_len = len;
++#endif
++    if (s->bind_error[index]) {
++        errno = s->bind_error[index];
++        return -1;
++    }
++#ifdef __linux__
++    if (index)
++        ((struct sockaddr_in6 *)&address)->sin6_port = htons (identifier);
++    else
++        ((struct sockaddr_in *)&address)->sin_port = htons (identifier);
++#else
++    (void)identifier;
++#endif
++    if (bind (fd, (void *)&address, len) < 0) {
++#ifdef __linux__
++        if (errno != EADDRINUSE)
++            return -1;
++        if (index)
++            ((struct sockaddr_in6 *)&address)->sin6_port = 0;
++        else
++            ((struct sockaddr_in *)&address)->sin_port = 0;
++        if (bind (fd, (void *)&address, len) < 0)
++            return -1;
++#else
++        return -1;
++#endif
++    }
++    if (s->interface_name) {
++#ifdef __APPLE__
++        if (!s->interface) {
++            errno = ENODEV;
++            return -1;
++        }
++        if (setsockopt (fd, index ? IPPROTO_IPV6 : IPPROTO_IP,
++                        index ? IPV6_BOUND_IF : IP_BOUND_IF, &s->interface,
++                        sizeof (s->interface)) < 0)
++            return -1;
++#else
++        if (set_sock_bind (fd, s->interface_name) < 0)
++            return -1;
++#endif
++    }
++    return s->mark ? set_sock_mark (fd, s->mark) : 0;
++}
++
++static void
++server_task (void *context)
++{
++    IcmpServer *s = context;
++    HevTask *task = hev_task_self ();
++    prepare_bind (s);
++    pthread_mutex_lock (&gate);
++    s->ready = s->running && atomic_load (&permitted);
++    if (!s->ready)
++        s->running = 0;
++    pthread_mutex_unlock (&gate);
++    for (;;) {
++        unsigned int i;
++        int running, queued;
++        char bytes[64];
++        while (read (s->fds[0], bytes, sizeof (bytes)) > 0)
++            ;
++        pthread_mutex_lock (&gate);
++        s->wake_pending = 0;
++        pthread_mutex_unlock (&gate);
++        for (i = 0; i < QUEUE_BATCH; i++) {
++            Submission *submission;
++            HevIcmpRequest *request;
++            int res;
++            pthread_mutex_lock (&gate);
++            submission = s->first;
++            if (!submission) {
++                pthread_mutex_unlock (&gate);
++                break;
++            }
++            s->first = submission->next;
++            if (!s->first)
++                s->last = NULL;
++            request = submission->request;
++            if (!atomic_load (&permitted))
++                s->running = 0;
++            if (!s->running)
++                res = -ESHUTDOWN;
++            else if (submission->client->closed ||
++                     submission->epoch != submission->client->epoch)
++                res = -ECANCELED;
++            else
++                res = hev_icmp_engine_send (s->engine, request);
++            pthread_mutex_unlock (&gate);
++            notify (s, submission,
++                    res ? HEV_SOCKS5_ICMP_ERROR : HEV_SOCKS5_ICMP_SENT,
++                    res ? -res : 0, NULL, 0, (void *)&request->destination,
++                    request->destination_len, NULL, res ? 0 : request->len);
++            if (res)
++                free (request);
++        }
++        hev_icmp_engine_poll (s->engine, active);
++        pthread_mutex_lock (&gate);
++        running = s->running;
++        queued = s->first != NULL;
++        pthread_mutex_unlock (&gate);
++        if (!running && !queued)
++            break;
++        if (queued) {
++            hev_task_yield (HEV_TASK_YIELD);
++        } else {
++            int timeout = hev_icmp_engine_timeout (s->engine);
++            if (timeout < 0)
++                hev_task_yield (HEV_TASK_WAITIO);
++            else
++                hev_task_sleep (timeout);
++        }
++    }
++    hev_icmp_engine_free (s->engine);
++    hev_task_del_fd (task, s->fds[0]);
++    pthread_mutex_lock (&gate);
++    current = NULL;
++    close (s->fds[0]);
++    close (s->fds[1]);
++    free (s);
++    pthread_mutex_unlock (&gate);
++}
++
++void
++hev_socks5_icmp_prepare (void)
++{
++    pthread_mutex_lock (&gate);
++    atomic_store (&permitted, 1);
++    pthread_mutex_unlock (&gate);
++}
++
++int
++hev_socks5_icmp_start (void)
++{
++    IcmpServer *s;
++    HevTask *task;
++    int i, error = ENOMEM;
++    pthread_mutex_lock (&gate);
++    if (!atomic_load (&permitted) || current) {
++        pthread_mutex_unlock (&gate);
++        return -1;
++    }
++    s = calloc (1, sizeof (*s));
++    if (!s)
++        goto fail;
++    s->fds[0] = s->fds[1] = -1;
++    if (pipe (s->fds) < 0) {
++        error = errno;
++        goto fail;
++    }
++    for (i = 0; i < 2; i++) {
++        if (fcntl (s->fds[i], F_SETFL, O_NONBLOCK) < 0 ||
++            fcntl (s->fds[i], F_SETFD, FD_CLOEXEC) < 0) {
++            error = errno;
++            goto fail;
++        }
++    }
++    s->engine = hev_icmp_engine_new (bind_socket, observe, complete, s);
++    if (!s->engine)
++        goto fail;
++    task = hev_task_new (65536);
++    if (!task)
++        goto fail;
++    if (hev_task_add_fd (task, s->fds[0], POLLIN) < 0) {
++        error = errno;
++        hev_task_unref (task);
++        goto fail;
++    }
++    if (!++generations)
++        ++generations;
++    s->generation = generations;
++    s->running = 1;
++    s->observer = configured_observer;
++    s->observer_context = configured_context;
++    current = s;
++    hev_task_run (task, server_task, s);
++    pthread_mutex_unlock (&gate);
++    return 0;
++fail:
++    if (s) {
++        if (s->fds[0] >= 0)
++            close (s->fds[0]);
++        if (s->fds[1] >= 0)
++            close (s->fds[1]);
++        hev_icmp_engine_free (s->engine);
++        free (s);
++    }
++    pthread_mutex_unlock (&gate);
++    errno = error;
++    return -1;
++}
++
++void
++hev_socks5_icmp_stop (void)
++{
++    pthread_mutex_lock (&gate);
++    atomic_store (&permitted, 0);
++    if (current) {
++        current->running = 0;
++        current->ready = 0;
++        wake_locked (current);
++    }
++    pthread_mutex_unlock (&gate);
++}
++
++void
++hev_socks5_icmp_request_stop (void)
++{
++    /* Called from the existing proxy stop/signal path. Worker 0 performs
++     * the mutex/descriptor shutdown after its stop event is delivered. */
++    atomic_store (&permitted, 0);
++}
+diff --git a/src/hev-icmp-server.h b/src/hev-icmp-server.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..753d539a20af7548929cd207a9dc25f5e6c0e03f
+--- /dev/null
++++ b/src/hev-icmp-server.h
+@@ -0,0 +1,11 @@
++#ifndef HEV_ICMP_SERVER_H
++#define HEV_ICMP_SERVER_H
++
++/* Native lifecycle only. prepare/stop may run outside the worker; start is
++ * called by worker 0 after its listener has been registered successfully. */
++void hev_socks5_icmp_prepare (void);
++int hev_socks5_icmp_start (void);
++void hev_socks5_icmp_stop (void);
++void hev_socks5_icmp_request_stop (void);
++
++#endif
+diff --git a/src/hev-main.h b/src/hev-main.h
+index 37a3c8ce0db9f734f07bfc57b3b59df8559562e6..46c915af117641bad25e55afef100ab2ce83d4c2 100644
+--- a/src/hev-main.h
++++ b/src/hev-main.h
+@@ -55,4 +55,6 @@ void hev_socks5_server_quit (void);
+ }
+ #endif
+ 
++#include "hev-socks5-icmp.h"
++
+ #endif /* __HEV_MAIN_H__ */
+diff --git a/src/hev-socks5-icmp.h b/src/hev-socks5-icmp.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..4aea45fe21679379265ed542b6e5d8021e97ca6c
+--- /dev/null
++++ b/src/hev-socks5-icmp.h
+@@ -0,0 +1,88 @@
++#ifndef HEV_SOCKS5_ICMP_PUBLIC_H
++#define HEV_SOCKS5_ICMP_PUBLIC_H
++
++#include <stddef.h>
++#include <stdint.h>
++#include <sys/socket.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/* Local C API; it introduces no SOCKS wire command. Input/output buffers are
++ * ICMP messages (the 8-byte Echo header and payload), without an IP header.
++ * All functions are thread safe. A zero generation means the native worker
++ * is not ready. A client belongs to exactly one server generation. */
++typedef struct _HevSocks5IcmpClient HevSocks5IcmpClient;
++
++enum
++{
++    HEV_SOCKS5_ICMP_SENT = 1,
++    HEV_SOCKS5_ICMP_REPLY = 2,
++    HEV_SOCKS5_ICMP_ERROR = 3,
++};
++
++typedef struct
++{
++    uint64_t request_id;
++    int event;
++    int error;
++    struct sockaddr_storage source;
++    struct sockaddr_storage destination;
++    socklen_t source_len;
++    socklen_t destination_len;
++    const unsigned char *echo;
++    size_t echo_len;
++} HevSocks5IcmpResult;
++
++/* Callbacks run serially on native worker 0. Result/echo storage is borrowed
++ * until return. SENT means accepted by the OS; REPLY requires an actual Echo
++ * Reply. ERROR is terminal (errno, including timeout/cancel/server stop).
++ * Callbacks must not block, destroy a client, or stop/join the server. */
++typedef void (*HevSocks5IcmpCallback) (const HevSocks5IcmpResult *result,
++                                       void *context);
++typedef void (*HevSocks5IcmpObserver) (const struct sockaddr *peer,
++                                       socklen_t peer_len, size_t bytes,
++                                       int writing, void *context);
++
++uint64_t hev_socks5_server_icmp_generation (void);
++HevSocks5IcmpClient *hev_socks5_server_icmp_client_new (
++    uint64_t generation, HevSocks5IcmpCallback callback, void *context);
++
++/* Return 0 when copied/accepted, otherwise a negative errno without callback.
++ * Source identifies the original client for an already received message; it
++ * is not an instruction to spoof the outgoing IP source. NULL is allowed for
++ * a local request. Identifier, sequence and payload are restored in replies.
++ * timeout_ms is 1..60000; echo_len is 8..65515 (IPv4) or 8..65535 (IPv6).
++ * Pending requests and bytes are bounded; -EAGAIN means the caller should retry later, without busy looping. */
++int hev_socks5_server_icmp_submit (HevSocks5IcmpClient *client,
++                                   uint64_t request_id,
++                                   const struct sockaddr *source,
++                                   socklen_t source_len,
++                                   const struct sockaddr *destination,
++                                   socklen_t destination_len, const void *echo,
++                                   size_t echo_len, uint32_t timeout_ms);
++int hev_socks5_server_icmp_ping (HevSocks5IcmpClient *client,
++                                 uint64_t request_id,
++                                 const struct sockaddr *destination,
++                                 socklen_t destination_len,
++                                 uint32_t timeout_ms);
++
++/* Cancels requests accepted before the call. The client remains reusable.
++ * After return those requests cannot start another send. Free also waits for
++ * any active callback and guarantees no subsequent access to its context.
++ * The caller must serialize free against its own other uses of the pointer. */
++void hev_socks5_server_icmp_cancel (HevSocks5IcmpClient *client);
++void hev_socks5_server_icmp_client_free (HevSocks5IcmpClient *client);
++
++/* Configure while stopped. Called synchronously on worker 0 immediately after
++ * positive OS I/O, before reply validation/cancellation. NULL disables it.
++ * Internal API transfers are never counted. Returns -EBUSY while running. */
++int hev_socks5_server_icmp_set_io_observer (HevSocks5IcmpObserver observer,
++                                            void *context);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif
+diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
+index ab2bae258711442dae7be819200f9f9b01b98116..6f1b73b0f3138d1446ee63760e28ad346f084f60 100644
+--- a/src/hev-socks5-proxy.c
++++ b/src/hev-socks5-proxy.c
+@@ -28,6 +28,7 @@
+ #include "hev-socks5-user-mark.h"
+ 
+ #include "hev-socks5-proxy.h"
++#include "hev-icmp-server.h"
+ 
+ enum
+ {
+@@ -249,6 +250,7 @@ hev_socks5_proxy_init (void)
+         return -1;
+     }
+ 
++    hev_socks5_icmp_prepare ();
+     factory = hev_socket_factory_new (listen_addr, listen_port, ipv6_only,
+                                       tcp_fastopen);
+     if (!factory) {
+@@ -284,8 +286,10 @@ hev_socks5_proxy_init (void)
+         worker_list[i].worker = worker;
+ 
+         /* Skip worker 0 */
+-        if (i == 0)
++        if (i == 0) {
++            hev_socks5_worker_enable_icmp (worker);
+             continue;
++        }
+ 
+         res = pthread_create (&worker_list[i].thread, NULL, work_thread_handler,
+                               worker);
+@@ -338,6 +342,7 @@ hev_socks5_proxy_fini (void)
+     int res;
+ 
+     LOG_D ("socks5 proxy fini");
++    hev_socks5_icmp_stop ();
+ 
+     atomic_store (&signal_worker, NULL);
+     while (atomic_load (&signal_users))
+@@ -397,6 +402,7 @@ hev_socks5_proxy_stop_inner (int pending)
+     int res;
+ 
+     LOG_D ("socks5 proxy stop");
++    hev_socks5_icmp_request_stop ();
+ 
+ retry:
+     res = atomic_fetch_or (&tsync, SYNC_WAIT);
+diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c
+index 052bdf5f41fcd632777b847412d755dfd7217baa..bcb7d652074496bd456740aa9af0d03abe12db9c 100644
+--- a/src/hev-socks5-worker.c
++++ b/src/hev-socks5-worker.c
+@@ -7,6 +7,8 @@
+  ============================================================================
+  */
+ 
++#include "hev-icmp-server.h"
++
+ #include <assert.h>
+ #include <errno.h>
+ #include <stdlib.h>
+@@ -42,6 +44,7 @@ struct _HevSocks5Worker
+     int event_fds[2];
+ 
+     int run;
++    int icmp_owner;
+     atomic_int tsync;
+ 
+     HevTask *task_event;
+@@ -103,12 +106,19 @@ hev_socks5_worker_task_entry (void *data)
+ 
+     LOG_D ("socks5 worker task run");
+ 
++    if (!READ_ONCE (self->run))
++        return;
+     fd = self->fd;
+     if (hev_task_add_fd (task, fd, POLLIN) < 0) {
+         LOG_E ("socks5 worker listen fd");
+         hev_socks5_worker_stop (self);
+         return;
+     }
++    if (self->icmp_owner && hev_socks5_icmp_start () < 0) {
++        hev_task_del_fd (task, fd);
++        hev_socks5_worker_stop (self);
++        return;
++    }
+     stack_size = hev_config_get_misc_task_stack_size ();
+ 
+     while (READ_ONCE (self->run)) {
+@@ -199,6 +209,8 @@ hev_socks5_event_task_entry (void *data)
+ exit:
+     atomic_fetch_and (&self->tsync, ~SYNC_SEND);
+     WRITE_ONCE (self->run, 0);
++    if (self->icmp_owner)
++        hev_socks5_icmp_stop ();
+     if (hev_task_get_state (self->task_worker) != HEV_TASK_STOPPED)
+         hev_task_wakeup (self->task_worker);
+ 
+@@ -418,3 +430,9 @@ hev_socks5_worker_set_auth (HevSocks5Worker *self, HevSocks5Authenticator *auth)
+     if (prev)
+         hev_object_unref (HEV_OBJECT (prev));
+ }
++
++void
++hev_socks5_worker_enable_icmp (HevSocks5Worker *self)
++{
++    self->icmp_owner = 1;
++}
+diff --git a/src/hev-socks5-worker.h b/src/hev-socks5-worker.h
+index 7b2ba690258286190f39bf1d2013ae0962a3f3e7..0615289cae5ed98fbfcce5df3a489ae316297d57 100644
+--- a/src/hev-socks5-worker.h
++++ b/src/hev-socks5-worker.h
+@@ -17,6 +17,8 @@ typedef struct _HevSocks5Worker HevSocks5Worker;
+ HevSocks5Worker *hev_socks5_worker_new (int fd);
+ void hev_socks5_worker_destroy (HevSocks5Worker *self);
+ 
++void hev_socks5_worker_enable_icmp (HevSocks5Worker *self);
++
+ void hev_socks5_worker_start (HevSocks5Worker *self);
+ void hev_socks5_worker_stop (HevSocks5Worker *self);
+ void hev_socks5_worker_reload (HevSocks5Worker *self);
