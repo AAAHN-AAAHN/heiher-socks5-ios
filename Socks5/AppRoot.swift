@@ -1,4 +1,5 @@
 import SwiftUI
+import HevSocks5Server
 
 @MainActor
 struct AppRoot: View {
@@ -7,6 +8,15 @@ struct AppRoot: View {
     @StateObject private var keepAlive = BackgroundKeepAlive()
     @StateObject private var ping = PeriodicPingModel()
     @State private var appliedSettingsChange: SettingsStore.Change?
+
+    private static let configureNativeIO: Void = {
+        precondition(hev_socks5_server_icmp_set_io_observer(hev_socks5_server_record_socket_io, nil) == 0,
+                     "Native I/O accounting must be connected before server startup.")
+    }()
+
+    init() {
+        _ = Self.configureNativeIO
+    }
 
     private var audioEnabled: Binding<Bool> {
         Binding(get: { self.settings.value.background.silentAudio }, set: { enabled in self.applyAudioIntent(enabled) })
