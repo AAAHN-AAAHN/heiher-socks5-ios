@@ -8,10 +8,10 @@ index 0000000000000000000000000000000000000000..c1133f100f632d11bea7270f0402a046
 \ No newline at end of file
 diff --git a/src/hev-icmp-engine.c b/src/hev-icmp-engine.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..20cdef47fe98e020bfa57748b2cd8393378f24ae
+index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbfb935f1dc
 --- /dev/null
 +++ b/src/hev-icmp-engine.c
-@@ -0,0 +1,543 @@
+@@ -0,0 +1,548 @@
 +#define _GNU_SOURCE
 +#ifdef __APPLE__
 +#define __APPLE_USE_RFC_3542
@@ -181,7 +181,8 @@ index 0000000000000000000000000000000000000000..20cdef47fe98e020bfa57748b2cd8393
 +            return -EADDRNOTAVAIL;
 +        ((struct sockaddr_in6 *)out)->sin6_family = AF_INET6;
 +        ((struct sockaddr_in6 *)out)->sin6_addr = a->sin6_addr;
-+        ((struct sockaddr_in6 *)out)->sin6_scope_id = a->sin6_scope_id;
++        if (IN6_IS_ADDR_LINKLOCAL (&a->sin6_addr))
++            ((struct sockaddr_in6 *)out)->sin6_scope_id = a->sin6_scope_id;
 +#ifdef __APPLE__
 +        ((struct sockaddr_in6 *)out)->sin6_len = sizeof (*a);
 +#endif
@@ -354,7 +355,7 @@ index 0000000000000000000000000000000000000000..20cdef47fe98e020bfa57748b2cd8393
 +    }
 +    if (e->next_sequence == ICMP_SLOTS) {
 +        if (e->first)
-+            return -EAGAIN;
++            return HEV_ICMP_DEFERRED;
 +        close_sockets (e);
 +        e->identifier[0] = next_identifier ();
 +        e->identifier[1] = next_identifier ();
@@ -457,6 +458,10 @@ index 0000000000000000000000000000000000000000..20cdef47fe98e020bfa57748b2cd8393
 +            memcmp (buf + 8, r->echo + 8, n - 8) ||
 +            (!index && hev_icmp_checksum (buf, n)))
 +            continue;
++        if (hev_icmp_now () >= r->deadline) {
++            complete (e, r, ETIMEDOUT, NULL, 0, NULL, 0, NULL, 0);
++            continue;
++        }
 +        for (c = CMSG_FIRSTHDR (&msg); c; c = CMSG_NXTHDR (&msg, c)) {
 +            if (index && c->cmsg_level == IPPROTO_IPV6 &&
 +                c->cmsg_type == IPV6_PKTINFO &&
@@ -557,10 +562,10 @@ index 0000000000000000000000000000000000000000..20cdef47fe98e020bfa57748b2cd8393
 +}
 diff --git a/src/hev-icmp-engine.h b/src/hev-icmp-engine.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..d7a5758eee934150c9f9ae18eed0e63ca26880b8
+index 0000000000000000000000000000000000000000..16434d91333653b3875a5c106ca3470b6b975e81
 --- /dev/null
 +++ b/src/hev-icmp-engine.h
-@@ -0,0 +1,63 @@
+@@ -0,0 +1,65 @@
 +/* ICMP Echo socket engine. Single native task owns every engine operation. */
 +#ifndef HEV_ICMP_ENGINE_H
 +#define HEV_ICMP_ENGINE_H
@@ -569,6 +574,7 @@ index 0000000000000000000000000000000000000000..d7a5758eee934150c9f9ae18eed0e63c
 +#include <stdint.h>
 +#include <sys/socket.h>
 +
++#define HEV_ICMP_DEFERRED 1
 +#define HEV_ICMP_REQUEST_LIMIT 4096U
 +#define HEV_ICMP_BYTE_LIMIT (16U * 1024U * 1024U)
 +
@@ -617,7 +623,8 @@ index 0000000000000000000000000000000000000000..d7a5758eee934150c9f9ae18eed0e63c
 +                                    HevIcmpObserver observer,
 +                                    HevIcmpCompletion completion,
 +                                    void *context);
-+/* Success transfers ownership; error leaves ownership with the caller. */
++/* Zero transfers ownership. DEFERRED means rollover awaits pending requests;
++ * it has not sent. DEFERRED or negative errno leaves ownership with caller. */
 +int hev_icmp_engine_send (HevIcmpEngine *engine, HevIcmpRequest *request);
 +void hev_icmp_engine_poll (HevIcmpEngine *engine, HevIcmpActive active);
 +int hev_icmp_engine_timeout (HevIcmpEngine *engine);

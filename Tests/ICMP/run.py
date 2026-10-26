@@ -15,7 +15,8 @@ test = Path(__file__).resolve().parent / "native.c"
 with tempfile.TemporaryDirectory(prefix="icmp-native-") as temp:
     common = [
         "cc", "-std=gnu11", "-O2", "-Wall", "-Wextra", "-Werror", "-pthread",
-        f"-I{source / 'src'}", f"-I{source / 'src/core/include'}", str(test),
+        f"-I{source / 'src'}", f"-I{source / 'src/core/include'}",
+        f"-I{source / 'third-part/hev-task-system/include'}", str(test),
         str(source / "bin/libhev-socks5-server.a"),
         str(source / "third-part/yaml/bin/libyaml.a"),
         str(source / "third-part/hev-task-system/bin/libhev-task-system.a"),
@@ -25,9 +26,10 @@ with tempfile.TemporaryDirectory(prefix="icmp-native-") as temp:
         binary = Path(temp) / mode
         command = common.copy()
         if mode == "faults":
-            command += ["-DICMP_TEST_IO", str(test.with_name("faults.c"))]
+            command += ["-DICMP_TEST_IO", str(test.with_name("faults.c")), str(test.with_name("engine.c"))]
             command += [f"-Wl,--wrap={name}" for name in (
-                "socket", "close", "bind", "setsockopt", "getsockname", "sendto", "recvmsg")]
+                "socket", "close", "bind", "setsockopt", "getsockname", "sendto", "recvmsg",
+                "hev_icmp_engine_send")]
         subprocess.run(command + ["-o", str(binary)], check=True)
         print(f"Running {mode} ICMP tests", flush=True)
         subprocess.run([str(binary)], check=True, timeout=30)

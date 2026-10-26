@@ -63,7 +63,7 @@ def main():
     if not formatter or 'version 18.' not in subprocess.check_output([formatter, '--version'], text=True):
         raise RuntimeError('The upstream clang-format 18 is required')
     run([sys.executable, 'Build/check.py', 'format', SOURCE, formatter], 'format.log')
-    for name in ('native.c', 'faults.c'):
+    for name in ('native.c', 'faults.c', 'engine.c'):
         path = ROOT / 'Tests/ICMP' / name
         expected = subprocess.check_output([formatter, '--style=file:' + str(SOURCE / '.clang-format'), str(path)])
         if expected != path.read_bytes():
