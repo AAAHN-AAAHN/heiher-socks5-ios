@@ -64,21 +64,31 @@ check_totals (unsigned int rounds)
 {
     HevSocks5EndpointStats rows[8];
     uint64_t received, sent;
+    unsigned int seen = 0;
     size_t count = hev_socks5_server_endpoint_rows (rows, 8);
-    assert (count == 2);
+    assert (count == 3);
     for (size_t i = 0; i < count; i++) {
         int family;
+        if (rows[i].id == 0) {
+            assert (!strcmp (rows[i].address, "Unattributed"));
+            assert (rows[i].received == 0 && rows[i].sent == 0);
+            seen |= 4;
+            continue;
+        }
         if (!strcmp (rows[i].address, "127.0.0.1"))
             family = 0;
         else {
             assert (!strcmp (rows[i].address, "::1"));
             family = 1;
         }
+        assert (!(seen & (1u << family)));
+        seen |= 1u << family;
         assert (rows[i].received == accepted[family]);
         assert (rows[i].sent == consumed[family]);
         assert (rows[i].received == (family ? 8 : 21) * rounds);
         assert (rows[i].sent == rows[i].received);
     }
+    assert (seen == 7);
     hev_socks5_server_endpoint_stats (&received, &sent);
     assert (received == accepted[0] + accepted[1]);
     assert (sent == consumed[0] + consumed[1]);
