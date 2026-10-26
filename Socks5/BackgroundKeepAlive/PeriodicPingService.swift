@@ -33,7 +33,7 @@ struct PingDestination: Sendable {
             inet_ntop(AF_INET, &v4, &normalized, socklen_t(normalized.count))
             family = AF_INET
             length = socklen_t(MemoryLayout<sockaddr_in>.size)
-            name = String(cString: normalized)
+            name = normalized.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
         } else {
             let parts = text.split(separator: "%", maxSplits: 2, omittingEmptySubsequences: false)
             guard (1...2).contains(parts.count), inet_pton(AF_INET6, String(parts[0]), &v6) == 1 else {
@@ -51,6 +51,7 @@ struct PingDestination: Sendable {
                 scope = UInt32(parts[1]) ?? if_nametoindex(String(parts[1]))
                 guard scope != 0 else { throw PingInputError.address }
             }
+            if raw[0] != 0xfe || raw[1] & 0xc0 != 0x80 { scope = 0 }
             var value = sockaddr_in6()
             #if canImport(Darwin)
             value.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)
@@ -64,7 +65,8 @@ struct PingDestination: Sendable {
             inet_ntop(AF_INET6, &v6, &normalized, socklen_t(normalized.count))
             family = AF_INET6
             length = socklen_t(MemoryLayout<sockaddr_in6>.size)
-            name = String(cString: normalized) + (scope == 0 ? "" : "%\(scope)")
+            name = normalized.withUnsafeBufferPointer { String(cString: $0.baseAddress!) } +
+                (scope == 0 ? "" : "%\(scope)")
         }
         address = storage
     }

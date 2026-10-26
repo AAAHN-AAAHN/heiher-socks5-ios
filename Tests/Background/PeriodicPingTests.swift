@@ -44,6 +44,8 @@ struct PeriodicPingTests {
         _ = try PeriodicPingConfiguration(destinations: "::1%1", period: String(Int.max / 1_000_000))
         let scoped = try PeriodicPingConfiguration(destinations: "fe80::1%1,fe80:0:0:0:0:0:0:1%01,fe80::1%2", period: "1")
         require(scoped.destinations.map(\.name) == ["fe80::1%1", "fe80::1%2"], "scope normalization and deduplication")
+        let unscoped = try PeriodicPingConfiguration(destinations: "::1%1, ::1%2, ::1, 2001:db8::1%1, 2001:0db8::1", period: "1")
+        require(unscoped.destinations.map(\.name) == ["::1", "2001:db8::1"], "non-link-local zone variants share one destination")
         let many = (0..<65_536).map { "10.1.\($0 / 256).\($0 % 256)" }.joined(separator: ",")
         for period in ["", "0", String(Int.max / 1_000_000 + 1)] {
             var checks = 0
