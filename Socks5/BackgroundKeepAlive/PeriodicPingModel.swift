@@ -135,7 +135,8 @@ final class PeriodicPingModel: @MainActor ObservableObject {
     private func update() {
         let id = UUID()
         request = id
-        status = ready ? (enabled ? "Starting" : "Off - stopping") : "Loading settings"
+        status = ready ? (enabled ? "Starting" : "Off - stopping") :
+            (loading ? "Loading settings" : "Settings could not be loaded")
         let updates = self.updates
         if ready {
             service.configure(enabled: enabled, destinations: destinations, period: period) { value in
