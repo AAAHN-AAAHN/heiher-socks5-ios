@@ -317,10 +317,11 @@ cancel_and_bound (size_t length)
 }
 
 #ifdef ICMP_TEST_IO
+extern void run_engine_checks (void);
 extern atomic_int icmp_test_suppress, icmp_test_send_error;
 extern atomic_int icmp_test_truncate, icmp_test_wrong_id;
 extern atomic_int icmp_test_open_error, icmp_test_short_send;
-extern atomic_int icmp_test_opened, icmp_test_live;
+extern atomic_int icmp_test_opened, icmp_test_live, icmp_test_defer;
 
 static void
 fault_case (int fault)
@@ -335,7 +336,11 @@ fault_case (int fault)
     echo[2] = checksum >> 8;
     echo[3] = checksum;
     inet_pton (AF_INET, "127.0.0.1", &dst.sin_addr);
-    atomic_store (&icmp_test_send_error, fault == 0 ? EACCES : 0);
+    int send_error = fault == 0 ? EACCES :
+                     fault == 6 ? EAGAIN :
+                     fault == 7 ? EBUSY :
+                                  0;
+    atomic_store (&icmp_test_send_error, send_error);
     atomic_store (&icmp_test_suppress, fault == 1);
     atomic_store (&icmp_test_wrong_id, fault == 2);
     atomic_store (&icmp_test_truncate, fault == 3);
@@ -349,12 +354,13 @@ fault_case (int fault)
         usleep (1000);
     assert (atomic_load (&c.errors) == 1 && !atomic_load (&c.replies));
     assert (atomic_load (&c.sent) == (fault > 0 && fault < 4));
-    assert (atomic_load (&c.last_error) == (fault == 0 || fault == 4 ? EACCES :
-                                            fault == 5               ? EIO :
+    assert (atomic_load (&c.last_error) == (send_error ? send_error :
+                                            fault == 4 ? EACCES :
+                                            fault == 5 ? EIO :
                                                          ETIMEDOUT));
-    assert (atomic_load (&tx) - before_tx == (fault == 0 || fault == 4 ? 0 :
-                                              fault == 5               ? 4 :
-                                                                         c.size));
+    assert (atomic_load (&tx) - before_tx == (fault > 0 && fault < 4 ? c.size :
+                                              fault == 5             ? 4 :
+                                                                       0));
     assert (atomic_load (&rx) - before_rx == (fault == 2 ? 8 :
                                               fault == 3 ? 12 :
                                                            0));
@@ -377,7 +383,7 @@ int
 main (void)
 {
     struct sockaddr_in dst = { .sin_family = AF_INET };
-    struct sockaddr_in6 dst6 = { .sin6_family = AF_INET6 };
+    struct sockaddr_in6 dst6 = { .sin6_family = AF_INET6, .sin6_scope_id = 1 };
     uint64_t generation, next;
     Client c[4] = { 0 };
     HevSocks5IcmpClient *client[4];
@@ -385,6 +391,9 @@ main (void)
     unsigned long before_tx, before_rx;
     int i;
     assert (echo);
+#ifdef ICMP_TEST_IO
+    atomic_store (&icmp_test_defer, 1);
+#endif
     checksum_vectors ();
     inet_pton (AF_INET, "127.0.0.1", &dst.sin_addr);
     inet_pton (AF_INET6, "::1", &dst6.sin6_addr);
@@ -436,6 +445,8 @@ main (void)
     puts (
         "PASS simulated IPv4/IPv6 socket responses, large payload, multiple clients, kernel ID rewrite, exact send bytes");
     assert (atomic_load (&icmp_test_opened) == 2);
+    puts (
+        "PASS server retains a deferred queue head and completes it without a false error");
 #else
     puts (
         "PASS real IPv4/IPv6 loopback, large payload, multiple clients, ID restore, exact send bytes");
@@ -463,8 +474,9 @@ main (void)
     cancel_and_bound (8);
     cancel_and_bound (65508);
 #ifdef ICMP_TEST_IO
-    for (i = 0; i < 6; i++)
+    for (i = 0; i < 8; i++)
         fault_case (i);
+    run_engine_checks ();
 #endif
     assert (!hev_socks5_server_icmp_set_io_observer (NULL, NULL));
     free (echo);
