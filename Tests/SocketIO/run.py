@@ -35,7 +35,7 @@ run([a.cc,'-O2','-pthread',*['-I'+str(n/path) for path in
 for name,defines in [('socket_observer',[]),('socket_observer',['-DFORCE_FALLBACK']),('stream_matrix',['-DENABLE_IO_SPLICE_SYSCALL'] if a.mode=='splice' else []),('registry',[]),('worker_boundaries',[])]:
  exe=out/(name+('-fallback' if '-DFORCE_FALLBACK' in defines else ''))
  run([a.cc,'-O2','-std=gnu11','-Wall','-Werror','-Wno-unused-function',*defines,'-I'+str(n/'src/core/src'),'-I'+str(task/'src'),'-I'+str(task/'include'),HERE/(name+'.c'),task/'bin/libhev-task-system.a','-pthread','-o',exe]);run([exe])
-for name in ('snapshot_rows','connected_peer','udp_gso_accounting'):
+for name in ('snapshot_rows','connected_peer','udp_gso_accounting','generic_io'):
  exe=out/name.replace('_','-')
  run([a.cc,'-O2','-pthread','-I'+str(n/'src'),'-I'+str(n/'src/core/src'),'-I'+str(task/'include'),
       HERE/(name+'.c'),n/'bin/libhev-socks5-server.a',

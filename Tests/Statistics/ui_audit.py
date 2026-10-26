@@ -18,7 +18,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/statistics-ui-audit'
 WORK = ROOT / '.build/statistics-ui-audit'
-CORE = ROOT / '.build/statistics-final-audit/core'
+CORE = ROOT / '.build/statistics-final-audit/server'
 
 
 def run(args, log, cwd=ROOT, timeout=180):

@@ -11,10 +11,10 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/statistics-final-audit'
-CORE = ROOT / '.build/statistics-final-audit/core'
+CORE = ROOT / '.build/statistics-final-audit/server'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 SOCKET_BASE = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
-UDP = '9baac92fb4508d9e1b96f00744a91ff1cae77003'
+UDP = '6a5f473f8a47913048ebf6b664d509ad5f983a1d'
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 SOCKET_PATCHES = [
     {'file': 'hev-socket-meter-task.patch', 'repository': 'third-part/hev-task-system'},
@@ -354,9 +354,8 @@ def main():
     run([sys.executable, 'Tests/Statistics/audit_driver_probe.py'], 'audit-driver.log')
     run([sys.executable, 'Tests/Statistics/udp_inheritance_regression.py'], 'udp-inheritance.log')
     run([sys.executable, 'Tests/Statistics/input_probe.py'], 'input-probe.log')
-    run(['git', 'clone', '--no-checkout', 'https://github.com/heiher/hev-socks5-server.git', CORE], 'clone.log')
-    run(['git', 'checkout', '--detach', CONFIG['sources']['.']], 'checkout.log', CORE)
-    run(['git', 'submodule', 'update', '--init', '--recursive'], 'submodules.log', CORE)
+    run([sys.executable, 'Build/native_sources.py', 'checkout', 'server', CORE], 'native-inputs.json')
+    run([sys.executable, 'Build/check.py', 'native', 'server', CORE], 'native-identity.log')
     run([sys.executable, 'Build/check.py', 'apply', CORE], 'apply.log')
     # Preserve the actual patched native sources for offline inspection; no build
     # product, credentials or .git metadata is included in this source-only archive.
