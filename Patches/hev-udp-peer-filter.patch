@@ -1,8 +1,8 @@
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index d1e3e74205e86fa2f449678568f6bce21d3cc793..2903c747dec9aed5073d595f9abce2fe4872afbe 100644
+index d20efb7b28f26a20dabe0b3e02a6b881d2ec2bf1..a118dcfe670d0bdf39d1d5fe46fc6b34d052d24c 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
-@@ -256,19 +256,21 @@ static int
+@@ -361,19 +361,21 @@ static int
  hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
                               unsigned int num, int nonblock)
  {
@@ -28,7 +28,7 @@ index d1e3e74205e86fa2f449678568f6bce21d3cc793..2903c747dec9aed5073d595f9abce2fe
          mvec[i].msg_hdr.msg_control = NULL;
          mvec[i].msg_hdr.msg_controllen = 0;
          mvec[i].msg_hdr.msg_iov = &iov[i];
-@@ -278,11 +280,6 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -383,11 +385,6 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          iov[i].iov_len = msgv[i].len;
      }
  
@@ -40,7 +40,7 @@ index d1e3e74205e86fa2f449678568f6bce21d3cc793..2903c747dec9aed5073d595f9abce2fe
      res = hev_task_io_socket_recvmmsg (fd, mvec, num, nonblock, task_io_yielder,
                                         self);
      if (res <= 0) {
-@@ -291,25 +288,43 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -396,25 +393,43 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          return res;
      }
  
@@ -90,8 +90,8 @@ index d1e3e74205e86fa2f449678568f6bce21d3cc793..2903c747dec9aed5073d595f9abce2fe
 +        addrlen = hev_socks5_addr_len (&udp->addr);
          if (addrlen <= 0) {
              LOG_D ("%p socks5 udp addr", self);
-             return -1;
-@@ -324,9 +339,16 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+             msgv[i].addr = NULL;
+@@ -433,9 +448,16 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          msgv[i].addr = &udp->addr;
          msgv[i].buf += doff;
          msgv[i].len -= doff;

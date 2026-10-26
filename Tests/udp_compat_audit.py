@@ -132,13 +132,8 @@ def main():
     if sys.platform == 'darwin':
         run(['plutil', '-lint', 'Socks5/Info.plist',
              'Socks5.xcodeproj/project.pbxproj'], 'xcode-metadata.log')
-    run(['git', 'clone', '--no-checkout', 'https://github.com/heiher/hev-socks5-server.git', CORE], 'clone.log')
-    run(['git', 'checkout', '--detach', CONFIG['sources']['.']], 'checkout.log', CORE)
-    run(['git', 'submodule', 'update', '--init', '--recursive'], 'submodules.log', CORE)
-    for path, sha in CONFIG['sources'].items():
-        actual = subprocess.check_output(['git', '-C', str(CORE / path), 'rev-parse', 'HEAD'], text=True).strip()
-        if actual != sha:
-            raise RuntimeError('Source mismatch: ' + path)
+    run([sys.executable, 'Build/native_sources.py', 'checkout', 'server', CORE], 'native-inputs.json')
+    run([sys.executable, 'Build/check.py', 'native', 'server', CORE], 'native-source-lock.log')
 
     run([sys.executable, 'Build/check.py', 'apply', CORE], 'native-input-audit.log')
     run([sys.executable, 'Build/check.py', 'reverse', CORE], 'native-input-restore.log')
