@@ -11,7 +11,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
-OUT = ROOT / 'artifacts/periodic-ping'
+NAME = json.loads((ROOT / 'Build/features.json').read_bytes())['name']
+OUT = ROOT / 'artifacts' / NAME / 'periodic-ping'
 COMBINE_DOUBLE = '''
 public protocol ObservableObject: AnyObject {
     var objectWillChange: ObservableObjectPublisher { get }
@@ -129,6 +130,8 @@ def main():
                                            '-o', work / 'libCombine.so'])
             extra = ['-I', work, '-L', work, '-lCombine', '-Xlinker', '-rpath', '-Xlinker', work]
         feedback = import_feedback_sources(work)
+        (OUT / 'import-feedback-source-manifest.json').write_bytes(
+            (work / 'import-feedback-source-manifest.json').read_bytes())
         for flag, mode in [('-Onone', 'debug'), ('-O', 'optimized')]:
             common = ['swiftc', '-swift-version', '5', '-strict-concurrency=complete', '-warnings-as-errors', flag,
                       ROOT / 'Socks5/BackgroundKeepAlive/PeriodicPingService.swift']
