@@ -2,7 +2,7 @@
   "base_commit": "94cc35ba5b50bab177f7aa678aa5af8fd3b8481d",
   "branches": {
     "feature/app-icon": "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
-    "feature/background": "ab3f0aa46f92693c9ed55c20bd5144c31fc04052",
+    "feature/background": "25330a671a317bd345e60fc7b8b95976f030e0de",
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
@@ -836,8 +836,8 @@
       "sha256": "e9e3ecfb86972931a49f793396ecb74b11b273c799b79184747764e20f42dd84"
     },
     "Tests/Background/check_periodic_ping.py": {
-      "commit": "ab3f0aa46f92693c9ed55c20bd5144c31fc04052",
-      "sha256": "5301fb71a5c712b129ade2a8fe3f64675dad796363aa630822a82045d3bba8c0"
+      "commit": "25330a671a317bd345e60fc7b8b95976f030e0de",
+      "sha256": "3f23d264092f1c57529d100450b3064ac6391c68d4c58ffc198b3e7593a079cf"
     },
     "Tests/Background/PeriodicPingLoopback.swift": {
       "commit": "8912ec057d2f048182c788016024b78d0a5e53eb",
