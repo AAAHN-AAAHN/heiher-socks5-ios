@@ -51,7 +51,7 @@ def main():
     current_paths = documents['code_paths'](ROOT, git('ls-files').decode().splitlines())
     allowed = {'.github/workflows/verify-build.yml', 'Build/check.py',
                'Build/features.json', 'README.md', 'Socks5/Socks5App.swift', 'Socks5/ContentView.swift',
-               'Socks5.xcodeproj/project.pbxproj'}
+               'Socks5/Info.plist', 'Socks5.xcodeproj/project.pbxproj'}
     additions = {'Socks5/AppRoot.swift', 'Socks5/Info.plist',
                  'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift',
                  'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift',
@@ -109,6 +109,11 @@ def main():
     assert fields(project, 'INFOPLIST_KEY_UIApplicationSceneManifest_Generation') == ['NO'] * 2
     assert not fields(project, 'CODE_SIGN_ENTITLEMENTS')
     info = plistlib.loads(data('Socks5/Info.plist'))
+    parent_info = plistlib.loads(original('Socks5/Info.plist'))
+    background_keys = {'UIBackgroundModes', 'NSLocationWhenInUseUsageDescription',
+                       'NSLocationAlwaysAndWhenInUseUsageDescription'}
+    assert set(info) == set(parent_info) | background_keys
+    assert {key: value for key, value in info.items() if key not in background_keys} == parent_info
     assert set(info['UIBackgroundModes']) == {'audio', 'location'}
     assert info['UIApplicationSceneManifest']['UIApplicationSupportsMultipleScenes'] is False
     for key in ('NSLocationWhenInUseUsageDescription',
