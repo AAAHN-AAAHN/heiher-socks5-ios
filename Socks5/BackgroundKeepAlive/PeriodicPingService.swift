@@ -51,6 +51,7 @@ struct PingDestination: Sendable {
                 scope = UInt32(parts[1]) ?? if_nametoindex(String(parts[1]))
                 guard scope != 0 else { throw PingInputError.address }
             }
+            if raw[0] != 0xfe || raw[1] & 0xc0 != 0x80 { scope = 0 }
             var value = sockaddr_in6()
             #if canImport(Darwin)
             value.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)
