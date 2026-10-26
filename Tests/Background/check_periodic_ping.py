@@ -171,14 +171,24 @@ def main():
             ]:
                 run(mode + '-import-feedback-' + case, [feedback_binary, case])
         live = work / 'icmp-loopback'
-        run('native-library-build', ['make', '-C', core, '-j3', 'ENABLE_IO_SPLICE_SYSCALL=0', 'static'])
-        libraries = [core / 'bin/libhev-socks5-server.a', core / 'third-part/yaml/bin/libyaml.a',
-                     core / 'third-part/hev-task-system/bin/libhev-task-system.a']
-        run('loopback-compile', ['swiftc', '-swift-version', '6', '-strict-concurrency=complete',
-                                '-warnings-as-errors', '-O', '-I', module,
-                                ROOT / 'Socks5/BackgroundKeepAlive/PeriodicPingService.swift',
-                                HERE / 'PeriodicPingLoopback.swift', *libraries, '-Xlinker', '-lpthread', '-o', live])
-        run('loopback-run', [live], accepted=(0, 77) if platform.system() == 'Linux' else (0,))
+        try:
+            run('native-library-build', ['make', '-C', core, '-j3', 'ENABLE_IO_SPLICE_SYSCALL=0', 'static'])
+            libraries = [core / 'bin/libhev-socks5-server.a', core / 'third-part/yaml/bin/libyaml.a',
+                         core / 'third-part/hev-task-system/bin/libhev-task-system.a']
+            run('loopback-compile', ['swiftc', '-swift-version', '6', '-strict-concurrency=complete',
+                                    '-warnings-as-errors', '-O', '-I', module,
+                                    ROOT / 'Socks5/BackgroundKeepAlive/PeriodicPingService.swift',
+                                    HERE / 'PeriodicPingLoopback.swift', *libraries, '-Xlinker', '-lpthread', '-o', live])
+            run('loopback-run', [live], accepted=(0, 77) if platform.system() == 'Linux' else (0,))
+        finally:
+            # Host objects must not become the next build's first Apple slice.
+            had_failure = sys.exc_info()[0] is not None
+            try:
+                run('native-library-clean', ['make', '-C', core, 'clean'])
+            except Exception as error:
+                if not had_failure:
+                    raise
+                print('Failed to clean host native outputs: ' + repr(error), file=sys.stderr)
     (OUT / 'SUCCESS.txt').write_text('PASS: controlled native client/model tests; actual native loopback result is separate (77 means NOT EXECUTED). No device/SDK/UI claim.\n')
     print(f'PASS: {len(records)} compile/runtime commands; actual native header/ABI, controlled callbacks and separate real loopback')
 
