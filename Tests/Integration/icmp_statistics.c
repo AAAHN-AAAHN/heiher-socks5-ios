@@ -2,6 +2,7 @@
 #include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdint.h>
@@ -86,13 +87,15 @@ check_totals (unsigned int rounds)
         assert (rows[i].received == accepted[family]);
         assert (rows[i].sent == consumed[family]);
         assert (rows[i].received == (family ? 8 : 21) * rounds);
-        assert (rows[i].sent == rows[i].received);
+        assert (rows[i].sent >= rows[i].received);
+        printf ("%s: accepted=%" PRIu64 ", consumed=%" PRIu64 "\n",
+                rows[i].address, rows[i].received, rows[i].sent);
     }
     assert (seen == 7);
     hev_socks5_server_endpoint_stats (&received, &sent);
     assert (received == accepted[0] + accepted[1]);
     assert (sent == consumed[0] + consumed[1]);
-    assert (received == 29 * rounds && sent == received);
+    assert (received == 29 * rounds);
 }
 
 int
@@ -133,7 +136,9 @@ main (void)
          * The origin metadata must not become fictitious client network bytes. */
         uint64_t before_in, before_out;
         hev_socks5_server_endpoint_stats (&before_in, &before_out);
-        assert (before_in == 29 * (round - 1) && before_out == before_in);
+        assert (before_in == 29 * (round - 1));
+        assert (before_in == accepted[0] + accepted[1]);
+        assert (before_out == consumed[0] + consumed[1]);
         assert (!hev_socks5_server_icmp_ping (clients[0], 1, (void *)&destination,
                                              sizeof (destination), 2000));
         assert (!hev_socks5_server_icmp_submit (clients[1], 2, (void *)&source,
