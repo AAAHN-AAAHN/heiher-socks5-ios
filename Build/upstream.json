@@ -1,11 +1,42 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "components": {
+    "core": {
+      "repository": "https://github.com/heiher/hev-socks5-core.git",
+      "commit": "dadbb54bf7509f6dea3c1b30e45198efa400679c",
+      "gitlinks": {},
+      "overrides": {}
+    },
+    "server": {
+      "repository": "https://github.com/heiher/hev-socks5-server.git",
+      "commit": "318a2ffebfd87a12b72dbac95a65ca27143eb01b",
+      "gitlinks": {
+        "src/core": "ef82008f7e2058e56d76a79543a585bba4b7feef",
+        "third-part/hev-task-system": "4039d2fdbb3577af380fa0096b90d0ad99969dfa",
+        "third-part/yaml": "94441ec8777eb319936735a58b376963d09c73d4"
+      },
+      "overrides": {
+        "src/core": "core"
+      }
+    },
+    "tunnel": {
+      "repository": "https://github.com/heiher/hev-socks5-tunnel.git",
+      "commit": "55cc2efc280f3a72ffc60ce856772b57f5122e9c",
+      "gitlinks": {
+        "src/core": "dadbb54bf7509f6dea3c1b30e45198efa400679c",
+        "third-part/hev-task-system": "d0365c370aadd39129924b563b80751cb63332d7",
+        "third-part/lwip": "495671e59d736ef59f6cfa7dc9d35b7359921062",
+        "third-part/yaml": "94441ec8777eb319936735a58b376963d09c73d4"
+      },
+      "overrides": {}
+    }
+  },
   "sources": {
-    ".": "691000437857d43385705bfd7e0b723925dc6cc7",
-    "src/core": "9f1cf0bfca0c003dd0cf0fbdcf6912a2b46a8d05",
-    "third-part/hev-task-system": "b2f2250371c1bd436a42f3c380ee46d4ac3bada8",
+    ".": "318a2ffebfd87a12b72dbac95a65ca27143eb01b",
+    "src/core": "dadbb54bf7509f6dea3c1b30e45198efa400679c",
+    "third-part/hev-task-system": "4039d2fdbb3577af380fa0096b90d0ad99969dfa",
     "third-part/yaml": "94441ec8777eb319936735a58b376963d09c73d4"
   },
   "upstream_app": "180012e8b9dbaa2002a68ebd2c75bccebcfb789c",
-  "verified_date": "2026-10-14"
+  "verified_date": "2026-10-26"
 }
