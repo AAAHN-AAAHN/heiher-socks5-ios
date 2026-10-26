@@ -6,7 +6,7 @@
     "feature/udp-compat": "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "feature/server-control": "7e40f951441cb226bc5e22a95d9c0658aba76939",
     "feature/traffic-statistics": "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
-    "feature/settings-persistence": "c8ee348db9cbc83ddb3f591c98d681474b701ecb"
+    "feature/settings-persistence": "d1d945cbe252dd625c6d9f1f1dced5e0efd85351"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -120,8 +120,8 @@
       "sha256": "016461b19055ca82b3dd740c8773414e5b228af0fc74d277445f24af72af2b0d"
     },
     "Socks5/Settings/SettingsView.swift": {
-      "commit": "def19e47e862d531b0ba327ae54d829e95ef9128",
-      "sha256": "6b6f9d45d803ac8cb77929033c9c5f18fcd42e1633bf19b1ccbc8d0931ccaa25"
+      "commit": "d1d945cbe252dd625c6d9f1f1dced5e0efd85351",
+      "sha256": "61136a0cc98d3dfcb3c55657ae118370f614d1b8e040dfcd13ef1436ed8f6767"
     },
     "Socks5/Statistics/TrafficStatistics.swift": {
       "commit": "da8dfd40293ec2c4f217280bcc17e6fbae491ab5",
@@ -512,8 +512,8 @@
       "sha256": "03ba53c6d0208c67e3e170a796ee1ba914509c56b261aab9bbf39bdb8801c7e2"
     },
     "Tests/Settings/run_checks.py": {
-      "commit": "819252a94ae274485395c53a3f8b14e1449a7a8f",
-      "sha256": "9c78201319c422fbfa9b9b4a443a0e850df871248670122a1e8510646c9d3cf7"
+      "commit": "d1d945cbe252dd625c6d9f1f1dced5e0efd85351",
+      "sha256": "73dd55391880fe6bc653fb08018ae18ae1b789eeecf3b01f825caba777803b5b"
     },
     "Tests/Settings/ui_audit.py": {
       "commit": "6a1f369bc43cc25281523ef13d17e98e3630de63",
@@ -854,6 +854,14 @@
     "Tests/Background/PeriodicPingImportFeedbackTests.swift.in": {
       "commit": "48f7bec613b53ba728aeb79126ffc1456ae4e28f",
       "sha256": "5835dd822caf2880550d835d3376ffc903325d5ae466a573c90b8584bc09566e"
+    },
+    "Tests/Settings/SettingsFeedbackTests.swift.in": {
+      "commit": "d1d945cbe252dd625c6d9f1f1dced5e0efd85351",
+      "sha256": "b4d2734e41c7244bc3561f9a6488a4495b265b754f07c2db74ff4057c1ffdeb4"
+    },
+    "Tests/Settings/check_file_feedback.py": {
+      "commit": "d1d945cbe252dd625c6d9f1f1dced5e0efd85351",
+      "sha256": "48336650759ff4bab5e48608a13b5e54ba76434c18f283b6f6c6b3431d309dbb"
     }
   },
   "files": {
