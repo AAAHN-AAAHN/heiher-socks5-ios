@@ -15,7 +15,7 @@ private final class NativeEchoResults: @unchecked Sendable {
     func receive(_ result: HevSocks5IcmpResult) {
         lock.lock(); defer { lock.unlock() }
         if result.event == HEV_SOCKS5_ICMP_REPLY, let bytes = result.echo {
-            replies[result.request_id] = Array(UnsafeBufferPointer(start: bytes, count: result.echo_len))
+            replies[result.request_id] = Array(UnsafeBufferPointer(start: bytes, count: Int(result.echo_len)))
         } else if result.event == HEV_SOCKS5_ICMP_ERROR {
             errors[result.request_id] = result.error
         }
