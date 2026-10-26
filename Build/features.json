@@ -1,9 +1,10 @@
 {
   "base_commit": "0181c7a3a0e19dc45eaad8b4f9767efb8d094abe",
   "features": [
-    "udp"
+    "udp",
+    "icmp"
   ],
-  "name": "udp-compat",
+  "name": "icmp-relay",
   "patches": [
     {
       "file": "hev-udp-port-zero.patch",
@@ -31,6 +32,14 @@
     },
     {
       "file": "hev-session-setup.patch",
+      "repository": "."
+    },
+    {
+      "file": "hev-icmp-core.patch",
+      "repository": "src/core"
+    },
+    {
+      "file": "hev-icmp-server.patch",
       "repository": "."
     }
   ],
