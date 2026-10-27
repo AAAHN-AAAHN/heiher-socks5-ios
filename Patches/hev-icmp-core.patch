@@ -8,10 +8,10 @@ index 0000000000000000000000000000000000000000..c1133f100f632d11bea7270f0402a046
 \ No newline at end of file
 diff --git a/src/hev-icmp-engine.c b/src/hev-icmp-engine.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbfb935f1dc
+index 0000000000000000000000000000000000000000..44d7d3551703c6aa2a36276d1fee07eaf8094200
 --- /dev/null
 +++ b/src/hev-icmp-engine.c
-@@ -0,0 +1,548 @@
+@@ -0,0 +1,907 @@
 +#define _GNU_SOURCE
 +#ifdef __APPLE__
 +#define __APPLE_USE_RFC_3542
@@ -26,6 +26,9 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +#include <unistd.h>
 +#include <arpa/inet.h>
 +#include <netinet/in.h>
++#ifdef __linux__
++#include <linux/errqueue.h>
++#endif
 +
 +#include <hev-task.h>
 +#include "hev-icmp-engine.h"
@@ -39,6 +42,9 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +    int fd[2];
 +    uint16_t identifier[2];
 +    uint32_t next_sequence;
++#ifdef __linux__
++    uint64_t error_generation[2];
++#endif
 +    size_t requests;
 +    size_t bytes;
 +    HevIcmpRequest **slots;
@@ -300,6 +306,15 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +#else
 +    if (!index && setsockopt (fd, IPPROTO_IP, IP_PKTINFO, &one, sizeof (one)))
 +        goto fail;
++    if (setsockopt (fd, index ? IPPROTO_IPV6 : IPPROTO_IP,
++                    index ? IPV6_RECVERR : IP_RECVERR, &one, sizeof (one)))
++        goto fail;
++#if defined(IP_RECVERR_RFC4884) && defined(IPV6_RECVERR_RFC4884)
++    /* Older kernels need not expose the optional extension boundary. */
++    setsockopt (fd, index ? IPPROTO_IPV6 : IPPROTO_IP,
++                index ? IPV6_RECVERR_RFC4884 : IP_RECVERR_RFC4884, &one,
++                sizeof (one));
++#endif
 +#endif
 +    if (index &&
 +        setsockopt (fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, &one, sizeof (one)))
@@ -338,7 +353,23 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +{
 +    int index = r->destination.ss_family == AF_INET6;
 +    ssize_t n;
-+    int res;
++    int res, retry = 0;
++    r->error_origin = HEV_ICMP_ERROR_LOCAL;
++#ifdef __linux__
++    if (r->send_error) {
++        res = r->send_error;
++        r->send_error = 0;
++        if (r->error_snapshot == e->error_generation[index])
++            return -res;
++        /* Reuse this unaccepted identity only for an immediate retry. A
++         * direct caller may have sent another request or rotated sockets
++         * meanwhile; then allocate from the current sequence space. */
++        retry = e->fd[index] >= 0 &&
++                read16 (r->echo + 4) == e->identifier[index] &&
++                e->next_sequence == (uint32_t)r->sequence + 1 &&
++                !e->slots[r->sequence];
++    }
++#endif
 +    if (e->requests >= HEV_ICMP_REQUEST_LIMIT ||
 +        r->len > HEV_ICMP_BYTE_LIMIT - e->bytes)
 +        return -EAGAIN;
@@ -353,7 +384,7 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +            return -ENOMEM;
 +        }
 +    }
-+    if (e->next_sequence == ICMP_SLOTS) {
++    if (!retry && e->next_sequence == ICMP_SLOTS) {
 +        if (e->first)
 +            return HEV_ICMP_DEFERRED;
 +        close_sockets (e);
@@ -366,7 +397,8 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +        if (res < 0)
 +            return res;
 +    }
-+    r->sequence = e->next_sequence++;
++    if (!retry)
++        r->sequence = e->next_sequence++;
 +    write16 (r->echo + 4, e->identifier[index]);
 +    write16 (r->echo + 6, r->sequence);
 +    write16 (r->echo + 2, 0);
@@ -376,11 +408,23 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +        n = sendto (e->fd[index], r->echo, r->len, 0, (void *)&r->destination,
 +                    r->destination_len);
 +    } while (n < 0 && errno == EINTR);
++#ifdef __linux__
++    if (n < 0) {
++        /* An older request's queued error can fail this send. Poll outside
++         * the server admission lock before deciding whether to retry it.
++         * With no newly consumed asynchronous error, preserve the local
++         * errno after exactly one worker yield, including EAGAIN/EBUSY. */
++        r->send_error = errno;
++        r->error_snapshot = e->error_generation[index];
++        return HEV_ICMP_RETRY;
++    }
++#endif
 +    if (n > 0 && e->observer)
 +        e->observer ((void *)&r->destination, r->destination_len, n, 1,
 +                     e->context);
 +    if (n != (ssize_t)r->len)
 +        return n < 0 ? -errno : -EIO;
++    r->error_origin = HEV_ICMP_ERROR_NONE;
 +    r->deadline = hev_icmp_now () + r->timeout;
 +    r->next = e->first;
 +    if (e->first)
@@ -398,6 +442,11 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +          const struct sockaddr *local, socklen_t llen,
 +          const unsigned char *echo, size_t len)
 +{
++    if (error && !r->error_origin)
++        r->error_origin = error == ETIMEDOUT ? HEV_ICMP_ERROR_TIMEOUT :
++                          error == ECANCELED ? HEV_ICMP_ERROR_CANCELLED :
++                          error == ESHUTDOWN ? HEV_ICMP_ERROR_SHUTDOWN :
++                                               HEV_ICMP_ERROR_LOCAL;
 +    if (r->prev)
 +        r->prev->next = r->next;
 +    else
@@ -411,12 +460,330 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +    free (r);
 +}
 +
++static void receive_family (HevIcmpEngine *e, int index, HevIcmpActive active);
++
++static int
++network_errno (int index, unsigned int type, unsigned int code)
++{
++    if (!index) {
++        if (type == 3) {
++            if (code == 4)
++                return EMSGSIZE;
++            if (code == 3)
++                return ECONNREFUSED;
++            if (code == 2)
++                return EPROTONOSUPPORT;
++            if (code == 9 || code == 10 || code == 13 || code == 15)
++                return EACCES;
++            return code == 0 || code == 6 || code == 11 ? ENETUNREACH :
++                                                          EHOSTUNREACH;
++        }
++        if (type == 11 && code <= 1)
++            return EHOSTUNREACH;
++        if (type == 12)
++            return EPROTO;
++    } else {
++        if (type == 1) {
++            if (code == 4)
++                return ECONNREFUSED;
++            if (code == 1 || code == 5 || code == 6)
++                return EACCES;
++            return code == 0 ? ENETUNREACH : EHOSTUNREACH;
++        }
++        if (type == 2 && !code)
++            return EMSGSIZE;
++        if (type == 3 && code <= 1)
++            return EHOSTUNREACH;
++        if (type == 4)
++            return EPROTO;
++    }
++    return 0;
++}
++
++static HevIcmpRequest *
++quoted_request (HevIcmpEngine *e, int index, const struct sockaddr *target,
++                socklen_t target_len, const unsigned char *echo, size_t len)
++{
++    struct sockaddr_storage normalized;
++    HevIcmpRequest *r;
++    if (len < 8 || echo[0] != (index ? 128 : 8) || echo[1] ||
++        read16 (echo + 4) != e->identifier[index])
++        return NULL;
++    r = e->slots[read16 (echo + 6)];
++    if (!r || r->destination.ss_family != (index ? AF_INET6 : AF_INET) ||
++        hev_icmp_address (&normalized, target, target_len) <= 0 ||
++        memcmp (&normalized, &r->destination, sizeof (normalized)))
++        return NULL;
++    /* A quote may end after the mandatory Echo header. Padding and ICMP
++     * extension objects beyond the original Echo are not its payload. */
++    if (len > r->len)
++        len = r->len;
++    return memcmp (echo + 8, r->echo + 8, len - 8) ? NULL : r;
++}
++
 +static void
-+receive_family (HevIcmpEngine *e, int index)
++received_error (HevIcmpEngine *e, HevIcmpRequest *r, int error, int origin,
++                unsigned int type, unsigned int code, uint32_t info,
++                const struct sockaddr *peer, socklen_t plen,
++                const struct sockaddr *local, socklen_t llen,
++                HevIcmpActive active)
++{
++    if (!active (r->context)) {
++        complete (e, r, ECANCELED, NULL, 0, NULL, 0, NULL, 0);
++        return;
++    }
++    if (hev_icmp_now () >= r->deadline) {
++        complete (e, r, ETIMEDOUT, NULL, 0, NULL, 0, NULL, 0);
++        return;
++    }
++    r->error_origin = origin;
++    r->icmp_type = type;
++    r->icmp_code = code;
++    r->icmp_info = info;
++    if (r->source_len) {
++        local = (void *)&r->source;
++        llen = r->source_len;
++    }
++    complete (e, r, error, peer, plen, local, llen, NULL, 0);
++}
++
++static socklen_t
++received_local (struct msghdr *msg, int index, struct sockaddr_storage *local,
++                unsigned int *interface)
++{
++    struct cmsghdr *c;
++    socklen_t len = 0;
++    for (c = CMSG_FIRSTHDR (msg); c; c = CMSG_NXTHDR (msg, c)) {
++        if (c->cmsg_len < CMSG_LEN (0) ||
++            c->cmsg_len > (size_t)((unsigned char *)msg->msg_control +
++                                   msg->msg_controllen - (unsigned char *)c))
++            break;
++        if (index && c->cmsg_level == IPPROTO_IPV6 &&
++            c->cmsg_type == IPV6_PKTINFO &&
++            c->cmsg_len >= CMSG_LEN (sizeof (struct in6_pktinfo))) {
++            struct in6_pktinfo pi;
++            struct sockaddr_in6 *a = (void *)local;
++            memcpy (&pi, CMSG_DATA (c), sizeof (pi));
++            a->sin6_family = AF_INET6;
++            a->sin6_addr = pi.ipi6_addr;
++            *interface = pi.ipi6_ifindex;
++            if (IN6_IS_ADDR_LINKLOCAL (&a->sin6_addr))
++                a->sin6_scope_id = *interface;
++            len = sizeof (*a);
++        }
++#ifdef __APPLE__
++        if (!index && c->cmsg_level == IPPROTO_IP &&
++            c->cmsg_type == IP_RECVDSTADDR &&
++            c->cmsg_len >= CMSG_LEN (sizeof (struct in_addr))) {
++            struct sockaddr_in *a = (void *)local;
++            a->sin_family = AF_INET;
++            memcpy (&a->sin_addr, CMSG_DATA (c), sizeof (a->sin_addr));
++            len = sizeof (*a);
++        }
++#else
++        if (!index && c->cmsg_level == IPPROTO_IP &&
++            c->cmsg_type == IP_PKTINFO &&
++            c->cmsg_len >= CMSG_LEN (sizeof (struct in_pktinfo))) {
++            struct in_pktinfo pi;
++            struct sockaddr_in *a = (void *)local;
++            memcpy (&pi, CMSG_DATA (c), sizeof (pi));
++            a->sin_family = AF_INET;
++            a->sin_addr = pi.ipi_addr;
++            *interface = pi.ipi_ifindex;
++            len = sizeof (*a);
++        }
++#endif
++    }
++    return len;
++}
++
++static void
++packet_error (HevIcmpEngine *e, int index, const unsigned char *buf, size_t len,
++              const struct sockaddr *peer, socklen_t plen,
++              const struct sockaddr *local, socklen_t llen,
++              unsigned int interface, HevIcmpActive active)
++{
++    struct sockaddr_storage target = { 0 };
++    const unsigned char *ip = buf + 8;
++    size_t quote = len - 8, offset, declared;
++    socklen_t target_len;
++    HevIcmpRequest *r;
++    uint32_t info = 0;
++    int error = network_errno (index, buf[0], buf[1]);
++    if (!error)
++        return;
++    /* RFC 4884's explicit quote length excludes extension objects. */
++    declared = !index                     ? (size_t)buf[5] * 4 :
++               buf[0] == 1 || buf[0] == 3 ? (size_t)buf[4] * 8 :
++                                            0;
++    if (declared) {
++        if (declared < 128 || declared > quote)
++            return;
++        quote = declared;
++    }
++    if (!index) {
++        struct sockaddr_in *a = (void *)&target;
++        uint16_t total;
++        if (quote < 28 || (ip[0] >> 4) != 4 || ip[9] != IPPROTO_ICMP)
++            return;
++        offset = (ip[0] & 15) * 4;
++#ifdef __APPLE__
++        /* XNU validates the ICMP checksum, then changes the quoted ip_len
++         * to host order before handing the message to datagram sockets. */
++        memcpy (&total, ip + 2, sizeof (total));
++#else
++        if (hev_icmp_checksum (buf, len))
++            return;
++        total = read16 (ip + 2);
++#endif
++        if (offset < 20 || quote < offset + 8 || total < offset + 8 ||
++            (read16 (ip + 6) & 0x1fff))
++            return;
++        if (quote > total)
++            quote = total;
++        a->sin_family = AF_INET;
++        memcpy (&a->sin_addr, ip + 16, 4);
++        target_len = sizeof (*a);
++        if (buf[0] == 3 && buf[1] == 4)
++            info = read16 (buf + 6);
++        else if (buf[0] == 12)
++            info = buf[4];
++    } else {
++        struct sockaddr_in6 *a = (void *)&target;
++        unsigned int next, count = 0;
++        if (quote < 48 || (ip[0] >> 4) != 6 || !llen ||
++            local->sa_family != AF_INET6)
++            return;
++        if (checksum6 ((const void *)peer, (const void *)local, buf, len))
++            return;
++        declared = 40U + read16 (ip + 4);
++        if (quote > declared)
++            quote = declared;
++        next = ip[6];
++        offset = 40;
++        while (next != IPPROTO_ICMPV6) {
++            size_t step;
++            if (++count > 8 || quote < offset + 2)
++                return;
++            if (next == IPPROTO_FRAGMENT) {
++                if (quote < offset + 8 || (read16 (ip + offset + 2) & 0xfff8))
++                    return;
++                step = 8;
++            } else if (next == IPPROTO_AH) {
++                step = ((size_t)ip[offset + 1] + 2) * 4;
++            } else if (next == IPPROTO_HOPOPTS || next == IPPROTO_ROUTING ||
++                       next == IPPROTO_DSTOPTS) {
++                step = ((size_t)ip[offset + 1] + 1) * 8;
++            } else {
++                return;
++            }
++            if (step > quote - offset)
++                return;
++            next = ip[offset];
++            offset += step;
++        }
++        if (quote < offset + 8)
++            return;
++        a->sin6_family = AF_INET6;
++        memcpy (&a->sin6_addr, ip + 24, 16);
++        if (IN6_IS_ADDR_LINKLOCAL (&a->sin6_addr))
++            a->sin6_scope_id = interface;
++        target_len = sizeof (*a);
++        if (buf[0] == 2 || buf[0] == 4)
++            info = ((uint32_t)read16 (buf + 4) << 16) | read16 (buf + 6);
++    }
++    r = quoted_request (e, index, (void *)&target, target_len, ip + offset,
++                        quote - offset);
++    if (r)
++        received_error (e, r, error, HEV_ICMP_ERROR_RECEIVED, buf[0], buf[1],
++                        info, peer, plen, local, llen, active);
++}
++
++#ifdef __linux__
++static void
++queued_error (HevIcmpEngine *e, int index, struct msghdr *msg, size_t len,
++              size_t capacity, HevIcmpActive active)
++{
++    struct cmsghdr *c;
++    for (c = CMSG_FIRSTHDR (msg); c; c = CMSG_NXTHDR (msg, c)) {
++        struct sock_extended_err err;
++        struct sockaddr_storage offender;
++        const struct sockaddr *peer = NULL;
++        socklen_t plen = 0;
++        HevIcmpRequest *r;
++        uint32_t info = 0;
++        int network;
++        if (c->cmsg_len < CMSG_LEN (0) ||
++            c->cmsg_len > (size_t)((unsigned char *)msg->msg_control +
++                                   msg->msg_controllen - (unsigned char *)c))
++            return;
++        if (c->cmsg_level != (index ? IPPROTO_IPV6 : IPPROTO_IP) ||
++            c->cmsg_type != (index ? IPV6_RECVERR : IP_RECVERR) ||
++            c->cmsg_len < CMSG_LEN (sizeof (err)))
++            continue;
++        memcpy (&err, CMSG_DATA (c), sizeof (err));
++        network = err.ee_origin ==
++                  (index ? SO_EE_ORIGIN_ICMP6 : SO_EE_ORIGIN_ICMP);
++        if (!network && err.ee_origin != SO_EE_ORIGIN_LOCAL)
++            return;
++        if (network) {
++            int normalized;
++            const void *address = CMSG_DATA (c) + sizeof (err);
++            size_t available = c->cmsg_len - CMSG_LEN (sizeof (err));
++            normalized = hev_icmp_address (&offender, address, available);
++            if (normalized > 0 &&
++                offender.ss_family == (index ? AF_INET6 : AF_INET)) {
++                peer = (void *)&offender;
++                plen = normalized;
++            }
++            e->error_generation[index]++;
++            if (len && e->observer)
++                e->observer (peer, plen, len > capacity ? capacity : len, 0,
++                             e->context);
++        }
++        if (len > capacity || (msg->msg_flags & (MSG_TRUNC | MSG_CTRUNC)) ||
++            !err.ee_errno || err.ee_errno > 4095 ||
++            (network && !network_errno (index, err.ee_type, err.ee_code)))
++            return;
++#ifdef SO_EE_RFC4884_FLAG_INVALID
++        if (network && err.ee_rfc4884.len) {
++            if (err.ee_rfc4884.len > len)
++                return;
++            len = err.ee_rfc4884.len;
++        }
++#endif
++        r = quoted_request (e, index, msg->msg_name, msg->msg_namelen,
++                            e->receive, len);
++        if (!r)
++            return;
++        if (!network)
++            e->error_generation[index]++;
++        /* Some kernels expose the reserved/RFC 4884 union for other
++         * types. Only MTU and parameter-pointer fields have API meaning. */
++        if (network && (index ? err.ee_type == 2 || err.ee_type == 4 :
++                                (err.ee_type == 3 && err.ee_code == 4) ||
++                                    err.ee_type == 12))
++            info = err.ee_info;
++        received_error (e, r, err.ee_errno,
++                        network ? HEV_ICMP_ERROR_RECEIVED :
++                                  HEV_ICMP_ERROR_LOCAL,
++                        network ? err.ee_type : 0, network ? err.ee_code : 0,
++                        info, peer, plen, NULL, 0, active);
++        return;
++    }
++}
++#endif
++
++static void
++receive_family (HevIcmpEngine *e, int index, HevIcmpActive active)
 +{
 +#if defined(__linux__) || defined(__APPLE__)
-+    unsigned int i;
-+    for (i = 0; e->fd[index] >= 0 && i < ICMP_DRAIN; i++) {
++    unsigned int i = 0;
++    int flags = MSG_DONTWAIT;
++#ifdef __linux__
++    flags |= MSG_ERRQUEUE;
++#endif
++    while (e->fd[index] >= 0 && i < ICMP_DRAIN) {
 +        struct sockaddr_storage peer = { 0 }, local = { 0 }, normalized;
 +        union
 +        {
@@ -425,9 +792,9 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +        } control;
 +        struct iovec iov = { e->receive, 65535 };
 +        struct msghdr msg = { 0 };
-+        struct cmsghdr *c;
 +        HevIcmpRequest *r;
 +        socklen_t plen, llen = 0;
++        unsigned int interface = 0;
 +        unsigned char *buf = e->receive;
 +        ssize_t n;
 +        msg.msg_name = &peer;
@@ -437,10 +804,28 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +        msg.msg_control = control.bytes;
 +        msg.msg_controllen = sizeof (control.bytes);
 +        do {
-+            n = recvmsg (e->fd[index], &msg, MSG_DONTWAIT);
++            n = recvmsg (e->fd[index], &msg, flags);
 +        } while (n < 0 && errno == EINTR);
-+        if (n < 0)
++        if (n < 0) {
++#ifdef __linux__
++            if (flags & MSG_ERRQUEUE) {
++                flags = MSG_DONTWAIT;
++                continue;
++            }
++#endif
 +            break;
++        }
++        i++;
++        if (msg.msg_controllen > sizeof (control.bytes)) {
++            msg.msg_controllen = sizeof (control.bytes);
++            msg.msg_flags |= MSG_CTRUNC;
++        }
++#ifdef __linux__
++        if (flags & MSG_ERRQUEUE) {
++            queued_error (e, index, &msg, n, iov.iov_len, active);
++            continue;
++        }
++#endif
 +        plen = msg.msg_namelen;
 +        if (n > 0 && e->observer)
 +            e->observer ((void *)&peer, plen,
@@ -448,54 +833,27 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +                         e->context);
 +        if (n < 8 || (size_t)n > iov.iov_len ||
 +            (msg.msg_flags & (MSG_TRUNC | MSG_CTRUNC)) ||
-+            buf[0] != (index ? 129 : 0) || buf[1] ||
-+            read16 (buf + 4) != e->identifier[index])
++            hev_icmp_address (&normalized, (void *)&peer, plen) <= 0 ||
++            normalized.ss_family != (index ? AF_INET6 : AF_INET))
++            continue;
++        llen = received_local (&msg, index, &local, &interface);
++        if (buf[0] != (index ? 129 : 0)) {
++            packet_error (e, index, buf, n, (void *)&normalized, plen,
++                          (void *)&local, llen, interface, active);
++            continue;
++        }
++        if (buf[1] || read16 (buf + 4) != e->identifier[index])
 +            continue;
 +        r = e->slots[read16 (buf + 6)];
 +        if (!r || n != (ssize_t)r->len ||
-+            hev_icmp_address (&normalized, (void *)&peer, plen) <= 0 ||
 +            memcmp (&normalized, &r->destination, sizeof (normalized)) ||
 +            memcmp (buf + 8, r->echo + 8, n - 8) ||
 +            (!index && hev_icmp_checksum (buf, n)))
 +            continue;
-+        if (hev_icmp_now () >= r->deadline) {
-+            complete (e, r, ETIMEDOUT, NULL, 0, NULL, 0, NULL, 0);
++        if (!active (r->context) || hev_icmp_now () >= r->deadline) {
++            int error = active (r->context) ? ETIMEDOUT : ECANCELED;
++            complete (e, r, error, NULL, 0, NULL, 0, NULL, 0);
 +            continue;
-+        }
-+        for (c = CMSG_FIRSTHDR (&msg); c; c = CMSG_NXTHDR (&msg, c)) {
-+            if (index && c->cmsg_level == IPPROTO_IPV6 &&
-+                c->cmsg_type == IPV6_PKTINFO &&
-+                c->cmsg_len >= CMSG_LEN (sizeof (struct in6_pktinfo))) {
-+                struct in6_pktinfo pi;
-+                struct sockaddr_in6 *a = (void *)&local;
-+                memcpy (&pi, CMSG_DATA (c), sizeof (pi));
-+                a->sin6_family = AF_INET6;
-+                a->sin6_addr = pi.ipi6_addr;
-+                if (IN6_IS_ADDR_LINKLOCAL (&a->sin6_addr))
-+                    a->sin6_scope_id = pi.ipi6_ifindex;
-+                llen = sizeof (*a);
-+            }
-+#ifdef __APPLE__
-+            if (!index && c->cmsg_level == IPPROTO_IP &&
-+                c->cmsg_type == IP_RECVDSTADDR &&
-+                c->cmsg_len >= CMSG_LEN (sizeof (struct in_addr))) {
-+                struct sockaddr_in *a = (void *)&local;
-+                a->sin_family = AF_INET;
-+                memcpy (&a->sin_addr, CMSG_DATA (c), sizeof (a->sin_addr));
-+                llen = sizeof (*a);
-+            }
-+#else
-+            if (!index && c->cmsg_level == IPPROTO_IP &&
-+                c->cmsg_type == IP_PKTINFO &&
-+                c->cmsg_len >= CMSG_LEN (sizeof (struct in_pktinfo))) {
-+                struct in_pktinfo pi;
-+                struct sockaddr_in *a = (void *)&local;
-+                memcpy (&pi, CMSG_DATA (c), sizeof (pi));
-+                a->sin_family = AF_INET;
-+                a->sin_addr = pi.ipi_addr;
-+                llen = sizeof (*a);
-+            }
-+#endif
 +        }
 +        if (r->source_len) {
 +            local = r->source;
@@ -514,6 +872,7 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +#else
 +    (void)e;
 +    (void)index;
++    (void)active;
 +#endif
 +}
 +
@@ -522,8 +881,8 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +{
 +    HevIcmpRequest *r, *next;
 +    uint64_t now;
-+    receive_family (e, 0);
-+    receive_family (e, 1);
++    receive_family (e, 0, active);
++    receive_family (e, 1, active);
 +    now = hev_icmp_now ();
 +    for (r = e->first; r; r = next) {
 +        int error = active (r->context) ? 0 : ECANCELED;
@@ -562,10 +921,10 @@ index 0000000000000000000000000000000000000000..8059e4ff9ff2c85a5fb855f87f347bbf
 +}
 diff --git a/src/hev-icmp-engine.h b/src/hev-icmp-engine.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..16434d91333653b3875a5c106ca3470b6b975e81
+index 0000000000000000000000000000000000000000..75d08ffa914816937380af43ad68d18b271ac272
 --- /dev/null
 +++ b/src/hev-icmp-engine.h
-@@ -0,0 +1,65 @@
+@@ -0,0 +1,86 @@
 +/* ICMP Echo socket engine. Single native task owns every engine operation. */
 +#ifndef HEV_ICMP_ENGINE_H
 +#define HEV_ICMP_ENGINE_H
@@ -575,8 +934,19 @@ index 0000000000000000000000000000000000000000..16434d91333653b3875a5c106ca3470b
 +#include <sys/socket.h>
 +
 +#define HEV_ICMP_DEFERRED 1
++#define HEV_ICMP_RETRY 2
 +#define HEV_ICMP_REQUEST_LIMIT 4096U
 +#define HEV_ICMP_BYTE_LIMIT (16U * 1024U * 1024U)
++
++enum
++{
++    HEV_ICMP_ERROR_NONE,
++    HEV_ICMP_ERROR_LOCAL,
++    HEV_ICMP_ERROR_RECEIVED,
++    HEV_ICMP_ERROR_TIMEOUT,
++    HEV_ICMP_ERROR_CANCELLED,
++    HEV_ICMP_ERROR_SHUTDOWN,
++};
 +
 +typedef struct _HevIcmpEngine HevIcmpEngine;
 +typedef struct _HevIcmpRequest HevIcmpRequest;
@@ -604,6 +974,14 @@ index 0000000000000000000000000000000000000000..16434d91333653b3875a5c106ca3470b
 +    uint32_t timeout;
 +    uint16_t sequence;
 +    unsigned char original[4];
++    unsigned char icmp_type;
++    unsigned char icmp_code;
++    int error_origin;
++    uint32_t icmp_info;
++#ifdef __linux__
++    int send_error;
++    uint64_t error_snapshot;
++#endif
 +    void *context;
 +    unsigned char echo[];
 +};
@@ -624,7 +1002,9 @@ index 0000000000000000000000000000000000000000..16434d91333653b3875a5c106ca3470b
 +                                    HevIcmpCompletion completion,
 +                                    void *context);
 +/* Zero transfers ownership. DEFERRED means rollover awaits pending requests;
-+ * it has not sent. DEFERRED or negative errno leaves ownership with caller. */
++ * it has not sent. RETRY also has not sent: poll outside the admission lock,
++ * then promptly call send again. Either positive outcome or negative errno
++ * leaves request ownership with the caller. */
 +int hev_icmp_engine_send (HevIcmpEngine *engine, HevIcmpRequest *request);
 +void hev_icmp_engine_poll (HevIcmpEngine *engine, HevIcmpActive active);
 +int hev_icmp_engine_timeout (HevIcmpEngine *engine);

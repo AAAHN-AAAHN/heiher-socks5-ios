@@ -20,6 +20,8 @@ typedef struct
     atomic_int replies;
     atomic_int errors;
     atomic_int last_error;
+    atomic_int last_origin;
+    atomic_int last_type;
     uint64_t id;
     size_t size;
     const unsigned char *payload;
@@ -84,9 +86,13 @@ callback (const HevSocks5IcmpResult *r, void *context)
     assert (r->request_id == c->id);
     if (r->event == HEV_SOCKS5_ICMP_SENT) {
         assert (!r->error && r->echo_len == c->size);
+        assert (!r->error_origin && !r->icmp_type && !r->icmp_code &&
+                !r->icmp_info);
         atomic_fetch_add (&c->sent, 1);
     } else if (r->event == HEV_SOCKS5_ICMP_REPLY) {
         assert (!r->error && r->echo && r->echo_len == c->size);
+        assert (!r->error_origin && !r->icmp_type && !r->icmp_code &&
+                !r->icmp_info);
         assert (r->source_len && r->destination_len);
         if (c->original_source) {
             struct in6_addr expected;
@@ -112,7 +118,12 @@ callback (const HevSocks5IcmpResult *r, void *context)
         atomic_fetch_add (&c->replies, 1);
     } else {
         assert (r->event == HEV_SOCKS5_ICMP_ERROR && r->error);
+        assert (!r->echo && !r->echo_len && r->error_origin);
+        if (r->error_origin != HEV_SOCKS5_ICMP_ERROR_RECEIVED)
+            assert (!r->icmp_type && !r->icmp_code && !r->icmp_info);
         atomic_store (&c->last_error, r->error);
+        atomic_store (&c->last_origin, r->error_origin);
+        atomic_store (&c->last_type, r->icmp_type);
         atomic_fetch_add (&c->errors, 1);
     }
 }
@@ -322,6 +333,80 @@ extern atomic_int icmp_test_suppress, icmp_test_send_error;
 extern atomic_int icmp_test_truncate, icmp_test_wrong_id;
 extern atomic_int icmp_test_open_error, icmp_test_short_send;
 extern atomic_int icmp_test_opened, icmp_test_live, icmp_test_defer;
+extern atomic_int icmp_test_capture_error, icmp_test_cross_error;
+
+static void
+asynchronous_error_case (int family)
+{
+    struct sockaddr_storage destination = { 0 };
+    socklen_t len;
+    HevSocks5IcmpClient *clients[3];
+    Client results[3] = { { .id = 0x12345678, .size = 8 },
+                          { .id = 0x12345678, .size = 8 },
+                          { .id = 0x12345678, .size = 8 } };
+    uint64_t generation = start ();
+    uint64_t began;
+    if (family == AF_INET) {
+        struct sockaddr_in *a = (void *)&destination;
+        a->sin_family = family;
+        inet_pton (family, "127.0.0.1", &a->sin_addr);
+        len = sizeof (*a);
+    } else {
+        struct sockaddr_in6 *a = (void *)&destination;
+        a->sin6_family = family;
+        inet_pton (family, "::1", &a->sin6_addr);
+        len = sizeof (*a);
+    }
+    for (unsigned int i = 0; i < 3; i++) {
+        clients[i] = hev_socks5_server_icmp_client_new (generation, callback,
+                                                        &results[i]);
+        assert (clients[i]);
+    }
+    atomic_store (&icmp_test_suppress, 1);
+    atomic_store (&icmp_test_capture_error, 1);
+    assert (!hev_socks5_server_icmp_ping (clients[0], results[0].id,
+                                          (void *)&destination, len, 60000));
+    for (unsigned int i = 0; i < 2000 && !atomic_load (&results[0].sent); i++)
+        usleep (1000);
+    assert (atomic_load (&results[0].sent) == 1);
+    assert (!hev_socks5_server_icmp_ping (clients[2], results[2].id,
+                                          (void *)&destination, len, 60000));
+    for (unsigned int i = 0; i < 2000 && !atomic_load (&results[2].sent); i++)
+        usleep (1000);
+    assert (atomic_load (&results[2].sent) == 1);
+    atomic_store (&icmp_test_suppress, 0);
+    atomic_store (&icmp_test_cross_error, 1);
+    began = hev_icmp_now ();
+    assert (!hev_socks5_server_icmp_ping (clients[1], results[1].id,
+                                          (void *)&destination, len, 1000));
+    for (unsigned int i = 0; i < 2000 && !atomic_load (&results[1].replies);
+         i++)
+        usleep (1000);
+    assert (hev_icmp_now () - began < 2000);
+    assert (atomic_load (&results[0].errors) == 1 &&
+            !atomic_load (&results[0].replies));
+    assert (atomic_load (&results[0].last_origin) ==
+            HEV_SOCKS5_ICMP_ERROR_RECEIVED);
+    assert (atomic_load (&results[0].last_type) ==
+            (family == AF_INET ? 11 : 3));
+    assert (atomic_load (&results[1].sent) == 1 &&
+            atomic_load (&results[1].replies) == 1);
+    assert (!atomic_load (&results[1].errors) &&
+            !atomic_load (&results[2].errors));
+    assert (!atomic_load (&results[2].replies));
+    hev_socks5_server_icmp_cancel (clients[2]);
+    for (unsigned int i = 0; i < 2000 && !atomic_load (&results[2].errors); i++)
+        usleep (1000);
+    assert (atomic_load (&results[2].errors) == 1);
+    assert (atomic_load (&results[2].last_origin) ==
+            HEV_SOCKS5_ICMP_ERROR_CANCELLED);
+    for (unsigned int i = 0; i < 3; i++)
+        hev_socks5_server_icmp_client_free (clients[i]);
+    stop ();
+    assert (!atomic_load (&icmp_test_live));
+    puts (
+        "PASS public server: old request ICMP error cannot fail/delay a new send behind an unrelated 60-second request");
+}
 
 static void
 fault_case (int fault)
@@ -336,10 +421,13 @@ fault_case (int fault)
     echo[2] = checksum >> 8;
     echo[3] = checksum;
     inet_pton (AF_INET, "127.0.0.1", &dst.sin_addr);
-    int send_error = fault == 0 ? EACCES :
-                     fault == 6 ? EAGAIN :
-                     fault == 7 ? EBUSY :
-                                  0;
+    int send_error = fault == 0  ? EACCES :
+                     fault == 6  ? EAGAIN :
+                     fault == 7  ? EBUSY :
+                     fault == 8  ? ETIMEDOUT :
+                     fault == 9  ? ECANCELED :
+                     fault == 10 ? ESHUTDOWN :
+                                   0;
     atomic_store (&icmp_test_send_error, send_error);
     atomic_store (&icmp_test_suppress, fault == 1);
     atomic_store (&icmp_test_wrong_id, fault == 2);
@@ -358,6 +446,9 @@ fault_case (int fault)
                                             fault == 4 ? EACCES :
                                             fault == 5 ? EIO :
                                                          ETIMEDOUT));
+    assert (atomic_load (&c.last_origin) == (fault > 0 && fault < 4 ?
+                                                 HEV_SOCKS5_ICMP_ERROR_TIMEOUT :
+                                                 HEV_SOCKS5_ICMP_ERROR_LOCAL));
     assert (atomic_load (&tx) - before_tx == (fault > 0 && fault < 4 ? c.size :
                                               fault == 5             ? 4 :
                                                                        0));
@@ -474,8 +565,10 @@ main (void)
     cancel_and_bound (8);
     cancel_and_bound (65508);
 #ifdef ICMP_TEST_IO
-    for (i = 0; i < 8; i++)
+    for (i = 0; i < 11; i++)
         fault_case (i);
+    asynchronous_error_case (AF_INET);
+    asynchronous_error_case (AF_INET6);
     run_engine_checks ();
 #endif
     assert (!hev_socks5_server_icmp_set_io_observer (NULL, NULL));

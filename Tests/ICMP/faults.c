@@ -10,6 +10,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <linux/errqueue.h>
 
 #include "hev-icmp-engine.h"
 
@@ -17,6 +18,10 @@ typedef struct
 {
     int family;
     int peer;
+    unsigned char failed_echo[8];
+    struct sockaddr_storage failed_target;
+    socklen_t target_len;
+    int error_ready;
 } Endpoint;
 static Endpoint endpoints[4096];
 atomic_int icmp_test_suppress;
@@ -28,6 +33,8 @@ atomic_int icmp_test_short_send;
 atomic_int icmp_test_defer;
 atomic_int icmp_test_opened;
 atomic_int icmp_test_live;
+atomic_int icmp_test_capture_error;
+atomic_int icmp_test_cross_error;
 
 int __real_socket (int, int, int);
 int __real_close (int);
@@ -68,6 +75,7 @@ __wrap_socket (int family, int type, int protocol)
     if (socketpair (AF_UNIX, SOCK_DGRAM, 0, pair))
         return -1;
     assert (pair[0] < 4096);
+    memset (&endpoints[pair[0]], 0, sizeof (endpoints[pair[0]]));
     endpoints[pair[0]].family = family;
     endpoints[pair[0]].peer = pair[1];
     atomic_fetch_add (&icmp_test_opened, 1);
@@ -128,6 +136,12 @@ __wrap_sendto (int fd, const void *data, size_t len, int flags,
     uint16_t checksum;
     if (!e)
         return __real_sendto (fd, data, len, flags, addr, addrlen);
+    if (atomic_exchange (&icmp_test_cross_error, 0)) {
+        assert (e->target_len);
+        e->error_ready = 1;
+        errno = EHOSTUNREACH;
+        return -1;
+    }
     if (atomic_load (&icmp_test_send_error)) {
         errno = atomic_load (&icmp_test_send_error);
         return -1;
@@ -138,6 +152,12 @@ __wrap_sendto (int fd, const void *data, size_t len, int flags,
     assert (in[4] == 0xbe && in[5] == 0xef); /* Kernel-selected identifier. */
     if (e->family == AF_INET)
         assert (!hev_icmp_checksum (in, len));
+    if (atomic_exchange (&icmp_test_capture_error, 0)) {
+        assert (len == sizeof (e->failed_echo));
+        memcpy (e->failed_echo, data, sizeof (e->failed_echo));
+        memcpy (&e->failed_target, addr, addrlen);
+        e->target_len = addrlen;
+    }
     if (atomic_load (&icmp_test_suppress))
         return len;
     reply = malloc (len);
@@ -165,6 +185,41 @@ __wrap_recvmsg (int fd, struct msghdr *message, int flags)
     ssize_t n;
     if (!e)
         return __real_recvmsg (fd, message, flags);
+    if (flags & MSG_ERRQUEUE) {
+        struct sock_extended_err error = { 0 };
+        struct sockaddr_storage offender = { 0 };
+        if (!e->error_ready) {
+            errno = EAGAIN;
+            return -1;
+        }
+        e->error_ready = 0;
+        error.ee_errno = EHOSTUNREACH;
+        error.ee_origin = e->family == AF_INET ? SO_EE_ORIGIN_ICMP :
+                                                 SO_EE_ORIGIN_ICMP6;
+        error.ee_type = e->family == AF_INET ? 11 : 3;
+        offender.ss_family = e->family;
+        if (e->family == AF_INET)
+            inet_pton (AF_INET, "127.0.0.254",
+                       &((struct sockaddr_in *)&offender)->sin_addr);
+        else
+            inet_pton (AF_INET6, "::2",
+                       &((struct sockaddr_in6 *)&offender)->sin6_addr);
+        assert (message->msg_iov->iov_len >= 8);
+        memcpy (message->msg_iov->iov_base, e->failed_echo, 8);
+        memcpy (message->msg_name, &e->failed_target, e->target_len);
+        message->msg_namelen = e->target_len;
+        c = CMSG_FIRSTHDR (message);
+        assert (c && message->msg_controllen >=
+                         CMSG_SPACE (sizeof (error) + e->target_len));
+        c->cmsg_level = e->family == AF_INET ? IPPROTO_IP : IPPROTO_IPV6;
+        c->cmsg_type = e->family == AF_INET ? IP_RECVERR : IPV6_RECVERR;
+        c->cmsg_len = CMSG_LEN (sizeof (error) + e->target_len);
+        memcpy (CMSG_DATA (c), &error, sizeof (error));
+        memcpy (CMSG_DATA (c) + sizeof (error), &offender, e->target_len);
+        message->msg_controllen = CMSG_SPACE (sizeof (error) + e->target_len);
+        message->msg_flags = MSG_ERRQUEUE;
+        return 8;
+    }
     real = *message;
     real.msg_name = NULL;
     real.msg_namelen = 0;
