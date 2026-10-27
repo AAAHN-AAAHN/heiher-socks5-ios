@@ -33,3 +33,22 @@ with tempfile.TemporaryDirectory(prefix="icmp-native-") as temp:
         subprocess.run(command + ["-o", str(binary)], check=True)
         print(f"Running {mode} ICMP tests", flush=True)
         subprocess.run([str(binary)], check=True, timeout=30)
+    # The same production parser is exercised on both Linux and Darwin.
+    # This deterministic fixture is additional to the real ICMP execution.
+    binary = Path(temp) / "error-packets"
+    engine = source / "src/core/src/hev-icmp-engine.c"
+    command = [
+        "cc", "-std=gnu11", "-O2", "-Wall", "-Wextra", "-Werror", "-pthread",
+        f"-I{engine.parent}", f"-I{source / 'third-part/hev-task-system/include'}",
+        f'-DICMP_ENGINE_SOURCE="{engine}"', "-DICMP_EXPECT_METADATA",
+        str(test.with_name("errors.c")),
+        str(source / "third-part/hev-task-system/bin/libhev-task-system.a"),
+        "-o", str(binary),
+    ]
+    subprocess.run(command, check=True)
+    print("Running deterministic ICMP error packet/queue tests", flush=True)
+    subprocess.run([str(binary)], check=True, timeout=30)
+    if not args.faults_only:
+        print("Running real loopback ICMP error delivery with a separate privileged injector", flush=True)
+        subprocess.run([sys.executable, str(test.with_name("live_errors.py")),
+                        str(source)], check=True, timeout=120)

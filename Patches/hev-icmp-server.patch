@@ -13,10 +13,10 @@ index 730252df7cd6e81005e8ae72f98e733a84ab4814..a421e77abc88aa259ffdf9d833bb3cec
      -library ./apple_xcframework/iphoneos-arm64/libhev-socks5-server.a -headers $INCLUDE_DIR \
 diff --git a/src/hev-icmp-server.c b/src/hev-icmp-server.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..95515835c8268e13415931575c4d04994e076536
+index 0000000000000000000000000000000000000000..5507759187d9f7bdb0d10c0cdf4d39df8a6f931c
 --- /dev/null
 +++ b/src/hev-icmp-server.c
-@@ -0,0 +1,600 @@
+@@ -0,0 +1,627 @@
 +#define _GNU_SOURCE
 +#include <errno.h>
 +#include <fcntl.h>
@@ -37,6 +37,15 @@ index 0000000000000000000000000000000000000000..95515835c8268e13415931575c4d0499
 +
 +#define CLIENT_LIMIT 1024
 +#define QUEUE_BATCH 256
++
++_Static_assert (
++    (int)HEV_ICMP_ERROR_NONE == (int)HEV_SOCKS5_ICMP_ERROR_NONE &&
++        (int)HEV_ICMP_ERROR_LOCAL == (int)HEV_SOCKS5_ICMP_ERROR_LOCAL &&
++        (int)HEV_ICMP_ERROR_RECEIVED == (int)HEV_SOCKS5_ICMP_ERROR_RECEIVED &&
++        (int)HEV_ICMP_ERROR_TIMEOUT == (int)HEV_SOCKS5_ICMP_ERROR_TIMEOUT &&
++        (int)HEV_ICMP_ERROR_CANCELLED == (int)HEV_SOCKS5_ICMP_ERROR_CANCELLED &&
++        (int)HEV_ICMP_ERROR_SHUTDOWN == (int)HEV_SOCKS5_ICMP_ERROR_SHUTDOWN,
++    "ICMP error origins must retain the public API mapping");
 +
 +typedef struct _Submission Submission;
 +typedef struct _IcmpServer IcmpServer;
@@ -310,6 +319,17 @@ index 0000000000000000000000000000000000000000..95515835c8268e13415931575c4d0499
 +    result.error = error;
 +    result.echo = echo;
 +    result.echo_len = len;
++    if (event == HEV_SOCKS5_ICMP_ERROR) {
++        HevIcmpRequest *r = submission->request;
++        result.error_origin =
++            r->error_origin    ? r->error_origin :
++            error == ECANCELED ? HEV_SOCKS5_ICMP_ERROR_CANCELLED :
++            error == ESHUTDOWN ? HEV_SOCKS5_ICMP_ERROR_SHUTDOWN :
++                                 HEV_SOCKS5_ICMP_ERROR_LOCAL;
++        result.icmp_type = r->icmp_type;
++        result.icmp_code = r->icmp_code;
++        result.icmp_info = r->icmp_info;
++    }
 +    if (peer && peer_len <= sizeof (result.source)) {
 +        memcpy (&result.source, peer, peer_len);
 +        result.source_len = peer_len;
@@ -321,9 +341,16 @@ index 0000000000000000000000000000000000000000..95515835c8268e13415931575c4d0499
 +    pthread_mutex_lock (&gate);
 +    deliver = !client->closed;
 +    if (event != HEV_SOCKS5_ICMP_SENT &&
-+        (client->epoch != submission->epoch || !s->running)) {
++        (client->epoch != submission->epoch || !s->running ||
++         !atomic_load (&permitted))) {
++        int running = s->running && atomic_load (&permitted);
 +        result.event = HEV_SOCKS5_ICMP_ERROR;
-+        result.error = s->running ? ECANCELED : ESHUTDOWN;
++        result.error = running ? ECANCELED : ESHUTDOWN;
++        result.error_origin = running ? HEV_SOCKS5_ICMP_ERROR_CANCELLED :
++                                        HEV_SOCKS5_ICMP_ERROR_SHUTDOWN;
++        result.icmp_type = result.icmp_code = 0;
++        result.icmp_info = 0;
++        result.source_len = result.destination_len = 0;
 +        result.echo = NULL;
 +        result.echo_len = 0;
 +    }
@@ -483,8 +510,8 @@ index 0000000000000000000000000000000000000000..95515835c8268e13415931575c4d0499
 +                res = -ECANCELED;
 +            else
 +                res = hev_icmp_engine_send (s->engine, request);
-+            if (res == HEV_ICMP_DEFERRED) {
-+                blocked = 1;
++            if (res == HEV_ICMP_DEFERRED || res == HEV_ICMP_RETRY) {
++                blocked = res;
 +                pthread_mutex_unlock (&gate);
 +                break;
 +            }
@@ -506,7 +533,7 @@ index 0000000000000000000000000000000000000000..95515835c8268e13415931575c4d0499
 +        pthread_mutex_unlock (&gate);
 +        if (!running && !queued)
 +            break;
-+        if (queued && !blocked) {
++        if (queued && (!blocked || blocked == HEV_ICMP_RETRY)) {
 +            hev_task_yield (HEV_TASK_YIELD);
 +        } else {
 +            int timeout = hev_icmp_engine_timeout (s->engine);
@@ -647,10 +674,10 @@ index 37a3c8ce0db9f734f07bfc57b3b59df8559562e6..46c915af117641bad25e55afef100ab2
  #endif /* __HEV_MAIN_H__ */
 diff --git a/src/hev-socks5-icmp.h b/src/hev-socks5-icmp.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..ba5116ce6ba0749cef7b46f512e09f90311d498d
+index 0000000000000000000000000000000000000000..e8cf8e53213513f8c7c93b3ac7472e60c122565c
 --- /dev/null
 +++ b/src/hev-socks5-icmp.h
-@@ -0,0 +1,90 @@
+@@ -0,0 +1,114 @@
 +#ifndef HEV_SOCKS5_ICMP_PUBLIC_H
 +#define HEV_SOCKS5_ICMP_PUBLIC_H
 +
@@ -675,6 +702,16 @@ index 0000000000000000000000000000000000000000..ba5116ce6ba0749cef7b46f512e09f90
 +    HEV_SOCKS5_ICMP_ERROR = 3,
 +};
 +
++enum
++{
++    HEV_SOCKS5_ICMP_ERROR_NONE,
++    HEV_SOCKS5_ICMP_ERROR_LOCAL,
++    HEV_SOCKS5_ICMP_ERROR_RECEIVED,
++    HEV_SOCKS5_ICMP_ERROR_TIMEOUT,
++    HEV_SOCKS5_ICMP_ERROR_CANCELLED,
++    HEV_SOCKS5_ICMP_ERROR_SHUTDOWN,
++};
++
 +typedef struct
 +{
 +    uint64_t request_id;
@@ -686,14 +723,28 @@ index 0000000000000000000000000000000000000000..ba5116ce6ba0749cef7b46f512e09f90
 +    socklen_t destination_len;
 +    const unsigned char *echo;
 +    size_t echo_len;
++    int error_origin;
++    unsigned char icmp_type;
++    unsigned char icmp_code;
++    uint32_t icmp_info;
 +} HevSocks5IcmpResult;
 +
 +/* Callbacks run serially on native worker 0. Result/echo storage is borrowed
 + * until return. SENT means accepted by the OS; REPLY requires an actual Echo
-+ * Reply. ERROR is terminal (errno, including timeout/cancel/server stop).
++ * Reply. ERROR is terminal. error_origin distinguishes local errno, received
++ * ICMP, timeout, cancellation and shutdown; only RECEIVED has icmp_type/code
++ * and icmp_info (MTU or parameter pointer, host order, zero if unavailable).
++ * On RECEIVED, source is the actual error origin when known; destination is
++ * the logical return recipient, or the local address when available. The
++ * original request target remains associated with request_id, not source.
++ * Errors have no echo bytes; a quoted request is never a successful reply.
 + * Callbacks must not block, destroy a client, or stop/join the server. */
 +typedef void (*HevSocks5IcmpCallback) (const HevSocks5IcmpResult *result,
 +                                       void *context);
++/* A received network error with an unknown offender has peer=NULL and
++ * peer_len=0: its actual copied bytes are unattributed, not the target's.
++ * Linux error-queue reads count returned quoted Echo bytes, never invented
++ * outer headers; locally generated error records add no network reads. */
 +typedef void (*HevSocks5IcmpObserver) (const struct sockaddr *peer,
 +                                       socklen_t peer_len, size_t bytes,
 +                                       int writing, void *context);
