@@ -8,10 +8,10 @@ index 0000000000000000000000000000000000000000..c1133f100f632d11bea7270f0402a046
 \ No newline at end of file
 diff --git a/src/hev-icmp-engine.c b/src/hev-icmp-engine.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..44d7d3551703c6aa2a36276d1fee07eaf8094200
+index 0000000000000000000000000000000000000000..05b750a25a0bdfe05c906c5f0b3eaad73f9c57c0
 --- /dev/null
 +++ b/src/hev-icmp-engine.c
-@@ -0,0 +1,907 @@
+@@ -0,0 +1,921 @@
 +#define _GNU_SOURCE
 +#ifdef __APPLE__
 +#define __APPLE_USE_RFC_3542
@@ -460,7 +460,7 @@ index 0000000000000000000000000000000000000000..44d7d3551703c6aa2a36276d1fee07ea
 +    free (r);
 +}
 +
-+static void receive_family (HevIcmpEngine *e, int index, HevIcmpActive active);
++static int receive_family (HevIcmpEngine *e, int index, HevIcmpActive active);
 +
 +static int
 +network_errno (int index, unsigned int type, unsigned int code)
@@ -594,6 +594,10 @@ index 0000000000000000000000000000000000000000..44d7d3551703c6aa2a36276d1fee07ea
 +        }
 +#endif
 +    }
++#ifdef __APPLE__
++    if (len)
++        ((struct sockaddr *)local)->sa_len = len;
++#endif
 +    return len;
 +}
 +
@@ -628,9 +632,13 @@ index 0000000000000000000000000000000000000000..44d7d3551703c6aa2a36276d1fee07ea
 +            return;
 +        offset = (ip[0] & 15) * 4;
 +#ifdef __APPLE__
-+        /* XNU validates the ICMP checksum, then changes the quoted ip_len
-+         * to host order before handing the message to datagram sockets. */
-+        memcpy (&total, ip + 2, sizeof (total));
++        /* XNU changes ip_len to host order only for codes it handles.
++         * Parameter Problem code 2 and unknown codes take its raw path. */
++        if ((buf[0] == 3 && buf[1] <= 15) || (buf[0] == 11 && buf[1] <= 1) ||
++            (buf[0] == 12 && buf[1] <= 1))
++            memcpy (&total, ip + 2, sizeof (total));
++        else
++            total = read16 (ip + 2);
 +#else
 +        if (hev_icmp_checksum (buf, len))
 +            return;
@@ -707,9 +715,10 @@ index 0000000000000000000000000000000000000000..44d7d3551703c6aa2a36276d1fee07ea
 +    struct cmsghdr *c;
 +    for (c = CMSG_FIRSTHDR (msg); c; c = CMSG_NXTHDR (msg, c)) {
 +        struct sock_extended_err err;
-+        struct sockaddr_storage offender;
++        struct sockaddr_storage offender, local = { 0 };
 +        const struct sockaddr *peer = NULL;
-+        socklen_t plen = 0;
++        socklen_t plen = 0, llen = 0;
++        unsigned int interface = 0;
 +        HevIcmpRequest *r;
 +        uint32_t info = 0;
 +        int network;
@@ -756,6 +765,8 @@ index 0000000000000000000000000000000000000000..44d7d3551703c6aa2a36276d1fee07ea
 +                            e->receive, len);
 +        if (!r)
 +            return;
++        if (network && !r->source_len)
++            llen = received_local (msg, index, &local, &interface);
 +        if (!network)
 +            e->error_generation[index]++;
 +        /* Some kernels expose the reserved/RFC 4884 union for other
@@ -768,13 +779,13 @@ index 0000000000000000000000000000000000000000..44d7d3551703c6aa2a36276d1fee07ea
 +                        network ? HEV_ICMP_ERROR_RECEIVED :
 +                                  HEV_ICMP_ERROR_LOCAL,
 +                        network ? err.ee_type : 0, network ? err.ee_code : 0,
-+                        info, peer, plen, NULL, 0, active);
++                        info, peer, plen, (void *)&local, llen, active);
 +        return;
 +    }
 +}
 +#endif
 +
-+static void
++static int
 +receive_family (HevIcmpEngine *e, int index, HevIcmpActive active)
 +{
 +#if defined(__linux__) || defined(__APPLE__)
@@ -869,20 +880,22 @@ index 0000000000000000000000000000000000000000..44d7d3551703c6aa2a36276d1fee07ea
 +        complete (e, r, 0, (void *)&normalized, r->destination_len,
 +                  (void *)&local, llen, buf, n);
 +    }
++    return i == ICMP_DRAIN;
 +#else
 +    (void)e;
 +    (void)index;
 +    (void)active;
++    return 0;
 +#endif
 +}
 +
-+void
++int
 +hev_icmp_engine_poll (HevIcmpEngine *e, HevIcmpActive active)
 +{
 +    HevIcmpRequest *r, *next;
 +    uint64_t now;
-+    receive_family (e, 0, active);
-+    receive_family (e, 1, active);
++    int more = receive_family (e, 0, active);
++    more |= receive_family (e, 1, active);
 +    now = hev_icmp_now ();
 +    for (r = e->first; r; r = next) {
 +        int error = active (r->context) ? 0 : ECANCELED;
@@ -892,6 +905,7 @@ index 0000000000000000000000000000000000000000..44d7d3551703c6aa2a36276d1fee07ea
 +        if (error)
 +            complete (e, r, error, NULL, 0, NULL, 0, NULL, 0);
 +    }
++    return more;
 +}
 +
 +int
@@ -921,10 +935,10 @@ index 0000000000000000000000000000000000000000..44d7d3551703c6aa2a36276d1fee07ea
 +}
 diff --git a/src/hev-icmp-engine.h b/src/hev-icmp-engine.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..75d08ffa914816937380af43ad68d18b271ac272
+index 0000000000000000000000000000000000000000..d2e505b17a9d61ec42efe90f00d9c2a6e4075753
 --- /dev/null
 +++ b/src/hev-icmp-engine.h
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,88 @@
 +/* ICMP Echo socket engine. Single native task owns every engine operation. */
 +#ifndef HEV_ICMP_ENGINE_H
 +#define HEV_ICMP_ENGINE_H
@@ -1006,7 +1020,9 @@ index 0000000000000000000000000000000000000000..75d08ffa914816937380af43ad68d18b
 + * then promptly call send again. Either positive outcome or negative errno
 + * leaves request ownership with the caller. */
 +int hev_icmp_engine_send (HevIcmpEngine *engine, HevIcmpRequest *request);
-+void hev_icmp_engine_poll (HevIcmpEngine *engine, HevIcmpActive active);
++/* Nonzero means a receive budget was exhausted. Yield cooperatively, then
++ * poll again before waiting for an edge-triggered I/O notification. */
++int hev_icmp_engine_poll (HevIcmpEngine *engine, HevIcmpActive active);
 +int hev_icmp_engine_timeout (HevIcmpEngine *engine);
 +void hev_icmp_engine_free (HevIcmpEngine *engine);
 +
