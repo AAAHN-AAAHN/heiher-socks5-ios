@@ -2,13 +2,13 @@
   "branch": "release/integrated",
   "frozen_source": "311963cb714902a3b360bcfdb774baca4463bf84",
   "parents": {
-    "feature/app-icon": "68c5c2f5f984b1e8554a3485c2ff95876533023a",
-    "feature/background": "705da3c4e4ee19615c439ce97949dcb362b9621a",
-    "feature/udp-compat": "ddae121f88fe48260810b75a0a5d3b3ea5cf6894",
-    "feature/icmp-relay": "50646fd6c1f000b5c9f7548204f074b90497c9fd",
-    "feature/server-control": "da8c50a15842ba210c02efdbe0994d4ef97a2f56",
-    "feature/traffic-statistics": "a31508f79669cceb18929ab5fb9dd7955b489740",
-    "feature/settings-persistence": "326eadc5e28110dc028af30e19acd959ef324e31"
+    "feature/app-icon": "d268d0bb8fb91fce426b9eef377e1456690fba47",
+    "feature/background": "bd6bc65dc5d5fba905edfc37a6618aad083f4af1",
+    "feature/udp-compat": "4d64d2dbfc37ef04fef326fde6133dbceba90e97",
+    "feature/icmp-relay": "70daf7907868b0db2d93f30d34aeca19373a1ec7",
+    "feature/server-control": "e6663544b9394c0e743108fd4f169c8c7baf7490",
+    "feature/traffic-statistics": "fc54f9aebe07c2460b98d3b2bc18a971911ff0d0",
+    "feature/settings-persistence": "45a592b81fda404edb63710067349276f72a986a"
   },
   "owned_documents": [
     "README.md",
