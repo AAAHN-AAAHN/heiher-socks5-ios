@@ -28,7 +28,7 @@ static char program[PATH_MAX];
 typedef struct
 {
     int fd[2];
-    int done, error, origin, type, code;
+    int done, error, origin, type, code, parameter_code, local_family;
     uint32_t info;
     size_t written, received, fixture_drained;
 } Live;
@@ -98,11 +98,12 @@ raw_socket (int v6)
 }
 
 static int
-inject (int v6)
+inject (int v6, int parameter_code)
 {
-    unsigned char echo[25], packet[80] = { 0 };
+    unsigned char echo[237], packet[264] = { 0 };
     struct sockaddr_storage destination;
-    size_t count = 0, len = 8 + (v6 ? 40 : 20) + 24;
+    size_t echo_len = parameter_code >= 0 ? 236 : 24;
+    size_t count = 0, len = 8 + (v6 ? 40 : 20) + echo_len;
     ssize_t n;
     int fd;
     for (;;) {
@@ -115,32 +116,33 @@ inject (int v6)
         if (count == sizeof (echo))
             break;
     }
-    if (n < 0 || count != 24 || echo[0] != (v6 ? 128 : 8) || echo[1])
+    if (n < 0 || count != echo_len || echo[0] != (v6 ? 128 : 8) || echo[1])
         return 2;
     fd = raw_socket (v6);
     if (fd < 0)
         return 3;
     unsigned char *ip = packet + 8;
-    /* Time Exceeded does not modify the loopback path-MTU cache. */
-    packet[0] = v6 ? 3 : 11;
+    /* These errors do not modify the loopback path-MTU cache. */
+    packet[0] = parameter_code >= 0 ? 12 : v6 ? 3 : 11;
+    packet[1] = parameter_code >= 0 ? parameter_code : 0;
     if (v6) {
         ip[0] = 0x60;
-        put16 (ip + 4, 24);
+        put16 (ip + 4, echo_len);
         ip[6] = IPPROTO_ICMPV6;
         ip[7] = 64;
         ip[23] = ip[39] = 1;
         echo[2] = echo[3] = 0;
-        put16 (echo + 2, checksum (echo, 24, 1));
-        memcpy (ip + 40, echo, 24);
+        put16 (echo + 2, checksum (echo, echo_len, 1));
+        memcpy (ip + 40, echo, echo_len);
     } else {
         ip[0] = 0x45;
-        put16 (ip + 2, 44);
+        put16 (ip + 2, 20 + echo_len);
         ip[8] = 64;
         ip[9] = IPPROTO_ICMP;
         ip[12] = ip[16] = 127;
         ip[15] = ip[19] = 1;
         put16 (ip + 10, checksum (ip, 20, 0));
-        memcpy (ip + 20, echo, 24);
+        memcpy (ip + 20, echo, echo_len);
     }
     put16 (packet + 2, checksum (packet, len, v6));
     socklen_t destination_len = loopback (&destination, v6, 0);
@@ -161,14 +163,21 @@ inject (int v6)
 }
 
 static void
-run_injector (int v6, const void *echo, size_t len)
+run_injector (int v6, int parameter_code, const void *echo, size_t len)
 {
     int channel[2], status;
     pid_t child;
     posix_spawn_file_actions_t actions;
-    char *args[] = { "sudo",     "-n",           "--", program,
-                     "--inject", v6 ? "6" : "4", NULL };
-    assert (len == 24 && !pipe (channel));
+    char code[] = { '0' + parameter_code, 0 };
+    char *args[] = { "sudo",
+                     "-n",
+                     "--",
+                     program,
+                     "--inject",
+                     v6 ? "6" : "4",
+                     parameter_code >= 0 ? code : "time",
+                     NULL };
+    assert (len == (parameter_code >= 0 ? 236U : 24U) && !pipe (channel));
     assert (!posix_spawn_file_actions_init (&actions));
     assert (
         !posix_spawn_file_actions_adddup2 (&actions, channel[0], STDIN_FILENO));
@@ -201,7 +210,9 @@ fixture_sendto (int fd, const void *echo, size_t len, int flags,
     ssize_t accepted = sendto (fd, echo, len, flags, target, target_len);
     if (accepted < 0)
         return accepted;
-    assert (accepted == (ssize_t)len && len == 24 && fd == current->fd[v6]);
+    assert (accepted == (ssize_t)len &&
+            len == (current->parameter_code >= 0 ? 236U : 24U) &&
+            fd == current->fd[v6]);
     uint64_t deadline = hev_icmp_now () + 3000;
     while (!matched && hev_icmp_now () < deadline) {
         ssize_t n =
@@ -218,7 +229,7 @@ fixture_sendto (int fd, const void *echo, size_t len, int flags,
                   !memcmp (reply + 4, (const unsigned char *)echo + 4, len - 4);
     }
     assert (matched);
-    run_injector (v6, echo, len);
+    run_injector (v6, current->parameter_code, echo, len);
     return accepted;
 }
 
@@ -270,9 +281,20 @@ complete_live (HevIcmpRequest *request, int error, const struct sockaddr *peer,
                void *context)
 {
     Live *live = context;
-    (void)local;
-    (void)local_len;
     assert (!live->done && error && peer && peer_len && !echo && !len);
+    assert (local && local_len && local->sa_family == peer->sa_family);
+#ifdef __APPLE__
+    assert (local->sa_len == local_len);
+#endif
+    if (local->sa_family == AF_INET)
+        assert (local_len == sizeof (struct sockaddr_in) &&
+                ((const struct sockaddr_in *)local)->sin_addr.s_addr ==
+                    htonl (INADDR_LOOPBACK));
+    else
+        assert (local_len == sizeof (struct sockaddr_in6) &&
+                IN6_IS_ADDR_LOOPBACK (
+                    &((const struct sockaddr_in6 *)local)->sin6_addr));
+    live->local_family = local->sa_family;
     live->done = 1;
     live->error = error;
     live->origin = request->error_origin;
@@ -285,25 +307,27 @@ static void
 run_live (void *unused)
 {
     (void)unused;
-    for (int v6 = 0; v6 < 2; v6++) {
-        Live live = { .fd = { -1, -1 } };
+    for (int scenario = 0; scenario < 5; scenario++) {
+        int v6 = scenario == 1;
+        int parameter_code = scenario >= 2 ? scenario - 2 : -1;
+        size_t echo_len = parameter_code >= 0 ? 236 : 24;
+        Live live = { .fd = { -1, -1 }, .parameter_code = parameter_code };
         struct sockaddr_storage destination;
         socklen_t len = loopback (&destination, v6, 0);
-        unsigned char echo[24] = { 0 };
+        unsigned char echo[236] = { 0 };
         current = &live;
         HevIcmpEngine *engine =
             hev_icmp_engine_new (bind_engine, observe, complete_live, &live);
         assert (engine);
         hev_icmp_echo (echo, v6 ? AF_INET6 : AF_INET, 0x31415926);
-        for (size_t i = 8; i < sizeof (echo); i++)
+        for (size_t i = 8; i < echo_len; i++)
             echo[i] = i;
         if (!v6) {
             echo[2] = echo[3] = 0;
-            put16 (echo + 2, checksum (echo, sizeof (echo), 0));
+            put16 (echo + 2, checksum (echo, echo_len, 0));
         }
-        HevIcmpRequest *request =
-            hev_icmp_request_new (NULL, 0, (void *)&destination, len, echo,
-                                  sizeof (echo), 3000, &live);
+        HevIcmpRequest *request = hev_icmp_request_new (
+            NULL, 0, (void *)&destination, len, echo, echo_len, 3000, &live);
         assert (request && !hev_icmp_engine_send (engine, request));
         uint64_t deadline = hev_icmp_now () + 3500;
         while (!live.done && hev_icmp_now () < deadline) {
@@ -312,15 +336,21 @@ run_live (void *unused)
                 hev_task_sleep (10);
         }
         assert (live.done && live.origin == HEV_ICMP_ERROR_RECEIVED &&
-                live.type == (v6 ? 3 : 11) && !live.code && !live.info);
-        assert (live.written == sizeof (echo) && live.received > 0 &&
-                live.fixture_drained >= sizeof (echo));
+                live.type == (parameter_code >= 0 ? 12 :
+                              v6                  ? 3 :
+                                                    11) &&
+                live.code == (parameter_code >= 0 ? parameter_code : 0) &&
+                !live.info);
+        if (parameter_code >= 0)
+            assert (live.error == EPROTO);
+        assert (live.written == echo_len && live.received > 0 &&
+                live.fixture_drained >= echo_len);
         hev_icmp_engine_free (engine);
         printf (
-            "{\"result\":\"PASS\",\"role\":\"unprivileged_engine\",\"family\":%d,\"euid\":%lu,\"error_origin\":%d,\"icmp_type\":%d,\"icmp_code\":%d,\"info\":%u,\"engine_os_write_bytes\":%zu,\"engine_os_read_bytes\":%zu,\"fixture_drained_read_bytes\":%zu}\n",
+            "{\"result\":\"PASS\",\"role\":\"unprivileged_engine\",\"family\":%d,\"euid\":%lu,\"error_origin\":%d,\"icmp_type\":%d,\"icmp_code\":%d,\"info\":%u,\"local_family\":%d,\"engine_os_write_bytes\":%zu,\"engine_os_read_bytes\":%zu,\"fixture_drained_read_bytes\":%zu}\n",
             v6 ? 6 : 4, (unsigned long)geteuid (), live.origin, live.type,
-            live.code, live.info, live.written, live.received,
-            live.fixture_drained);
+            live.code, live.info, live.local_family, live.written,
+            live.received, live.fixture_drained);
     }
     puts (
         "PASS: real loopback ICMP errors reached the unprivileged production engine; privileged injector and fixture-consumed Echo Reply are separate");
@@ -342,9 +372,18 @@ main (int argc, char **argv)
             (unsigned long)geteuid ());
         return 0;
     }
-    if (argc == 3 && !strcmp (argv[1], "--inject") &&
-        (!strcmp (argv[2], "4") || !strcmp (argv[2], "6")))
-        return inject (!strcmp (argv[2], "6"));
+    if (argc == 4 && !strcmp (argv[1], "--inject") &&
+        (!strcmp (argv[2], "4") || !strcmp (argv[2], "6"))) {
+        int v6 = !strcmp (argv[2], "6");
+        int code = !strcmp (argv[3], "time") ? -1 :
+                   strlen (argv[3]) == 1 && argv[3][0] >= '0' &&
+                           argv[3][0] <= '2' ?
+                                               argv[3][0] - '0' :
+                                               -2;
+        if (code < -1 || (v6 && code >= 0))
+            return 2;
+        return inject (v6, code);
+    }
     assert (argc == 1 && geteuid () != 0);
     assert (!hev_task_system_init ());
     HevTask *task = hev_task_new (65536);

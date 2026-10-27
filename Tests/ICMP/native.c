@@ -94,6 +94,11 @@ callback (const HevSocks5IcmpResult *r, void *context)
         assert (!r->error_origin && !r->icmp_type && !r->icmp_code &&
                 !r->icmp_info);
         assert (r->source_len && r->destination_len);
+#ifdef __APPLE__
+        assert (((const struct sockaddr *)&r->source)->sa_len == r->source_len);
+        assert (((const struct sockaddr *)&r->destination)->sa_len ==
+                r->destination_len);
+#endif
         if (c->original_source) {
             struct in6_addr expected;
             inet_pton (AF_INET6, "2001:db8::5", &expected);
@@ -255,6 +260,65 @@ received_echo (uint64_t generation)
     hev_socks5_server_icmp_client_free (client);
     puts (
         "PASS already-received IPv6 Echo, original return address, odd payload and restored checksum");
+}
+
+static void
+burst_replies (int family)
+{
+    enum
+    {
+        COUNT = 200
+    };
+    struct sockaddr_storage destination = { 0 };
+    socklen_t len;
+    Client c = { .id = 0x12345678, .size = 8 };
+    uint64_t generation = start ();
+    HevSocks5IcmpClient *client =
+        hev_socks5_server_icmp_client_new (generation, gated_callback, &c);
+    assert (client);
+    if (family == AF_INET) {
+        struct sockaddr_in *a = (void *)&destination;
+        a->sin_family = family;
+        inet_pton (family, "127.0.0.1", &a->sin_addr);
+        len = sizeof (*a);
+    } else {
+        struct sockaddr_in6 *a = (void *)&destination;
+        a->sin6_family = family;
+        inet_pton (family, "::1", &a->sin6_addr);
+        len = sizeof (*a);
+    }
+    pthread_mutex_lock (&barrier);
+    barrier_entered = barrier_release = 0;
+    pthread_mutex_unlock (&barrier);
+    assert (!hev_socks5_server_icmp_ping (client, c.id, (void *)&destination,
+                                          len, 2000));
+    pthread_mutex_lock (&barrier);
+    while (!barrier_entered)
+        pthread_cond_wait (&barrier_changed, &barrier);
+    pthread_mutex_unlock (&barrier);
+    /* Complete one queue batch before the worker can read replies. The real
+     * edge-triggered reactor must drain every receive slice without another
+     * submission or wake byte arriving to rescue the remaining replies. */
+    for (unsigned int i = 1; i < COUNT; i++)
+        assert (!hev_socks5_server_icmp_ping (client, c.id,
+                                              (void *)&destination, len, 2000));
+    pthread_mutex_lock (&barrier);
+    barrier_release = 1;
+    pthread_cond_broadcast (&barrier_changed);
+    pthread_mutex_unlock (&barrier);
+    for (unsigned int i = 0;
+         i < 3000 && atomic_load (&c.replies) + atomic_load (&c.errors) < COUNT;
+         i++)
+        usleep (1000);
+    fprintf (stderr, "ICMP %s burst: sent=%d replies=%d errors=%d\n",
+             family == AF_INET ? "IPv4" : "IPv6", atomic_load (&c.sent),
+             atomic_load (&c.replies), atomic_load (&c.errors));
+    assert (atomic_load (&c.sent) == COUNT);
+    assert (atomic_load (&c.replies) == COUNT && !atomic_load (&c.errors));
+    hev_socks5_server_icmp_client_free (client);
+    stop ();
+    puts (
+        "PASS 200 queued replies drain across bounded receive slices without a new edge or deadline wait");
 }
 
 static void
@@ -562,6 +626,8 @@ main (void)
     hev_socks5_server_icmp_client_free (client[3]);
     stop ();
     assert (!atomic_load (&callbacks_after_free));
+    burst_replies (AF_INET);
+    burst_replies (AF_INET6);
     cancel_and_bound (8);
     cancel_and_bound (65508);
 #ifdef ICMP_TEST_IO

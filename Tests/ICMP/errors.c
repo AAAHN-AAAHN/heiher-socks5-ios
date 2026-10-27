@@ -45,8 +45,8 @@ typedef struct
 {
     int active, terminals, error, origin, type, code;
     uint32_t info;
-    struct sockaddr_storage peer;
-    socklen_t peer_len;
+    struct sockaddr_storage peer, local;
+    socklen_t peer_len, local_len;
 } Result;
 
 static Endpoint endpoints[2];
@@ -154,7 +154,7 @@ fixture_recvmsg (int fd, struct msghdr *msg, int flags)
 {
     Endpoint *ep = find_endpoint (fd);
     int queued = 0;
-    size_t i, copied;
+    size_t i, copied, used = 0;
     Packet p;
     struct cmsghdr *c;
 #ifdef __linux__
@@ -199,9 +199,15 @@ fixture_recvmsg (int fd, struct msghdr *msg, int flags)
             memset (CMSG_DATA (c) + sizeof (ee), 0, p.address_len);
         else
             memcpy (CMSG_DATA (c) + sizeof (ee), &p.peer, p.address_len);
-        msg->msg_controllen = CMSG_SPACE (sizeof (ee) + p.address_len);
+        used = CMSG_SPACE (sizeof (ee) + p.address_len);
         msg->msg_flags |= MSG_ERRQUEUE;
-        return copied;
+        if (p.origin == SO_EE_ORIGIN_LOCAL || !p.local.ss_family) {
+            msg->msg_controllen = used;
+            return copied;
+        }
+        assert (used + CMSG_SPACE (sizeof (struct in6_pktinfo)) <=
+                msg->msg_controllen);
+        c = (void *)((unsigned char *)c + used);
     }
 #endif
     if (ep->family == AF_INET) {
@@ -231,6 +237,7 @@ fixture_recvmsg (int fd, struct msghdr *msg, int flags)
         memcpy (CMSG_DATA (c), &pi, sizeof (pi));
         msg->msg_controllen = CMSG_SPACE (sizeof (pi));
     }
+    msg->msg_controllen += used;
     return copied;
 }
 
@@ -370,7 +377,8 @@ error_packet (HevIcmpRequest *r, int queued, int type, int code, uint32_t info,
     }
     seal_packet (&p, index);
 #ifdef __APPLE__
-    if (!index) {
+    if (!index && ((type == 3 && code <= 15) || (type == 11 && code <= 1) ||
+                   (type == 12 && code <= 1))) {
         uint16_t host_length = 20 + r->len;
         memcpy (ip + 2, &host_length, 2);
     }
@@ -440,9 +448,10 @@ fixture_complete (HevIcmpRequest *r, int error, const struct sockaddr *peer,
 {
     Result *result = r->context;
     (void)context;
-    (void)local;
-    (void)local_len;
     assert (++result->terminals == 1);
+    result->local_len = local_len;
+    if (local && local_len)
+        memcpy (&result->local, local, local_len);
     result->error = error;
     result->peer_len = peer_len;
     if (peer)
@@ -549,10 +558,46 @@ quote_lengths_and_budget (HevIcmpEngine *e, int index)
 #endif
             enqueue (index, p);
     }
-    hev_icmp_engine_poll (e, fixture_active);
+    assert (hev_icmp_engine_poll (e, fixture_active));
     assert (a.terminals == 1 && read_calls - before == 64);
-    hev_icmp_engine_poll (e, fixture_active);
+    assert (!e->requests && endpoints[index].count == 1);
+    assert (!hev_icmp_engine_poll (e, fixture_active));
     assert (a.terminals == 1 && read_calls - before == 65);
+    assert (!hev_icmp_engine_poll (e, fixture_active));
+    assert (hev_icmp_engine_timeout (e) == -1);
+}
+
+static void
+receive_budget_fairness (HevIcmpEngine *e)
+{
+    Result results[2] = { 0 };
+    HevIcmpRequest *requests[2];
+    Packet packets[2];
+    unsigned int before = read_calls;
+    for (int index = 0; index < 2; index++) {
+        requests[index] = fixture_request (e, index, &results[index], 0);
+        packets[index] =
+            error_packet (requests[index], 0, index ? 3 : 11, 0, 0, 0);
+    }
+    /* Foreign IPv4 packets exhaust its budget. IPv6 must still run in this
+     * cycle, and pending timeouts must still run before the returned yield. */
+    Packet foreign = packets[0];
+    foreign.data[8 + 20 + 4] ^= 1;
+    seal_packet (&foreign, 0);
+    for (unsigned int i = 0; i < 65; i++)
+        enqueue (0, foreign);
+    enqueue (1, packets[1]);
+    requests[0]->deadline = 0;
+    assert (hev_icmp_engine_poll (e, fixture_active));
+    assert (read_calls - before == 65 && endpoints[0].count == 1);
+    assert (results[0].terminals == 1 && results[0].error == ETIMEDOUT);
+    assert (results[1].terminals == 1 && results[1].error == EHOSTUNREACH);
+    assert (!e->requests && !hev_icmp_engine_poll (e, fixture_active));
+    assert (read_calls - before == 66);
+    assert (!hev_icmp_engine_poll (e, fixture_active));
+    assert (hev_icmp_engine_timeout (e) == -1);
+    puts (
+        "PASS receive budgets preserve both-family/deadline fairness and clear the drain hint at idle");
 }
 
 static void
@@ -576,6 +621,8 @@ positive_errors (HevIcmpEngine *e, int index, int queued)
         assert (received - before == p.len * 2 && read_calls - calls == 2);
         assert (a.peer_len == p.address_len &&
                 !memcmp (&a.peer, &p.peer, p.address_len));
+        assert (a.local_len == p.address_len &&
+                !memcmp (&a.local, &p.local, p.address_len));
 #ifdef ICMP_EXPECT_METADATA
         assert (a.origin == HEV_ICMP_ERROR_RECEIVED && a.type == types[i] &&
                 a.code == code && a.info == info);
@@ -628,6 +675,25 @@ negative_errors (HevIcmpEngine *e, int index, int queued)
 }
 
 static void
+parameter_problem_lengths (HevIcmpEngine *e)
+{
+    for (unsigned int code = 0; code <= 2; code++) {
+        Result result = { 0 };
+        HevIcmpRequest *r = fixture_request_sized (e, 0, &result, 0, 236);
+        Packet p = error_packet (r, 0, 12, code, 0, 0);
+        /* The original IP total length is 256. Reading its network bytes
+         * as host order on little-endian Darwin yields 1, not 256. */
+        enqueue (0, p);
+        hev_icmp_engine_poll (e, fixture_active);
+        assert (result.terminals == 1 && result.error == EPROTO);
+#ifdef ICMP_EXPECT_METADATA
+        assert (result.origin == HEV_ICMP_ERROR_RECEIVED && result.type == 12 &&
+                result.code == (int)code && !result.info);
+#endif
+    }
+}
+
+static void
 scope_extensions_and_lifecycle (HevIcmpEngine *e)
 {
     for (unsigned int fault = 0; fault < 4; fault++) {
@@ -675,6 +741,37 @@ scope_extensions_and_lifecycle (HevIcmpEngine *e)
 }
 
 #if defined(__linux__) && defined(ICMP_EXPECT_METADATA)
+static void
+queue_local_addresses (HevIcmpEngine *e)
+{
+    for (int index = 0; index < 2; index++) {
+        for (unsigned int mode = 0; mode < 3; mode++) {
+            Result result = { 0 };
+            HevIcmpRequest *r = fixture_request (e, index, &result, 0);
+            Packet p = error_packet (r, 1, index ? 3 : 11, 0, 0, 0);
+            struct sockaddr_storage expected = p.local;
+            socklen_t expected_len = r->destination_len;
+            if (mode == 1) {
+                /* The logical return recipient has priority over the
+                 * socket's local address; it is not an outgoing bind. */
+                r->source = r->destination;
+                r->source_len = r->destination_len;
+                expected = r->source;
+            } else if (mode == 2) {
+                memset (&p.local, 0, sizeof (p.local));
+            }
+            enqueue (index, p);
+            hev_icmp_engine_poll (e, fixture_active);
+            assert (result.terminals == 1 && result.error == EHOSTUNREACH);
+            if (mode == 2)
+                assert (!result.local_len);
+            else
+                assert (result.local_len == expected_len &&
+                        !memcmp (&result.local, &expected, result.local_len));
+        }
+    }
+}
+
 static void
 queue_origin_and_retry (HevIcmpEngine *e)
 {
@@ -793,8 +890,11 @@ error_tests (void *unused)
         negative_errors (e, index, 1);
 #endif
     }
+    receive_budget_fairness (e);
+    parameter_problem_lengths (e);
     scope_extensions_and_lifecycle (e);
 #if defined(__linux__) && defined(ICMP_EXPECT_METADATA)
+    queue_local_addresses (e);
     queue_origin_and_retry (e);
 #endif
     Result stopped = { 0 };
