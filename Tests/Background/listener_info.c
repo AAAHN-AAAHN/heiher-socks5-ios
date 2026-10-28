@@ -105,12 +105,13 @@ check_run (const char *host, int workers, int ipv6_only)
     }
     const char *actual =
         !strncmp (info.address, "::ffff:", 7) ? info.address + 7 : info.address;
-    if (!ready || strcmp (actual, host))
+    const char *expected = !strncmp (host, "::ffff:", 7) ? host + 7 : host;
+    if (!ready || strcmp (actual, expected))
         fprintf (stderr,
                  "listener host=%s workers=%d ready=%d actual=%s result=%d\n",
                  host, workers, ready, info.address,
                  atomic_load (&server_result));
-    assert (ready && !strcmp (actual, host));
+    assert (ready && !strcmp (actual, expected));
     assert (info.ipv6_only == ipv6_only);
     connect_and_check_auth (&info);
     hev_socks5_server_quit ();
@@ -159,6 +160,7 @@ main (void)
     for (int i = 0; i < 3; ++i) {
         check_run ("127.0.0.1", 1, 0);
         check_run ("0.0.0.0", 2, 0);
+        check_run ("::ffff:0.0.0.0", 2, 0);
         check_run ("::1", 1, 1);
         check_run ("::", 2, 0);
     }
