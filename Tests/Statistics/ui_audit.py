@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import platform
 import plistlib
+import re
 import shutil
 import subprocess
 import sys
@@ -95,7 +96,27 @@ def verify_presentation():
     changed = set(output('git', 'diff', '--name-only', ui_base, 'HEAD', '--',
                          'Socks5', 'Socks5.xcodeproj').splitlines())
     assert changed <= {'Socks5/Statistics/TrafficStatisticsView.swift',
-                       'Socks5/Statistics/TrafficStatistics.swift'}, changed
+                       'Socks5/Statistics/TrafficStatistics.swift',
+                       'Socks5/Statistics/SocketIOWriter.swift',
+                       'Socks5.xcodeproj/project.pbxproj'}, changed
+    # Only the writer's two objects and their group/build memberships may change.
+    project = (ROOT / 'Socks5.xcodeproj/project.pbxproj').read_text()
+    old_project = output('git', 'show', ui_base + ':Socks5.xcodeproj/project.pbxproj')
+    writer = 'SocketIOWriter.swift'
+    lines = [line for line in project.splitlines(keepends=True) if writer in line]
+    assert len(lines) == 4
+    assert ''.join(line for line in project.splitlines(keepends=True) if writer not in line) == old_project
+    file = re.search(r'([A-F0-9]{24}) /\* SocketIOWriter.swift \*/ = \{isa = PBXFileReference; '
+                     r'lastKnownFileType = sourcecode.swift; path = "SocketIOWriter.swift"; '
+                     r'sourceTree = "<group>"; \};', project)
+    build = re.search(r'([A-F0-9]{24}) /\* SocketIOWriter.swift in Sources \*/ = \{isa = PBXBuildFile; '
+                      r'fileRef = ([A-F0-9]{24}) /\* SocketIOWriter.swift \*/; \};', project)
+    assert file and build and build[2] == file[1] and build[1] != file[1]
+    assert file[1] not in old_project and build[1] not in old_project
+    group = re.search(r'/\* Statistics \*/ = \{(.*?)\n\t\t\};', project, re.S)
+    sources = re.search(r'isa = PBXSourcesBuildPhase;(.*?)\n\t\t\};', project, re.S)
+    assert group and f'{file[1]} /* SocketIOWriter.swift */,' in group[1]
+    assert sources and f'{build[1]} /* SocketIOWriter.swift in Sources */,' in sources[1]
     view = (ROOT / 'Socks5/Statistics/TrafficStatisticsView.swift').read_text()
     old_view = output('git', 'show', ui_base + ':Socks5/Statistics/TrafficStatisticsView.swift')
     model = (ROOT / 'Socks5/Statistics/TrafficStatistics.swift').read_text()

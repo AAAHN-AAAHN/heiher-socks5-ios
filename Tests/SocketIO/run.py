@@ -55,3 +55,7 @@ if sys.platform == 'linux':
       task/'bin/libhev-task-system.a','-Wl,--wrap=hev_socks5_session_new','-o',exe])
  for workers in (1,4,8):
   for family in (4,6): run([exe,str(workers),str(family)],timeout=15)
+
+if 'background' in features:
+ run([sys.executable,HERE.parent/'Statistics/periodic_echo_accounting.py',n,
+      out/'periodic-echo-accounting'],timeout=120)

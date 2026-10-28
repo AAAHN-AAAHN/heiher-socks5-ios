@@ -44,6 +44,7 @@ if [ ! -d "$CORE/.git" ]; then
     git clone --no-checkout https://github.com/heiher/hev-socks5-server.git "$CORE"
     git -C "$CORE" checkout --detach "$SERVER_REF"
     git -C "$CORE" submodule update --init --recursive
+    python3 Build/check.py checkout "$CORE" > "$OUT/source-checkout.log"
 fi
 python3 Build/check.py apply "$CORE" > "$OUT/source-audit.log"
 CF=$(command -v clang-format-18 || command -v clang-format)

@@ -15,6 +15,7 @@
 		F0B49EF432005E531F41803A /* AppRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = F012CAD8EFF712318ABE3D46 /* AppRoot.swift */; };
 		F01458C735412E0D383C0D64 /* TrafficStatistics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F2AD6594E2C498AD1D258B /* TrafficStatistics.swift */; };
 		F0304AB3D1EBB5612B39426F /* TrafficStatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F029B5868B1526CF1898650C /* TrafficStatisticsView.swift */; };
+		85CCE692E9CB13DB57BDCCBF /* SocketIOWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73FF1096BE15F15D4972B375 /* SocketIOWriter.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 		F03BEAAF29668CE70ACC7A54 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
 		F0F2AD6594E2C498AD1D258B /* TrafficStatistics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrafficStatistics.swift"; sourceTree = "<group>"; };
 		F029B5868B1526CF1898650C /* TrafficStatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrafficStatisticsView.swift"; sourceTree = "<group>"; };
+		73FF1096BE15F15D4972B375 /* SocketIOWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SocketIOWriter.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -84,6 +86,7 @@
 		F02F87751CD799C484F3256E /* Statistics */ = {
 			isa = PBXGroup;
 			children = (
+				73FF1096BE15F15D4972B375 /* SocketIOWriter.swift */,
 				F0F2AD6594E2C498AD1D258B /* TrafficStatistics.swift */,
 				F029B5868B1526CF1898650C /* TrafficStatisticsView.swift */,
 			);
@@ -161,6 +164,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				85CCE692E9CB13DB57BDCCBF /* SocketIOWriter.swift in Sources */,
 				D30F96602C18058B002DB6BF /* ContentView.swift in Sources */,
 				F0B49EF432005E531F41803A /* AppRoot.swift in Sources */,
 				F01458C735412E0D383C0D64 /* TrafficStatistics.swift in Sources */,

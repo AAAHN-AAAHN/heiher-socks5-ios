@@ -1,0 +1,82 @@
+diff --git a/src/hev-main.h b/src/hev-main.h
+--- a/src/hev-main.h
++++ b/src/hev-main.h
+@@ -11,6 +11,7 @@
+ #define __HEV_MAIN_H__
+ #include <stddef.h>
+ #include <stdint.h>
++#include <sys/socket.h>
+ 
+ #ifdef __cplusplus
+ extern "C" {
+@@ -70,6 +71,18 @@
+ size_t hev_socks5_server_endpoint_rows (HevSocks5EndpointStats *rows,
+                                         size_t capacity);
+ 
++/* A caller-owned single writer, independent of native worker TLS. Serialize
++ * record and free; join all callbacks before free. Totals survive release.
++ * Address is the actual socket peer. Directions retain the peer viewpoint:
++ * accepted_write -> received by the peer; consumed_read -> sent by the peer. */
++void *hev_socks5_server_io_writer_new (void);
++void hev_socks5_server_io_writer_record (void *writer,
++                                         const struct sockaddr *address,
++                                         socklen_t length,
++                                         size_t accepted_write,
++                                         size_t consumed_read);
++void hev_socks5_server_io_writer_free (void *writer);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/src/hev-main.c b/src/hev-main.c
+--- a/src/hev-main.c
++++ b/src/hev-main.c
+@@ -8,6 +8,7 @@
+  */
+ 
+ #include <stdio.h>
++#include <errno.h>
+ #include <signal.h>
+ #include <string.h>
+ 
+@@ -23,6 +24,7 @@
+ 
+ #include "hev-main.h"
+ #include "core/src/hev-socks5-meter.h"
++#include "core/src/worker_meter.h"
+ 
+ #ifdef __MSYS__
+ #define WEAK
+@@ -171,6 +173,32 @@
+     return hev_meter_rows (rows ? client_stats_copy : NULL, &copy);
+ }
+ 
++void *
++hev_socks5_server_io_writer_new (void)
++{
++    return wm_worker_new ();
++}
++
++void
++hev_socks5_server_io_writer_record (void *writer,
++                                    const struct sockaddr *address,
++                                    socklen_t length, size_t accepted_write,
++                                    size_t consumed_read)
++{
++    int saved_errno = errno;
++
++    if (writer && (accepted_write || consumed_read))
++        wm_add (wm_peer (writer, address, length), accepted_write,
++                consumed_read);
++    errno = saved_errno;
++}
++
++void
++hev_socks5_server_io_writer_free (void *writer)
++{
++    wm_worker_release (writer);
++}
++
+ WEAK int
+ main (int argc, char *argv[])
+ {
