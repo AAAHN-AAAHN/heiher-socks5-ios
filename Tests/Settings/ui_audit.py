@@ -10,6 +10,7 @@ import hashlib
 import json
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -33,17 +34,25 @@ def output(*args):
 
 def verify_production():
     baseline = 'cc78af2f170ecaf560fc2f6e41a4a4cd47729464'
-    source_base = '94cc35ba5b50bab177f7aa678aa5af8fd3b8481d'
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
+    source_base = config['base_commit']
+    if (not re.fullmatch(r'[0-9a-f]{40}', source_base) or
+            output('git', 'rev-parse', '--verify', source_base + '^{commit}').strip() != source_base):
+        raise RuntimeError('Main source baseline must be an exact commit')
     expected = json.loads(output('git', 'show', baseline + ':Build/features.json'))
     parent = json.loads((ROOT / 'docs/documentation.json').read_bytes())['parents']['feature/server-control']
     inherited = json.loads(output('git', 'show', parent + ':Build/features.json'))
     shared = json.loads(output('git', 'show', source_base + ':Build/features.json'))
+    if shared['name'] != 'baseline' or shared['features'] or shared['patches']:
+        raise RuntimeError('Shared main source baseline must be unpatched upstream')
+    patches = [{'file': 'hev-server-lifecycle.patch', 'repository': '.'},
+               {'file': 'hev-server-startup-stop.patch', 'repository': '.'}]
     if (inherited['base_commit'] != source_base or inherited['sources'] != shared['sources']
-            or inherited['upstream_app'] != shared['upstream_app']):
+            or inherited['upstream_app'] != shared['upstream_app']
+            or inherited['features'] != ['server'] or inherited['patches'] != patches):
         raise RuntimeError('Server-control parent differs from the exact shared source baseline')
     expected.update(base_commit=source_base, sources=shared['sources'],
-                    upstream_app=shared['upstream_app'])
+                    upstream_app=shared['upstream_app'], patches=patches)
     if config != expected:
         raise RuntimeError('Settings configuration differs beyond the exact inherited source baseline')
     # Current owner changes are approved by the committed frozen-code contract;
@@ -52,11 +61,13 @@ def verify_production():
     run([sys.executable, 'Build/check_ownership.py'], 'ownership-contract.log')
     production_base = 'c64faec0ca5ed14edfec2774bd5a2fad3bbaf4d9'
     allowed = {'Socks5/AppRoot.swift', 'Socks5/Settings/SettingsStore.swift',
-               'Socks5/Settings/SettingsView.swift'}
+               'Socks5/Settings/SettingsView.swift', 'Socks5/Settings/AppSettings.swift'}
+    inherited_changes = {'Socks5/Server/ServerController.swift',
+                         'Patches/hev-server-lifecycle.patch', 'Patches/hev-server-startup-stop.patch'}
     changed = set(output('git', 'diff', '--name-only', production_base, 'HEAD', '--',
                          'Socks5', 'Socks5.xcodeproj', 'Patches').splitlines())
-    if not changed <= allowed:
-        raise RuntimeError('Unexpected inherited production change: ' + repr(sorted(changed - allowed)))
+    if not changed <= allowed | inherited_changes:
+        raise RuntimeError('Unexpected inherited production change: ' + repr(sorted(changed - allowed - inherited_changes)))
     membership = json.loads((ROOT / 'docs/feature-membership.json').read_bytes())
     hashes = {path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest() for path in sorted(allowed)}
     if any(membership['files'].get(path) != digest for path, digest in hashes.items()):
