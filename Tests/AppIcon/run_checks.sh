@@ -12,7 +12,17 @@ git rev-parse HEAD > "$OUT/tested-commit.txt"
 git rev-parse 'HEAD^{tree}' > "$OUT/tested-tree.txt"
 git archive --format=zip HEAD -o "$OUT/tested-source.zip"
 git archive --format=zip f88e8c8946b095c4d5551d413dee3b4a60943714 -o "$OUT/input-source.zip"
-git archive --format=zip bf23e26538cffb7c79f1cf401792a74cbd9848e9 -o "$OUT/main-source.zip"
+ICON_BASE=$(python3 - <<'PY'
+import json, re
+from pathlib import Path
+base = json.loads(Path('Build/features.json').read_bytes())['base_commit']
+if not isinstance(base, str) or not re.fullmatch('[0-9a-f]{40}', base):
+    raise SystemExit('Full baseline commit SHA required')
+print(base)
+PY
+)
+git merge-base --is-ancestor "$ICON_BASE" HEAD
+git archive --format=zip "$ICON_BASE" -o "$OUT/main-source.zip"
 git diff --check f88e8c8946b095c4d5551d413dee3b4a60943714 HEAD > "$OUT/whitespace.log"
 python3 Build/check.py baseline > "$OUT/baseline.log"
 python3 Tests/baseline_audit.py > "$OUT/baseline-driver.log" 2>&1
