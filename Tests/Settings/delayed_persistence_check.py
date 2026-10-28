@@ -38,7 +38,10 @@ def main():
                 data = old if label == 'original-controller' and path.endswith('/ServerController.swift') else (ROOT / path).read_bytes()
                 text = data.decode()
                 if path.endswith('/ServerController.swift'):
-                    boundary = 'Task { @MainActor in self.finished(result) }'
+                    # Hold only delivery, preserving each controller's exact
+                    # completion arguments and the current run identity guard.
+                    boundary = ('Task { @MainActor in self.finished(result) }' if label == 'original-controller' else
+                                'Task { @MainActor in self.finished(result, id: id) }')
                     assert text.count(boundary) == 1, 'Native completion boundary changed'
                     text = text.replace(boundary, 'PersistenceCompletionGate.wait()\n                ' + boundary, 1)
                 if sys.platform != 'darwin': text = text.replace('import SwiftUI\n', 'import Foundation\n', 1)
