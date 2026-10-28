@@ -303,13 +303,21 @@ def main():
                 assert run.returncode == 0, run.stderr
                 data = json.loads(run.stdout)
                 received = echo.snapshot()
-                assert all(len(packets) >= 5 for packets in received.values()), (data, received)
+                delivered = sum(map(len, received.values()))
+                observation = {"kind": "mixed", "case": index, "listener": info,
+                               "probe": data, "received": received,
+                               "unconfirmed_deliveries": data["writes"] - delivered}
+                (options.output / f"mixed-{index}-observation.json").write_text(
+                    json.dumps(observation, indent=2) + "\n")
+                assert set(received) == {4, 6} and all(
+                    len(packets) >= 5 for packets in received.values()), (data, received)
                 assert all(packet[0] == "00" for packets in received.values() for packet in packets)
-                assert sum(map(len, received.values())) == data["writes"], (data, received)
+                # Off closes TCP and terminates its UDP association. Successful
+                # UDP writes do not guarantee destination delivery across that close.
+                assert delivered <= data["writes"], (data, received)
                 assert (data["readBytes"] > 0) == replies
                 stop_server(server)
-                results.append({"kind": "mixed", "case": index, "listener": info,
-                                "probe": data, "received": received})
+                results.append(observation)
         finally:
             if server is not None:
                 finish_process(server)
