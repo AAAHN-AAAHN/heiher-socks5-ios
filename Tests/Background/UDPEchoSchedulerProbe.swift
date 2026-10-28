@@ -39,6 +39,13 @@ private final class Observed: @unchecked Sendable {
 
 @main
 struct UDPEchoSchedulerProbe {
+    private static func require(_ value: Bool, _ marker: String) {
+        guard value else {
+            FileHandle.standardError.write(Data(("SCHEDULER_PREDICATE: " + marker + "\n").utf8))
+            preconditionFailure(marker)
+        }
+    }
+
     static func main() async throws {
         let args = CommandLine.arguments
         let mode = args[1]
@@ -78,22 +85,26 @@ struct UDPEchoSchedulerProbe {
         let stoppedCount = observed.snapshot().0
         try await Task.sleep(for: .milliseconds(mode.hasSuffix("-wait") ? 1100 : 140))
         let (count, readBytes, states, prepared, timestamps) = observed.snapshot()
-        precondition(count == stoppedCount)
-        if mode.hasSuffix("-wait") {
-            precondition(count == 0 && prepared == 1)
-            precondition(states.contains(mode == "statistics-wait" ?
-                "Waiting for traffic statistics" : "Waiting for SOCKS5 listener"))
-        } else {
-            precondition(activeCount >= 5 * families && activeCount <= 20 * families)
-            precondition(states.contains("Sending UDP Echo"))
-            precondition(prepared == 1)
-            if mode == "silence" { precondition(readBytes == 0) }
-            let intervals = zip(timestamps, timestamps.dropFirst()).map { Double($1 - $0) / 1_000_000 }
-            if families == 1 { precondition(intervals.allSatisfy { $0 >= 8 && $0 < 200 }) }
-        }
+        // Write observations before an optimized precondition trap can end the
+        // process without a Swift runtime diagnostic on the target platform.
         let result: [String: Any] = ["writes": count, "activeWrites": activeCount,
-                                     "readBytes": readBytes, "states": states, "preparations": prepared]
+                                     "readBytes": readBytes, "states": states, "preparations": prepared,
+                                     "stoppedWrites": stoppedCount, "families": families,
+                                     "timestamps": timestamps]
         let data = try JSONSerialization.data(withJSONObject: result, options: .sortedKeys)
-        print(String(decoding: data, as: UTF8.self))
+        FileHandle.standardOutput.write(data + Data([10]))
+        require(count == stoppedCount, "OFF_STABLE")
+        if mode.hasSuffix("-wait") {
+            require(count == 0 && prepared == 1, "WAIT_NO_WORK")
+            require(states.contains(mode == "statistics-wait" ?
+                "Waiting for traffic statistics" : "Waiting for SOCKS5 listener"), "WAIT_STATE")
+        } else {
+            require(activeCount >= 5 * families && activeCount <= 20 * families, "ACTIVE_COUNT")
+            require(states.contains("Sending UDP Echo"), "SENDING_STATE")
+            require(prepared == 1, "PREPARE_ONCE")
+            if mode == "silence" { require(readBytes == 0, "SILENCE_READS") }
+            let intervals = zip(timestamps, timestamps.dropFirst()).map { Double($1 - $0) / 1_000_000 }
+            if families == 1 { require(intervals.allSatisfy { $0 >= 8 && $0 < 200 }, "INTERVAL_RANGE") }
+        }
     }
 }
