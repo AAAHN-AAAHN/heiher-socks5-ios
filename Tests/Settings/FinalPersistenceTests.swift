@@ -41,23 +41,24 @@ import Foundation
         settings.selectedTab = .background
         try await store.importData(settings.encoded())
         let ordinary = try settings.encoded()
-        for count in [ordinary.count, 65_535, 65_536] {
+        for count in [ordinary.count, 65_535, 65_536, 65_537, 1_048_576] {
             var padded = ordinary
             padded.append(Data(repeating: 0x20, count: count - padded.count))
             try padded.write(to: input)
             try await store.importFile(input)
-            check(try store.value == settings && durable() == settings, "Bounded regular-file import \(count)")
+            check(try store.value == settings && durable() == settings, "Complete regular-file import \(count)")
             check(try Data(contentsOf: file) == ordinary, "Canonical output does not retain padding")
         }
-        var tooLarge = ordinary
-        tooLarge.append(Data(repeating: 0x20, count: 65_537 - tooLarge.count))
-        try await reject(tooLarge, "65537-byte direct import")
-        try tooLarge.write(to: input)
+        var malformed = ordinary
+        malformed.append(Data(repeating: 0x20, count: 65_537 - malformed.count))
+        malformed.append(0x78)
+        try await reject(malformed, "Large malformed direct import")
+        try malformed.write(to: input)
         let initialBytes = try Data(contentsOf: file)
         var failed = false
         do { try await store.importFile(input) } catch { failed = true }
-        check(failed && store.value == settings, "65537-byte coordinated import rejected")
-        check(try Data(contentsOf: file) == initialBytes, "Oversize file import preserves disk")
+        check(failed && store.value == settings, "Large malformed coordinated import rejected")
+        check(try Data(contentsOf: file) == initialBytes, "Malformed file import preserves disk")
         let document = try JSONSerialization.jsonObject(with: ordinary) as! [String: Any]
         for key in ["version", "server", "serverRunning", "background", "selectedTab"] {
             var missing = document; missing.removeValue(forKey: key)

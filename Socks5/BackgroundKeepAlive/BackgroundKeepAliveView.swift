@@ -5,8 +5,10 @@ import SwiftUI
 @MainActor
 struct BackgroundKeepAliveView: View {
     @ObservedObject var keepAlive: BackgroundKeepAlive
+    @ObservedObject var udpEcho: PeriodicUDPEchoModel
     @Binding var locationEnabled: Bool
     @Binding var audioEnabled: Bool
+    var acceptsNewIntent = true
 
     var body: some View {
         NavigationStack {
@@ -41,7 +43,34 @@ struct BackgroundKeepAliveView: View {
                         .font(.footnote)
                 }
                 Section {
-                    Text("Background services are independent of Server Start/Stop. Recovery runs only while iOS allows the app to execute.")
+                    Toggle("Periodic UDP Echo", isOn: Binding(get: { udpEcho.enabled },
+                                                             set: { udpEcho.setEnabled($0) }))
+                        .disabled(!udpEcho.enabled && !acceptsNewIntent)
+                        .accessibilityIdentifier("background.udpEcho.enabled")
+                    TextField("Destination IP", text: Binding(get: { udpEcho.destinations },
+                                                             set: { udpEcho.setDestinations($0) }), axis: .vertical)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .disabled(!acceptsNewIntent)
+                        .accessibilityIdentifier("background.udpEcho.destinations")
+                    TextField("Period (ms)", text: Binding(get: { udpEcho.period },
+                                                          set: { udpEcho.setPeriod($0) }))
+                        .keyboardType(.numberPad)
+                        .disabled(!acceptsNewIntent)
+                        .accessibilityIdentifier("background.udpEcho.period")
+                    Text(udpEcho.state).font(.footnote)
+                        .accessibilityIdentifier("background.udpEcho.state")
+                    if let error = udpEcho.storageError {
+                        Text(error).font(.footnote)
+                        Button("Retry save") { udpEcho.retrySave() }
+                    }
+                } header: {
+                    Text("Periodic UDP Echo")
+                } footer: {
+                    Text("Sends to UDP port 7 through the SOCKS5 server. Separate destination IPs with commas or newlines. Sending continues without replies.")
+                }
+                Section {
+                    Text("Audio and location are independent of Server Start/Stop. UDP Echo waits for a running SOCKS5 server. Recovery runs only while iOS allows the app to execute.")
                         .font(.footnote)
                 }
             }

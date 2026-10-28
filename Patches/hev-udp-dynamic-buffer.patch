@@ -1,5 +1,5 @@
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index 2903c747dec9aed5073d595f9abce2fe4872afbe..db7682284981c9687e2516cb3d325ce94108203f 100644
+index a118dcfe670d0bdf39d1d5fe46fc6b34d052d24c..db7682284981c9687e2516cb3d325ce94108203f 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -9,6 +9,10 @@
@@ -717,7 +717,7 @@ index 2903c747dec9aed5073d595f9abce2fe4872afbe..db7682284981c9687e2516cb3d325ce9
 +    res = udp_sendmmsg (self, hev_socks5_udp_get_fd (self), mvec, g);
      if (res <= 0) {
 -        /* Segments larger than the path MTU are rejected, don't retry them. */
--        if ((errno == EINVAL) && (segs[0] > 1)) {
+-        if (((errno == EINVAL) || (errno == EMSGSIZE)) && (segs[0] > 1)) {
 +        /* A rejected GSO group is retried once as ordinary datagrams. */
 +        if (res == -1 && HEV_SOCKS5 (self)->timeout &&
 +            mvec[0].msg_hdr.msg_iovlen > 3 &&
@@ -813,7 +813,7 @@ index 2903c747dec9aed5073d595f9abce2fe4872afbe..db7682284981c9687e2516cb3d325ce9
 -
 -    if ((num > 1) && udp_gso_max_size) {
 -        res = hev_socks5_udp_sendmmsg_udp_gso (self, msgv, num, iov);
--        if ((res > 0) || (errno != EINVAL))
+-        if ((res > 0) || ((errno != EINVAL) && (errno != EMSGSIZE)))
 -            return res;
 -    }
 -#endif /* __linux__ && UDP_SEGMENT */
@@ -1041,7 +1041,7 @@ index 2903c747dec9aed5073d595f9abce2fe4872afbe..db7682284981c9687e2516cb3d325ce9
          if (!HEV_SOCKS5 (self)->udp_associated) {
              if (connect (fd, (struct sockaddr *)&taddr[i], sizeof (taddr[i])) <
                  0)
-@@ -421,72 +1008,88 @@
+@@ -421,76 +1008,88 @@
              HEV_SOCKS5 (self)->udp_associated = 1;
          }
  
@@ -1056,13 +1056,17 @@ index 2903c747dec9aed5073d595f9abce2fe4872afbe..db7682284981c9687e2516cb3d325ce9
 -        addrlen = hev_socks5_addr_len (&udp->addr);
 -        if (addrlen <= 0) {
 -            LOG_D ("%p socks5 udp addr", self);
--            return -1;
+-            msgv[i].addr = NULL;
+-            msgv[i].len = 0;
+-            continue;
 -        }
 -
 -        doff = 3 + addrlen;
 -        if (doff > msgv[i].len) {
 -            LOG_D ("%p socks5 udp data len", self);
--            return -1;
+-            msgv[i].addr = NULL;
+-            msgv[i].len = 0;
+-            continue;
 -        }
 -
 -        msgv[i].addr = &udp->addr;
@@ -1178,7 +1182,7 @@ index 2903c747dec9aed5073d595f9abce2fe4872afbe..db7682284981c9687e2516cb3d325ce9
          int n, ret;
  
          for (i = 0, n = 0; i < res; i++) {
-@@ -501,6 +1104,10 @@
+@@ -505,6 +1104,10 @@
              family = hev_socks5_get_addr_family (HEV_SOCKS5 (self));
              ret = hev_socks5_addr_into_sockaddr6 (svec[i].addr, &addr[n],
                                                    &family);
@@ -1189,7 +1193,7 @@ index 2903c747dec9aed5073d595f9abce2fe4872afbe..db7682284981c9687e2516cb3d325ce9
              if (ret < 0) {
                  LOG_D ("%p socks5 udp sockaddr", self);
                  continue;
-@@ -522,15 +1129,20 @@
+@@ -526,15 +1129,20 @@
              struct sockaddr *addr = dvec[0].msg_hdr.msg_name;
              ret = skptr->binder (HEV_SOCKS5 (self), fd, addr);
              if (ret < 0) {
@@ -1212,7 +1216,7 @@ index 2903c747dec9aed5073d595f9abce2fe4872afbe..db7682284981c9687e2516cb3d325ce9
              if (ret <= 0) {
                  if (ret == -2)
                      return -1;
-@@ -549,29 +1161,55 @@
+@@ -553,29 +1161,55 @@
  }
  
  static int
@@ -1283,7 +1287,7 @@ index 2903c747dec9aed5073d595f9abce2fe4872afbe..db7682284981c9687e2516cb3d325ce9
      }
      if (res <= 0) {
          if (res == -1 && errno == EAGAIN)
-@@ -589,60 +1227,73 @@
+@@ -593,60 +1227,73 @@
      HevTask *task = hev_task_self ();
      int res_f = 1, res_b = 1;
      int bind = 0;

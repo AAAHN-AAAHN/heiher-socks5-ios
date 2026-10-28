@@ -37,7 +37,7 @@ private final class DiskProbe: @unchecked Sendable {
         if block { wait() }
         if fail { throw CocoaError(.fileReadNoPermission) }
         let handle=try FileHandle(forReadingFrom:url); defer { try? handle.close() }
-        return try handle.read(upToCount:65_537) ?? Data()
+        return try handle.readToEnd() ?? Data()
     }
     func imported(_ url: URL) throws -> Data {
         enter(); defer { leave() }
@@ -126,6 +126,29 @@ struct AsyncStorageTests {
             check(!s.value.background.silentAudio,"load cannot undo explicit Off")
             check(s.value.server == original.server && s.value.background.continuousLocation,"untouched saved fields preserved")
             check(try AppSettings.decoded(Data(contentsOf:url)) == s.value,"merged early edits persisted")
+        case "echo-blocked-load":
+            var original=try seed(url)
+            original.background.periodicUDPEcho.enabled=true
+            original.background.periodicUDPEcho.destinations="192.0.2.9"
+            try original.encoded().write(to:url)
+            p.armRead();let s=make(url,defaults,p)
+            s.set(\.background.periodicUDPEcho.enabled,false)
+            try await waitFor{ p.counts().waiting == 1 }
+            p.release();await s.whenLoaded();try await s.flush()
+            check(!s.value.background.periodicUDPEcho.enabled,"late load revived Echo after explicit Off")
+            check(s.value.background.periodicUDPEcho.destinations == "192.0.2.9","early Echo Off erased saved destinations")
+            check(try AppSettings.decoded(Data(contentsOf:url)) == s.value,"Echo Off not durable")
+        case "echo-stale-import":
+            let original=try seed(url)
+            var other=original;other.background.periodicUDPEcho.enabled=true
+            try other.encoded().write(to:imported)
+            let s=make(url,defaults,p);await s.whenLoaded();p.armProvider()
+            let task=Task { try await s.importFile(imported) }
+            try await waitFor{ p.counts().waiting == 1 }
+            s.set(\.background.periodicUDPEcho.enabled,false)
+            p.release();await rejects { try await task.value };try await s.flush()
+            check(!s.value.background.periodicUDPEcho.enabled,"late import revived Echo after explicit Off")
+            check(try AppSettings.decoded(Data(contentsOf:url)) == original,"stale Echo import changed disk")
         case "blocked-save":
             _=try seed(url,audio:true)
             let s=make(url,defaults,p);await s.whenLoaded();p.armWrite()

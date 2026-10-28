@@ -53,6 +53,7 @@ if [ ! -d "$CORE/.git" ]; then
     git clone --no-checkout https://github.com/heiher/hev-socks5-server.git "$CORE"
     git -C "$CORE" checkout --detach "$SERVER_REF"
     git -C "$CORE" submodule update --init --recursive
+    python3 Build/check.py checkout "$CORE" > "$OUT/source-checkout.log"
 fi
 python3 Build/check.py apply "$CORE" > "$OUT/source-audit.log"
 CF=$(command -v clang-format-18 || command -v clang-format)
@@ -74,7 +75,8 @@ feature() { python3 -c 'import json,sys; sys.exit(sys.argv[1] not in json.load(o
 python3 Build/native_checks.py "$CORE" "$OUT/native" > "$OUT/native-checks.log" 2>&1
 make -C "$CORE" clean > "$OUT/native-clean.log" 2>&1
 if feature background; then
-    python3 Tests/Background/run_checks.py > "$OUT/background.log" 2>&1
+    python3 Tests/Background/run_checks.py --core "$CORE" > "$OUT/background.log" 2>&1
+    make -C "$CORE" clean > "$OUT/udp-echo-native-clean.log" 2>&1
     python3 Tests/Background/check_async_session.py > "$OUT/background-async.log" 2>&1
     python3 Build/owner_checks.py --background-policy > "$OUT/background-policy.log" 2>&1
     if [ "$(uname -s)" = Darwin ]; then
@@ -108,6 +110,7 @@ if [ "$(uname -s)" = Darwin ] && [ "${BUILD_IPA:-1}" = 1 ]; then
     rm -rf "$PRODUCT/HevSocks5Server.xcframework"
     cp -R "$CORE/HevSocks5Server.xcframework" "$PRODUCT/"
     if [ "$NAME" = integrated ]; then
+        cmp "$MODULE/hev-main.h" "$PRODUCT/HevSocks5Server.xcframework/ios-arm64/Headers/hev-main.h"
         python3 Build/release_source.py record "$PRODUCT"
     fi
     xcodebuild archive -project "$PRODUCT/Socks5.xcodeproj" -scheme Socks5 -configuration Release \

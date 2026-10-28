@@ -47,13 +47,20 @@ def main():
         mode = b'100755' if (ROOT / path).stat().st_mode & 0o111 else b'100644'
         assert entry == mode, ('executable mode', path)
     # Entry point and platform declarations retain their exact prior bytes.
-    # The root now owns direct intent/load readiness, and the project adds only
-    # the three Background-owned files to the existing app source phase.
+    # The root owns direct intent/load readiness. The exact target delta is
+    # checked by intent_boundaries: three audio, five Echo and one writer input.
     for path in ('Socks5/Socks5App.swift', 'Socks5/Info.plist'):
         assert (ROOT / path).read_bytes() == git('show', INPUT + ':' + path), path
     subprocess.run([sys.executable, 'Tests/Integration/intent_boundaries.py', '--source-only'], check=True)
     root = (ROOT / 'Socks5/AppRoot.swift').read_text()
-    for name, kind in (('settings', 'SettingsStore'), ('server', 'ServerController'), ('keepAlive', 'BackgroundKeepAlive')):
+    for name, kind in (('settings', 'SettingsStore'), ('udpEcho', 'PeriodicUDPEchoModel')):
+        assert root.count('@StateObject private var ' + name + ': ' + kind) == 1
+    assert root.count('lazy var value = SettingsStore()') == 1 and root.count('SettingsStore()') == 1
+    assert root.count('let owner = DeferredSettings()') == 1
+    assert root.count('_settings = StateObject(wrappedValue: owner.value)') == 1
+    assert root.count('let settings = owner.value') == 1
+    assert root.count('_udpEcho = StateObject(wrappedValue: PeriodicUDPEchoModel(store: nil, save:') == 1
+    for name, kind in (('server', 'ServerController'), ('keepAlive', 'BackgroundKeepAlive')):
         assert root.count('@StateObject private var ' + name + ' = ' + kind + '()') == 1
     info = plistlib.loads((ROOT / 'Socks5/Info.plist').read_bytes())
     assert set(info['UIBackgroundModes']) == {'audio', 'location'}
@@ -65,7 +72,25 @@ def main():
     assert set(re.findall(r'PRODUCT_BUNDLE_IDENTIFIER = ([^;]+)', project)) == {'hev.Socks5'}
     statistics = json.loads(git('show', refs['feature/traffic-statistics'] + ':Build/features.json'))
     server = json.loads(git('show', refs['feature/server-control'] + ':Build/features.json'))
-    assert config['patches'] == statistics['patches'] + server['patches']
+    background = json.loads(git('show', refs['feature/background'] + ':Build/features.json'))
+    expected_patches = []
+    owners = {}
+    # Common lifecycle/UDP patches are inherited once. Shared declarations must
+    # agree on repository, file name and complete canonical patch bytes.
+    for branch, owner in (('feature/traffic-statistics', statistics),
+                          ('feature/server-control', server), ('feature/background', background)):
+        for item in owner['patches']:
+            name = item['file']
+            canonical = git('show', refs[branch] + ':Patches/' + name)
+            if name in owners:
+                previous, raw = owners[name]
+                assert item == previous and canonical == raw, ('Conflicting shared patch', name)
+            else:
+                owners[name] = item, canonical
+                expected_patches.append(item)
+            assert (ROOT / 'Patches' / name).read_bytes() == canonical, ('Canonical owner patch changed', name)
+    assert len(statistics['patches']) == 12 and len(server['patches']) == 2 and len(background['patches']) == 9
+    assert len(expected_patches) == 14 and config['patches'] == expected_patches
     assert len(config['patches']) == len({p['file'] for p in config['patches']})
     for ref in refs.values():
         owner = json.loads(git('show', ref + ':Build/features.json'))
@@ -74,9 +99,12 @@ def main():
         git('merge-base', '--is-ancestor', config['base_commit'], ref)
     # Test inheritance and executable prerequisites use the same current parents;
     # runtime equivalence alone cannot excuse a missing parent verification input.
-    stats_audit = git('show', refs['feature/traffic-statistics'] + ':Tests/Statistics/audit.py').decode()
-    dependency = re.search(r"^UDP = '([0-9a-f]{40})'$", stats_audit, re.M).group(1)
+    stats_documents = json.loads(git('show', refs['feature/traffic-statistics'] + ':docs/documentation.json'))
+    dependency = stats_documents['parents']['feature/udp-compat']
     documents = json.loads((ROOT / 'docs/documentation.json').read_bytes())
+    assert refs == documents['parents'], 'Owner refs differ from document parents'
+    background_documents = json.loads(git('show', refs['feature/background'] + ':docs/documentation.json'))
+    assert background_documents['parents'] == {'feature/udp-compat': dependency}
     assert refs['feature/traffic-statistics'] == documents['parents']['feature/traffic-statistics']
     assert dependency == refs['feature/udp-compat'] == documents['parents']['feature/udp-compat']
     git('merge-base', '--is-ancestor', dependency, refs['feature/traffic-statistics'])
@@ -126,7 +154,7 @@ def main():
                            ('Build/check_swift_sdk.sh', ['sdk-success.txt'])]:
         blob = git('rev-parse', '2dcfce074e288c942bd6582b3b77d4763c516a25:' + entry).decode().strip()
         driver.check(entry, markers, blob, 'integrated')
-    print(f'PASS: {len(members["sources"])} exact owner files, {len(config["patches"])} ordered patches, direct root intent, exact 15-source target and preserved platform/failure controls')
+    print(f'PASS: {len(members["sources"])} exact owner files, {len(config["patches"])} ordered patches, direct root intent, exact 21-source target and preserved platform/failure controls')
 
 
 if __name__ == '__main__':

@@ -1,4 +1,39 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
+#if canImport(Combine)
+import Combine
+#else
+protocol ObservableObject: AnyObject {
+    associatedtype ObjectWillChangePublisher = ObservableObjectPublisher
+    var objectWillChange: ObjectWillChangePublisher { get }
+}
+final class ObservableObjectPublisher {
+    @MainActor var onSend: (() -> Void)?
+    @MainActor init() {}
+    @MainActor func send() { onSend?() }
+}
+#endif
+
+/// Native endpoint discovery is the only Echo runtime facade. Returning nil
+/// represents a started server whose listener is not yet published.
+enum Socks5ServerEndpoint {
+    static func resolve(preferIPv4: Bool) -> Socks5UDPClient.Address? { nil }
+}
+
+@MainActor private func observeEcho(_ model: PeriodicUDPEchoModel,
+                                  _ callback: @escaping () -> Void) -> () -> Void {
+    #if canImport(Combine)
+    let subscription = model.objectWillChange.sink { callback() }
+    return { subscription.cancel() }
+    #else
+    model.objectWillChange.onSend = callback
+    return { model.objectWillChange.onSend = nil }
+    #endif
+}
 
 /// The driver inserts the unchanged AppRoot routing methods below. These small
 /// facades observe routing; the live-storage build additionally uses the actual
@@ -25,11 +60,22 @@ struct Binding<Value> {
 }
 
 #if !LIVE_SETTINGS
-struct ServerSettings: Equatable { var listenPort = "1080" }
+struct ServerSettings: Equatable {
+    var listenPort = "1080"
+    var udpListenAddress = "0.0.0.0"
+    var authUsername = ""
+    var authPassword = ""
+}
 struct AppSettings: Equatable {
     struct Background: Equatable {
         var continuousLocation = false
         var silentAudio = false
+        struct UDPEcho: Equatable {
+            var enabled = false
+            var destinations = "1.1.1.1"
+            var period = "1000"
+        }
+        var periodicUDPEcho = UDPEcho()
     }
     enum Tab { case statistics, server, background, settings }
     var server = ServerSettings()
@@ -39,6 +85,8 @@ struct AppSettings: Equatable {
 }
 
 @MainActor final class SettingsStore {
+    static var constructions = 0
+    init() { Self.constructions += 1 }
     enum LoadState { case loading, ready, failed }
     enum Origin { case user, load, imported }
     struct Change: Equatable { let revision: UInt64; let origin: Origin }
@@ -48,9 +96,12 @@ struct AppSettings: Equatable {
     var audioChange = Change(revision: 0, origin: .load)
     var locationChange = Change(revision: 0, origin: .load)
     var serverRunningChange = Change(revision: 0, origin: .load)
+    var echoChange = Change(revision: 0, origin: .load)
+    var onSet: (() -> Void)?
     var acceptsNewIntent = true
     private(set) var audioWrites: [Bool] = []
     private(set) var runningWrites: [Bool] = []
+    private(set) var echoWrites: [AppSettings.Background.UDPEcho] = []
 
     func set<Value>(_ path: WritableKeyPath<AppSettings, Value>, _ next: Value,
                     origin: Origin = .user) {
@@ -72,24 +123,33 @@ struct AppSettings: Equatable {
             serverRunningChange = change
             runningWrites.append(value.serverRunning)
         }
+        if path == \AppSettings.self || path == \.background || path == \.background.periodicUDPEcho ||
+            path == \.background.periodicUDPEcho.enabled || path == \.background.periodicUDPEcho.destinations ||
+            path == \.background.periodicUDPEcho.period {
+            echoChange = change
+            echoWrites.append(value.background.periodicUDPEcho)
+        }
         Trace.add("settings.\(change.revision)")
+        let callback = onSet; onSet = nil
+        callback?()
     }
 }
-#else
-#if canImport(Combine)
-import Combine
-#else
-protocol ObservableObject: AnyObject {
-    associatedtype ObjectWillChangePublisher = ObservableObjectPublisher
-    var objectWillChange: ObjectWillChangePublisher { get }
+/// Models the documented escaping autoclosure boundary. The exact AppRoot
+/// initializer is inserted into RootConstructionHost without source edits.
+@MainActor private final class StateObject<Value: AnyObject> {
+    private let factory: () -> Value
+    lazy var value = factory()
+    init(wrappedValue: @autoclosure @escaping () -> Value) { factory = wrappedValue }
 }
-// A globally isolated class would be implicitly Sendable and hide the real
-// Combine publisher's nonisolated-witness boundary for a stored let property.
-final class ObservableObjectPublisher {
-    @MainActor init() {}
-    @MainActor func send() {}
+
+private final class SocketIOWriter: Sendable {
+    init?() { fatalError("ROOT_INTENT_UNEXPECTED_STATISTICS_PREPARATION") }
+    func record(_ address: UnsafePointer<sockaddr>, length: socklen_t, bytes: Int, sent: Bool) {
+        fatalError("ROOT_INTENT_UNEXPECTED_STATISTICS_RECORD")
+    }
 }
-#endif
+
+#else
 #if !canImport(Darwin)
 final class NSFileCoordinator {
     init(filePresenter: Any?) {}
@@ -194,8 +254,11 @@ private final class LeaseProbe: @unchecked Sendable {
 }
 
 @MainActor final class ServerController {
+    struct Run { let id: UUID; let settings: ServerSettings }
+    private(set) var run: Run?
     var onApply: (() -> Void)?
     func apply(_ value: ServerSettings, running: Bool, retry: Bool = false) {
+        run = running ? (run ?? Run(id: UUID(), settings: value)) : nil
         Trace.add("server.\(running).\(value.listenPort).\(retry)")
         let callback = onApply; onApply = nil
         callback?()
@@ -205,6 +268,44 @@ private final class LeaseProbe: @unchecked Sendable {
 // INSERT_ROOT_INTENT_HOST
 
 #if !LIVE_SETTINGS
+@MainActor private extension RootConstructionHost {
+    static func check(_ name: String) {
+        let before = SettingsStore.constructions
+        switch name {
+        case "deferred-unused":
+            let unused = (0..<128).map { _ in RootConstructionHost() }
+            Trace.check(SettingsStore.constructions == before, "DEFERRED_EAGER_STORE")
+            withExtendedLifetime(unused) {}
+        case "deferred-shared":
+            var initial: RootConstructionHost? = RootConstructionHost()
+            let settings = initial!._settings.value
+            let echo = initial!._udpEcho.value
+            Trace.check(SettingsStore.constructions == before + 1, "DEFERRED_SHARED_STORE")
+            // Retained StateObjects outlive the first value. New initializer
+            // autoclosures remain unused when SwiftUI retains those objects.
+            initial = nil
+            let replacements = (0..<128).map { _ in RootConstructionHost() }
+            Trace.check(SettingsStore.constructions == before + 1, "DEFERRED_REBUILD_STORE")
+            echo.setEnabled(true)
+            Trace.check(settings.value.background.periodicUDPEcho.enabled &&
+                        SettingsStore.constructions == before + 1, "DEFERRED_SHARED_STORE")
+            echo.setEnabled(false)
+            withExtendedLifetime(replacements) {}
+        case "deferred-echo-first":
+            let root = RootConstructionHost()
+            let echo = root._udpEcho.value
+            Trace.check(SettingsStore.constructions == before, "DEFERRED_ECHO_CREATED_STORE")
+            echo.setPeriod("00020")
+            let settings = root._settings.value
+            Trace.check(SettingsStore.constructions == before + 1 &&
+                        settings.value.background.periodicUDPEcho.period == "00020", "DEFERRED_ECHO_DIFFERENT_STORE")
+            Trace.check(root._settings.value === settings, "DEFERRED_REPEATED_STORE")
+        default: fatalError("Unknown initialization case: " + name)
+        }
+        print("PASS: exact AppRoot deferred construction " + name)
+    }
+}
+
 @MainActor private extension RootIntentHost {
     static func routing(_ name: String) {
         let settings = SettingsStore()
@@ -413,6 +514,88 @@ private final class LeaseProbe: @unchecked Sendable {
             host.restoreServices()
             Trace.check(!settings.value.background.continuousLocation && !host.keepAlive.locationEnabled,
                 "TERMINAL_LOCATION_OFF")
+        case "udp-direct":
+            host.udpEcho.setEnabled(true)
+            Trace.check(settings.value.background.periodicUDPEcho.enabled, "UDP_DIRECT_NOT_STORED")
+            host.udpEcho.setDestinations(" 127.0.0.1,::1\n")
+            host.udpEcho.setPeriod("00020")
+            host.udpEcho.setEnabled(false)
+            let echo = settings.value.background.periodicUDPEcho
+            Trace.check(!echo.enabled && echo.destinations == " 127.0.0.1,::1\n" && echo.period == "00020",
+                        "UDP_DIRECT_RAW_FIELDS")
+            Trace.check(settings.echoWrites.count == 4 && !host.udpEcho.enabled, "UDP_DIRECT_WRITES")
+        case "udp-loading-off":
+            settings.loadState = .loading
+            settings.value.background.periodicUDPEcho.enabled = true
+            host.udpEcho.restore(.init(enabled: true))
+            host.udpEcho.setEnabled(false)
+            host.restoreServices()
+            Trace.check(!settings.value.background.periodicUDPEcho.enabled && !host.udpEcho.enabled,
+                        "UDP_LOADING_OFF_GATED")
+        case "udp-restore":
+            let echo = AppSettings.Background.UDPEcho(enabled: true, destinations: "::1,127.0.0.1", period: "00012")
+            settings.set(\.background.periodicUDPEcho, echo)
+            host.restoreServices()
+            Trace.check(host.udpEcho.settings == .init(enabled: true, destinations: echo.destinations, period: echo.period),
+                        "UDP_RESTORE_FIELDS")
+            Trace.check(settings.echoWrites.count == 1, "UDP_RESTORE_PERSISTENCE_LOOP")
+            let revision = host.udpEcho.intentRevision
+            settings.set(\.selectedTab, .server)
+            host.restoreServices()
+            Trace.check(host.udpEcho.intentRevision == revision, "UDP_UNRELATED_RESTART")
+            host.udpEcho.setEnabled(false)
+        case "udp-save-reentry":
+            settings.onSet = {
+                host.udpEcho.setEnabled(false)
+                settings.set(\.selectedTab, .background)
+            }
+            host.udpEcho.setEnabled(true)
+            host.restoreServices()
+            Trace.check(!host.udpEcho.enabled && !settings.value.background.periodicUDPEcho.enabled,
+                        "UDP_SAVE_REENTRY_OLD_ON")
+            Trace.check(settings.echoWrites.map(\.enabled) == [true, false], "UDP_SAVE_REENTRY_WRITES")
+        case "udp-restore-reentry":
+            settings.value.serverRunning = true
+            settings.value.background.periodicUDPEcho.enabled = true
+            var once = false
+            let cancel = observeEcho(host.udpEcho) {
+                guard !once else { return }
+                once = true
+                host.udpEcho.setEnabled(false)
+                settings.set(\.selectedTab, .background)
+            }
+            host.restoreServices()
+            cancel()
+            Trace.check(once && !host.udpEcho.enabled && !settings.value.background.periodicUDPEcho.enabled,
+                        "UDP_RESTORE_REENTRY_OLD_ON")
+            Trace.check(!Trace.events.contains("server.true.1080.false"), "UDP_STALE_SERVER_AFTER_RESTORE")
+        case "udp-whole-import":
+            var imported = settings.value
+            imported.background.periodicUDPEcho = .init(enabled: true, destinations: "", period: "")
+            settings.set(\.self, imported, origin: .imported)
+            host.restoreServices()
+            Trace.check(host.udpEcho.settings == .init(enabled: true, destinations: "", period: ""),
+                        "UDP_IMPORT_RAW_EMPTY")
+            Trace.check(settings.echoWrites.count == 1, "UDP_IMPORT_EXTRA_WRITE")
+            host.udpEcho.setEnabled(false)
+        case "udp-terminal-off":
+            settings.value.background.periodicUDPEcho = .init(enabled: true, destinations: "::1", period: "9")
+            host.udpEcho.restore(.init(enabled: true, destinations: "::1", period: "9"))
+            settings.change = .init(revision: .max, origin: .user)
+            settings.acceptsNewIntent = false
+            host.udpEcho.setEnabled(false)
+            Trace.check(!settings.value.background.periodicUDPEcho.enabled, "UDP_TERMINAL_OFF_NOT_STORED")
+            Trace.check(!host.udpEcho.enabled && settings.value.background.periodicUDPEcho.destinations == "::1" &&
+                        settings.value.background.periodicUDPEcho.period == "9", "UDP_TERMINAL_OFF_FIELDS")
+        case "udp-server-stop":
+            host.udpEcho.setEnabled(true)
+            host.startServer()
+            host.restoreServices()
+            host.stopServer()
+            host.restoreServices()
+            Trace.check(host.server.run == nil && host.udpEcho.enabled && settings.value.background.periodicUDPEcho.enabled,
+                        "UDP_STOP_LOST_USER_INTENT")
+            host.udpEcho.setEnabled(false)
         default: fatalError("Unknown routing case: " + name)
         }
         print("PASS: AppRoot routing " + name)
@@ -596,6 +779,42 @@ private final class DiskProbe: @unchecked Sendable {
                 Trace.check(settings.change.origin == .imported && settings.audioChange == settings.change &&
                     settings.locationChange == settings.change && settings.serverRunningChange == settings.change,
                     "LIVE_IMPORT_STAMPS")
+            } else if name == "udp-import" {
+                var replacement = saved
+                replacement.background.periodicUDPEcho = .init(enabled: true, destinations: "", period: "")
+                try await settings.importData(replacement.encoded())
+                host.restoreServices()
+                Trace.check(host.udpEcho.settings == .init(enabled: true, destinations: "", period: ""),
+                            "LIVE_UDP_IMPORT_RAW")
+                Trace.check(settings.echoChange == settings.change, "LIVE_UDP_IMPORT_STAMP")
+                host.udpEcho.setEnabled(false)
+                try await settings.flush()
+            } else if name == "udp-blocked-save" {
+                host.udpEcho.setEnabled(true)
+                try await settings.flush()
+                disk.arm("write")
+                host.udpEcho.setEnabled(false)
+                try await wait { disk.counts().waiting == 1 }
+                Trace.check(!host.udpEcho.enabled && !settings.value.background.periodicUDPEcho.enabled &&
+                            host.udpEcho.state == "Off", "LIVE_UDP_OFF_BLOCKED_BY_STORAGE")
+                Trace.check(settings.savePending, "LIVE_UDP_SAVE_NOT_PENDING")
+                disk.release()
+                try await settings.flush()
+            } else if name == "udp-stale-import" {
+                var replacement = saved
+                replacement.background.periodicUDPEcho.enabled = true
+                try replacement.encoded().write(to: imported)
+                disk.arm("import")
+                let task = Task { try await settings.importFile(imported) }
+                try await wait { disk.counts().waiting == 1 }
+                host.udpEcho.setEnabled(false)
+                disk.release()
+                do { try await task.value; fatalError("ROOT_INTENT_UDP_STALE_IMPORT_ACCEPTED") }
+                catch { }
+                host.restoreServices()
+                Trace.check(!host.udpEcho.enabled && !settings.value.background.periodicUDPEcho.enabled,
+                            "LIVE_UDP_IMPORT_UNDID_OFF")
+                try await settings.flush()
             } else if name == "invalid-import" {
                 let before = try Data(contentsOf: target)
                 let change = settings.change
@@ -625,7 +844,8 @@ private final class DiskProbe: @unchecked Sendable {
         #if LIVE_SETTINGS
         try await RootIntentHost.live(name)
         #else
-        RootIntentHost.routing(name)
+        if name.hasPrefix("deferred-") { RootConstructionHost.check(name) }
+        else { RootIntentHost.routing(name) }
         #endif
     }
 }

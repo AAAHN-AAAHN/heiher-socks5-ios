@@ -45,7 +45,7 @@ private final class FaultDisk: @unchecked Sendable {
         lock.lock(); reads += 1; lock.unlock()
         let handle = try FileHandle(forReadingFrom: target)
         defer { try? handle.close() }
-        return try handle.read(upToCount: 65_537) ?? Data()
+        return try handle.readToEnd() ?? Data()
     }
     func write(_ bytes: Data, _ target: URL) throws {
         dispatchPrecondition(condition: .notOnQueue(.main))

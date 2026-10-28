@@ -40,6 +40,10 @@ with tempfile.TemporaryDirectory() as name:
         if baseline and path.endswith('ServerSettings.swift'):
             continue
         ref = reference if baseline else (previous_ref if previous and path.endswith('SettingsStore.swift') else None)
+        if previous and path.endswith('AppSettings.swift'):
+            # Freeze the historical schema together with its tests. The new
+            # Echo extension intentionally removes the former JSON byte cap.
+            ref = historical_tests
         raw = (subprocess.check_output(['git', '-C', str(root), 'show', ref + ':' + path])
                if ref else (root / path).read_bytes())
         print('SOURCE', path, hashlib.sha256(raw).hexdigest(), flush=True)
@@ -60,6 +64,7 @@ with tempfile.TemporaryDirectory() as name:
               (['LoadAccessTests.swift'], provider, '6 access-boundary assertions; 1 failed')]
     if not baseline and not previous:
         groups.append((['FinalPersistenceTests.swift'], provider, None))
+        groups.append((['UDPEchoSettingsTests.swift'], provider, None))
         groups.append((['FinalCoordination.swift'], [], None))
     if baseline:
         groups = groups[2:3]
@@ -114,3 +119,6 @@ with tempfile.TemporaryDirectory() as name:
 if not baseline and not previous:
     subprocess.run([sys.executable, str(Path(__file__).with_name('async_storage_check.py'))], check=True)
     subprocess.run([sys.executable, str(Path(__file__).with_name('rollback_storage_check.py'))], check=True)
+
+    subprocess.run([sys.executable, str(Path(__file__).with_name('check_file_feedback.py')),
+                    '--source', str(root), '--out', str(root / 'artifacts' / 'settings-file-feedback')], check=True)

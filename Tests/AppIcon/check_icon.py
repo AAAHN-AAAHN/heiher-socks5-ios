@@ -4,12 +4,12 @@ import hashlib
 import json
 from pathlib import Path
 import plistlib
+import re
 import struct
 import subprocess
 import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE = '94cc35ba5b50bab177f7aa678aa5af8fd3b8481d'
 INPUT = 'f88e8c8946b095c4d5551d413dee3b4a60943714'
 CATALOG = 'Socks5/Assets.xcassets/AppIcon.appiconset'
 IMAGE_HASH = '4a2f2a9384e8b6db351a9284232db56e719377e60f17123e4a6992cee1799cc2'
@@ -109,8 +109,12 @@ def main():
     import runpy
     documents = runpy.run_path(str(ROOT / 'Build/check_documentation.py'))
     documents['check'](ROOT)
+    config = json.loads((ROOT / 'Build/features.json').read_bytes())
+    base = config['base_commit']
+    require(isinstance(base, str) and re.fullmatch('[0-9a-f]{40}', base),
+            'Full baseline commit SHA required')
     result = catalog(ROOT / CATALOG)
-    git('merge-base', '--is-ancestor', BASE, 'HEAD')
+    git('merge-base', '--is-ancestor', base, 'HEAD')
     git('merge-base', '--is-ancestor', INPUT, 'HEAD')
     paths = documents['code_paths'](ROOT, git('ls-files').decode().splitlines())
     originals = documents['code_paths'](ROOT, git('ls-tree', '-r', '--name-only', INPUT).decode().splitlines())
@@ -118,16 +122,15 @@ def main():
     shared = {'Build/build.sh', 'Build/check.py', 'docs/main-baseline.md',
               'Build/upstream.json', 'Build/baseline-framework.json',
               'Tests/tcp_smoke.py', 'Tests/tcp_smoke_contract.py'}
-    shared.update(p for p in git('ls-tree', '-r', '--name-only', BASE).decode().splitlines()
+    shared.update(p for p in git('ls-tree', '-r', '--name-only', base).decode().splitlines()
                   if p.startswith('HevSocks5Server.xcframework/'))
     inherited = {'Tests/baseline_audit.py', 'docs/top-level-principles.md'}
     for path in documents['code_paths'](ROOT, shared | inherited):
-        require((ROOT / path).read_bytes() == git('show', BASE + ':' + path),
+        require((ROOT / path).read_bytes() == git('show', base + ':' + path),
                 'Current main source: ' + path)
     old_config = json.loads(git('show', INPUT + ':Build/features.json'))
-    baseline_config = json.loads(git('show', BASE + ':Build/features.json'))
-    require(json.loads((ROOT / 'Build/features.json').read_bytes()) ==
-            dict(old_config, base_commit=BASE, sources=baseline_config['sources'],
+    baseline_config = json.loads(git('show', base + ':Build/features.json'))
+    require(config == dict(old_config, base_commit=base, sources=baseline_config['sources'],
                  upstream_app=baseline_config['upstream_app']), 'Only shared baseline inputs change')
     preserved = []
     require(set(originals) <= set(paths), 'Original file removed')
@@ -138,19 +141,18 @@ def main():
     require(all(p.startswith('Tests/AppIcon/') or p in inherited | shared
                 for p in set(paths) - set(originals)),
             'Unexpected feature addition')
-    config = json.loads((ROOT / 'Build/features.json').read_bytes())
     require(config['features'] == ['icon'] and not config['patches'], 'Icon-only composition')
     for key in ('sources', 'upstream_app'):
         require(config[key] == baseline_config[key], 'Native/app source pin changed')
     for path in ('Socks5/Socks5App.swift', 'Socks5/ContentView.swift'):
-        require((ROOT / path).read_bytes() == git('show', BASE + ':' + path), 'Runtime source changed')
+        require((ROOT / path).read_bytes() == git('show', base + ':' + path), 'Runtime source changed')
     info = plistlib.loads((ROOT / 'Socks5/Info.plist').read_bytes())
     require(set(info) == {'UIApplicationSceneManifest', 'NSLocalNetworkUsageDescription'}, 'Extra plist feature')
     require(info['UIApplicationSceneManifest']['UIApplicationSupportsMultipleScenes'] is False,
             'Preserve existing single-scene declaration')
     require((ROOT / 'README.md').read_bytes() == (ROOT / 'docs/features/app-icon.md').read_bytes(), 'README mirror')
     result.update(testedCommit=git('rev-parse', 'HEAD').decode().strip(),
-                  inputCommit=INPUT, baseline=BASE, unchangedInputFiles=preserved,
+                  inputCommit=INPUT, baseline=base, unchangedInputFiles=preserved,
                   scope='Source and complete PNG decoding. Not compilation, installation or OS rendering.')
     print(json.dumps(result, indent=2))
 

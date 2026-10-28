@@ -6,6 +6,14 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+# Preserve every original production hunk across the shared-lifecycle split.
+original_patch = subprocess.check_output(['git', '-C', str(ROOT), 'show',
+    '7e40f951441cb226bc5e22a95d9c0658aba76939:Patches/hev-server-startup-stop.patch'])
+shared_patch = (ROOT / 'Patches/hev-server-lifecycle.patch').read_bytes()
+server_patch = (ROOT / 'Patches/hev-server-startup-stop.patch').read_bytes()
+if shared_patch + server_patch != original_patch:
+    raise AssertionError('Shared lifecycle split lost or changed an original ServerControl hunk')
+print('PASS: shared lifecycle and ServerControl remainder exactly reconstruct the canonical original')
 with tempfile.TemporaryDirectory() as name:
     temp = Path(name)
     sources = []
@@ -18,17 +26,17 @@ with tempfile.TemporaryDirectory() as name:
         sources.append(str(output))
     mocks = []
     if sys.platform != 'darwin':
-        (temp / 'UI.swift').write_text('import Foundation\nprotocol ObservableObject {}\n@propertyWrapper struct Published<T> { var wrappedValue: T }\n')
+        (temp / 'UI.swift').write_text('import Foundation\nprotocol ObservableObject: AnyObject { var objectWillChange: ObservableObjectPublisher { get } }\n@propertyWrapper struct Published<T> { var wrappedValue: T }\nfinal class ObservableObjectPublisher { var receive: (() -> Void)?; func send() { receive?() } }\n')
         mocks.append(str(temp / 'UI.swift'))
-    for test in ('ServerTests', 'RevalidationTests'):
+    for test in ('ServerTests', 'RevalidationTests', 'RunSnapshotTests'):
         executable = temp / test
-        subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors', *mocks, *sources,
+        subprocess.run(['swiftc', '-swift-version', '5', '-strict-concurrency=complete', '-warnings-as-errors', *mocks, *sources,
                         str(Path(__file__).with_name('ServerMocks.swift')),
                         str(Path(__file__).with_name(test + '.swift')), '-o', str(executable)], check=True, timeout=120)
         subprocess.run([str(executable)], check=True, timeout=45)
     # Exhaust four-intent suffixes with the actual controller and held engine return.
     matrix = temp / 'transition-matrix'
-    subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors', *mocks, *sources,
+    subprocess.run(['swiftc', '-swift-version', '5', '-strict-concurrency=complete', '-warnings-as-errors', *mocks, *sources,
                     str(Path(__file__).with_name('TransitionBoundary.swift')),
                     str(Path(__file__).with_name('TransitionMatrix.swift')), '-o', str(matrix)],
                    check=True, timeout=120)
@@ -38,7 +46,7 @@ with tempfile.TemporaryDirectory() as name:
     old.write_bytes(subprocess.check_output(['git', '-C', str(ROOT), 'show',
         '68599f96331f3f45e3fa271db02e6ede0fc35d73:Socks5/Server/ServerSettings.swift']))
     negative = temp / 'old-equality'
-    subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors', *mocks,
+    subprocess.run(['swiftc', '-swift-version', '5', '-strict-concurrency=complete', '-warnings-as-errors', *mocks,
                     str(old), sources[1], str(Path(__file__).with_name('ServerMocks.swift')),
                     str(Path(__file__).with_name('RevalidationTests.swift')), '-o', str(negative)], check=True, timeout=120)
     result = subprocess.run([str(negative), '--unicode-only'], text=True, capture_output=True, timeout=45)
@@ -52,7 +60,7 @@ with tempfile.TemporaryDirectory() as name:
     original = original.replace('AppSettings', 'OriginalAppSettings').replace('ServerSettings', 'OriginalServerSettings').replace('SettingsError', 'OriginalSettingsError')
     (temp / 'Original.swift').write_text(original)
     parity = temp / 'parity'
-    subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors',
+    subprocess.run(['swiftc', '-swift-version', '5', '-strict-concurrency=complete', '-warnings-as-errors',
                     str(ROOT / 'Socks5/Server/ServerSettings.swift'), str(temp / 'Original.swift'),
                     str(Path(__file__).with_name('ConfigurationParity.swift')), '-o', str(parity)], check=True, timeout=120)
     subprocess.run([str(parity)], check=True, timeout=30)

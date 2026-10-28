@@ -14,12 +14,13 @@ OUT = ROOT / 'artifacts/statistics-final-audit'
 CORE = ROOT / '.build/statistics-final-audit/core'
 START = 'd34e49478d7e061b8824e9f431b40998db25f8b2'
 SOCKET_BASE = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
-UDP = '9baac92fb4508d9e1b96f00744a91ff1cae77003'
+UDP = json.loads((ROOT / 'docs/documentation.json').read_bytes())['parents']['feature/udp-compat']
 CONFIG = json.loads((ROOT / 'Build/features.json').read_text())
 SOCKET_PATCHES = [
     {'file': 'hev-socket-meter-task.patch', 'repository': 'third-part/hev-task-system'},
     {'file': 'hev-socket-meter-core.patch', 'repository': 'src/core'},
     {'file': 'hev-socket-meter-server.patch', 'repository': '.'},
+    {'file': 'hev-socket-meter-writer.patch', 'repository': '.'},
 ]
 UDP_COMPOSED_SOURCES = ('udp_sockaddr_unit.c', 'udp_buffer_unit.c', 'udp_buffer_io.c',
                         'udp_buffer_send.c', 'udp_stream_boundaries.c', 'udp_splicer_lifetime.c',
@@ -67,7 +68,7 @@ def run(args, log, cwd=ROOT, timeout=180, env=None):
 def worker_baseline_sha256():
     """Supply this owner's reviewed worker input to composed lifecycle checks."""
     manifest = json.loads((ROOT / 'Tests/SocketIO/worker-native.json').read_text())
-    digest = manifest['compositions']['statistics']['src/hev-socks5-worker.c']
+    digest = manifest['worker_before_stop_guard']
     assert re.fullmatch(r'[0-9a-f]{64}', digest), 'Invalid Statistics worker digest'
     return digest
 
@@ -92,7 +93,7 @@ def check_udp_inheritance():
             entries[path.decode()] = tuple(meta.decode().split())
     # Discover the whole parent test tree, not a hand-maintained partial inventory.
     paths = dict(UDP_FILES)
-    paths.update({p: p for p in entries if p.startswith('Tests/')})
+    paths.update({p: p for p in entries if p.startswith(('Tests/', 'Patches/'))})
     preserved = {}
     for target, source in paths.items():
         mode, kind, blob = entries[source]
@@ -129,6 +130,8 @@ def inspect_sources(commit=None):
                               'Socks5', 'Socks5.xcodeproj', 'Patches').decode().splitlines())
     allowed = {'Socks5/Statistics/TrafficStatistics.swift',
                'Socks5/Statistics/TrafficStatisticsView.swift',
+               'Socks5/Statistics/SocketIOWriter.swift',
+               'Socks5.xcodeproj/project.pbxproj',
                'Patches/hev-stats-task-io.patch', 'Patches/hev-stats-core.patch',
                'Patches/hev-stats-server.patch',
                *('Patches/' + p['file'] for p in SOCKET_PATCHES),
@@ -138,7 +141,9 @@ def inspect_sources(commit=None):
     git('merge-base', '--is-ancestor', UDP, 'HEAD')
     git('diff', '--exit-code', SOCKET_BASE, 'HEAD', '--', 'Socks5', 'Socks5.xcodeproj',
         ':(exclude)Socks5/Statistics/TrafficStatistics.swift',
-        ':(exclude)Socks5/Statistics/TrafficStatisticsView.swift')
+        ':(exclude)Socks5/Statistics/TrafficStatisticsView.swift',
+        ':(exclude)Socks5/Statistics/SocketIOWriter.swift',
+        ':(exclude)Socks5.xcodeproj/project.pbxproj')
     for name in ('hev-stats-task-io.patch', 'hev-stats-core.patch', 'hev-stats-server.patch'):
         assert not (ROOT / 'Patches' / name).exists(), 'Obsolete payload collector: ' + name
     from ui_audit import verify_presentation
@@ -196,6 +201,11 @@ def native_checks(mode):
     includes = ['-I' + str(CORE / 'src'), '-I' + str(CORE / 'src/core/src'),
                 '-I' + str(CORE / 'src/misc'),
                 '-I' + str(task / 'src'), '-I' + str(task / 'include')]
+    writer = OUT / 'socket-writer'
+    run([*common, *includes, 'Tests/Statistics/socket_writer.c', *libs, '-o', writer],
+        mode + '-socket-writer-build.log')
+    run([writer], mode + '-socket-writer.log')
+    writer.unlink()
     run([sys.executable, 'Tests/SocketIO/run.py', CORE, '--mode', mode,
          '--output', OUT / ('socket-' + mode)], mode + '-socket-io.log', timeout=600)
     # Preserve the UDP parent's protocol and buffer checks on the composed core.
@@ -280,6 +290,12 @@ def native_checks(mode):
         mode + '-socket-abi-build.log')
     run([executable], mode + '-socket-abi.log')
     executable.unlink()
+    executable = OUT / 'socket-writer-bridge'
+    run(['swiftc', '-swift-version', '5', '-strict-concurrency=complete', '-warnings-as-errors', '-I', module,
+         'Socks5/Statistics/SocketIOWriter.swift', 'Tests/Statistics/SocketWriterBridge.swift',
+         *libs, '-Xlinker', '-lpthread', '-o', executable], mode + '-writer-bridge-build.log')
+    run([executable], mode + '-writer-bridge.log')
+    executable.unlink()
 
 
 def model_checks():
@@ -357,6 +373,7 @@ def main():
     run(['git', 'clone', '--no-checkout', 'https://github.com/heiher/hev-socks5-server.git', CORE], 'clone.log')
     run(['git', 'checkout', '--detach', CONFIG['sources']['.']], 'checkout.log', CORE)
     run(['git', 'submodule', 'update', '--init', '--recursive'], 'submodules.log', CORE)
+    run([sys.executable, 'Build/check.py', 'checkout', CORE], 'effective-pins.log')
     run([sys.executable, 'Build/check.py', 'apply', CORE], 'apply.log')
     # Preserve the actual patched native sources for offline inspection; no build
     # product, credentials or .git metadata is included in this source-only archive.
@@ -385,6 +402,7 @@ def main():
     (OUT / 'statistics-source-hashes.json').write_text(json.dumps(hashes, indent=2) + '\n')
     # Test-only C follows the same formatter; never silently rewrite reviewed files.
     for path in [*(ROOT / 'Tests/SocketIO').glob('*.c'),
+                 ROOT / 'Tests/Statistics/socket_writer.c',
                  *(ROOT / 'Tests' / source for source in UDP_COMPOSED_SOURCES)]:
         target = OUT / ('formatted-' + path.name)
         formatted = subprocess.check_output([formatter, '--style=file:' + str(CORE / '.clang-format'), str(path)])

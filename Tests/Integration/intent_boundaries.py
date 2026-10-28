@@ -19,6 +19,12 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/integrated/intent-boundaries'
 PREVIOUS = 'ed6b920cee4f3e5f0469807e521f19bf6f92f92e'
 NEW_AUDIO = ('LoopAudioService.swift', 'PlaybackProgressMonitor.swift', 'RecoveryExecutionLease.swift')
+NEW_ECHO = ('Socks5UDPClient.swift', 'Socks5ServerEndpoint.swift', 'PeriodicUDPEchoModel.swift',
+            'PeriodicUDPEchoService.swift', 'PeriodicUDPEchoStore.swift')
+HOST_ECHO = tuple('Socks5/BackgroundKeepAlive/' + name for name in NEW_ECHO
+                  if name != 'Socks5ServerEndpoint.swift')
+PROJECT_ADDITIONS = {**{name: 'BackgroundKeepAlive' for name in NEW_AUDIO + NEW_ECHO},
+                     'SocketIOWriter.swift': 'Statistics'}
 EXPECTED_SOURCES = {
     'Socks5/AppRoot.swift', 'Socks5/Socks5App.swift', 'Socks5/ContentView.swift',
     'Socks5/Server/ServerController.swift', 'Socks5/Server/ServerSettings.swift',
@@ -27,16 +33,21 @@ EXPECTED_SOURCES = {
     'Socks5/Statistics/TrafficStatisticsView.swift',
     'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift',
     'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift',
-    *('Socks5/BackgroundKeepAlive/' + name for name in NEW_AUDIO),
+    *('Socks5/BackgroundKeepAlive/' + name for name in NEW_AUDIO + NEW_ECHO),
+    'Socks5/Statistics/SocketIOWriter.swift',
 }
 ROUTING = ('direct', 'repeated', 'echo', 'off-on', 'loading', 'failed-stop', 'origin',
            'location-reentry', 'audio-reentry', 'direct-reentry', 'start-reentry', 'readiness-reentry',
            'direct-unrelated', 'direct-newer-unrelated', 'direct-identical-reentry',
            'start-unrelated', 'stop-unrelated', 'stop-newer-unrelated', 'start-identical-reentry',
            'terminal-on', 'terminal-start', 'terminal-off', 'location-loading', 'location-failed-off',
-           'location-unrelated', 'location-newer-unrelated', 'terminal-location')
+           'location-unrelated', 'location-newer-unrelated', 'terminal-location',
+           'udp-direct', 'udp-loading-off', 'udp-restore', 'udp-save-reentry',
+           'udp-restore-reentry', 'udp-whole-import', 'udp-terminal-off', 'udp-server-stop')
+INITIALIZATION = ('deferred-unused', 'deferred-shared', 'deferred-echo-first')
 LIVE = ('blocked-load', 'blocked-save', 'stale-import', 'invalid-import',
-        'unrelated-reentry', 'same-field-reentry', 'whole-field-reentry', 'import-intent', 'location-reentry')
+        'unrelated-reentry', 'same-field-reentry', 'whole-field-reentry', 'import-intent', 'location-reentry',
+        'udp-import', 'udp-blocked-save', 'udp-stale-import')
 
 
 def require(condition, reason):
@@ -45,15 +56,26 @@ def require(condition, reason):
 
 
 def root_contract(code):
-    for name, kind in (('settings', 'SettingsStore'), ('server', 'ServerController'),
-                       ('keepAlive', 'BackgroundKeepAlive')):
+    for name, kind in (('settings', 'SettingsStore'), ('udpEcho', 'PeriodicUDPEchoModel')):
+        require(code.count('@StateObject private var ' + name + ': ' + kind) == 1,
+                'Root injected owner lifetime: ' + name)
+    require(code.count('lazy var value = SettingsStore()') == 1 and code.count('SettingsStore()') == 1 and
+            code.count('let owner = DeferredSettings()') == 1 and
+            code.count('_settings = StateObject(wrappedValue: owner.value)') == 1 and
+            code.count('let settings = owner.value') == 1 and
+            code.count('_udpEcho = StateObject(wrappedValue: PeriodicUDPEchoModel(store: nil, save: { value in') == 1,
+            'Root defers and shares one settings owner and injects Echo persistence')
+    require('acceptsNewIntent: settings.acceptsNewIntent)' in code and
+            '.onReceive(server.objectWillChange) { syncEchoServer() }' in code,
+            'Echo terminal intent or server lifecycle binding missing')
+    for name, kind in (('server', 'ServerController'), ('keepAlive', 'BackgroundKeepAlive')):
         require(code.count('@StateObject private var ' + name + ' = ' + kind + '()') == 1,
                 'Root owner lifetime: ' + name)
     require(re.findall(r'\.tag\(AppSettings.Tab\.(\w+)\)', code) == [
         'statistics', 'server', 'background', 'settings'], 'Four-tab composition changed')
     require(code.count('.modifier(BackgroundKeepAliveEvents(keepAlive: keepAlive))') == 1,
             'Root event lifetime changed')
-    require('audioEnabled: audioEnabled)' in code and 'set: { enabled in self.applyAudioIntent(enabled) })' in code,
+    require('audioEnabled: audioEnabled,' in code and 'set: { enabled in self.applyAudioIntent(enabled) })' in code,
             'Audio toggle bypasses direct intent')
     require('locationEnabled: locationEnabled,' in code and 'set: { enabled in self.applyLocationIntent(enabled) })' in code,
             'Location toggle bypasses immediate Off')
@@ -68,9 +90,10 @@ def root_contract(code):
 
 def project_contract(project, original):
     sources = re.findall(r'[A-F0-9]{24} /\* Sources \*/ = \{(.*?)\n\s*\};', project, re.S)
-    group = re.findall(r'[A-F0-9]{24} /\* BackgroundKeepAlive \*/ = \{(.*?)\n\s*\};', project, re.S)
-    require(len(sources) == len(group) == 1, 'Ambiguous app source phase or background group')
-    for name in NEW_AUDIO:
+    require(len(sources) == 1, 'Ambiguous app source phase')
+    for name, owner in PROJECT_ADDITIONS.items():
+        group = re.findall(r'[A-F0-9]{24} /\* ' + owner + r' \*/ = \{(.*?)\n\s*\};', project, re.S)
+        require(len(group) == 1, 'Ambiguous app source group: ' + owner)
         escaped = re.escape(name)
         build = re.findall(r'([A-F0-9]{24}) /\* ' + escaped + r' in Sources \*/ = '
                            r'\{isa = PBXBuildFile; fileRef = ([A-F0-9]{24}) /\* ' + escaped + r' \*/; \};', project)
@@ -81,18 +104,18 @@ def project_contract(project, original):
         require(sources[0].count(build[0][0] + ' /* ' + name + ' in Sources */,') == 1,
                 'Missing app target source: ' + name)
         require(group[0].count(refs[0] + ' /* ' + name + ' */,') == 1,
-                'Missing background group source: ' + name)
+                'Missing owner group source: ' + name)
     # All twelve existing target inputs and every build setting retain their
-    # original bytes. The only allowed project delta is these three source links.
+    # original bytes. Only the explicitly enumerated owner source links may change.
     kept = [line for line in project.splitlines(keepends=True)
             if not any('/* ' + name + ' */' in line or '/* ' + name + ' in Sources */' in line
-                       for name in NEW_AUDIO)]
-    require(''.join(kept) == original, 'Project changed beyond the three audio target registrations')
+                       for name in PROJECT_ADDITIONS)]
+    require(''.join(kept) == original, 'Project changed beyond the nine explicit audio/Echo/statistics registrations')
 
 
 def source_contract():
     paths = {p.relative_to(ROOT).as_posix() for p in (ROOT / 'Socks5').rglob('*.swift')}
-    require(paths == EXPECTED_SOURCES, 'Production Swift inventory is not the exact 12-to-15 composition')
+    require(paths == EXPECTED_SOURCES, 'Production Swift inventory is not the exact 12-to-21 composition')
     code = (ROOT / 'Socks5/AppRoot.swift').read_text()
     root_contract(code)
     original = subprocess.check_output(['git', '-C', str(ROOT), 'show',
@@ -102,12 +125,17 @@ def source_contract():
     # These are source guard controls; unlike runtime mutants they do not claim
     # an execution failure. Each damages the exact link the guard must protect.
     for label, changed in (
-        ('direct-binding', code.replace('audioEnabled: audioEnabled)',
-                                       'audioEnabled: settings.binding(\\.background.silentAudio))', 1)),
+        ('direct-binding', code.replace('audioEnabled: audioEnabled,',
+                                       'audioEnabled: settings.binding(\\.background.silentAudio),', 1)),
         ('location-binding', code.replace('locationEnabled: locationEnabled,',
                                          'locationEnabled: settings.binding(\\.background.continuousLocation),', 1)),
         ('load-observer', code.replace('.onChange(of: settings.loadState)', '.onChange(of: settings.value)', 1)),
         ('duplicate-owner', code.replace('@StateObject private var keepAlive', '@State private var keepAlive', 1)),
+        ('duplicate-echo-store', code.replace('PeriodicUDPEchoModel(store: nil, save:', 'PeriodicUDPEchoModel(save:', 1)),
+        ('echo-terminal-guard', code.replace('acceptsNewIntent: settings.acceptsNewIntent)', 'acceptsNewIntent: true)', 1)),
+        ('eager-settings-holder', code.replace('lazy var value = SettingsStore()', 'var value = SettingsStore()', 1)),
+        ('split-settings-owner', code.replace('_settings = StateObject(wrappedValue: owner.value)',
+                                              '_settings = StateObject(wrappedValue: SettingsStore())', 1)),
     ):
         try:
             root_contract(changed)
@@ -123,24 +151,55 @@ def source_contract():
         pass
     else:
         raise RuntimeError('Removed app target input accepted')
-    return {'swift_sources': len(paths), 'source_rejection_controls': 5}
+    return {'swift_sources': len(paths), 'source_rejection_controls': 9}
 
 
 def routing_methods():
     code = (ROOT / 'Socks5/AppRoot.swift').read_text()
-    start, end = '    private var audioEnabled: Binding<Bool> {', '    var body: some View {'
+    start, end = '    private func syncEchoServer() {', '    var body: some View {'
     require(code.count(start) == code.count(end) == 1, 'AppRoot routing extraction boundary changed')
     return code[code.index(start):code.index(end)]
 
 
-def host(methods):
-    return '''@MainActor private final class RootIntentHost {
+def echo_save_body():
+    code = (ROOT / 'Socks5/AppRoot.swift').read_text()
+    begin = 'PeriodicUDPEchoModel(store: nil, save: { value in'
+    end = '        }, prepareObserver: {'
+    require(code.count(begin) == code.count(end) == 1, 'Root Echo save extraction boundary changed')
+    return code[code.index(begin) + len(begin):code.index(end)]
+
+
+def construction_parts():
+    code = (ROOT / 'Socks5/AppRoot.swift').read_text()
+    begin, end = '@MainActor\nprivate final class DeferredSettings {', '@MainActor\nstruct AppRoot: View {'
+    require(code.count(begin) == code.count(end) == 1, 'Deferred owner extraction boundary changed')
+    deferred = code[code.index(begin):code.index(end)]
+    begin, end = '    init() {\n', '    private func syncEchoServer() {'
+    require(code.count(begin) == code.count(end) == 1, 'Root initialization extraction boundary changed')
+    return deferred, code[code.index(begin):code.index(end)]
+
+
+def host(methods, save_body, deferred, initializer):
+    return deferred + """#if !LIVE_SETTINGS
+@MainActor private struct RootConstructionHost {
+    let _settings: StateObject<SettingsStore>
+    let _udpEcho: StateObject<PeriodicUDPEchoModel>
+""" + initializer + """}
+#endif
+
+@MainActor private final class RootIntentHost {
     let settings: SettingsStore
     let server = ServerController()
     let keepAlive = BackgroundKeepAlive()
+    let udpEcho: PeriodicUDPEchoModel
     var appliedSettingsChange: SettingsStore.Change?
-    init(settings: SettingsStore) { self.settings = settings }
-''' + methods + '}\n'
+    init(settings: SettingsStore) {
+        self.settings = settings
+        let owner = DeferredSettings()
+        owner.value = settings
+        udpEcho = PeriodicUDPEchoModel(store: nil, save: { value in""" + save_body + """        })
+    }
+""" + methods + '}\n'
 
 
 def main():
@@ -156,21 +215,25 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / 'result.json').unlink(missing_ok=True)
     methods = routing_methods()
+    save_body = echo_save_body()
+    deferred, initializer = construction_parts()
     fixture = (ROOT / 'Tests/Integration/IntentBoundaryTests.swift').read_text()
     require(fixture.count('// INSERT_ROOT_INTENT_HOST') == 1, 'Fixture insertion boundary changed')
     entries = []
     with tempfile.TemporaryDirectory(prefix='release-intent-') as folder:
         temporary = Path(folder)
 
-        def compile_host(label, body, production=()):
+        echo_sources = [ROOT / name for name in HOST_ECHO]
+
+        def compile_host(label, body, production=(), saved=save_body, initialize=initializer):
             source = temporary / (label + '.swift')
-            source.write_text(fixture.replace('// INSERT_ROOT_INTENT_HOST', host(body)))
+            source.write_text(fixture.replace('// INSERT_ROOT_INTENT_HOST', host(body, saved, deferred, initialize)))
             binary = temporary / label
             args = ['swiftc', '-parse-as-library', '-swift-version', '5',
                     '-strict-concurrency=complete', '-warnings-as-errors']
             if production:
                 args += ['-D', 'LIVE_SETTINGS']
-            args += [str(source), *map(str, production), '-o', str(binary)]
+            args += [str(source), *map(str, echo_sources), *map(str, production), '-o', str(binary)]
             with (OUT / (label + '-compile.log')).open('w') as stream:
                 subprocess.run(args, stdout=stream, stderr=subprocess.STDOUT, check=True, timeout=120)
             return binary
@@ -190,6 +253,19 @@ def main():
         current = compile_host('routing-current', methods)
         for case in ROUTING:
             execute(current, 'routing-current', case)
+        for case in INITIALIZATION:
+            execute(current, 'root-construction', case)
+        for label, before, after, case, rejection in (
+            ('deferred-eager-root', '        let owner = DeferredSettings()\n',
+             '        let owner = DeferredSettings()\n        _ = owner.value\n',
+             'deferred-unused', 'DEFERRED_EAGER_STORE'),
+            ('deferred-split-owner', '_settings = StateObject(wrappedValue: owner.value)',
+             '_settings = StateObject(wrappedValue: SettingsStore())',
+             'deferred-shared', 'DEFERRED_SHARED_STORE'),
+        ):
+            require(before in initializer, 'Initialization mutation boundary missing: ' + label)
+            binary = compile_host(label, methods, initialize=initializer.replace(before, after, 1))
+            execute(binary, label, case, rejection)
         mutations = [
             ('missing-direct', '        keepAlive.setAudio(enabled)\n', '', 'direct', 'DIRECT_ORDER'),
             ('no-ready-gate', '        guard settings.loadState == .ready else { return }\n', '', 'loading', 'LOADING_APPLIED'),
@@ -221,7 +297,21 @@ def main():
                                           'guard settings.change == change else')
             binary = compile_host(label, changed)
             execute(binary, label, case, rejection)
-        production_hashes = {}
+        # Persistence mutations execute actual Echo model behavior with the
+        # unchanged AppRoot callback, except for the single named root defect.
+        for label, before, after, case, rejection in (
+            ('udp-missing-save', '                settings.set(\\.background.periodicUDPEcho, .init(\n'
+             '                    enabled: value.enabled, destinations: value.destinations, period: value.period))\n',
+             '', 'udp-direct', 'UDP_DIRECT_NOT_STORED'),
+            ('udp-terminal-off', '            } else if !value.enabled {\n'
+             '                settings.set(\\.background.periodicUDPEcho.enabled, false)\n',
+             '', 'udp-terminal-off', 'UDP_TERMINAL_OFF_NOT_STORED'),
+        ):
+            require(before in save_body, 'Echo save mutation boundary missing: ' + label)
+            binary = compile_host(label, methods, saved=save_body.replace(before, after, 1))
+            execute(binary, label, case, rejection)
+        production_hashes = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
+                             for name in HOST_ECHO}
         if mode != ['--routing-only']:
             production = []
             for name in ('Socks5/Server/ServerSettings.swift', 'Socks5/Settings/AppSettings.swift',
@@ -240,9 +330,12 @@ def main():
     value = {'result': 'PASS', **source_result,
              'root_sha256': hashlib.sha256((ROOT / 'Socks5/AppRoot.swift').read_bytes()).hexdigest(),
              'routing_methods_sha256': hashlib.sha256(methods.encode()).hexdigest(),
+             'echo_save_body_sha256': hashlib.sha256(save_body.encode()).hexdigest(),
+             'deferred_owner_sha256': hashlib.sha256(deferred.encode()).hexdigest(),
+             'root_initializer_sha256': hashlib.sha256(initializer.encode()).hexdigest(),
              'fixture_sha256': hashlib.sha256(fixture.encode()).hexdigest(),
              'production_sources': production_hashes, 'cases': entries,
-             'scope': 'Exact routing methods; controlled disk and audio endpoint. No AVFAudio, native listener, Simulator or physical-device result.'}
+             'scope': 'Exact root initializer/lazy owner, routing and Echo save callback; actual Echo model/service/store/transport and live SettingsStore/audio service. Controlled StateObject autoclosure storage, disk, audio endpoint and native-listener resolver. No SwiftUI graph execution, AVFAudio, actual native listener, Simulator or physical-device result.'}
     (OUT / 'result.json').write_text(json.dumps(value, indent=2) + '\n')
     print(json.dumps(value, indent=2))
 

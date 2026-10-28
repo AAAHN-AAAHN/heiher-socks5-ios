@@ -8,6 +8,10 @@ rm -f "$OUT/SUCCESS.txt"
 python3 -c 'import sys; sys.exit(0 if __debug__ else "Assertions must be enabled.")'
 git diff --exit-code HEAD -- > "$OUT/working-tree.log"
 git diff --cached --exit-code HEAD -- > "$OUT/index.log"
+python3 Tests/Background/native_inputs.py verify > "$OUT/native-inputs.log"
+HEADERS="$PWD/artifacts/background/compiled-headers"
+test "$(cat "$HEADERS/source-commit.txt")" = "$(git rev-parse HEAD)"
+(cd "$HEADERS" && shasum -a 256 -c SHA256SUMS.txt) >> "$OUT/native-inputs.log"
 xcodebuild -version | tee "$OUT/toolchain.txt"
 xcrun --sdk iphoneos --show-sdk-version | tee -a "$OUT/toolchain.txt" | grep -E '^27\.'
 git rev-parse HEAD > "$OUT/tested-commit.txt"
@@ -34,12 +38,17 @@ grep -n -A8 -B4 -E 'activateWithOptions:|deactivateWithOptions:|ResumptionContex
   "$SDK/System/Library/Frameworks/AVFAudio.framework/Headers/AVAudioSession.h" > "$OUT/session-api-declarations.txt"
 xcrun swiftc -typecheck -swift-version 5 -strict-concurrency=complete -warnings-as-errors \
   -sdk "$SDK" -target arm64-apple-ios17.2 \
-  -I HevSocks5Server.xcframework/ios-arm64/Headers \
+  -I "$HEADERS" \
   Socks5/Socks5App.swift Socks5/AppRoot.swift Socks5/ContentView.swift \
   Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift \
   Socks5/BackgroundKeepAlive/LoopAudioService.swift \
   Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift \
   Socks5/BackgroundKeepAlive/RecoveryExecutionLease.swift \
+  Socks5/BackgroundKeepAlive/Socks5UDPClient.swift \
+  Socks5/BackgroundKeepAlive/Socks5ServerEndpoint.swift \
+  Socks5/BackgroundKeepAlive/PeriodicUDPEchoModel.swift \
+  Socks5/BackgroundKeepAlive/PeriodicUDPEchoService.swift \
+  Socks5/BackgroundKeepAlive/PeriodicUDPEchoStore.swift \
   Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift > "$OUT/ios-sdk-typecheck.log" 2>&1
 git diff --exit-code HEAD -- >> "$OUT/working-tree.log"
 git diff --cached --exit-code HEAD -- >> "$OUT/index.log"

@@ -135,6 +135,7 @@ def main():
     run(['git', 'clone', '--no-checkout', 'https://github.com/heiher/hev-socks5-server.git', CORE], 'clone.log')
     run(['git', 'checkout', '--detach', CONFIG['sources']['.']], 'checkout.log', CORE)
     run(['git', 'submodule', 'update', '--init', '--recursive'], 'submodules.log', CORE)
+    run([sys.executable, 'Build/check.py', 'checkout', CORE], 'effective-pins.log')
     for path, sha in CONFIG['sources'].items():
         actual = subprocess.check_output(['git', '-C', str(CORE / path), 'rev-parse', 'HEAD'], text=True).strip()
         if actual != sha:
@@ -213,6 +214,9 @@ def main():
 
     if sys.platform == 'darwin':
         sdk = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path'], text=True).strip()
+        # Match build.mk's version macro when compiling hev-main.c directly.
+        revision = subprocess.check_output(
+            ['git', '-C', str(CORE / 'src'), 'rev-parse', '--short', 'HEAD'], text=True).strip()
         includes = ['-I' + str(CORE / path) for path in (
             'src/misc', 'src/core/include', 'src/core/src',
             'third-part/yaml/src', 'third-part/hev-task-system/include',
@@ -223,7 +227,7 @@ def main():
                                           (ROOT / 'Patches' / item['file']).read_text(), re.M)}
         run(['xcrun', '--sdk', 'iphoneos', 'clang', '-target', 'arm64-apple-ios17.2',
              '-isysroot', sdk, '-std=gnu11', '-Wall', '-Werror', '-fsyntax-only',
-             *includes, *sorted(sources)], 'ios-arm64-syntax.log')
+             '-DCOMMIT_ID="' + revision + '"', *includes, *sorted(sources)], 'ios-arm64-syntax.log')
         if all(row['passed'] for row in baseline):
             raise RuntimeError('Darwin negative control did not reproduce either defect.')
         known = next(row for row in port_only if row['test'].startswith('UDP 127.0.0.1 hint=known'))

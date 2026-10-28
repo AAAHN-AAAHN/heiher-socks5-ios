@@ -124,6 +124,224 @@ final class IntegrationUITests: XCTestCase {
         XCTAssertFalse(Self.handshake(), "Saved Stop must not start a listener on relaunch")
     }
 
+    @MainActor func testPeriodicUDPEchoThroughRunningServerAndPersistence() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        addTeardownBlock { @MainActor in app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        let state = app.staticTexts["background.udpEcho.state"]
+        let destination = app.descendants(matching: .any)
+            .matching(identifier: "background.udpEcho.destinations").firstMatch
+        let period = app.textFields["background.udpEcho.period"]
+
+        @MainActor func toggle() -> XCUIElement {
+            let row = app.switches["background.udpEcho.enabled"]
+            let backing = row.switches.firstMatch
+            return backing.exists ? backing : row
+        }
+        @MainActor func reveal(_ element: XCUIElement, upward: Bool = true) {
+            for _ in 0..<12 {
+                if element.exists && element.isHittable { break }
+                let form = app.collectionViews.firstMatch.exists ?
+                    app.collectionViews.firstMatch : app.scrollViews.firstMatch
+                if upward { form.swipeUp() } else { form.swipeDown() }
+            }
+            XCTAssertTrue(element.exists && element.isHittable, "Use the actual reachable control")
+        }
+        @MainActor func background() {
+            XCTAssertTrue(app.tabBars.buttons["Background"].waitForExistence(timeout: 10))
+            app.tabBars.buttons["Background"].tap()
+            reveal(toggle())
+        }
+        @MainActor func expectState(_ text: String) {
+            reveal(state)
+            let expectation = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "label == %@", text), object: state)
+            XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 10), .completed)
+        }
+        @MainActor func replace(_ field: XCUIElement, with text: String) {
+            reveal(field)
+            XCTAssertTrue(field.isEnabled)
+            field.tap()
+            let previous = field.value as? String ?? ""
+            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: previous.count) + text)
+            XCTAssertEqual(field.value as? String, text)
+        }
+        @MainActor func server(running: Bool) {
+            XCTAssertTrue(app.tabBars.buttons["Server"].waitForExistence(timeout: 10))
+            app.tabBars.buttons["Server"].tap()
+            let control = app.buttons[running ? "Start" : "Stop"]
+            reveal(control)
+            XCTAssertTrue(waitUntil { app.buttons["Start"].isEnabled || app.buttons["Stop"].isEnabled })
+            if control.isEnabled { control.tap() }
+            XCTAssertTrue(waitUntil { app.buttons["Stop"].isEnabled == running &&
+                app.buttons["Start"].isEnabled != running })
+            XCTAssertTrue(waitUntil { Self.handshake() == running }, "Actual native listener must follow Start/Stop")
+        }
+        @MainActor func saved() {
+            app.tabBars.buttons["Settings"].tap()
+            let export = app.buttons["Export JSON"]
+            XCTAssertTrue(export.waitForExistence(timeout: 5))
+            XCTAssertTrue(waitUntil {
+                export.isHittable && export.isEnabled &&
+                    !app.staticTexts["Loading saved settings..."].exists &&
+                    !app.staticTexts["Saving changes..."].exists && !app.buttons["Retry Save"].exists
+            }, "Accepted settings must be durable before testing process recreation")
+        }
+        @MainActor func expectFields(enabled: Bool) {
+            background()
+            XCTAssertEqual(toggle().value as? String, enabled ? "1" : "0")
+            reveal(destination)
+            XCTAssertEqual(destination.value as? String, "127.0.0.1,::1")
+            reveal(period)
+            XCTAssertEqual(period.value as? String, "00200", "Persist the user's raw period text")
+        }
+        func packets(atLeast minimum: [String: Int], replies: Bool) throws -> EchoObservation {
+            let deadline = Date().addingTimeInterval(10)
+            repeat {
+                let value = try Self.echoFixture("snapshot")
+                XCTAssertEqual(value.replies, replies)
+                XCTAssertTrue(value.valid, "UDP7 must receive the one-byte payload from the native loopback relay")
+                if ["4", "6"].allSatisfy({ value.counts[$0, default: 0] >= minimum[$0, default: 0] }) {
+                    return value
+                }
+                Thread.sleep(forTimeInterval: 0.05)
+            } while Date() < deadline
+            XCTFail("The actual app must continue periodic sends to both UDP7 destinations")
+            throw NSError(domain: "IntegratedUDPEcho", code: 1)
+        }
+        func quiet() throws {
+            // Drain datagrams already accepted before Stop/Off, then observe four periods.
+            Thread.sleep(forTimeInterval: 0.4)
+            let before = try Self.echoFixture("snapshot")
+            Thread.sleep(forTimeInterval: 0.8)
+            let after = try Self.echoFixture("snapshot")
+            XCTAssertEqual(after.epoch, before.epoch)
+            XCTAssertEqual(after.counts, before.counts, "Stopped/Off intent must leave no periodic sends")
+            XCTAssertTrue(after.valid)
+        }
+
+        _ = try Self.echoFixture("reply")
+        server(running: false)
+        background()
+        if toggle().value as? String == "1" { toggle().tap() }
+        expectState("Off")
+        replace(destination, with: "127.0.0.1,::1")
+        replace(period, with: "00200")
+        saved()
+        background()
+        toggle().tap()
+        XCTAssertEqual(toggle().value as? String, "1")
+        expectState("Waiting for SOCKS5 server")
+        try quiet()
+        server(running: true)
+        let replying = try packets(atLeast: ["4": 3, "6": 3], replies: true)
+        XCTAssertEqual(replying.ports["4"]?.count, 1, "Periodic sends must reuse the IPv4 association")
+        XCTAssertEqual(replying.ports["6"]?.count, 1, "Periodic sends must reuse the IPv6 association")
+        background()
+        expectState("Sending UDP Echo")
+        let capture = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        capture.name = "integrated-udp-echo-running"; capture.lifetime = .keepAlways; add(capture)
+
+        // Keep the receiving sockets open while deliberately sending no replies.
+        _ = try Self.echoFixture("drop")
+        let silent = try packets(atLeast: ["4": 4, "6": 4], replies: false)
+        let continued = try packets(atLeast: silent.counts.mapValues { $0 + 3 }, replies: false)
+        XCTAssertEqual(continued.ports["4"]?.count, 1)
+        XCTAssertEqual(continued.ports["6"]?.count, 1)
+        server(running: false)
+        expectFields(enabled: true)
+        expectState("Waiting for SOCKS5 server")
+        try quiet()
+        let stopped = try Self.echoFixture("snapshot")
+        server(running: true)
+        _ = try packets(atLeast: stopped.counts.mapValues { $0 + 3 }, replies: false)
+
+        // Relaunch must restore actual sends, the On intent and both raw inputs.
+        saved()
+        app.terminate()
+        XCTAssertTrue(waitUntil { !Self.handshake() })
+        let terminated = try Self.echoFixture("snapshot")
+        app.launch()
+        expectFields(enabled: true)
+        XCTAssertTrue(waitUntil { Self.handshake() })
+        _ = try packets(atLeast: terminated.counts.mapValues { $0 + 3 }, replies: false)
+        reveal(toggle(), upward: false)
+        toggle().tap()
+        XCTAssertEqual(toggle().value as? String, "0")
+        expectState("Off")
+        try quiet()
+        XCTAssertTrue(Self.handshake(), "Echo Off must leave the independently running server intact")
+        saved()
+        app.terminate()
+        XCTAssertTrue(waitUntil { !Self.handshake() })
+        app.launch()
+        expectFields(enabled: false)
+        expectState("Off")
+        XCTAssertTrue(waitUntil { Self.handshake() }, "Saved server Start survives Echo Off")
+        try quiet()
+        server(running: false)
+        saved()
+        let final = try Self.echoFixture("snapshot")
+        let evidence = XCTAttachment(string: "UDP7 fixture: \(final.counts); Echo Off, server stopped, raw fields preserved")
+        evidence.name = "integrated-udp-echo-final"; evidence.lifetime = .keepAlways; add(evidence)
+    }
+
+    private struct EchoObservation: Decodable {
+        let epoch: Int
+        let replies: Bool
+        let counts: [String: Int]
+        let ports: [String: [Int]]
+        let valid: Bool
+    }
+
+    /// Test-runner control channel only; the application sees only ordinary UDP7 traffic.
+    private static func echoFixture(_ command: String) throws -> EchoObservation {
+        let port = try XCTUnwrap(UInt16(ProcessInfo.processInfo.environment["UDP_ECHO_FIXTURE_PORT"] ?? ""),
+                                "The temporary test scheme must identify its host UDP7 fixture")
+        let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        defer { Darwin.close(fd) }
+        var noSignal: Int32 = 1
+        var timeout = timeval(tv_sec: 5, tv_usec: 0)
+        guard setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal,
+                         socklen_t(MemoryLayout.size(ofValue: noSignal))) == 0,
+              setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
+                         socklen_t(MemoryLayout.size(ofValue: timeout))) == 0,
+              setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
+                         socklen_t(MemoryLayout.size(ofValue: timeout))) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = port.bigEndian
+        guard inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) == 1,
+              withUnsafePointer(to: &address, {
+                  $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                      Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+                  }
+              }) == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        let request = Array((command + "\n").utf8)
+        var offset = 0
+        while offset < request.count {
+            let count = request.withUnsafeBytes {
+                Darwin.send(fd, $0.baseAddress!.advanced(by: offset), $0.count - offset, 0)
+            }
+            guard count > 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+            offset += count
+        }
+        var response = Data()
+        var buffer = [UInt8](repeating: 0, count: 1024)
+        while !response.contains(10) && response.count < 16_384 {
+            let count = buffer.withUnsafeMutableBytes { Darwin.recv(fd, $0.baseAddress, $0.count, 0) }
+            guard count > 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+            response.append(contentsOf: buffer.prefix(count))
+        }
+        return try JSONDecoder().decode(EchoObservation.self, from: response)
+    }
+
     private func waitUntil(_ condition: () -> Bool) -> Bool {
         let deadline = Date().addingTimeInterval(5)
         repeat {
