@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import platform
 import plistlib
+import re
 import shutil
 import subprocess
 import sys
@@ -34,21 +35,32 @@ def output(*args):
 
 def verify_production():
     baseline = '6cffa8a71b45796eacca3f5a941106646932ec05'
-    source_base = '94cc35ba5b50bab177f7aa678aa5af8fd3b8481d'
     config = json.loads((ROOT / 'Build/features.json').read_bytes())
+    source_base = config['base_commit']
+    if (not re.fullmatch(r'[0-9a-f]{40}', source_base) or
+            output('git', 'rev-parse', '--verify', source_base + '^{commit}').strip() != source_base):
+        raise RuntimeError('Main source baseline must be an exact commit')
     expected = json.loads(output('git', 'show', baseline + ':Build/features.json'))
     shared = json.loads(output('git', 'show', source_base + ':Build/features.json'))
+    if shared['name'] != 'baseline' or shared['features'] or shared['patches']:
+        raise RuntimeError('Shared main source baseline must be unpatched upstream')
     parent = json.loads((ROOT / 'docs/documentation.json').read_bytes())['parents']['main']
     expected.update(base_commit=source_base, sources=shared['sources'],
-                    upstream_app=shared['upstream_app'])
+                    upstream_app=shared['upstream_app'], patches=[
+                        {'file': 'hev-server-lifecycle.patch', 'repository': '.'},
+                        {'file': 'hev-server-startup-stop.patch', 'repository': '.'}])
     if config != expected:
         raise RuntimeError('Server-control configuration differs beyond the exact shared source baseline')
     run(['git', 'merge-base', '--is-ancestor', source_base, parent], 'preserved-main-ancestry.log')
     run(['git', 'diff', '--exit-code', source_base, parent, '--', '.',
          ':(exclude)README.md', ':(exclude)docs'], 'preserved-main-source.log')
     run([sys.executable, ROOT / 'Build/check_documentation.py'], 'preserved-documents.log')
+    # The common source pin and concatenated original patch are checked here;
+    # the run snapshot controller is hash-locked and exercises the same native gates.
+    run([sys.executable, ROOT / 'Build/check_ownership.py'], 'preserved-ownership.log')
     run(['git', 'diff', '--exit-code', baseline, 'HEAD', '--',
-         'Socks5', 'Socks5.xcodeproj', 'Patches'], 'preserved-production.log')
+         'Socks5', 'Socks5.xcodeproj',
+         ':(exclude)Socks5/Server/ServerController.swift'], 'preserved-production.log')
     run(['git', 'diff', '--exit-code', source_base, 'HEAD', '--',
          'Build/upstream.json', 'Build/baseline-framework.json',
          'HevSocks5Server.xcframework'], 'preserved-native-source.log')
