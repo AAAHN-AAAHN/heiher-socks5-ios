@@ -63,10 +63,19 @@ def main():
             fixture.finish()
         assert result.returncode == 0, (mode, result.returncode, result.stdout, result.stderr)
         data = json.loads(result.stdout)
-        assert len(fixture.datagrams) == data["writes"], (mode, len(fixture.datagrams), data)
-        results.append({"mode": mode, "family": family, **data})
+        delivered = len(fixture.datagrams)
+        # Off closes TCP and terminates its UDP association. Successful UDP
+        # writes can still be in flight; destination delivery is a separate count.
+        if mode == "statistics-wait":
+            assert delivered == data["writes"] == 0, (mode, delivered, data)
+        else:
+            assert 5 <= delivered <= data["writes"], (mode, delivered, data)
+        results.append({"mode": mode, "family": family, **data,
+                        "received_datagrams": delivered,
+                        "unconfirmed_deliveries": data["writes"] - delivered})
         (options.output / "results.json").write_text(json.dumps(results, indent=2) + "\n")
-        print("PASS:", mode, fixture.host, "wire datagrams", data["writes"], flush=True)
+        print("PASS:", mode, fixture.host, "wire datagrams", delivered,
+              "unconfirmed deliveries", data["writes"] - delivered, flush=True)
     command = [str(executable), "resolver-wait", "127.0.0.1", "1", "127.0.0.1"]
     result = subprocess.run(command, capture_output=True, text=True, timeout=5)
     record_process(options.output, "resolver-wait", command, result)
