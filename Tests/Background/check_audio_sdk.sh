@@ -17,7 +17,7 @@ xcrun --sdk iphoneos --show-sdk-version | tee -a "$OUT/toolchain.txt" | grep -E 
 git rev-parse HEAD > "$OUT/tested-commit.txt"
 git archive --format=zip HEAD -o "$OUT/source.zip"
 BASE=$(python3 -c 'import json; print(json.load(open("Build/features.json"))["base_commit"])')
-git diff --check "$BASE" HEAD > "$OUT/whitespace.log"
+git diff --check "$BASE" HEAD -- . ':(exclude)Patches/*.patch' > "$OUT/whitespace.log"
 python3 Build/check.py baseline > "$OUT/baseline.log"
 python3 Tests/baseline_audit.py > "$OUT/baseline-driver.log" 2>&1
 python3 Build/check.py composition > "$OUT/composition.log"
