@@ -1,7 +1,7 @@
 {
-  "base_commit": "94cc35ba5b50bab177f7aa678aa5af8fd3b8481d",
+  "base_commit": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
   "branches": {
-    "main": "94cc35ba5b50bab177f7aa678aa5af8fd3b8481d"
+    "main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
   },
   "sources": {
     "Tests/server_lifecycle_host.c": {
@@ -11,10 +11,16 @@
     "Tests/server_lifecycle_regression.py": {
       "commit": "16689f780f3e0e0c9344397273528697f197c9e5",
       "sha256": "6705e3f54c41ec3e61929d2062cb3eae1d8b64841c40c170059bbe5d6ccd941d"
+    },
+    "Patches/hev-server-lifecycle.patch": {
+      "commit": "2e0d6932a3a551380b3f304bb31e98bc942f13f4",
+      "path": "Build/native/hev-server-lifecycle.patch",
+      "sha256": "df872f0a6a10d1dfbc4efd23f62c566a4698b6f2a79d6e2298068c39b6ac98a9"
     }
   },
   "files": {
-    "Patches/hev-server-startup-stop.patch": "77b46a0a4a58d1fdb219d11cde4a99a085799ccf7027e7309ee42ba53eb314db"
+    "Patches/hev-server-startup-stop.patch": "e9d9a51850ee252a2c9f26128eecf1d18d98503823d39d2a1f96b28d942b1528",
+    "Socks5/Server/ServerController.swift": "1dcf39b15a59d78186d9900f0173f71e60655e8647fa291bd0a31f11542c19cb"
   },
   "responsibility": "Server control only; no persistent application settings. Historical source is retained by the downstream persistence merge. The locally extended lifecycle patch is hash-locked under files; the original pre-start hunk remains verified against the old settings commit."
 }

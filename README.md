@@ -4,7 +4,7 @@
 
 This feature gives the application explicit, validated server configuration and predictable Start/Stop behavior. A single controller owns the blocking native engine independently of the visible tab. Configuration, lifecycle control and persistence remain separate responsibilities so the same server implementation can be used by a standalone feature or a settings-enabled release.
 
-The feature consists of `ServerSettings`, `ServerController`, the existing configuration editor and the native startup/stop patch. It does not add a storage layer, background service, traffic sampler or a second server instance.
+The feature consists of `ServerSettings`, `ServerController`, the existing configuration editor and the native lifecycle and authentication/class-initialization patches. It does not add a storage layer, background service, traffic sampler or a second server instance.
 
 ## Functional behavior
 
@@ -42,9 +42,11 @@ The controller validates before invoking the engine. At the idle boundary, after
 
 The standalone root owns its configuration and requested-running state without persisting them. The settings-enabled root owns one SettingsStore and passes the same model and running intent to this controller. Neither the model nor controller calls the persistence store. Changing tabs does not create a replacement server owner.
 
+A `Run` value exposes the immutable settings actually passed to the active invocation and a unique invocation ID. Stop or replacement clears this admitted run immediately; native completion is accepted only for the still-owned ID. All public run, status and running fields are settled before one observable notification, so a synchronous subscriber can Stop without a later outer publication reviving the old state. The shared lifecycle patch is identical in UDP and ServerControl and applied once in the integrated engine. Its bytes plus the remaining ServerControl patch reproduce the earlier complete lifecycle/authentication patch exactly.
+
 ## Design rationale and resource cost
 
-One controller and one owned native invocation prevent duplicate listening sockets and overlapping engine state. Retaining only current, desired, attempted and stopping state is sufficient to express coalescing, latest-intent priority and explicit retry without a separate queue of every UI request.
+One controller and one owned native invocation prevent duplicate listening sockets and overlapping engine state. Retaining current, desired, attempted, stopping and invocation identity state is sufficient to express coalescing, latest-intent priority and explicit retry without a separate queue of every UI request.
 
 Validation before execution avoids sending malformed parameters into the native parser. Byte-sensitive equality matters because the native engine receives UTF-8 bytes, not a normalized user-interface string. Single-purpose YAML generation keeps configuration escaping in one place.
 

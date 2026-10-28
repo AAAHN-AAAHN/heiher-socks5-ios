@@ -41,12 +41,16 @@ def main():
             if sys.platform != 'darwin':
                 code = code.replace('import SwiftUI\n', 'import Foundation\n', 1)
                 ui = folder / 'UI.swift'
-                ui.write_text('protocol ObservableObject {}\n@propertyWrapper struct Published<T> { var wrappedValue: T }\n')
+                ui.write_text('protocol ObservableObject: AnyObject { var objectWillChange: ObservableObjectPublisher { get } }\n@propertyWrapper struct Published<T> { var wrappedValue: T }\nfinal class ObservableObjectPublisher { var receive: (() -> Void)?; func send() { receive?() } }\n')
+                if label == 'original':
+                    # Combine supplies this for the historical @Published model.
+                    with ui.open('a') as stream:
+                        stream.write('extension ObservableObject { var objectWillChange: ObservableObjectPublisher { ObservableObjectPublisher() } }\n')
                 sources.append(ui)
             copied = folder / 'ServerController.swift'; copied.write_text(code); sources.append(copied)
             executable = folder / 'host'
             with (output / (label + '-build.log')).open('w') as log:
-                subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors', '-I', str(include),
+                subprocess.run(['swiftc', '-swift-version', '5', '-strict-concurrency=complete', '-warnings-as-errors', '-I', str(include),
                                 *map(str, sources), *map(str, libs), '-Xlinker', '-lpthread', '-o', str(executable)],
                                stdout=log, stderr=subprocess.STDOUT, check=True, timeout=120)
             for workers in ('1', '4'):
