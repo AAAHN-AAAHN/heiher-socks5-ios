@@ -80,7 +80,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
          onState: @escaping @Sendable (State) -> Void) {
         self.prepareObserver = prepareObserver
         self.onState = onState
-        timer = DispatchSource.makeTimerSource(queue: queue)
+        timer = DispatchSource.makeTimerSource(flags: .strict, queue: queue)
         timer.setEventHandler { [weak self] in self?.drive() }
         timer.schedule(deadline: .distantFuture)
         timer.resume()
