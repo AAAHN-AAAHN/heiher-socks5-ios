@@ -1,6 +1,6 @@
 {
   "branch": "feature/app-icon",
-  "frozen_source": "280863bc6fe9507655c020b7ba37d1a204add1f5",
+  "frozen_source": "c48b4780b15d2cdfac10132da9cdbe20689c196f",
   "parents": {
     "main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
   },
@@ -12,7 +12,7 @@
   "validation_files": {
     "Build/check.py": "57ccedf4cfad22ded66f22232d645d452e3fb13d",
     "Build/check_documentation.py": "944d0641ec99802e3f8a64ddd24bf75494561a31",
-    "Tests/AppIcon/check_icon.py": "99c12340f6869c5ec6d919df78ae258343b34a51",
+    "Tests/AppIcon/check_icon.py": "93cfbf9a90712bc3d7d52fe460947ee4b05c9564",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }
