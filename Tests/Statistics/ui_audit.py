@@ -196,7 +196,9 @@ def verify_presentation():
     assert '["KB", "MB", "GB", "TB", "PB"]' in model
     assert '["Kbps", "Mbps", "Gbps", "Tbps", "Pbps"]' in model
     assert 'In is bytes the OS accepted toward that IP' in view
-    assert 'Out is bytes this server consumed from that IP' in view
+    assert 'Out is bytes this app consumed from that IP' in view
+    assert "recorded at this app's server and client sockets" in view
+    assert 'Only instrumented server and client sockets are observed.' in view
     assert 'Total sums peer endpoints' in view
     assert 'over the actual sampling interval, in bits per second' in view
 
