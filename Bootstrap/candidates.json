@@ -1,10 +1,10 @@
 {
-  "sha256": "93d510cf6cf9e4e088347f60bc2ecb5a8d5fa3dce7f04d85fb1ccafc735836c9",
+  "sha256": "520e880bf25a6315e257c94b8504386937d9e96bc1e92f99269203e745386caf",
   "candidates": [
     {
-      "name": "background",
-      "sha": "cbe348c4ad74cba5370cdd71695ec3c56962d339",
-      "ref": "refs/heads/work/udp-echo-background-20261028"
+      "name": "integrated",
+      "sha": "4cc1a53416df1f888603df448126392c611b2bb9",
+      "ref": "refs/heads/work/udp-echo-integrated-20261028"
     }
   ],
   "support": [
@@ -17,6 +17,10 @@
       "sha": "ad9c5bab630ab6f9fe1188f0e3edc590f0b5dfc6"
     },
     {
+      "name": "background",
+      "sha": "cbe348c4ad74cba5370cdd71695ec3c56962d339"
+    },
+    {
       "name": "server",
       "sha": "bf0789c68670078def846d7e3778e7f5cfe9e77f"
     },
@@ -27,16 +31,12 @@
     {
       "name": "icon",
       "sha": "5d5327d4513b587e2a2e948fa20f588a04f1376f"
-    },
-    {
-      "name": "integrated",
-      "sha": "4cc1a53416df1f888603df448126392c611b2bb9"
     }
   ],
   "matrix": [
     {
-      "name": "background",
-      "sha": "cbe348c4ad74cba5370cdd71695ec3c56962d339",
+      "name": "integrated",
+      "sha": "4cc1a53416df1f888603df448126392c611b2bb9",
       "os": "xcode-27",
       "runtime": true
     }

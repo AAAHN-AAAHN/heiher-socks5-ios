@@ -1,15 +1,15 @@
 {
   "result": "PASS",
   "selected": [
-    "background"
+    "integrated"
   ],
   "support": [
     "udp",
     "statistics",
+    "background",
     "server",
     "settings",
-    "icon",
-    "integrated"
+    "icon"
   ],
   "heads": {
     "main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
@@ -22,9 +22,9 @@
     "integrated": "4cc1a53416df1f888603df448126392c611b2bb9"
   },
   "macos_only": [
-    "background"
+    "integrated"
   ],
-  "bundle_sha256": "93d510cf6cf9e4e088347f60bc2ecb5a8d5fa3dce7f04d85fb1ccafc735836c9",
+  "bundle_sha256": "520e880bf25a6315e257c94b8504386937d9e96bc1e92f99269203e745386caf",
   "bundle_bytes": 230090,
   "prerequisites": [
     "9baac92fb4508d9e1b96f00744a91ff1cae77003",
@@ -78,19 +78,19 @@
       "sha": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
     }
   ],
-  "remote_snapshot_time": "2026-10-28 17:05:14 UTC",
-  "remote_snapshot_sha256": "d5cc4a1889030ff62d114f3b867badc4ff320bee993535824a418ae58499b4ab",
+  "remote_snapshot_time": "2026-10-28T18:13:10.530Z",
+  "remote_snapshot_sha256": "c6d9c36153fe4d6a10a75705da910ce49c470b6601e1f74fd3d2a5e7b8b354ba",
   "frozen_heads_sha256": "ee938a2795612e43c5d91f51604097e07e545d1093f4764d446bf362c1011611",
   "matrix": [
     {
-      "name": "background",
-      "sha": "cbe348c4ad74cba5370cdd71695ec3c56962d339",
+      "name": "integrated",
+      "sha": "4cc1a53416df1f888603df448126392c611b2bb9",
       "os": "xcode-27",
       "runtime": true
     }
   ],
   "remote_mutations": false,
   "actual_importer_verified": true,
-  "bundle_upload_path": "/workspace/scratch/547a8ea54499/udp_echo_20261028/publication-helper/Bootstrap/candidates.bundle",
+  "bundle_upload_path": "/workspace/scratch/547a8ea54499/udp_echo_20261028/simulator-fixture-diagnostic-helper/Bootstrap/candidates.bundle",
   "scope": "Local bundle and read-only preparation verified; CI runtime results are not implied."
 }

@@ -1,176 +1,57 @@
-name: Verify restored UDP Echo candidates
+name: Diagnose UDP Echo fixture across Simulator boot
 on:
   push:
     branches: [work/udp-echo-build-20261028]
 permissions:
   contents: read
 jobs:
-  prepare:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    outputs:
-      matrix: ${{ steps.prepare.outputs.matrix }}
+  simulator-fixture-diagnostic:
+    name: Simulator fixture startup diagnostic (xcode-27)
+    runs-on: xcode-27
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - id: prepare
-        run: python3 Bootstrap/import_candidates.py
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
-        with:
-          name: UDP-Echo-prepare-${{ github.run_id }}
-          path: |
-            Bootstrap/
-            artifacts/candidate-prepare/
-          retention-days: 90
-  verify:
-    needs: prepare
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ (matrix.runtime || (matrix.name == 'integrated' && matrix.os == 'ubuntu-24.04')) && 90 || 60 }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Verify candidate objects and create a detached local worktree
+      - name: Verify immutable diagnostic source
         env:
-          CANDIDATE: ${{ matrix.name }}
-          CANDIDATE_SHA: ${{ matrix.sha }}
+          CANDIDATE_SHA: 4cc1a53416df1f888603df448126392c611b2bb9
         shell: bash
         run: |
           set -euo pipefail
-          python3 Bootstrap/import_candidates.py --candidate "$CANDIDATE" --sha "$CANDIDATE_SHA"
+          python3 Bootstrap/import_candidates.py --candidate integrated --sha "$CANDIDATE_SHA"
           git worktree add --detach "$RUNNER_TEMP/udp-source" "$CANDIDATE_SHA"
-          mkdir -p "$RUNNER_TEMP/udp-source/artifacts/candidate-prepare"
-          cp artifacts/candidate-prepare/result.json "$RUNNER_TEMP/udp-source/artifacts/candidate-prepare/"
-      - name: Install exact formatter major
+          mkdir -p "$RUNNER_TEMP/udp-source/artifacts/simulator-fixture-controls"
+          cp artifacts/candidate-prepare/result.json "$RUNNER_TEMP/udp-source/artifacts/simulator-fixture-controls/source-prepare.json"
+      - name: Compare real fixture startup before and after Simulator boot
         shell: bash
         run: |
           set -euo pipefail
-          if [ "$RUNNER_OS" = Linux ]; then
-            sudo apt-get update -qq
-            sudo apt-get install -y clang-format-18
-          else
-            brew install llvm@18
-            mkdir -p "$RUNNER_TEMP/format-only"
-            ln -sf "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
-            echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
+          diagnostic_output="$RUNNER_TEMP/udp-source/artifacts/simulator-fixture-controls"
+          python3 Bootstrap/integrated_simulator_fixture_controls.py \
+            --root "$RUNNER_TEMP/udp-source" --output "$diagnostic_output" \
+            > "$diagnostic_output/driver.log" 2>&1
+      - name: Record source preservation
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          diagnostic_source="$RUNNER_TEMP/udp-source"
+          if [ -d "$diagnostic_source" ]; then
+            git -C "$diagnostic_source" rev-parse HEAD > "$diagnostic_source/artifacts/simulator-fixture-controls/tested-commit.txt"
+            git -C "$diagnostic_source" diff --exit-code HEAD -- > "$diagnostic_source/artifacts/simulator-fixture-controls/source-worktree.log"
+            git -C "$diagnostic_source" diff --cached --exit-code HEAD -- > "$diagnostic_source/artifacts/simulator-fixture-controls/source-index.log"
           fi
-      - name: Verify scheduler observation and timer regression controls
-        if: ${{ matrix.name == 'background' && runner.os == 'macOS' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          diagnostic_dir="$RUNNER_TEMP/scheduler-window-controls"
-          diagnostic_records="$RUNNER_TEMP/udp-source/artifacts/scheduler-window-controls"
-          mkdir -p "$diagnostic_dir" "$diagnostic_records"
-          preserve_diagnostics() {
-            diagnostic_status=$?
-            trap - EXIT
-            for diagnostic_file in "$diagnostic_dir"/*.json "$diagnostic_dir"/*.log; do
-              if [ -f "$diagnostic_file" ]; then cp "$diagnostic_file" "$diagnostic_records/"; fi
-            done
-            exit "$diagnostic_status"
-          }
-          trap preserve_diagnostics EXIT
-          python3 Bootstrap/scheduler_window_controls.py \
-            --root "$RUNNER_TEMP/udp-source" --output "$diagnostic_dir" \
-            --require-nonstrict > "$diagnostic_dir/driver.log" 2>&1
-      - name: Verify privileged UDP Echo fixture startup and cleanup
-        if: ${{ matrix.name == 'integrated' && runner.os == 'macOS' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          diagnostic_dir="$RUNNER_TEMP/integrated-ui-fixture-controls"
-          diagnostic_records="$RUNNER_TEMP/udp-source/artifacts/ui-fixture-controls"
-          mkdir -p "$diagnostic_dir" "$diagnostic_records"
-          preserve_diagnostics() {
-            diagnostic_status=$?
-            trap - EXIT
-            python3 - "$diagnostic_dir" "$diagnostic_records" <<'PY'
-          from pathlib import Path
-          import shutil, sys
-          source, target = map(Path, sys.argv[1:])
-          for path in source.rglob('*'):
-              if path.is_file() and path.suffix in ('.json', '.log'):
-                  copied = target / path.relative_to(source)
-                  copied.parent.mkdir(parents=True, exist_ok=True)
-                  shutil.copyfile(path, copied)
-          PY
-            exit "$diagnostic_status"
-          }
-          trap preserve_diagnostics EXIT
-          python3 Bootstrap/integrated_ui_fixture_controls.py \
-            --root "$RUNNER_TEMP/udp-source" --output "$diagnostic_dir" \
-            --actual > "$diagnostic_dir/driver.log" 2>&1
-      - name: Execute the exact candidate owner gates
-        id: owner
-        working-directory: ${{ runner.temp }}/udp-source
-        env:
-          CANDIDATE: ${{ matrix.name }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          case "$CANDIDATE" in
-            udp) python3 Tests/udp_compat_audit.py ;;
-            statistics) python3 Tests/Statistics/audit.py ;;
-            *) bash Build/build.sh ;;
-          esac
-          if [ "$RUNNER_OS" = macOS ]; then
-            case "$CANDIDATE" in
-              server|settings|integrated) bash Build/check_swift_sdk.sh ;;
-              background) bash Tests/Background/check_audio_sdk.sh ;;
-            esac
-          fi
-      - name: Execute requested macOS runtime coverage
-        if: ${{ matrix.runtime }}
-        working-directory: ${{ runner.temp }}/udp-source
-        env:
-          CANDIDATE: ${{ matrix.name }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$RUNNER_OS" = macOS
-          case "$CANDIDATE" in
-            server) python3 Tests/ServerControl/ui_audit.py ;;
-            settings) python3 Tests/Settings/ui_audit.py ;;
-            background) python3 Tests/Background/check_async_ui.py ;;
-            icon) bash Tests/AppIcon/run_checks.sh ;;
-            statistics) python3 Tests/Statistics/ui_audit.py ;;
-            integrated)
-              python3 Build/verify_release.py > artifacts/integrated/package-review.log 2>&1
-              python3 Build/simulator_review.py > artifacts/integrated/simulator-review.log 2>&1
-              python3 Build/ui_review.py > artifacts/integrated/ui-review.log 2>&1
-              ;;
-            *) echo "Unsupported runtime candidate: $CANDIDATE" >&2; exit 1 ;;
-          esac
-      - name: Preserve the verified integrated framework
-        if: ${{ always() && matrix.name == 'integrated' && runner.os == 'macOS' && steps.owner.outcome == 'success' }}
-        working-directory: ${{ runner.temp }}/udp-source
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 Build/release_source.py check
-          ditto -c -k --keepParent \
-            .build/integrated-product-source/HevSocks5Server.xcframework \
-            artifacts/integrated/HevSocks5Server.xcframework.zip
-          shasum -a 256 artifacts/integrated/HevSocks5Server.xcframework.zip \
-            > artifacts/integrated/HevSocks5Server.xcframework.zip.sha256
-      - name: Record integrated source evidence
-        if: ${{ always() && matrix.name == 'integrated' }}
-        working-directory: ${{ runner.temp }}/udp-source
-        run: python3 Build/record_evidence.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: UDP-Echo-${{ matrix.name }}-${{ runner.os }}-${{ github.run_id }}
-          path: ${{ runner.temp }}/udp-source/artifacts/
+          name: UDP-Echo-simulator-fixture-diagnostic-${{ github.run_id }}
+          path: |
+            Bootstrap/integrated_simulator_fixture_controls.py
+            Bootstrap/candidates.json
+            Bootstrap/generation-receipt.json
+            ${{ runner.temp }}/udp-source/artifacts/simulator-fixture-controls/
           if-no-files-found: error
           retention-days: 90
