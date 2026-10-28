@@ -22,7 +22,7 @@ PRINCIPLES_SOURCE = '75335d201cb1e541bb153e9899badbc11ccf1973'
 PARENTS = {
     'main': ['upstream'],
     'feature/app-icon': ['main'],
-    'feature/background': ['main'],
+    'feature/background': ['feature/udp-compat'],
     'feature/server-control': ['main'],
     'feature/settings-persistence': ['feature/server-control'],
     'feature/traffic-statistics': ['feature/udp-compat'],

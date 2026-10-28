@@ -135,6 +135,7 @@ def main():
     run(['git', 'clone', '--no-checkout', 'https://github.com/heiher/hev-socks5-server.git', CORE], 'clone.log')
     run(['git', 'checkout', '--detach', CONFIG['sources']['.']], 'checkout.log', CORE)
     run(['git', 'submodule', 'update', '--init', '--recursive'], 'submodules.log', CORE)
+    run([sys.executable, 'Build/check.py', 'checkout', CORE], 'effective-pins.log')
     for path, sha in CONFIG['sources'].items():
         actual = subprocess.check_output(['git', '-C', str(CORE / path), 'rev-parse', 'HEAD'], text=True).strip()
         if actual != sha:

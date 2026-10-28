@@ -1,0 +1,15 @@
+{
+  "base_commit": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+  "branches": {
+    "main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
+  },
+  "sources": {
+    "Patches/hev-server-lifecycle.patch": {
+      "commit": "2e0d6932a3a551380b3f304bb31e98bc942f13f4",
+      "path": "Build/native/hev-server-lifecycle.patch",
+      "sha256": "df872f0a6a10d1dfbc4efd23f62c566a4698b6f2a79d6e2298068c39b6ac98a9"
+    }
+  },
+  "files": {},
+  "responsibility": "UDP compatibility and its shared native lifecycle prerequisite; no application background controller."
+}
