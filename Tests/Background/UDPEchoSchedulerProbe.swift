@@ -71,9 +71,21 @@ struct UDPEchoSchedulerProbe {
         }
         let active = PeriodicUDPEchoSettings(enabled: true, destinations: args[4], period: "20")
         let families = try PeriodicUDPEchoService.parse(active).targets.filter { !$0.isEmpty }.count
+        let activationTime = DispatchTime.now().uptimeNanoseconds
         service.update(active)
+        // Measure cadence after setup; fragmented SOCKS negotiation is not
+        // part of the active sending interval. The process still has a 5s bound.
+        let setupDeadline = activationTime + 2_000_000_000
+        if !mode.hasSuffix("-wait") {
+            while observed.snapshot().0 == 0 && DispatchTime.now().uptimeNanoseconds < setupDeadline {
+                try await Task.sleep(for: .milliseconds(5))
+            }
+        }
+        let observationTime = DispatchTime.now().uptimeNanoseconds
+        let ready = observed.snapshot().4.first.map { $0 <= setupDeadline } ?? false
         try await Task.sleep(for: .milliseconds(360))
         let activeCount = observed.snapshot().0
+        let offTime = DispatchTime.now().uptimeNanoseconds
         if mode == "invalid-input" {
             service.update(.init(enabled: true, destinations: "invalid.example", period: "20"))
         } else {
@@ -90,7 +102,11 @@ struct UDPEchoSchedulerProbe {
         let result: [String: Any] = ["writes": count, "activeWrites": activeCount,
                                      "readBytes": readBytes, "states": states, "preparations": prepared,
                                      "stoppedWrites": stoppedCount, "families": families,
-                                     "timestamps": timestamps]
+                                     "timestamps": timestamps, "activationTime": activationTime,
+                                     "observationTime": observationTime, "offTime": offTime,
+                                     "setupElapsedMS": timestamps.first.map {
+                                         Double($0 - activationTime) / 1_000_000
+                                     } ?? -1]
         let data = try JSONSerialization.data(withJSONObject: result, options: .sortedKeys)
         FileHandle.standardOutput.write(data + Data([10]))
         require(count == stoppedCount, "OFF_STABLE")
@@ -99,6 +115,7 @@ struct UDPEchoSchedulerProbe {
             require(states.contains(mode == "statistics-wait" ?
                 "Waiting for traffic statistics" : "Waiting for SOCKS5 listener"), "WAIT_STATE")
         } else {
+            require(ready, "SETUP_READY")
             require(activeCount >= 5 * families && activeCount <= 20 * families, "ACTIVE_COUNT")
             require(states.contains("Sending UDP Echo"), "SENDING_STATE")
             require(prepared == 1, "PREPARE_ONCE")

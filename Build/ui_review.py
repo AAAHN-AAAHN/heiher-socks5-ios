@@ -6,12 +6,14 @@ rebuilt XCFramework as the ARM64 archive. This does not emulate either installer
 """
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import socketserver
 import subprocess
 import sys
 import threading
+import time
 import zipfile
 import hashlib
 import xml.etree.ElementTree as ET
@@ -41,23 +43,38 @@ def echo_command(echo, command):
     return {'replies': echo.replies, 'packets': echo.snapshot()}
 
 
+def write_diagnostic(message):
+    try:
+        print(message, file=sys.stderr, flush=True)
+    except Exception:
+        pass  # Diagnostics must not replace the original failure.
+
+
 class UDPEchoFixture:
     """Host responder/control only; the app receives no test hooks or privileges."""
     def __init__(self):
         self.module = echo_module()
         self.echo = self.helper = None
+        self.helper_diagnostic = None
         try:
             self.echo = self.module.Echo(True, elevate=False)
         except PermissionError:
             # This small responder has a mode command; the product and test
             # runner retain their ordinary identity, as in the native audit.
-            self.helper = subprocess.Popen(
-                ['sudo', '-n', sys.executable, str(Path(__file__).resolve()), '--udp-echo-helper'],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1)
+            command = ['sudo', '-n', sys.executable, str(Path(__file__).resolve()), '--udp-echo-helper']
+            self.helper_started = time.monotonic()
+            self.helper_diagnostic = {'argv': command, 'started_unix': time.time(),
+                                      'stderr': 'udp-echo-helper.log', 'stages': []}
             try:
+                with (OUT / 'udp-echo-helper.log').open('wb') as log:
+                    self.helper = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                                   stderr=log, text=True, bufsize=1)
+                self.record_helper('spawned')
                 assert self.module.response(self.helper)['ready']
-            except Exception:
-                self.finish_echo()
+                self.record_helper('ready')
+            except Exception as error:
+                self.record_helper('startup-failed', error)
+                self.cleanup_failed_start()
                 raise
         self.events = []
         self.errors = []
@@ -83,7 +100,7 @@ class UDPEchoFixture:
         try:
             self.control = socketserver.TCPServer(('127.0.0.1', 0), Control)
         except Exception:
-            self.finish_echo()
+            self.cleanup_failed_start()
             raise
         self.thread = threading.Thread(target=self.control.serve_forever,
                                        kwargs={'poll_interval': .1})
@@ -106,9 +123,36 @@ class UDPEchoFixture:
         self.events.append(event)
         return result
 
+    def record_helper(self, stage, error=None):
+        if self.helper_diagnostic is None:
+            return
+        try:
+            self.helper_diagnostic['stages'].append({
+                'stage': stage, 'elapsed_seconds': time.monotonic() - self.helper_started,
+                'pid': self.helper.pid if self.helper is not None else None,
+                'poll': self.helper.poll() if self.helper is not None else None,
+                'error': repr(error) if error is not None else None})
+            (OUT / 'udp-echo-helper.json').write_text(json.dumps(self.helper_diagnostic, indent=2) + '\n')
+        except Exception as error:
+            write_diagnostic('UDP Echo helper diagnostic failed: ' + repr(error))
+
+    def cleanup_failed_start(self):
+        try:
+            self.finish_echo()
+        except Exception as cleanup_error:
+            # Preserve the startup exception; finish_echo records this secondary
+            # failure without claiming a still-unconfirmed child has exited.
+            write_diagnostic('UDP Echo fixture startup cleanup failed: ' + repr(cleanup_error))
+
     def finish_echo(self):
         if self.helper is not None:
-            self.module.finish_process(self.helper)
+            self.record_helper('cleanup-started')
+            try:
+                self.module.finish_process(self.helper)
+            except Exception as error:
+                self.record_helper('cleanup-failed', error)
+                raise
+            self.record_helper('cleanup-finished')
         elif self.echo is not None:
             self.echo.finish()
 
@@ -152,7 +196,7 @@ def output(*args):
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for marker in ('SUCCESS.txt', 'advisory-check.txt', 'app-sha256.txt', 'final-settings.json',
-                   'udp-echo-fixture.json'):
+                   'udp-echo-fixture.json', 'udp-echo-helper.json', 'udp-echo-helper.log'):
         (OUT / marker).unlink(missing_ok=True)
     if not __debug__ or sys.platform != 'darwin' or WORK.exists():
         raise SystemExit('Use assertions, the Apple toolchain and a clean UI workspace')
@@ -258,12 +302,22 @@ def main():
 
 if __name__ == '__main__':
     if sys.argv[1:] == ['--udp-echo-helper']:
-        echo = echo_module().Echo(True, elevate=False)
+        def phase(name):
+            write_diagnostic(json.dumps({'udp_echo_helper_phase': name, 'pid': os.getpid(),
+                                         'parent_pid': os.getppid(), 'uid': os.geteuid(),
+                                         'time_ns': time.monotonic_ns()}))
+        phase('entry')
+        module = echo_module()
+        phase('module-loaded')
+        echo = module.Echo(True, elevate=False)
         try:
+            phase('udp7-ready')
             print(json.dumps({'ready': True}), flush=True)
             for line in sys.stdin:
                 print(json.dumps(echo_command(echo, line.rstrip('\n'))), flush=True)
         finally:
+            phase('stopping')
             echo.finish()
+            phase('stopped')
     else:
         main()
