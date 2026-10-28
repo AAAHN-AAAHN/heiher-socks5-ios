@@ -58,6 +58,7 @@ class Fixture:
         self.tcp_written = 0
         self.tcp_read = 0
         self.reply_bytes = 0
+        self.post_off_byte = None
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
 
@@ -80,10 +81,10 @@ class Fixture:
                     self.stop.wait(0.8)
                     return
                 if self.mode == "off-during-greeting":
-                    time.sleep(0.12)
                     try:
                         self.send_control(connection, b"\x05\x00")
-                        assert connection.recv(1) == b""
+                        self.post_off_byte = connection.recv(1).hex()
+                        assert self.post_off_byte == "", ("OFF_GREETING_NEXT_BYTE", self.post_off_byte)
                     except (BrokenPipeError, ConnectionResetError):
                         pass
                     return
@@ -236,7 +237,17 @@ def main():
         result = subprocess.run([str(executable), fixture_mode, fixture.host,
                                  str(fixture.listener.getsockname()[1]), target],
                                 capture_output=True, text=True, timeout=6, env=environment)
-        fixture.finish()
+        try:
+            fixture.finish()
+        finally:
+            # Preserve final fixture state and process output even when its
+            # bounded join or EOF assertion fails.
+            (options.output / "last-case.json").write_text(json.dumps({
+                "mode": mode, "family": family, "target": target,
+                "returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr,
+                "fixture_error": fixture.error, "post_off_byte": fixture.post_off_byte,
+                "fixture_thread_alive": fixture.thread.is_alive(),
+            }, indent=2) + "\n")
         assert result.returncode == 0, (mode, result.stderr, result.stdout)
         data = json.loads(result.stdout)
         failed = [event for event in data["events"] if event.startswith("failed:")]
@@ -247,6 +258,8 @@ def main():
         off = mode.startswith("off-")
         if off:
             assert not fixture.datagrams and data["datagramWrites"] == 0, (mode, data)
+            if mode == "off-during-greeting":
+                assert data["greetingOffAcknowledged"] and data["writes"] == 3 and data["reads"] == 0, (mode, data)
         elif not negative:
             expected = 4 if mode == "io-drop" else 5
             assert len(fixture.datagrams) == expected and data["accepted"] == expected, (mode, data)

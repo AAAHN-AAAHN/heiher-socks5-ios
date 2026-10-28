@@ -113,15 +113,22 @@ def server_config(path, host, udp_host, workers, auth, fixed_port=0):
     path.write_text(value)
 
 
-def launch_server(executable, config, log):
+def launch_server(executable, config, log, record=None):
     process = subprocess.Popen([str(executable), str(config)], stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE, stderr=log, text=True, bufsize=1)
     try:
         info = response(process)
+        if record is not None:
+            record(stage="listener-reported", listener=info,
+                   server_pid=process.pid, server_poll=process.poll())
         assert info["state"] == "ready" and info["port"] != 0
-    except BaseException:
+    except BaseException as error:
+        if record is not None:
+            record(stage="listener-failed", server_poll=process.poll(), error=repr(error))
         process.kill()
         process.wait()
+        if record is not None:
+            record(server_final_poll=process.returncode)
         raise
     return process, info
 
@@ -169,11 +176,13 @@ def compile_probes(options):
                  common + production + [str(HERE / "UDPEchoNativeProbe.swift"),
                                         "-o", str(interactive)]]
     native = options.output / "server"
-    commands.append([options.cc, "-Wall", "-Wextra", "-Werror", "-pthread",
-                     "-I" + str(options.native / "src"), str(HERE / "UDPEchoNativeServer.c"),
-                     *map(str, libraries), "-o", str(native)])
+    for name, executable in (("UDPEchoNativeServer.c", native),
+                             ("listener_info.c", options.output / "listener-info")):
+        commands.append([options.cc, "-Wall", "-Wextra", "-Werror", "-pthread",
+                         "-I" + str(options.native / "src"), str(HERE / name),
+                         *map(str, libraries), "-o", str(executable)])
     (options.output / "compile-commands.json").write_text(json.dumps(commands, indent=2) + "\n")
-    for command_line in commands[-4:]:
+    for command_line in commands[-5:]:
         subprocess.run(command_line, check=True)
     return transport, scheduler, interactive, native
 
@@ -188,6 +197,7 @@ def main():
     assert options.swiftc and options.cc
     options.output.mkdir(parents=True, exist_ok=True)
     transport, scheduler, interactive, native = compile_probes(options)
+    subprocess.run([str(options.output / "listener-info")], check=True, timeout=35)
     results = []
     cases = [
         ("127.0.0.1", "127.0.0.1", 1, False, "127.0.0.1", True),
@@ -202,17 +212,33 @@ def main():
     for index, (host, udp_host, workers, auth, target, replies) in enumerate(cases):
         config = options.output / f"transport-{index}.yml"
         server_config(config, host, udp_host, workers, auth)
+        diagnostic = {"case": index, "config": config.read_text(), "target": target,
+                      "replies": replies, "listener": None, "endpoint": None,
+                      "server_poll": None, "client": None, "received": None}
+        diagnostic_path = options.output / f"transport-{index}-diagnostic.json"
+
+        def record(**values):
+            diagnostic.update(values)
+            diagnostic_path.write_text(json.dumps(diagnostic, indent=2) + "\n")
+
+        record(stage="configured")
         echo = Echo(replies)
         server = None
         try:
             with (options.output / f"transport-{index}-server.log").open("w") as log:
-                server, info = launch_server(native, config, log)
+                server, info = launch_server(native, config, log, record)
                 mode = "auth" if auth else ("echo" if replies else "silence")
-                run = subprocess.run([str(transport), mode, endpoint(info), str(info["port"]), target],
+                address = endpoint(info)
+                record(stage="client-starting", endpoint={"host": address, "port": info["port"]},
+                       server_poll=server.poll())
+                run = subprocess.run([str(transport), mode, address, str(info["port"]), target],
                                      text=True, capture_output=True, timeout=6)
+                record(stage="client-returned", server_poll=server.poll(),
+                       client={"returncode": run.returncode, "stdout": run.stdout, "stderr": run.stderr})
                 assert run.returncode == 0, run.stderr
                 data = json.loads(run.stdout)
                 received = echo.snapshot()
+                record(stage="checking-packets", probe=data, received=received, server_poll=server.poll())
                 packets = received[ipaddress.ip_address(target).version]
                 assert len(packets) == data["accepted"] == 5, (index, data, received)
                 assert all(packet[0] == "00" for packet in packets)
@@ -233,10 +259,30 @@ def main():
                 results.append({"kind": "transport", "case": index, "listener": info,
                                 "auth": auth, "target": target, "replies": replies,
                                 "probe": data, "rejected": rejected, "received": received})
-        finally:
+                record(stage="passed", server_poll=server.poll())
+        except BaseException as error:
+            failure = {"error": repr(error)}
             if server is not None:
-                finish_process(server)
-            echo.finish()
+                failure["server_poll"] = server.poll()
+            if isinstance(error, subprocess.TimeoutExpired):
+                failure["timeout_output"] = {
+                    name: value.decode(errors="replace") if isinstance(value, bytes) else value
+                    for name, value in (("stdout", error.stdout), ("stderr", error.stderr))}
+            record(**failure)
+            raise
+        finally:
+            try:
+                try:
+                    if server is not None:
+                        finish_process(server)
+                finally:
+                    echo.finish()
+            except BaseException as error:
+                record(cleanup_error=repr(error))
+                raise
+            finally:
+                if server is not None:
+                    record(server_final_poll=server.poll())
         print("PASS: native transport", index, host, target, "echo", replies, flush=True)
 
     for index, (host, workers, auth, replies) in enumerate([
@@ -333,11 +379,13 @@ def main():
     (options.output / "results.json").write_text(json.dumps(results, indent=2) + "\n")
     paths = [ROOT / "Socks5/BackgroundKeepAlive" / name for name in (
         "Socks5UDPClient.swift", "PeriodicUDPEchoService.swift", "PeriodicUDPEchoStore.swift")]
-    paths += [options.native / "src/core/src/hev-socks5-udp.c", options.native / "src/hev-main.c",
-              options.native / "src/hev-socks5-proxy.c", options.native / "bin/libhev-socks5-server.a"]
+    paths += [options.native / name for name in (
+        "src/core/src/hev-socks5-udp.c", "src/hev-main.c", "src/hev-main.h",
+        "src/hev-socket-factory.c", "src/hev-socket-factory.h", "src/hev-socks5-proxy.c",
+        "bin/libhev-socks5-server.a")]
     paths += [HERE / name for name in ("check_udp_echo_native.py", "UDPEchoNativeServer.c",
                                        "UDPEchoNativeProbe.swift", "UDPEchoTransportProbe.swift",
-                                       "UDPEchoSchedulerProbe.swift")]
+                                       "UDPEchoSchedulerProbe.swift", "listener_info.c")]
     (options.output / "source-identities.json").write_text(json.dumps(
         {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}, indent=2) + "\n")
     print(f"PASS: {len(results)} actual native end-to-end cases")

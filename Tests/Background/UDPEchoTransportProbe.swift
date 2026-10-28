@@ -21,6 +21,7 @@ private final class Probe: @unchecked Sendable {
     var dropped = 0
     var pending = false
     var finished = false
+    var greetingOffAcknowledged = false
     let mode: String
     let target: Socks5UDPClient.Address
     let configuration: Socks5UDPClient.Configuration
@@ -52,18 +53,14 @@ private final class Probe: @unchecked Sendable {
                 }
             }
         }
-        if mode == "off-during-greeting" {
-            DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(50)) { [self] in
-                admission.begin(enabled: false)
-            }
-        }
         queue.asyncAfter(deadline: .now() + .milliseconds(650)) { [self] in finish() }
         guard done.wait(timeout: .now() + 5) == .success else { fatalError("Transport probe stalled") }
         // Cancellation handlers execute on this same queue before the snapshot.
         let result: [String: Any] = queue.sync {
             ["events": events, "writes": writes, "reads": reads,
              "datagramWrites": datagramWrites, "udpReadBytes": udpReadBytes,
-             "attempts": attempts, "accepted": accepted, "dropped": dropped]
+             "attempts": attempts, "accepted": accepted, "dropped": dropped,
+             "greetingOffAcknowledged": greetingOffAcknowledged]
         }
         let data = try! JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
         print(String(decoding: data, as: UTF8.self))
@@ -72,6 +69,21 @@ private final class Probe: @unchecked Sendable {
     private func observed(_ peer: Socks5UDPClient.Address, count: Int, sent: Bool) {
         precondition(count > 0)
         if sent { writes += count } else { reads += count }
+        if mode == "off-during-greeting", sent, writes == 3, !greetingOffAcknowledged {
+            // Observe the complete greeting, including partial writes. The
+            // production callback runs outside Admission's lock. Hold only
+            // this test queue until an external Off has actually completed;
+            // elapsed time cannot establish ordering with the server reply.
+            let acknowledged = DispatchSemaphore(value: 0)
+            DispatchQueue.global().async { [admission, queue] in
+                dispatchPrecondition(condition: .notOnQueue(queue))
+                admission.begin(enabled: false)
+                acknowledged.signal()
+            }
+            precondition(acknowledged.wait(timeout: .now() + 2) == .success,
+                         "OFF_GREETING_ACK_TIMEOUT")
+            greetingOffAcknowledged = true
+        }
         if peer.port != configuration.server.port {
             if sent { datagramWrites += count } else { udpReadBytes += count }
         }
