@@ -20,6 +20,27 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def classify_result(record, markers=(), observe_cadence=False):
+    assert record["returncode"] is not None, record
+    rejected = record["returncode"] != 0 and any(
+        "SCHEDULER_PREDICATE: " + marker in record["stderr"].splitlines() for marker in markers)
+    if markers and not (observe_cadence and record["returncode"] == 0):
+        assert rejected, record
+    else:
+        assert record["returncode"] == 0 and 5 <= record["delivered"] <= record["observed"]["writes"], record
+    peer_close = record["setup_peer_close"]
+    expected_cancellation = (
+        record["label"] == "delayed-original-rejected" and markers == ("ACTIVE_COUNT",) and rejected
+        and peer_close is not None and peer_close["kind"] in ("ConnectionResetError", "BrokenPipeError")
+        and record["fixture_error"] == peer_close["error"]
+        and record["cleanup_error_kind"] == "AssertionError" and record["cleanup_matches_fixture_error"])
+    clean = record["fixture_error"] is None and record["cleanup_error"] is None and peer_close is None
+    assert record["fixture_joined"] and (clean or expected_cancellation), record
+    if observe_cadence:
+        return "CADENCE_PREDICATE_REJECTED" if rejected else "NORMAL_CADENCE_OBSERVED"
+    return "EXPECTED_SETUP_CANCELLATION" if expected_cancellation else "EXPECTED_REJECTION" if markers else "ACCEPTED"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
@@ -57,6 +78,7 @@ def main():
             self.delay = delay
             self.delay_applied = False
             self.control_times = []
+            self.setup_peer_close = None
             super().__init__(mode, socket.AF_INET6, "::1")
 
         def send_control(self, connection, value):
@@ -66,7 +88,11 @@ def main():
                 self.stop.wait(self.delay)
             self.control_times.append({"phase": "response-start", "time_ns": time.monotonic_ns(),
                                        "bytes": len(value)})
-            super().send_control(connection, value)
+            try:
+                super().send_control(connection, value)
+            except (ConnectionResetError, BrokenPipeError) as error:
+                self.setup_peer_close = {"kind": type(error).__name__, "error": repr(error)}
+                raise
 
     def compile_variant(label, candidate_service, candidate_probe):
         executable = output / label
@@ -81,19 +107,27 @@ def main():
             subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=120)
         return executable
 
-    def exercise(label, executable, delay=0, fixture_mode="echo", markers=()):
+    def exercise(label, executable, delay=0, fixture_mode="echo", markers=(), observe_cadence=False):
         fixture = DelayedFixture(fixture_mode, delay)
         command = [str(executable), "echo", fixture.host, str(fixture.listener.getsockname()[1]), "::1"]
         run = None
+        cleanup_error = None
         try:
             run = subprocess.run(command, capture_output=True, text=True, timeout=5)
         finally:
             try:
                 fixture.finish()
+            except Exception as error:
+                cleanup_error = error
             finally:
                 record = {"label": label, "command": command, "delay_seconds": delay,
                           "fixture_mode": fixture_mode, "fixture_control_times": fixture.control_times,
                           "fixture_error": fixture.error, "fixture_joined": not fixture.thread.is_alive(),
+                          "setup_peer_close": fixture.setup_peer_close,
+                          "cleanup_error": repr(cleanup_error) if cleanup_error is not None else None,
+                          "cleanup_error_kind": type(cleanup_error).__name__ if cleanup_error is not None else None,
+                          "cleanup_matches_fixture_error": (isinstance(cleanup_error, AssertionError)
+                                                            and cleanup_error.args == (fixture.error,)),
                           "delivered": len(fixture.datagrams), "expected_markers": list(markers),
                           "returncode": None if run is None else run.returncode,
                           "stdout": None if run is None else run.stdout,
@@ -103,11 +137,10 @@ def main():
                 records.append(record)
                 (output / "results.json").write_text(json.dumps(records, indent=2) + "\n")
         assert run is not None
-        if markers:
-            assert run.returncode != 0 and any("SCHEDULER_PREDICATE: " + m in run.stderr for m in markers), record
-        else:
-            assert run.returncode == 0 and 5 <= len(fixture.datagrams) <= record["observed"]["writes"], record
-        print("PASS", label, "exit", run.returncode, "wire", len(fixture.datagrams), flush=True)
+        record["classification"] = classify_result(record, markers, observe_cadence)
+        (output / "results.json").write_text(json.dumps(records, indent=2) + "\n")
+        print("PASS", label, "exit", run.returncode, "wire", len(fixture.datagrams), record["classification"], flush=True)
+        return record["classification"]
 
     original = compile_variant("original", service, old_probe)
     corrected = compile_variant("corrected", service, probe)
@@ -129,9 +162,10 @@ def main():
         nonstrict = output / "nonstrict-service.swift"
         nonstrict.write_text(text.replace(anchor, "DispatchSource.makeTimerSource(queue: queue)", 1))
         plain = compile_variant("nonstrict", nonstrict, probe)
-        exercise("nonstrict-corrected-probe-rejected", plain, markers=("ACTIVE_COUNT", "INTERVAL_RANGE"))
+        # Non-strict dispatch timers permit coalescing; they do not require it.
+        strict_result = exercise("nonstrict-corrected-probe-observed", plain,
+                                 markers=("ACTIVE_COUNT", "INTERVAL_RANGE"), observe_cadence=True)
         exercise("strict-same-host-accepted", corrected)
-        strict_result = "PASS_REJECTED_UNCHANGED_NEGATIVE_ON_SAME_HOST"
     after = {str(p): sha(p) for p in source_files}
     assert after == before
     receipt = {"result": "PASS", "platform": platform.platform(),

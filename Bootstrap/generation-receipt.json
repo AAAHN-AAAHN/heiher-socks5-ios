@@ -1,15 +1,15 @@
 {
   "result": "PASS",
   "selected": [
-    "background",
-    "integrated"
+    "background"
   ],
   "support": [
     "udp",
     "statistics",
     "server",
     "settings",
-    "icon"
+    "icon",
+    "integrated"
   ],
   "heads": {
     "main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
@@ -21,9 +21,11 @@
     "statistics": "ad9c5bab630ab6f9fe1188f0e3edc590f0b5dfc6",
     "integrated": "4cc1a53416df1f888603df448126392c611b2bb9"
   },
-  "macos_only": [],
-  "bundle_sha256": "fc70327e1f11f97e592027f6fa53c0e74da08a0d15e9c6f5f08dcc7508423ab2",
-  "bundle_bytes": 230092,
+  "macos_only": [
+    "background"
+  ],
+  "bundle_sha256": "93d510cf6cf9e4e088347f60bc2ecb5a8d5fa3dce7f04d85fb1ccafc735836c9",
+  "bundle_bytes": 230090,
   "prerequisites": [
     "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
@@ -76,31 +78,13 @@
       "sha": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
     }
   ],
-  "remote_snapshot_time": "2026-10-28 14:52:45 UTC",
-  "remote_snapshot_sha256": "a45380fc66424ad73f6c5ce78be6c4f2351d9adde8b82aaffa9365e37814eadf",
+  "remote_snapshot_time": "2026-10-28 17:05:14 UTC",
+  "remote_snapshot_sha256": "d5cc4a1889030ff62d114f3b867badc4ff320bee993535824a418ae58499b4ab",
   "frozen_heads_sha256": "ee938a2795612e43c5d91f51604097e07e545d1093f4764d446bf362c1011611",
   "matrix": [
     {
       "name": "background",
       "sha": "cbe348c4ad74cba5370cdd71695ec3c56962d339",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "background",
-      "sha": "cbe348c4ad74cba5370cdd71695ec3c56962d339",
-      "os": "xcode-27",
-      "runtime": true
-    },
-    {
-      "name": "integrated",
-      "sha": "4cc1a53416df1f888603df448126392c611b2bb9",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "integrated",
-      "sha": "4cc1a53416df1f888603df448126392c611b2bb9",
       "os": "xcode-27",
       "runtime": true
     }
