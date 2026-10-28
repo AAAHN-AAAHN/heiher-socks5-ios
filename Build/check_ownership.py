@@ -68,7 +68,9 @@ def main():
                 assert path in manifest['files'], 'Settings extension must be hash-locked: ' + path
             assert 'periodicUDPEcho' in content('Socks5/Settings/AppSettings.swift')
             assert 'contains(.periodicUDPEcho)' in content('Socks5/Settings/AppSettings.swift')
-        assert 'server.apply(value.server, running: value.serverRunning)' in root
+        apply_call = ('server.apply(value.server, running: value.serverRunning)' if CONFIG['name'] == 'integrated'
+                      else 'server.apply(settings.value.server, running: settings.value.serverRunning)')
+        assert apply_call in root
         assert 'settings.binding(\\.server)' in root
     else:
         assert not (ROOT / 'Socks5/Settings').exists()
