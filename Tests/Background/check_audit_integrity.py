@@ -5,10 +5,12 @@ Exact old Git blobs are negative controls. Temporary Git worktrees and failing
 SDK executables test provenance/marker behavior, not Apple compilation or playback.
 """
 import hashlib
+import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import native_inputs
 import tempfile
 from unittest import mock
 
@@ -26,6 +28,9 @@ def exercise(name, source, label, case, output_name):
         path = root / 'Tests/Background' / name
         path.parent.mkdir(parents=True)
         path.write_bytes(source)
+        (path.parent / 'native_inputs.py').write_bytes((ROOT / 'Tests/Background/native_inputs.py').read_bytes())
+        (root / 'Build').mkdir()
+        (root / 'Build/features.json').write_text(json.dumps({'name': 'background'}))
         (root / '.gitignore').write_text('artifacts/\n.build/\ntools/\nreached-sdk\n')
         probe = root / 'tracked-source.txt'
         probe.write_text('committed source\n')
@@ -36,6 +41,32 @@ def exercise(name, source, label, case, output_name):
         git('add', '.')
         git('-c', 'user.name=Audit Fixture', '-c', 'user.email=audit@localhost',
             'commit', '-qm', 'Isolated audit-driver input')
+        commit = git('rev-parse', 'HEAD').stdout.decode().strip()
+        core = root / '.build/core'
+        (core / 'src').mkdir(parents=True)
+        raw_header = b'/* Controlled audit fixture; no compiled product. */\n'
+        (core / 'src/hev-main.h').write_bytes(raw_header)
+        framework = core / 'HevSocks5Server.xcframework'
+        for target in ('ios-arm64', 'ios-arm64_x86_64-simulator'):
+            headers = framework / target / 'Headers'
+            headers.mkdir(parents=True)
+            (headers / 'hev-main.h').write_bytes(raw_header)
+            (framework / target / 'libhev-socks5-server.a').write_bytes(b'fixture library')
+        with mock.patch.object(native_inputs, 'ROOT', root):
+            native_inputs.record(core, commit)
+        native = root / 'artifacts/background'
+        (native / 'tested-commit.txt').write_text(commit + '\n')
+        (native / 'SUCCESS.txt').write_text('Controlled fixture only\n')
+        if case == 'native-stale':
+            (native / 'compiled-headers/source-commit.txt').write_text('0' * 40 + '\n')
+        elif case == 'native-changed-header':
+            (native / 'compiled-headers/hev-main.h').write_bytes(b'changed header')
+        elif case == 'native-changed-framework':
+            (framework / 'ios-arm64/libhev-socks5-server.a').write_bytes(b'changed library')
+        elif case == 'native-missing-success':
+            (native / 'SUCCESS.txt').unlink()
+        elif case == 'native-missing-receipt':
+            (native / 'built-framework.json').unlink()
         if case in ('unstaged', 'staged', 'index-only'):
             probe.write_text('uncommitted source\n')
             if case != 'unstaged':
@@ -64,7 +95,7 @@ def exercise(name, source, label, case, output_name):
         result = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True, timeout=15)
         reached = (root / 'reached-sdk').exists()
         expected_reached = (case == 'clean'
-                            or (label == 'old-control' and case in ('unstaged', 'staged'))
+                            or (label == 'old-control' and (case in ('unstaged', 'staged') or case.startswith('native-')))
                             or (label != 'current' and case == 'index-only')
                             or (label != 'current' and name.endswith('.sh') and case == 'optimized-python'))
         if result.returncode == 0 or reached != expected_reached:
@@ -137,6 +168,80 @@ def optimization_boundaries():
     return count
 
 
+def native_copy_boundaries():
+    # These are small byte fixtures for receipt/copy integrity, never native binaries.
+    count = 0
+    for case in ('clean-copy', 'changed-library', 'extra-file', 'missing-file', 'linked-file',
+                 'changed-module', 'changed-header', 'linked-header', 'linked-headers',
+                 'stale-framework', 'receipt-file-map'):
+        with tempfile.TemporaryDirectory(prefix='background-native-input-') as temporary:
+            root = Path(temporary)
+            (root / 'Build').mkdir()
+            (root / 'Build/features.json').write_text(json.dumps({'name': 'background'}))
+            core = root / '.build/core'
+            (core / 'src').mkdir(parents=True)
+            (core / 'src/hev-main.h').write_bytes(b'fixture header')
+            framework = core / 'HevSocks5Server.xcframework'
+            for target in ('ios-arm64', 'ios-arm64_x86_64-simulator'):
+                headers = framework / target / 'Headers'
+                headers.mkdir(parents=True)
+                (headers / 'hev-main.h').write_bytes(b'fixture header')
+                (framework / target / 'libhev-socks5-server.a').write_bytes(b'fixture library')
+            commit = 'a' * 40
+            with mock.patch.object(native_inputs, 'ROOT', root), mock.patch.object(native_inputs, 'head', return_value=commit):
+                native_inputs.record(core, commit)
+                out = root / 'artifacts/background'
+                (out / 'SUCCESS.txt').write_text('fixture only')
+                (out / 'tested-commit.txt').write_text(commit)
+                target = framework / 'ios-arm64/libhev-socks5-server.a'
+                if case == 'changed-library':
+                    target.write_bytes(b'changed')
+                elif case == 'extra-file':
+                    (framework / 'extra').write_bytes(b'extra')
+                elif case == 'missing-file':
+                    target.unlink()
+                elif case == 'linked-file':
+                    target.unlink()
+                    target.symlink_to(core / 'src/hev-main.h')
+                elif case == 'changed-module':
+                    (out / 'compiled-headers/module.modulemap').write_bytes(b'changed')
+                elif case == 'changed-header':
+                    (out / 'compiled-headers/hev-main.h').write_bytes(b'changed')
+                elif case == 'linked-header':
+                    header = out / 'compiled-headers/hev-main.h'
+                    header.unlink()
+                    header.symlink_to(core / 'src/hev-main.h')
+                elif case == 'linked-headers':
+                    headers = out / 'compiled-headers'
+                    headers.rename(out / 'moved-headers')
+                    headers.symlink_to(out / 'moved-headers', target_is_directory=True)
+                elif case in ('stale-framework', 'receipt-file-map'):
+                    receipt = json.loads((out / 'built-framework.json').read_bytes())
+                    if case == 'stale-framework':
+                        receipt['source_commit'] = 'b' * 40
+                    else:
+                        receipt['files'].pop('ios-arm64/libhev-socks5-server.a')
+                    (out / 'built-framework.json').write_text(json.dumps(receipt))
+                if case == 'clean-copy':
+                    destination = root / 'Copied.xcframework'
+                    destination.mkdir()
+                    (destination / 'stock-library').write_bytes(b'stale')
+                    with mock.patch.object(sys, 'argv', ['native_inputs.py', 'copy', str(destination)]):
+                        native_inputs.main()
+                    if native_inputs.snapshot(destination) != native_inputs.snapshot(framework):
+                        raise RuntimeError('Native prepared framework copy differs')
+                else:
+                    try:
+                        native_inputs.verify()
+                    except (RuntimeError, OSError):
+                        pass
+                    else:
+                        raise RuntimeError('Native input mutation was accepted: ' + case)
+            count += 1
+            print('PASS: native receipt/copy integrity', case)
+    return count
+
+
 def main():
     if not __debug__:
         raise SystemExit('Assertions must be enabled')
@@ -145,7 +250,9 @@ def main():
         old = original(old_blob)
         current = (ROOT / 'Tests/Background' / name).read_bytes()
         for label, source in [('old-control', old), ('current', current)]:
-            cases = ['clean', 'unstaged', 'staged', 'index-only', 'optimized-python']
+            cases = ['clean', 'unstaged', 'staged', 'index-only', 'optimized-python',
+                     'native-stale', 'native-changed-header', 'native-changed-framework',
+                     'native-missing-success', 'native-missing-receipt']
             if name.endswith('.py'):
                 cases += ['existing-work']
             for case in cases:
@@ -157,6 +264,7 @@ def main():
             exercise(name, prior, 'prior-input-guard', case, output_name)
             count += 1
     count += optimization_boundaries()
+    count += native_copy_boundaries()
     print(f'SUMMARY: {count} actual audit-entry boundary cases, including retained and exact-prior negative controls')
 
 

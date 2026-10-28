@@ -262,6 +262,57 @@ extension LoopAudioService {
             app!.setLocation(true)
             check(!app!.audioEnabled && app!.locationEnabled, "AUDIO_STOP_DISABLED_LOCATION")
             app!.setLocation(false)
+            // Use the actual facade publisher. Darwin supplies Apple Combine;
+            // Linux supplies the same synchronous object publisher boundary.
+            // Publication must commit location values before nested user intent.
+            for scenario in ["intent-off", "intent-on", "start-off", "permission-off", "update-off", "off-state-on"] {
+                CLLocationManager.initialAuthorization = scenario == "permission-off" ? .notDetermined : .authorizedAlways
+                if ["intent-on", "update-off", "off-state-on"].contains(scenario) { app!.setLocation(true) }
+                let updateManager = CLLocationManager.instances.last
+                let beforeManagers = CLLocationManager.instances.count
+                let nestedOn = scenario == "intent-on" || scenario == "off-state-on"
+                var reentered = false
+                var startsAtOff = 0
+                var requestsAtOff = 0
+                let subscription = app!.objectWillChange.sink { _ in
+                    guard !reentered else { return }
+                    if scenario == "off-state-on", app!.locationEnabled { return }
+                    if scenario == "start-off" || scenario == "permission-off" {
+                        guard app!.locationEnabled, CLLocationManager.instances.count > beforeManagers else { return }
+                    }
+                    reentered = true
+                    app!.setLocation(nestedOn)
+                    startsAtOff = CLLocationManager.instances.reduce(0) { $0 + $1.starts }
+                    requestsAtOff = CLLocationManager.instances.reduce(0) { $0 + $1.requests }
+                }
+                switch scenario {
+                case "intent-on", "off-state-on": app!.setLocation(false)
+                case "update-off": app!.locationManager(updateManager!, didUpdateLocations: [CLLocation()])
+                default: app!.setLocation(true)
+                }
+                check(reentered, "LOCATION_PUBLICATION_MISSING_\(scenario)")
+                check(app!.locationEnabled == nestedOn, "LOCATION_LATEST_INTENT_OVERWRITTEN_\(scenario)")
+                check(nestedOn ? app!.locationState != "Off" : app!.locationState == "Off",
+                      "LOCATION_LATEST_STATE_OVERWRITTEN_\(scenario)")
+                if scenario == "start-off" {
+                    check(CLLocationManager.instances.reduce(0) { $0 + $1.starts } == startsAtOff,
+                          "LOCATION_START_AFTER_NEWER_OFF")
+                }
+                if scenario == "permission-off" {
+                    check(CLLocationManager.instances.reduce(0) { $0 + $1.requests } == requestsAtOff,
+                          "LOCATION_PERMISSION_AFTER_NEWER_OFF")
+                }
+                if nestedOn {
+                    check(CLLocationManager.instances.last?.delegate != nil,
+                          "LOCATION_NEWER_MANAGER_DETACHED_\(scenario)")
+                } else {
+                    check(CLLocationManager.instances.allSatisfy { $0.delegate == nil },
+                          "LOCATION_OFF_RETAINED_DELEGATE_\(scenario)")
+                }
+                subscription.cancel()
+                app!.setLocation(false)
+            }
+            CLLocationManager.initialAuthorization = .authorizedAlways
         default: fatalError("Unknown facade scenario")
         }
         app = nil

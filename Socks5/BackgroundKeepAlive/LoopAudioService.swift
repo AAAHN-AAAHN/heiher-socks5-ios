@@ -493,7 +493,7 @@ private final class LoopAudioQueueOwner: @unchecked Sendable {
             return
         }
         if releaseBarrier { begin(.stop); return }
-        if assetBlocked { return }
+        if assetBlocked { publish(lastState); return }
         let remaining = retryAt - Self.now
         if remaining > 0 { schedule(at: retryAt); return }
         if playing && !rebuild {

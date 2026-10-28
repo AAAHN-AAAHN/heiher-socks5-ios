@@ -138,6 +138,54 @@ def native_boundaries(old, current):
     return count
 
 
+def effective_pins(current):
+    tree = ast.parse(current)
+    functions = ast.Module(body=[n for n in tree.body if isinstance(n, ast.FunctionDef)
+                                 and n.name in ('git', 'tracked', 'clean_tracked', 'clean_native', 'checkout')], type_ignores=[])
+    cases = ('clean', 'modified-c', 'staged-c', 'index-c', 'assume-unchanged',
+             'skip-worktree', 'clean-filter', 'filemode', 'untracked-c', 'ignored-c')
+    for case in cases:
+        with tempfile.TemporaryDirectory(prefix='baseline-effective-pins-') as folder:
+            root = Path(folder)
+            initialize(root)
+            dependency = root / 'dependency'
+            recorded = initialize(dependency)
+            (dependency / 'src/probe.c').write_text('int updated;\n')
+            git(dependency, 'add', '.')
+            git(dependency, '-c', 'user.name=Input fixture', '-c', 'user.email=audit@localhost',
+                'commit', '-qm', 'Effective dependency source')
+            effective = git(dependency, 'rev-parse', 'HEAD').decode().strip()
+            git(dependency, 'checkout', '--detach', recorded)
+            git(root, 'update-index', '--add', '--cacheinfo', '160000', recorded, 'dependency')
+            git(root, '-c', 'user.name=Input fixture', '-c', 'user.email=audit@localhost',
+                'commit', '-qm', 'Recorded dependency gitlink')
+            head = git(root, 'rev-parse', 'HEAD').decode().strip()
+            namespace = {'subprocess': subprocess, 'os': os, 'hashlib': hashlib,
+                         'CONFIG': {'sources': {'.': head, 'dependency': effective}}}
+            exec(compile(functions, '<exact-effective-pin-checkout>', 'exec'), namespace)
+            try:
+                namespace['clean_native'](root)
+            except AssertionError:
+                pass
+            else:
+                raise RuntimeError('Recorded gitlink was accepted as the effective pin')
+            alter(dependency, case)
+            accepted = True
+            try:
+                namespace['checkout'](root)
+            except (AssertionError, subprocess.CalledProcessError):
+                accepted = False
+            if accepted != (case == 'clean'):
+                raise RuntimeError(('effective pins', case, accepted))
+            expected = effective if accepted else recorded
+            if git(dependency, 'rev-parse', 'HEAD').decode().strip() != expected:
+                raise RuntimeError('Dirty input moved before validation')
+            if git(root, 'rev-parse', 'HEAD:dependency').decode().strip() != recorded:
+                raise RuntimeError('Recorded gitlink rewritten')
+            print('PASS effective pins:', case, 'accepted=', accepted, flush=True)
+    return len(cases)
+
+
 def optimization(old, current):
     count = 0
     for label, source in [('old', old), ('current', current)]:
@@ -557,7 +605,7 @@ def main():
     for key in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GITHUB_OUTPUT'):
         os.environ.pop(key, None)
     old, current = original(OLD_CHECK), (ROOT / 'Build/check.py').read_bytes()
-    count = native_boundaries(old, current) + optimization(old, current)
+    count = native_boundaries(old, current) + optimization(old, current) + effective_pins(current)
     current_build = (ROOT / 'Build/build.sh').read_bytes()
     count += shell_boundaries(original(OLD_BUILD), current_build)
     count += publication_boundaries(original(PREVIOUS_BUILD), current_build)

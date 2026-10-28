@@ -1,0 +1,362 @@
+#define _GNU_SOURCE
+#include <assert.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <hev-task.h>
+#include <hev-task-io.h>
+#include <hev-task-io-socket.h>
+
+static int fail_allocation, short_query, query_error;
+static int query_interrupts, receive_interrupts, control_interrupts;
+static int receive_cancel;
+void *io_malloc (size_t size);
+void io_free (void *ptr);
+ssize_t io_recv (int fd, void *buf, size_t len, int flags);
+ssize_t io_recvmsg (int fd, struct msghdr *message, int flags);
+int io_getsockopt (int fd, int level, int option, void *value,
+                   socklen_t *length);
+
+int io_recvmmsg (int fd, void *messages, unsigned int count, int flags,
+                 HevTaskIOYielder yielder, void *data);
+
+#define hev_task_io_socket_recvmmsg io_recvmmsg
+#define hev_malloc io_malloc
+#define hev_free io_free
+#define recv io_recv
+#define recvmsg io_recvmsg
+#define getsockopt io_getsockopt
+#include "hev-socks5-udp.c"
+#undef hev_malloc
+#undef hev_free
+#undef recv
+#undef recvmsg
+#undef getsockopt
+#undef hev_task_io_socket_recvmmsg
+
+#include <stdio.h>
+
+void *
+io_malloc (size_t size)
+{
+    if (fail_allocation)
+        return NULL;
+    return malloc (size);
+}
+
+void
+io_free (void *ptr)
+{
+    free (ptr);
+}
+
+static int
+interrupt_once (int *pending)
+{
+    if (!*pending)
+        return 0;
+    --*pending;
+    errno = EINTR;
+    return 1;
+}
+
+int
+io_recvmmsg (int fd, void *messages, unsigned int count, int flags,
+             HevTaskIOYielder yielder, void *data)
+{
+    if (receive_cancel) {
+        receive_cancel = 0;
+        errno = EINTR;
+        return -2;
+    }
+    if (interrupt_once (&receive_interrupts))
+        return -1;
+    return hev_task_io_socket_recvmmsg (fd, messages, count, flags, yielder,
+                                        data);
+}
+
+ssize_t
+io_recv (int fd, void *buf, size_t len, int flags)
+{
+#if defined(__linux__)
+    if (flags & MSG_PEEK) {
+        if (interrupt_once (&query_interrupts))
+            return -1;
+        if (query_error) {
+            errno = query_error;
+            return -1;
+        }
+        if (short_query)
+            return 1;
+    }
+#endif
+    if (!flags && len == 1 && interrupt_once (&control_interrupts))
+        return -1;
+    return recv (fd, buf, len, flags);
+}
+
+ssize_t
+io_recvmsg (int fd, struct msghdr *message, int flags)
+{
+    if (flags & MSG_PEEK) {
+        if (interrupt_once (&query_interrupts))
+            return -1;
+        if (query_error) {
+            errno = query_error;
+            return -1;
+        }
+        if (short_query) {
+            message->msg_flags &= ~MSG_TRUNC;
+            return 1;
+        }
+    }
+    return recvmsg (fd, message, flags);
+}
+
+int
+io_getsockopt (int fd, int level, int option, void *value, socklen_t *length)
+{
+#if defined(__APPLE__)
+    if (option == SO_NREAD && interrupt_once (&query_interrupts))
+        return -1;
+    if (query_error && option == SO_NREAD) {
+        errno = query_error;
+        return -1;
+    }
+    if (short_query && option == SO_NREAD) {
+        assert (*length == sizeof (int));
+        *(int *)value = 1;
+        return 0;
+    }
+#endif
+    return getsockopt (fd, level, option, value, length);
+}
+
+/* Nonblocking send completion is not receive readiness on every host.
+ * Bound the fixture's readiness wait without changing production I/O policy. */
+static void
+wait_readable (int fd, uint64_t deadline)
+{
+    uint64_t now = udp_buffer_now ();
+    struct pollfd event = { .fd = fd, .events = POLLIN };
+    assert (now < deadline);
+    int delay = (int)((deadline - now) / 1000000 + 1);
+    assert (poll (&event, 1, delay) == 1 && (event.revents & POLLIN));
+}
+
+static int
+receive_ready (HevSocks5 *self, int fd, struct mmsghdr *messages,
+               unsigned int num, UDPBuffer *buffers)
+{
+    uint64_t deadline = udp_buffer_now () + 2 * UDP_NSEC_PER_SEC;
+    unsigned int done = 0;
+    while (done < num) {
+        int result;
+        wait_readable (fd, deadline);
+        result = udp_buffer_recvmmsg (self, fd, messages + done, num - done,
+                                      MSG_DONTWAIT, buffers + done);
+        if (result < 0 && errno == EAGAIN)
+            continue;
+        if (result <= 0)
+            return done ? (int)done : result;
+        done += result;
+        if (!HEV_SOCKS5 (self)->timeout)
+            break;
+    }
+    return done;
+}
+
+static void
+family_test (int family)
+{
+    UDPBuffers owner = { 0 };
+    UDPBuffer buffers[3] = { 0 };
+    unsigned char base[3][UDP_BUF_SIZE], payload[48001], received[48001];
+    struct sockaddr_in6 target = { 0 }, peers[3];
+    struct mmsghdr messages[3] = { 0 };
+    struct iovec vectors[3];
+    HevSocks5 self = { .type = HEV_SOCKS5_TYPE_UDP_IN_TCP, .timeout = 60000 };
+    int input = socket (family, SOCK_DGRAM, 0);
+    int output = socket (family, SOCK_DGRAM, 0);
+    int sendspace = 256 * 1024;
+    socklen_t length = sizeof (target);
+
+    assert (input >= 0 && output >= 0);
+    assert (setsockopt (output, SOL_SOCKET, SO_SNDBUF, &sendspace,
+                        sizeof (sendspace)) == 0);
+    if (family == AF_INET6) {
+        target.sin6_family = AF_INET6;
+        target.sin6_addr = in6addr_loopback;
+#if defined(__APPLE__)
+        target.sin6_len = sizeof (target);
+#endif
+        assert (bind (input, (struct sockaddr *)&target, sizeof (target)) == 0);
+    } else {
+        struct sockaddr_in *v4 = (struct sockaddr_in *)&target;
+        v4->sin_family = AF_INET;
+        v4->sin_addr.s_addr = htonl (INADDR_LOOPBACK);
+#if defined(__APPLE__)
+        v4->sin_len = sizeof (*v4);
+#endif
+        assert (bind (input, (struct sockaddr *)v4, sizeof (*v4)) == 0);
+    }
+    assert (getsockname (input, (struct sockaddr *)&target, &length) == 0);
+    assert (connect (output, (struct sockaddr *)&target, length) == 0);
+    assert (fcntl (input, F_SETFL, O_NONBLOCK) == 0);
+    owner.slots = buffers;
+    owner.count = 3;
+    for (int i = 0; i < 3; i++) {
+        buffers[i].base = base[i];
+        buffers[i].capacity = UDP_BUF_SIZE;
+        buffers[i].owner = &owner;
+        vectors[i] = (struct iovec){ base[i], sizeof (base[i]) };
+        messages[i].msg_hdr.msg_iov = &vectors[i];
+        messages[i].msg_hdr.msg_iovlen = 1;
+        messages[i].msg_hdr.msg_name = &peers[i];
+        messages[i].msg_hdr.msg_namelen = sizeof (peers[i]);
+    }
+    assert (udp_buffer_datagram_size (input, &buffers[0]) < 0 &&
+            errno == EAGAIN);
+    for (size_t i = 0; i < sizeof (payload); i++)
+        payload[i] = i % 251;
+    assert (send (output, payload, 0, 0) == 0);
+    assert (send (output, payload, 2048, 0) == 2048);
+    assert (send (output, payload, sizeof (payload), 0) == sizeof (payload));
+    wait_readable (input, udp_buffer_now () + 2 * UDP_NSEC_PER_SEC);
+    assert (udp_buffer_datagram_size (input, &buffers[0]) == 0);
+    assert (receive_ready (&self, input, messages, 3, buffers) == 3);
+    const unsigned int sizes[] = { 0, 2048, 48001 };
+    for (int i = 0; i < 3; i++) {
+        size_t capacity;
+#if defined(__APPLE__) || defined(__linux__)
+        assert (udp_buffer_round (sizes[i], &capacity) == 0);
+#else
+        capacity = UDP_BUF_SIZE;
+        while (capacity < sizes[i])
+            capacity *= 2;
+#endif
+        assert (buffers[i].capacity == capacity);
+        assert (messages[i].msg_len == sizes[i]);
+        assert (!(messages[i].msg_hdr.msg_flags & MSG_TRUNC));
+        assert (!memcmp (udp_buffer_data (&buffers[i]), payload, sizes[i]));
+    }
+    assert (recv (input, received, sizeof (received), 0) < 0 &&
+            errno == EAGAIN);
+    for (int i = 0; i < 3; i++)
+        assert (udp_buffer_resize (&buffers[i], UDP_BUF_SIZE) == 0);
+
+    /* Force only the non-consuming size hint wrong. Real kernel truncation must
+     * remain flagged and must not become a recorded successful full demand. */
+    short_query = 1;
+    assert (send (output, payload, 2048, 0) == 2048);
+    assert (receive_ready (&self, input, messages, 1, buffers) == 1);
+    assert (messages[0].msg_hdr.msg_flags & MSG_TRUNC);
+    assert (!buffers[0].history);
+    short_query = 0;
+
+    /* A successful small prefix survives allocation failure of the next slot.
+     * The oversized datagram is not consumed as a misleading prefix. */
+    fail_allocation = 1;
+    assert (send (output, payload, 7, 0) == 7);
+    assert (send (output, payload, 2048, 0) == 2048);
+    assert (receive_ready (&self, input, messages, 2, buffers) == 1);
+    assert (messages[0].msg_len == 7 && !self.timeout);
+    assert (recv (input, received, sizeof (received), 0) == 2048);
+    assert (!memcmp (received, payload, 2048));
+    fail_allocation = 0;
+
+    /* A portable size probe may grow storage before returning its length.
+     * Resource failure there is terminal too; ordinary query errors retain
+     * their existing state. Every rejected query leaves the datagram intact. */
+    const int query_errors[] = { ENOMEM, EOVERFLOW, EAGAIN };
+    for (size_t i = 0; i < sizeof (query_errors) / sizeof (*query_errors);
+         i++) {
+        self.timeout = 60000;
+        assert (send (output, payload, 2048, 0) == 2048);
+        wait_readable (input, udp_buffer_now () + 2 * UDP_NSEC_PER_SEC);
+        query_error = query_errors[i];
+        assert (udp_buffer_recvmmsg (&self, input, messages, 1, MSG_DONTWAIT,
+                                     buffers) == -1);
+        assert (errno == query_error);
+        assert (
+            self.timeout ==
+            (query_error == ENOMEM || query_error == EOVERFLOW ? 0 : 60000));
+        assert (!buffers[0].history && buffers[0].capacity == UDP_BUF_SIZE);
+        query_error = 0;
+        assert (recv (input, received, sizeof (received), 0) == 2048);
+        assert (!memcmp (received, payload, 2048));
+    }
+    /* No-transfer interruption is retried before yielding or disabling a
+     * direction. The real queued datagram is consumed once, in full. */
+    int *interruptions[] = { &query_interrupts, &receive_interrupts };
+    for (size_t i = 0; i < 2; i++) {
+        self.timeout = 60000;
+        assert (send (output, payload, 2048, 0) == 2048);
+        *interruptions[i] = 3;
+        assert (receive_ready (&self, input, messages, 1, buffers) == 1);
+        assert (!*interruptions[i] && self.timeout == 60000);
+        assert (messages[0].msg_len == 2048);
+        assert (!(messages[0].msg_hdr.msg_flags & MSG_TRUNC));
+        assert (!memcmp (udp_buffer_data (&buffers[0]), payload, 2048));
+        assert (recv (input, received, sizeof (received), 0) == -1 &&
+                errno == EAGAIN);
+        assert (udp_buffer_resize (&buffers[0], UDP_BUF_SIZE) == 0);
+    }
+    self.timeout = 60000;
+    assert (send (output, payload, 7, 0) == 7);
+    wait_readable (input, udp_buffer_now () + 2 * UDP_NSEC_PER_SEC);
+    receive_cancel = 1;
+    assert (udp_buffer_recvmmsg (&self, input, messages, 1, MSG_DONTWAIT,
+                                 buffers) == -2);
+    assert (!receive_cancel);
+    assert (recv (input, received, sizeof (received), 0) == 7);
+    assert (!memcmp (received, payload, 7));
+    close (input);
+    close (output);
+    puts (
+        family == AF_INET ?
+            "PASS: actual IPv4 length/consume/empty/mixed queue, truncation and allocation failure" :
+            "PASS: actual IPv6 length/consume/empty/mixed queue, truncation and allocation failure");
+}
+
+static void
+control_test (void)
+{
+    int sockets[2];
+    char byte;
+    HevSocks5 self = { .type = HEV_SOCKS5_TYPE_UDP_IN_UDP, .timeout = 60000 };
+    assert (socketpair (AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
+    assert (fcntl (sockets[0], F_SETFL, O_NONBLOCK) == 0);
+    self.fd = sockets[0];
+    control_interrupts = 3;
+    assert (udp_control_check (&self) == 0 && self.timeout == 60000);
+    assert (!control_interrupts);
+    assert (send (sockets[1], "x", 1, 0) == 1);
+    control_interrupts = 3;
+    assert (udp_control_check (&self) == 0 && self.timeout == 60000);
+    assert (!control_interrupts);
+    assert (recv (sockets[0], &byte, 1, 0) == -1 && errno == EAGAIN);
+    assert (shutdown (sockets[1], SHUT_WR) == 0);
+    control_interrupts = 3;
+    assert (udp_control_check (&self) == -1 && self.timeout == 0);
+    assert (!control_interrupts);
+    control_interrupts = 3;
+    assert (task_io_yielder (HEV_TASK_YIELD, &self) == -1);
+    assert (control_interrupts == 3);
+    control_interrupts = 0;
+    close (sockets[0]);
+    close (sockets[1]);
+    puts (
+        "PASS: interrupted control check preserves live/data/EOF and terminal no-I/O boundaries");
+}
+
+int
+main (void)
+{
+    control_test ();
+    family_test (AF_INET);
+    family_test (AF_INET6);
+    return 0;
+}

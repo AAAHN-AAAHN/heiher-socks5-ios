@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit the Background delta without re-auditing or modifying the main engine.
+"""Audit the Background delta against its declared UDP compatibility parent.
 
 This checks source/configuration contracts, not an installed app or OS permission.
 Run against a complete Git checkout; source archives do not prove ancestry.
@@ -17,7 +17,12 @@ if not __debug__:
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = json.loads((ROOT / 'Build/features.json').read_bytes())
 BASE = CONFIG['base_commit']
-assert BASE == '94cc35ba5b50bab177f7aa678aa5af8fd3b8481d'
+assert BASE == 'd3f20d7e3905dcc300f0a5ebf155aa4cc2869774'
+PARENT = json.loads((ROOT / 'docs/documentation.json').read_bytes())['parents']['feature/udp-compat']
+ECHO_SOURCES = ('Socks5UDPClient.swift', 'Socks5ServerEndpoint.swift', 'PeriodicUDPEchoModel.swift',
+                'PeriodicUDPEchoService.swift', 'PeriodicUDPEchoStore.swift')
+# Exact reviewed snapshot/authentication/Stop bridge; any edit requires a new audit.
+CONTENT_SHA256 = 'd9eb5eaedd9e89d8bfc4890e8b8b5ff5e6c95195ddfff56f16803307c7039e71'
 
 
 def git(*args):
@@ -33,7 +38,7 @@ def text(path):
 
 
 def original(path):
-    return git('show', BASE + ':' + path)
+    return git('show', PARENT + ':' + path)
 
 
 def fields(project, name):
@@ -44,31 +49,70 @@ def main():
     import runpy
     documents = runpy.run_path(str(ROOT / 'Build/check_documentation.py'))
     documents['check'](ROOT)
-    git('merge-base', '--is-ancestor', BASE, 'HEAD')
-    base_paths = documents['code_paths'](ROOT, git('ls-tree', '-r', '--name-only', BASE).decode().splitlines())
+    git('merge-base', '--is-ancestor', BASE, PARENT)
+    git('merge-base', '--is-ancestor', PARENT, 'HEAD')
+    base_paths = documents['code_paths'](ROOT, git('ls-tree', '-r', '--name-only', PARENT).decode().splitlines())
     current_paths = documents['code_paths'](ROOT, git('ls-files').decode().splitlines())
     allowed = {'.github/workflows/verify-build.yml', 'Build/check.py',
-               'Build/features.json', 'README.md', 'Socks5/Socks5App.swift',
-               'Socks5.xcodeproj/project.pbxproj'}
+               'Build/features.json', 'Build/build.sh', 'README.md', 'Socks5/Socks5App.swift', 'Socks5/ContentView.swift',
+               'Socks5.xcodeproj/project.pbxproj', 'Socks5/Info.plist'}
     additions = {'Socks5/AppRoot.swift', 'Socks5/Info.plist',
                  'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift',
                  'Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift',
                  'Socks5/BackgroundKeepAlive/LoopAudioService.swift',
                  'Socks5/BackgroundKeepAlive/PlaybackProgressMonitor.swift',
                  'Socks5/BackgroundKeepAlive/RecoveryExecutionLease.swift',
-                 'Socks5/BackgroundKeepAlive/Silence.wav', 'docs/features/background.md'}
-    assert set(base_paths) <= set(current_paths), 'A main file was removed'
+                 'Socks5/BackgroundKeepAlive/Silence.wav', 'docs/features/background.md',
+                 'Patches/hev-socks5-listener-info.patch', '.github/workflows/udp-compat-audit.yml',
+                 *('Socks5/BackgroundKeepAlive/' + name for name in ECHO_SOURCES)}
+    assert set(base_paths) <= set(current_paths), 'A UDP parent file was removed'
     for path in set(current_paths) - set(base_paths):
         assert path in additions or path.startswith('Tests/Background/'), path
+    assert data('.github/workflows/udp-compat-audit.yml') == original('.github/workflows/verify-build.yml'), 'Mapped UDP audit workflow differs'
+    workflow = text('.github/workflows/verify-build.yml')
+    expected_prerequisite = ('  udp-prerequisite:\n'
+        "    if: ${{ !contains(github.event.head_commit.message, '[audio-checks-only]') }}\n"
+        '    uses: ./.github/workflows/udp-compat-audit.yml\n'
+        '    with:\n      ref: ' + PARENT + '\n')
+    assert expected_prerequisite in workflow, 'UDP prerequisite is not pinned to the declared owner'
+    assert ('  verify:\n    needs: udp-prerequisite\n'
+        "    if: ${{ !contains(github.event.head_commit.message, '[audio-checks-only]') }}\n") in workflow
+    membership = json.loads(data('docs/feature-membership.json'))
+    assert membership['base_commit'] == BASE and membership['branches'] == {'feature/udp-compat': PARENT}
+    for target, entry in membership['sources'].items():
+        raw = original(entry.get('path', target))
+        assert entry['commit'] == PARENT and entry['sha256'] == hashlib.sha256(raw).hexdigest(), target
+        assert data(target) == raw, 'Inherited membership bytes changed: ' + target
     preserved = []
     for path in base_paths:
         if path not in allowed:
-            assert data(path) == original(path), 'Main implementation changed: ' + path
+            assert data(path) == original(path), 'Inherited UDP implementation changed: ' + path
             preserved.append(path)
     assert data('Socks5/Socks5App.swift') == original('Socks5/Socks5App.swift').replace(
         b'ContentView()', b'AppRoot()', 1), 'Unexpected app entry-point change'
+    # The native preparation and archive boundary are the only shell changes.
+    old_build = original('Build/build.sh').decode()
+    apple = '    (cd "$CORE" && ./build-apple.sh) > "$OUT/core-apple.log" 2>&1\n'
+    assert old_build.count(apple) == 1
+    expected_build = old_build.replace(apple, apple +
+        '    python3 Tests/Background/native_inputs.py record "$CORE" "$COMMIT" > "$OUT/native-inputs.log"\n')
+    expected_build = expected_build.replace('python3 Tests/Background/run_checks.py >',
+        'python3 Tests/Background/run_checks.py --core "$CORE" >')
+    expected_build = expected_build.replace(
+        '    python3 Tests/Background/run_checks.py --core "$CORE" > "$OUT/background.log" 2>&1\n',
+        '    python3 Tests/Background/run_checks.py --core "$CORE" > "$OUT/background.log" 2>&1\n'
+        '    make -C "$CORE" clean > "$OUT/udp-echo-native-clean.log" 2>&1\n')
+    begin = expected_build.index('    # Keep the committed baseline and all later source checks untouched.')
+    end = expected_build.index('\nfi\npython3 Build/check.py reverse', begin)
+    package = ''.join('    ' + line if line.strip() else line
+                      for line in expected_build[begin:end].splitlines(keepends=True))
+    expected_build = expected_build[:begin] + '    if [ "${BUILD_IPA:-1}" != 0 ]; then\n' + package + '\n    fi' + expected_build[end:]
+    assert text('Build/build.sh') == expected_build, 'Build changed beyond native receipts and optional packaging'
     baseline_config = json.loads(original('Build/features.json'))
-    assert CONFIG['features'] == ['background'] and CONFIG['patches'] == []
+    assert CONFIG['features'] == baseline_config['features'] + ['background']
+    assert CONFIG['patches'] == baseline_config['patches'] + [
+        {'file': 'hev-socks5-listener-info.patch', 'repository': '.'}]
+    assert {'file': 'hev-server-lifecycle.patch', 'repository': '.'} in baseline_config['patches']
     for key in ('sources', 'upstream_app'):
         assert CONFIG[key] == baseline_config[key]
     # Feature validation may evolve; native patch/format/reverse/package logic may not.
@@ -88,6 +132,10 @@ def main():
     assert fields(project, 'INFOPLIST_KEY_UIApplicationSceneManifest_Generation') == ['NO'] * 2
     assert not fields(project, 'CODE_SIGN_ENTITLEMENTS')
     info = plistlib.loads(data('Socks5/Info.plist'))
+    inherited_info = plistlib.loads(original('Socks5/Info.plist'))
+    assert set(info) == set(inherited_info) | {'UIBackgroundModes',
+        'NSLocationWhenInUseUsageDescription', 'NSLocationAlwaysAndWhenInUseUsageDescription'}
+    assert all(info[key] == value for key, value in inherited_info.items()), 'Inherited Info.plist value changed'
     assert set(info['UIBackgroundModes']) == {'audio', 'location'}
     assert info['UIApplicationSceneManifest']['UIApplicationSupportsMultipleScenes'] is False
     for key in ('NSLocationWhenInUseUsageDescription',
@@ -100,7 +148,20 @@ def main():
         'background.continuousLocation', 'background.silentAudio']
     assert root.count('@StateObject private var keepAlive = BackgroundKeepAlive()') == 1
     assert root.count('.modifier(BackgroundKeepAliveEvents(keepAlive: keepAlive))') == 1
-    assert 'ScrollView { ContentView() }' in root
+    assert root.count('@StateObject private var udpEcho = PeriodicUDPEchoModel()') == 1
+    assert 'ContentView { id, credentials, preferIPv4 in' in root
+    assert 'udpEcho.setServer(nil, runID: nil)' in root
+    assert 'udpEcho.setServer(resolve:' in root and 'Socks5ServerEndpoint.resolve(preferIPv4: preferIPv4)' in root
+    assert '.init(server: endpoint, credentials: credentials)' in root
+    content = text('Socks5/ContentView.swift')
+    assert hashlib.sha256(content.encode()).hexdigest() == CONTENT_SHA256, 'Unreviewed standalone lifecycle bridge'
+    assert '@MainActor\nstruct ContentView' in content and 'guard invocation == id else { return }' in content
+    prepare = content.index('hev_socks5_server_prepare()')
+    assert prepare < content.index('invocation = id') < content.index('DispatchQueue.global(qos: .utility).async')
+    assert content.index('let credentials:') < content.index('DispatchQueue.global(qos: .utility).async')
+    assert 'UInt32(conf.utf8.count)' in content
+    stop = content[content.index('guard !stopping else { return }'):]
+    assert stop.index('serverChanged(nil, nil, false)') < stop.index('hev_socks5_server_quit()')
     for name in ('location', 'audio'):
         assert '.onChange(of: ' + name + 'Enabled, initial: true)' in root
     assert 'locationEnabled: $locationEnabled' in root
@@ -137,8 +198,10 @@ def main():
     # One real, audio-specific queue boundary; the public handle and platform
     # lock are checked, while the AV adapter cannot cross queues as Sendable.
     swift_modules = list((ROOT / 'Socks5/BackgroundKeepAlive').glob('*.swift'))
-    unchecked = [p.name for p in swift_modules if '@unchecked Sendable' in p.read_text()]
-    assert unchecked == ['LoopAudioService.swift'], unchecked
+    unchecked = {p.name: p.read_text().count('@unchecked Sendable')
+                 for p in swift_modules if '@unchecked Sendable' in p.read_text()}
+    assert unchecked == {'LoopAudioService.swift': 1, 'PeriodicUDPEchoStore.swift': 1,
+                         'PeriodicUDPEchoService.swift': 1, 'Socks5UDPClient.swift': 4}, unchecked
     assert service.count('@unchecked Sendable') == 1
     assert 'final class LoopAudioService: Sendable {' in service
     assert 'private final class LoopAudioQueueOwner: @unchecked Sendable {' in service
@@ -166,12 +229,22 @@ def main():
     # compiler input must all include each new module, not merely name a file.
     phase = project[project.index('/* Begin PBXSourcesBuildPhase section */'):project.index('/* End PBXSourcesBuildPhase section */')]
     sdk = text('Tests/Background/check_audio_sdk.sh')
-    for name in ('LoopAudioService.swift', 'PlaybackProgressMonitor.swift', 'RecoveryExecutionLease.swift'):
+    for name in ('LoopAudioService.swift', 'PlaybackProgressMonitor.swift', 'RecoveryExecutionLease.swift') + ECHO_SOURCES:
         build = re.search(r'([A-F0-9]{24}) /\* ' + re.escape(name) + r' in Sources \*/ = \{isa = PBXBuildFile; fileRef = ([A-F0-9]{24})', project)
         assert build and build[1] + ' /* ' + name + ' in Sources */' in phase, name
         assert '/* ' + name + ' */ = {isa = PBXFileReference;' in project, name
         assert 'Socks5/BackgroundKeepAlive/' + name in sdk, name
     assert '-strict-concurrency=complete' in sdk and '-warnings-as-errors' in sdk
+    assert 'compiled-headers' in sdk and 'SHA256SUMS.txt' in sdk and 'source-commit.txt' in sdk
+    assert 'HevSocks5Server.xcframework/ios-arm64/Headers' not in sdk
+    echo = text('Socks5/BackgroundKeepAlive/PeriodicUDPEchoService.swift')
+    assert echo.count('DispatchSource.makeTimerSource(') == 1
+    assert 'private static let payload: [UInt8] = [0]' in echo
+    assert 'port: 7' in echo and '65_536' in echo and '256' in echo
+    assert 'PeriodicPing' not in echo and '1_000_000_000' in echo
+    store = text('Socks5/BackgroundKeepAlive/PeriodicUDPEchoStore.swift')
+    assert 'periodic-udp-echo.json' in store and 'UserDefaults' not in store
+    assert 'PeriodicPing' not in store
     view = text('Socks5/BackgroundKeepAlive/BackgroundKeepAliveView.swift')
     assert view.index('Text("Audio")') < view.index('Text("Location")')
     assert 'private let audioEvents' not in view
@@ -180,11 +253,11 @@ def main():
     assert hashlib.sha256(data('Socks5/BackgroundKeepAlive/Silence.wav')).hexdigest() == (
         '26131825c935435301fb05d3549d815bc93b1e717d6228d890ee9578dd00025e')
     print(json.dumps({
-        'base_main': BASE, 'tested_commit': git('rev-parse', 'HEAD').decode().strip(),
-        'main_files_byte_preserved': preserved,
-        'main_modified_paths_reviewed': sorted(allowed),
+        'base_main': BASE, 'parent_udp': PARENT, 'tested_commit': git('rev-parse', 'HEAD').decode().strip(),
+        'udp_parent_files_byte_preserved': preserved,
+        'parent_modified_paths_reviewed': sorted(allowed),
         'background_additions': sorted(set(current_paths) - set(base_paths)),
-        'result': 'PASS: main boundary, source pins, entry/root/settings, project, plist, assets and README',
+        'result': 'PASS: UDP parent boundary, source pins, Echo lifecycle, root intent, project, plist, assets and README',
         'scope': 'Source contracts only; no IPA, installed signing, LiveContainer runtime, or device permissions.'
     }, indent=2))
 

@@ -19,6 +19,11 @@
 		D81EE6C89C4DD5403AC6713C /* LoopAudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F9B5CC12A9492842F7E1899 /* LoopAudioService.swift */; };
 		031A8B56E58245F7D9FF0A2C /* PlaybackProgressMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C91A99E4054FF1E39D64D00F /* PlaybackProgressMonitor.swift */; };
 		32F0A970598CABE6B37F1DEF /* RecoveryExecutionLease.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A945561DFD684F00CE6B275 /* RecoveryExecutionLease.swift */; };
+		47465DD8202AE8C54E30AC8E /* Socks5UDPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868F7ABC27BAFB67FD8F6E9E /* Socks5UDPClient.swift */; };
+		326168A12542D3D3723309DD /* Socks5ServerEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 783B090D42181CDE16265E25 /* Socks5ServerEndpoint.swift */; };
+		6EFF90B60FAB36856ECE5814 /* PeriodicUDPEchoModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2197A7F061B599983FA20653 /* PeriodicUDPEchoModel.swift */; };
+		B7ACDF33C8997C3A4D523E53 /* PeriodicUDPEchoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83292697C0506F4F1D1D49D1 /* PeriodicUDPEchoService.swift */; };
+		322E9DBC72B62BDAD28769F8 /* PeriodicUDPEchoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E5CD33A3F6CC246084D6E97 /* PeriodicUDPEchoStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +41,11 @@
 		1F9B5CC12A9492842F7E1899 /* LoopAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LoopAudioService.swift"; sourceTree = "<group>"; };
 		C91A99E4054FF1E39D64D00F /* PlaybackProgressMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlaybackProgressMonitor.swift"; sourceTree = "<group>"; };
 		1A945561DFD684F00CE6B275 /* RecoveryExecutionLease.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoveryExecutionLease.swift"; sourceTree = "<group>"; };
+		868F7ABC27BAFB67FD8F6E9E /* Socks5UDPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Socks5UDPClient.swift"; sourceTree = "<group>"; };
+		783B090D42181CDE16265E25 /* Socks5ServerEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Socks5ServerEndpoint.swift"; sourceTree = "<group>"; };
+		2197A7F061B599983FA20653 /* PeriodicUDPEchoModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeriodicUDPEchoModel.swift"; sourceTree = "<group>"; };
+		83292697C0506F4F1D1D49D1 /* PeriodicUDPEchoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeriodicUDPEchoService.swift"; sourceTree = "<group>"; };
+		8E5CD33A3F6CC246084D6E97 /* PeriodicUDPEchoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeriodicUDPEchoStore.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,6 +102,11 @@
 		F0D4F75D05524C67A96E2242 /* BackgroundKeepAlive */ = {
 			isa = PBXGroup;
 			children = (
+				8E5CD33A3F6CC246084D6E97 /* PeriodicUDPEchoStore.swift */,
+				83292697C0506F4F1D1D49D1 /* PeriodicUDPEchoService.swift */,
+				2197A7F061B599983FA20653 /* PeriodicUDPEchoModel.swift */,
+				783B090D42181CDE16265E25 /* Socks5ServerEndpoint.swift */,
+				868F7ABC27BAFB67FD8F6E9E /* Socks5UDPClient.swift */,
 				F09E6B82453D1079B3356F4A /* BackgroundKeepAlive.swift */,
 				1A945561DFD684F00CE6B275 /* RecoveryExecutionLease.swift */,
 				C91A99E4054FF1E39D64D00F /* PlaybackProgressMonitor.swift */,
@@ -173,6 +188,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				322E9DBC72B62BDAD28769F8 /* PeriodicUDPEchoStore.swift in Sources */,
+				B7ACDF33C8997C3A4D523E53 /* PeriodicUDPEchoService.swift in Sources */,
+				6EFF90B60FAB36856ECE5814 /* PeriodicUDPEchoModel.swift in Sources */,
+				326168A12542D3D3723309DD /* Socks5ServerEndpoint.swift in Sources */,
+				47465DD8202AE8C54E30AC8E /* Socks5UDPClient.swift in Sources */,
 				D30F96602C18058B002DB6BF /* ContentView.swift in Sources */,
 				F0B49EF432005E531F41803A /* AppRoot.swift in Sources */,
 				F0301EB5F2CF2B728DA9BA91 /* BackgroundKeepAlive.swift in Sources */,

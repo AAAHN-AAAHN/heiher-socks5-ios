@@ -1,0 +1,127 @@
+diff --git a/src/misc/hev-misc.c b/src/misc/hev-misc.c
+index dbf195e542494275e3e921518e46b914631cd1bb..cc588c0133a3ad78f86d8dd59b4e71f5502c36f3 100644
+--- a/src/misc/hev-misc.c
++++ b/src/misc/hev-misc.c
+@@ -20,6 +20,7 @@
+ #include <TargetConditionals.h>
+ #endif
+ 
++#include <hev-task.h>
+ #include <hev-task-dns.h>
+ 
+ #include "hev-logger.h"
+@@ -38,8 +39,12 @@ hev_netaddr_resolve (struct sockaddr_in6 *daddr, const char *addr,
+     hints.ai_socktype = SOCK_STREAM;
+     hints.ai_flags = AI_PASSIVE;
+ 
+-    res = hev_task_dns_getaddrinfo (addr, port, &hints, &result);
+-    if (res < 0)
++    /* Serial startup has no task to suspend while the resolver is pending. */
++    if (hev_task_self ())
++        res = hev_task_dns_getaddrinfo (addr, port, &hints, &result);
++    else
++        res = getaddrinfo (addr, port, &hints, &result);
++    if (res != 0)
+         return -1;
+ 
+     if (result->ai_family == AF_INET) {
+diff --git a/third-part/hev-task-system/src/lib/dns/hev-task-dns-proxy.c b/third-part/hev-task-system/src/lib/dns/hev-task-dns-proxy.c
+index 4ada2bd57b73e8a53aafe2b34cd6368e0437e021..36efdf78b1eb412ba2c83728660524aa042beea9 100644
+--- a/third-part/hev-task-system/src/lib/dns/hev-task-dns-proxy.c
++++ b/third-part/hev-task-system/src/lib/dns/hev-task-dns-proxy.c
+@@ -95,35 +95,38 @@ static void
+ hev_task_dns_server_handler (unsigned int revents, void *data)
+ {
+     HevTaskDNSProxy *proxy = data;
++    int fd = proxy->work.fd;
++    char sync = 's';
++    int res;
+ 
+-    for (;;) {
+-        char sync = 's';
+-        int res;
++    do {
++        res = read (fd, &sync, sizeof (sync));
++    } while ((0 > res) && (EINTR == errno));
++    if (0 >= res)
++        return;
++
++    switch (proxy->call->type) {
++    case HEV_TASK_DNS_CALL_GETADDRINFO:
++        hev_task_dns_server_getaddrinfo (proxy->call);
++        break;
++    case HEV_TASK_DNS_CALL_GETNAMEINFO:
++        hev_task_dns_server_getnameinfo (proxy->call);
++        break;
++    }
+ 
+-        res = read (proxy->work.fd, &sync, sizeof (sync));
+-        if (0 >= res)
+-            break;
++    /* The caller may destroy the proxy as soon as it receives this reply. */
++    for (;;) {
++        struct pollfd pfd;
+ 
+-        switch (proxy->call->type) {
+-        case HEV_TASK_DNS_CALL_GETADDRINFO:
+-            hev_task_dns_server_getaddrinfo (proxy->call);
+-            break;
+-        case HEV_TASK_DNS_CALL_GETNAMEINFO:
+-            hev_task_dns_server_getnameinfo (proxy->call);
++        res = write (fd, &sync, sizeof (sync));
++        if ((0 > res) && (EINTR == errno))
++            continue;
++        if ((0 <= res) || (EAGAIN != errno))
+             break;
+-        }
+-
+-        for (;;) {
+-            struct pollfd pfd;
+-
+-            res = write (proxy->work.fd, &sync, sizeof (sync));
+-            if ((0 <= res) || (EAGAIN != errno))
+-                break;
+ 
+-            pfd.fd = proxy->work.fd;
+-            pfd.events = POLLOUT;
+-            poll (&pfd, 1, -1);
+-        }
++        pfd.fd = fd;
++        pfd.events = POLLOUT;
++        poll (&pfd, 1, -1);
+     }
+ }
+ 
+@@ -198,6 +201,8 @@ hev_task_dns_proxy_call (HevTaskDNSProxy *self, HevTaskDNSCall *call)
+     for (;;) {
+         char sync = 's';
+         int res = write (self->fd, &sync, sizeof (sync));
++        if ((0 > res) && (EINTR == errno))
++            continue;
+         if ((0 <= res) || (EAGAIN != errno))
+             break;
+ 
+@@ -207,6 +212,8 @@ hev_task_dns_proxy_call (HevTaskDNSProxy *self, HevTaskDNSCall *call)
+     for (;;) {
+         char sync;
+         int res = read (self->fd, &sync, sizeof (sync));
++        if ((0 > res) && (EINTR == errno))
++            continue;
+         if ((0 <= res) || (EAGAIN != errno))
+             break;
+ 
+diff --git a/third-part/hev-task-system/src/kern/aide/hev-task-aide.c b/third-part/hev-task-system/src/kern/aide/hev-task-aide.c
+index 1f6cb8c29002e0a4ba340b3d214e1dfe6c1cce8d..50bff39f0fbf4cc55be75581bbd9be6d9ddf216c 100644
+--- a/third-part/hev-task-system/src/kern/aide/hev-task-aide.c
++++ b/third-part/hev-task-system/src/kern/aide/hev-task-aide.c
+@@ -50,9 +50,7 @@ hev_task_aide_init (void)
+ {
+     int res = 0;
+ 
+-    if (reactor)
+-        return 0;
+-
++    /* Publish the reactor only after its thread starts successfully. */
+     pthread_mutex_lock (&mutex);
+     if (!reactor) {
+         reactor = hev_task_io_reactor_new ();

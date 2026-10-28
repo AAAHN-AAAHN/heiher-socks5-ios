@@ -94,6 +94,7 @@ def main():
         raise SystemExit('Assertions and a clean workspace are required')
     run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'working-tree.log')
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'index.log')
+    run(['python3', 'Tests/Background/native_inputs.py', 'verify'], 'native-inputs.log')
     if not output('xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version').startswith('27.'):
         raise SystemExit('Actual iOS27 Simulator SDK required')
     paths = output('git', 'ls-files').splitlines()
@@ -106,6 +107,8 @@ def main():
     app.mkdir(parents=True)
     with zipfile.ZipFile(OUT / 'source.zip') as source:
         source.extractall(app)
+    run(['python3', 'Tests/Background/native_inputs.py', 'copy', app / 'HevSocks5Server.xcframework'],
+        'native-framework-copy.log')
     add_test_target(app)
     runtimes = json.loads(output('xcrun', 'simctl', 'list', 'runtimes', '-j'))['runtimes']
     runtime = next(r for r in runtimes if r.get('isAvailable') and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-27-'))

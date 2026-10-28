@@ -44,6 +44,7 @@ if [ ! -d "$CORE/.git" ]; then
     git clone --no-checkout https://github.com/heiher/hev-socks5-server.git "$CORE"
     git -C "$CORE" checkout --detach "$SERVER_REF"
     git -C "$CORE" submodule update --init --recursive
+    python3 Build/check.py checkout "$CORE" > "$OUT/source-checkout.log"
 fi
 python3 Build/check.py apply "$CORE" > "$OUT/source-audit.log"
 CF=$(command -v clang-format-18 || command -v clang-format)
@@ -91,7 +92,8 @@ if feature statistics; then
     rm "$OUT/stats-model"
 fi
 if feature background; then
-    python3 Tests/Background/run_checks.py > "$OUT/background.log" 2>&1
+    python3 Tests/Background/run_checks.py --core "$CORE" > "$OUT/background.log" 2>&1
+    make -C "$CORE" clean > "$OUT/udp-echo-native-clean.log" 2>&1
     if [ "$(uname -s)" = Darwin ]; then
         swift Tests/Background/check_silence.swift Socks5/BackgroundKeepAlive/Silence.wav > "$OUT/decoded-silence.log"
     fi
@@ -101,32 +103,35 @@ if feature settings; then
 fi
 if [ "$(uname -s)" = Darwin ]; then
     (cd "$CORE" && ./build-apple.sh) > "$OUT/core-apple.log" 2>&1
-    # Keep the committed baseline and all later source checks untouched.
-    PRODUCT=$(mktemp -d "$ROOT/.build/$NAME-product-source.XXXXXX")
-    trap 'rm -rf "$PRODUCT"' EXIT
-    unzip -q "$OUT/source.zip" -d "$PRODUCT"
-    rm -rf "$PRODUCT/HevSocks5Server.xcframework"
-    cp -R "$CORE/HevSocks5Server.xcframework" "$PRODUCT/"
-    xcodebuild archive -project "$PRODUCT/Socks5.xcodeproj" -scheme Socks5 -configuration Release \
-        -sdk iphoneos -destination 'generic/platform=iOS' \
-        -archivePath "$ROOT/.build/$NAME.xcarchive" \
-        CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
-        MARKETING_VERSION=3.0.0 CURRENT_PROJECT_VERSION=1 \
-        > "$OUT/app-build.log" 2>&1
-    APP="$ROOT/.build/$NAME.xcarchive/Products/Applications/Socks5.app"
-    xcrun lipo "$APP/Socks5" -verify_arch arm64
-    python3 Build/check.py package "$APP" > "$OUT/package.log"
-    rm -rf "$ROOT/.build/package-$NAME"
-    mkdir -p "$ROOT/.build/package-$NAME/Payload"
-    ditto "$APP" "$ROOT/.build/package-$NAME/Payload/Socks5.app"
-    rm -f "$OUT/Socks5-$NAME-unsigned.ipa"
-    (cd "$ROOT/.build/package-$NAME" && zip -qr "$OUT/Socks5-$NAME-unsigned.ipa" Payload)
-    unzip -t "$OUT/Socks5-$NAME-unsigned.ipa" >> "$OUT/package.log"
-    ditto -c -k --keepParent "$ROOT/.build/$NAME.xcarchive/dSYMs" "$OUT/Socks5-dSYMs.zip"
-    cp "$OUT/source.zip" "$OUT/Socks5-$NAME-source.zip"
-    (cd "$OUT" && shasum -a 256 *.ipa > SHA256SUMS.txt)
-    rm -rf "$PRODUCT"
-    trap - EXIT
+    python3 Tests/Background/native_inputs.py record "$CORE" "$COMMIT" > "$OUT/native-inputs.log"
+    if [ "${BUILD_IPA:-1}" != 0 ]; then
+        # Keep the committed baseline and all later source checks untouched.
+        PRODUCT=$(mktemp -d "$ROOT/.build/$NAME-product-source.XXXXXX")
+        trap 'rm -rf "$PRODUCT"' EXIT
+        unzip -q "$OUT/source.zip" -d "$PRODUCT"
+        rm -rf "$PRODUCT/HevSocks5Server.xcframework"
+        cp -R "$CORE/HevSocks5Server.xcframework" "$PRODUCT/"
+        xcodebuild archive -project "$PRODUCT/Socks5.xcodeproj" -scheme Socks5 -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$ROOT/.build/$NAME.xcarchive" \
+            CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION=3.0.0 CURRENT_PROJECT_VERSION=1 \
+            > "$OUT/app-build.log" 2>&1
+        APP="$ROOT/.build/$NAME.xcarchive/Products/Applications/Socks5.app"
+        xcrun lipo "$APP/Socks5" -verify_arch arm64
+        python3 Build/check.py package "$APP" > "$OUT/package.log"
+        rm -rf "$ROOT/.build/package-$NAME"
+        mkdir -p "$ROOT/.build/package-$NAME/Payload"
+        ditto "$APP" "$ROOT/.build/package-$NAME/Payload/Socks5.app"
+        rm -f "$OUT/Socks5-$NAME-unsigned.ipa"
+        (cd "$ROOT/.build/package-$NAME" && zip -qr "$OUT/Socks5-$NAME-unsigned.ipa" Payload)
+        unzip -t "$OUT/Socks5-$NAME-unsigned.ipa" >> "$OUT/package.log"
+        ditto -c -k --keepParent "$ROOT/.build/$NAME.xcarchive/dSYMs" "$OUT/Socks5-dSYMs.zip"
+        cp "$OUT/source.zip" "$OUT/Socks5-$NAME-source.zip"
+        (cd "$OUT" && shasum -a 256 *.ipa > SHA256SUMS.txt)
+        rm -rf "$PRODUCT"
+        trap - EXIT
+    fi
 fi
 python3 Build/check.py reverse "$CORE" >> "$OUT/source-audit.log"
 test "$(git rev-parse HEAD)" = "$COMMIT" || { echo 'Source HEAD changed during build' >&2; exit 1; }
