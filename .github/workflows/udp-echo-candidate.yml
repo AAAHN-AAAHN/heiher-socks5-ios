@@ -64,6 +64,7 @@ jobs:
             echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
           fi
       - name: Execute the exact candidate owner gates
+        id: owner
         working-directory: ${{ runner.temp }}/udp-source
         env:
           CANDIDATE: ${{ matrix.name }}
@@ -103,6 +104,18 @@ jobs:
               ;;
             *) echo "Unsupported runtime candidate: $CANDIDATE" >&2; exit 1 ;;
           esac
+      - name: Preserve the verified integrated framework
+        if: ${{ always() && matrix.name == 'integrated' && runner.os == 'macOS' && steps.owner.outcome == 'success' }}
+        working-directory: ${{ runner.temp }}/udp-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 Build/release_source.py check
+          ditto -c -k --keepParent \
+            .build/integrated-product-source/HevSocks5Server.xcframework \
+            artifacts/integrated/HevSocks5Server.xcframework.zip
+          shasum -a 256 artifacts/integrated/HevSocks5Server.xcframework.zip \
+            > artifacts/integrated/HevSocks5Server.xcframework.zip.sha256
       - name: Record integrated source evidence
         if: ${{ always() && matrix.name == 'integrated' }}
         working-directory: ${{ runner.temp }}/udp-source

@@ -1,108 +1,87 @@
 {
-  "sha256": "a6fcbd07803bf1e9626b408fee0ceb35e2883e9c0519886957ad0837fdf4be63",
+  "sha256": "44b94de7d7b0754d30b2005719f60c93578beea071dd57b689f4d981ba2886e4",
   "candidates": [
     {
-      "name": "udp",
-      "sha": "dc1a2229343b47ffbb5d1abf9db21ffea607a213",
-      "ref": "refs/heads/work/udp-echo-udp-20261028"
-    },
-    {
       "name": "statistics",
-      "sha": "a7ff8856c782113c44fa17e8ef8545f88121a1e5",
+      "sha": "a072b70773862a1f3c191e7798a029f7ee13ff84",
       "ref": "refs/heads/work/udp-echo-statistics-20261028"
     },
     {
-      "name": "background",
-      "sha": "b3b14842ec42a3af319711de5bbea0363afd4a57",
-      "ref": "refs/heads/work/udp-echo-background-20261028"
-    },
-    {
       "name": "server",
-      "sha": "41a1c10be7309dba884e0dade1d13eac6a971bf6",
+      "sha": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
       "ref": "refs/heads/work/udp-echo-server-20261028"
     },
     {
       "name": "settings",
-      "sha": "7f7fbb93f05d671b2ea08ba255a7dda8b16d7a21",
+      "sha": "30c513d330b47bdecbf2356e4ddfc5e3b2d59f8e",
       "ref": "refs/heads/work/udp-echo-settings-20261028"
     },
     {
-      "name": "icon",
-      "sha": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
-      "ref": "refs/heads/work/udp-echo-icon-20261028"
+      "name": "integrated",
+      "sha": "af191c32b7454134933ad79a77b2872d90199477",
+      "ref": "refs/heads/work/udp-echo-integrated-20261028"
     }
   ],
-  "support": [],
+  "support": [
+    {
+      "name": "udp",
+      "sha": "dc1a2229343b47ffbb5d1abf9db21ffea607a213"
+    },
+    {
+      "name": "background",
+      "sha": "b3b14842ec42a3af319711de5bbea0363afd4a57"
+    },
+    {
+      "name": "icon",
+      "sha": "5d5327d4513b587e2a2e948fa20f588a04f1376f"
+    }
+  ],
   "matrix": [
     {
-      "name": "udp",
-      "sha": "dc1a2229343b47ffbb5d1abf9db21ffea607a213",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "udp",
-      "sha": "dc1a2229343b47ffbb5d1abf9db21ffea607a213",
-      "os": "xcode-27",
-      "runtime": false
-    },
-    {
       "name": "statistics",
-      "sha": "a7ff8856c782113c44fa17e8ef8545f88121a1e5",
+      "sha": "a072b70773862a1f3c191e7798a029f7ee13ff84",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "statistics",
-      "sha": "a7ff8856c782113c44fa17e8ef8545f88121a1e5",
-      "os": "xcode-27",
-      "runtime": true
-    },
-    {
-      "name": "background",
-      "sha": "b3b14842ec42a3af319711de5bbea0363afd4a57",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "background",
-      "sha": "b3b14842ec42a3af319711de5bbea0363afd4a57",
+      "sha": "a072b70773862a1f3c191e7798a029f7ee13ff84",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "server",
-      "sha": "41a1c10be7309dba884e0dade1d13eac6a971bf6",
+      "sha": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "server",
-      "sha": "41a1c10be7309dba884e0dade1d13eac6a971bf6",
+      "sha": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "settings",
-      "sha": "7f7fbb93f05d671b2ea08ba255a7dda8b16d7a21",
+      "sha": "30c513d330b47bdecbf2356e4ddfc5e3b2d59f8e",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "settings",
-      "sha": "7f7fbb93f05d671b2ea08ba255a7dda8b16d7a21",
+      "sha": "30c513d330b47bdecbf2356e4ddfc5e3b2d59f8e",
       "os": "xcode-27",
       "runtime": true
     },
     {
-      "name": "icon",
-      "sha": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
+      "name": "integrated",
+      "sha": "af191c32b7454134933ad79a77b2872d90199477",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
-      "name": "icon",
-      "sha": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
+      "name": "integrated",
+      "sha": "af191c32b7454134933ad79a77b2872d90199477",
       "os": "xcode-27",
       "runtime": true
     }
