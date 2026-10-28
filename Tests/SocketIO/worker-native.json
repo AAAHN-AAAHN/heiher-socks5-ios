@@ -24,8 +24,8 @@
     },
     "integrated": {
       "src/hev-main.c": "b0b8f0f0e93a9e4abff3ac6526fb5190a7f397e43c4861f165767a956323c786",
-      "src/hev-main.h": "a3867460b9d2a8199e381d2af76a12ce9b7d99d238adb3059481ece36643962b",
-      "src/hev-socks5-proxy.c": "ddad5db45056e695c01b83d9da68f3b5b0f1a5dcfb6230c50ad1d306234965ad",
+      "src/hev-main.h": "3afd75ee4246c61f06ff5c8cae615d3883bbc8a6ecc9fa80fe2fead07fcb88d4",
+      "src/hev-socks5-proxy.c": "6a64f8f12dbd4120cf939f1e298144f2d392081b33832d7624c845cb1a6109b5",
       "src/hev-socks5-worker.c": "521fef014ebdba8280de296b407c357f0999ee15852216cf100995d8e80d36e8"
     }
   },

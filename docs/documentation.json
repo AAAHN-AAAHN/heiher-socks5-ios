@@ -6,7 +6,7 @@
     "feature/background": "10cfbbc67c7e2e0a2586e4f82a10e4bb947c1878",
     "feature/server-control": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
     "feature/settings-persistence": "953ee8d720cf32311d82dad1bcb1b566333c5d62",
-    "feature/traffic-statistics": "a072b70773862a1f3c191e7798a029f7ee13ff84",
+    "feature/traffic-statistics": "4690a2cbc9755fe2c851bc9f048b452083a6095c",
     "feature/udp-compat": "dc1a2229343b47ffbb5d1abf9db21ffea607a213"
   },
   "owned_documents": [
