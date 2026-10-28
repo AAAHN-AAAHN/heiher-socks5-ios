@@ -78,14 +78,26 @@ def clean_tracked(repo, sha):
         assert (actual_mode, digest) == (mode, blob), 'Changed source input: ' + str(path)
 
 
-def clean_native(core):
-    for relative, sha in CONFIG['sources'].items():
+def clean_native(core, sources=None):
+    for relative, sha in (CONFIG['sources'] if sources is None else sources).items():
         repo = core / relative
         clean_tracked(repo, sha)
         # Only known generated output roots are exempt, never ignored sources or Makefiles.
         outputs = (b'bin/', b'build/', b'HevSocks5Server.xcframework/', b'HevTaskSystem.xcframework/')
         assert all(not name or name.startswith(outputs) for name in
                    git(repo, 'ls-files', '--others', '-z').split(b'\0')), 'Untracked native input: ' + relative
+
+
+def checkout(core):
+    # A fresh clone's recorded gitlinks may differ from the effective source pins.
+    # Validate every input before changing any HEAD; never discard local edits.
+    current = {relative: git(core / relative, 'rev-parse', 'HEAD').decode().strip()
+               for relative in CONFIG['sources']}
+    clean_native(core, current)
+    for relative, sha in CONFIG['sources'].items():
+        git(core / relative, 'checkout', '--detach', sha)
+    clean_native(core)
+    print('PASS: exact effective source pins selected from clean input')
 
 
 def archive(path, ref):
@@ -218,6 +230,8 @@ if __name__ == '__main__':
         archive(Path(sys.argv[2]), sys.argv[3])
     elif command == 'baseline':
         baseline()
+    elif command == 'checkout':
+        checkout(Path(sys.argv[2]))
     elif command == 'apply':
         apply(Path(sys.argv[2]))
     elif command == 'format':

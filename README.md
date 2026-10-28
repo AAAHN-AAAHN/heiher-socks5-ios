@@ -14,13 +14,15 @@ On Linux with UDP segmentation support, the upstream engine can group equal-size
 
 Domain destinations use the configured address family. UDP forwarding accepts empty payloads and continues past individual resolution or send failures; cancellation and association setup failures remain terminal.
 
-The feature relationships are one-way. UDP compatibility supplies transport behavior to traffic statistics. Server control supplies configuration and lifecycle management to settings persistence. Background services and the app icon are independent feature owners. The integrated release combines all six owners through its root view and ordered native-patch list.
+The feature relationships are one-way. UDP compatibility supplies transport behavior to traffic statistics and the Background SOCKS5 client. Server control supplies configuration and lifecycle management to settings persistence. Background owns audio, location and its independent SOCKS5 UDP Echo client; the app icon owns its asset integration. The integrated release combines all six owners through its root view and ordered native-patch list.
 
 Documentation inheritance is independent of the frozen executable-composition reference. `Build/features.json` and `Build/upstream.json` identify functional inputs. `docs/documentation.json` identifies the branch's document parents and frozen-code comparison boundary. This separation lets documentation follow the current parent without changing dependency versions, native behavior or test inputs.
 
+The task-system input normalizes nanosecond carry at exact-second deadlines and includes its upstream finalization, timed condition-waiter, join and channel cleanup corrections. The application source and Xcode project retain their upstream identities; these native dependency fixes add no Ping or ICMP command.
+
 ## Implementation and ownership
 
-`Build/upstream.json` records the upstream application revision and the server, core, task-system and YAML revisions. The three submodules use the server's selected gitlinks rather than independently selected heads. `Build/baseline-framework.json` records the committed framework inventory. The source identifiers are machine inputs to reproducibility checks; they are not instructions to fetch floating dependencies.
+`Build/upstream.json` records the upstream application revision and the server, core, task-system and YAML revisions. The effective submodule revisions are explicit immutable pins. A clean fresh clone first validates every raw source and index input, selects those exact pins even when a recorded server gitlink differs, and validates again. A reused dirty or mismatched checkout is rejected before patching. `Build/baseline-framework.json` records the committed framework inventory. The source identifiers are machine inputs to reproducibility checks; they are not instructions to fetch floating dependencies.
 
 `Build/check.py` checks source-lock agreement, framework contents and feature composition. Before applying a native patch it requires the complete tracked working tree and index, including executable modes, to match the declared native revision. Raw bytes and Git modes are checked independently of local index flags, filters and ignore rules; only known generated output roots are exempt. Reversing the patches first checks each native HEAD and must restore those same tracked inputs, including build scripts and Makefiles, not only C and header files. Formatting follows the pinned native project's clang-format rules.
 
