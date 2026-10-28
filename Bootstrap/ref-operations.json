@@ -10,7 +10,7 @@
     "main": "19aec84fbc929678bb0f05b89c76d490ada6f8b7",
     "release/integrated": "e82e590412e5b5cbcd531827a81f845596ee16f6"
   },
-  "operation": "archive",
+  "operation": "store",
   "preserved_tags": {
     "refs/tags/archive/2026-09-22/audit/statistics-final-20260921": "31ef4a7baa15f76e7c7cdbc1ed11216c1fa2f93e",
     "refs/tags/archive/2026-09-22/audit/udp-patches-20260921": "eccd78c41103e6d31e305eebc4e176864d442d48",
