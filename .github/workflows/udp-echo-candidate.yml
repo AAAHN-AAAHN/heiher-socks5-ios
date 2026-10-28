@@ -1,4 +1,4 @@
-name: Diagnose UDP Echo Darwin scheduling
+name: Compare UDP Echo Darwin timer flag
 on:
   push:
     branches: [work/udp-echo-build-20261028]
@@ -16,10 +16,15 @@ jobs:
           persist-credentials: false
       - name: Verify exact candidate objects without changing refs
         run: python3 Bootstrap/import_candidates.py
-      - name: Prepare unchanged Background production source
-        run: git worktree add --detach "$RUNNER_TEMP/scheduler-source" b3b14842ec42a3af319711de5bbea0363afd4a57
-      - name: Run diagnostic overlay with unchanged scheduler criteria
-        run: python3 Bootstrap/scheduler-diagnostic/run.py "$RUNNER_TEMP/scheduler-source"
+      - name: Prepare two exact baseline worktrees
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/scheduler-before" b3b14842ec42a3af319711de5bbea0363afd4a57
+          git worktree add --detach "$RUNNER_TEMP/scheduler-strict" b3b14842ec42a3af319711de5bbea0363afd4a57
+      - name: Observe the previous timer on this host
+        continue-on-error: true
+        run: python3 Bootstrap/scheduler-diagnostic/run.py "$RUNNER_TEMP/scheduler-before" --baseline
+      - name: Require the same scheduler criteria with the strict timer flag
+        run: python3 Bootstrap/scheduler-diagnostic/run.py "$RUNNER_TEMP/scheduler-strict"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -27,6 +32,9 @@ jobs:
           path: |
             artifacts/candidate-prepare/
             Bootstrap/scheduler-diagnostic/
-            ${{ runner.temp }}/scheduler-source/artifacts/background-scheduler-diagnostic/
+            ${{ runner.temp }}/scheduler-before/artifacts/background-scheduler-diagnostic/*.json
+            ${{ runner.temp }}/scheduler-before/artifacts/background-scheduler-diagnostic/*.log
+            ${{ runner.temp }}/scheduler-strict/artifacts/background-scheduler-diagnostic/*.json
+            ${{ runner.temp }}/scheduler-strict/artifacts/background-scheduler-diagnostic/*.log
           if-no-files-found: error
           retention-days: 90

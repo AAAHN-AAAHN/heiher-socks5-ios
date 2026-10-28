@@ -1,20 +1,37 @@
 {
   "candidate": "b3b14842ec42a3af319711de5bbea0363afd4a57",
-  "scope": "Only diagnostic test overlay; all eight Boolean predicates, numeric thresholds and timeouts unchanged. No production source edit.",
-  "predicate_identity": "PASS",
+  "scope": "Causal test overlay, not a frozen final candidate gate. Two existing diagnostics plus one production line (strict timer). All acceptance predicates, thresholds, queue QoS, deadlines, one-timer design and 1 ms leeway unchanged.",
   "files": {
     "Tests/Background/UDPEchoSchedulerProbe.swift": {
       "before_sha256": "f56ddf8a21ddc3f3175fe0521296bb12b8223f3665906632a29c4367c56d8d13",
-      "diagnostic_sha256": "f89e8cbc444d85cbc5abe28188222fa6e70d900655047c3f7010f9f2fe2cf3e3"
+      "overlay_sha256": "f89e8cbc444d85cbc5abe28188222fa6e70d900655047c3f7010f9f2fe2cf3e3",
+      "kind": "unchanged diagnostic-only overlay"
     },
     "Tests/Background/UDPEchoSchedulerTests.py": {
       "before_sha256": "ee5e57f87df8145e2c951078571b6b2f0e6ec957516080deab7fcd601a7d0c95",
-      "diagnostic_sha256": "f8a574932768c7c583213c4f2f777dbcc84f4cf272941e0d5c8765d927051762"
+      "overlay_sha256": "f8a574932768c7c583213c4f2f777dbcc84f4cf272941e0d5c8765d927051762",
+      "kind": "unchanged diagnostic-only overlay"
+    },
+    "Socks5/BackgroundKeepAlive/PeriodicUDPEchoService.swift": {
+      "before_sha256": "6a89e5a3bca0ecc8b93f29bd1658311efcff45f40d099adb9913f084681cc16f",
+      "overlay_sha256": "f2247c1f185e45fba62dca8bb6b5843df1346147b15775b3d4582555e517a674",
+      "kind": "single timer flag"
     }
   },
-  "production_sources": {
+  "unchanged_production_sources": {
     "Socks5/BackgroundKeepAlive/Socks5UDPClient.swift": "57da93313e01f5c3938f0be3b112de58afeeaf0aab5013ca9a8c20278d377465",
-    "Socks5/BackgroundKeepAlive/PeriodicUDPEchoService.swift": "6a89e5a3bca0ecc8b93f29bd1658311efcff45f40d099adb9913f084681cc16f",
     "Socks5/BackgroundKeepAlive/PeriodicUDPEchoStore.swift": "95fca19be76523779dbdfcf6da36d8e61477a44c53b84cd5ab8bac8e05ba5aea"
-  }
+  },
+  "before_run": 40653065185,
+  "before_artifact": 12800517717,
+  "before_artifact_sha256": "ca6d85fb9a722f22af417cc0223c027f3f2b4a043b6095c7fdf0e3f5fb7aadc6",
+  "before_failed_predicate": "ACTIVE_COUNT",
+  "before_snapshot": {
+    "activeWrites": 4,
+    "stoppedWrites": 5,
+    "writes": 5,
+    "preparations": 1,
+    "readBytes": 0
+  },
+  "primary_reference": "https://developer.apple.com/documentation/dispatch/dispatchsource/timerflags"
 }
