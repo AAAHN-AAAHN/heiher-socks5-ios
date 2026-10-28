@@ -1,6 +1,6 @@
 {
   "branch": "feature/udp-compat",
-  "frozen_source": "d71a96312f10cca18c221c2bd0c07727f5856192",
+  "frozen_source": "945be61eee5f1e5222d609babd986c9b0cf800c7",
   "parents": {
     "main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
   },
@@ -10,8 +10,8 @@
   ],
   "readme_mirror": "docs/features/udp-compatibility.md",
   "validation_files": {
-    "Build/check.py": "faf2b032b513f4e908ebeb6e1f73e71697916bbd",
-    "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
+    "Build/check.py": "57ccedf4cfad22ded66f22232d645d452e3fb13d",
+    "Build/check_documentation.py": "944d0641ec99802e3f8a64ddd24bf75494561a31",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }
