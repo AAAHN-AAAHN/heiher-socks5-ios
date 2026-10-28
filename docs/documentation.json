@@ -1,6 +1,6 @@
 {
   "branch": "release/integrated",
-  "frozen_source": "df3ef46d51f64ecf8b4837f14de4e65b4a2ab3e2",
+  "frozen_source": "e607ca2bb6ad117c1f73bc74fd40094c38bbc811",
   "parents": {
     "feature/app-icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
     "feature/background": "b3b14842ec42a3af319711de5bbea0363afd4a57",
@@ -15,12 +15,12 @@
   ],
   "readme_mirror": "docs/features/integrated.md",
   "validation_files": {
-    "Build/check.py": "041770092d3d47993d64451d0e8dca233d8a0ceb",
-    "Build/check_documentation.py": "e29b6037ac7d6e3bba0cbf60207b0d0f562f80c9",
-    "Build/check_ownership.py": "d063871f7d73d4caad662d7837734dfdfca294bd",
-    "Tests/AppIcon/check_icon.py": "99c12340f6869c5ec6d919df78ae258343b34a51",
-    "Tests/Background/check_scope.py": "64b7ad07fff91e2dfd22ab20f212d27cf0422c38",
-    "Tests/Statistics/audit.py": "d246c4f5963712cd2091081a68bb5f0c3049db20",
+    "Build/check.py": "58ed4ef1c607792d37223e864a4e090ee48940b6",
+    "Build/check_documentation.py": "944d0641ec99802e3f8a64ddd24bf75494561a31",
+    "Build/check_ownership.py": "73c69291d09e8e64a010a57c627f85ff8c0eedae",
+    "Tests/AppIcon/check_icon.py": "93cfbf9a90712bc3d7d52fe460947ee4b05c9564",
+    "Tests/Background/check_scope.py": "dd52627dba86359b5cb93cc9fdab0a891eba4e28",
+    "Tests/Statistics/audit.py": "b91101b038117ace7beec3eff7cb7dacbe26e806",
     "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
   }
 }
