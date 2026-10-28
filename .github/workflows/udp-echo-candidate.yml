@@ -63,6 +63,53 @@ jobs:
             ln -sf "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
             echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
           fi
+      - name: Verify scheduler observation and timer regression controls
+        if: ${{ matrix.name == 'background' && runner.os == 'macOS' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          diagnostic_dir="$RUNNER_TEMP/scheduler-window-controls"
+          diagnostic_records="$RUNNER_TEMP/udp-source/artifacts/scheduler-window-controls"
+          mkdir -p "$diagnostic_dir" "$diagnostic_records"
+          preserve_diagnostics() {
+            diagnostic_status=$?
+            trap - EXIT
+            for diagnostic_file in "$diagnostic_dir"/*.json "$diagnostic_dir"/*.log; do
+              if [ -f "$diagnostic_file" ]; then cp "$diagnostic_file" "$diagnostic_records/"; fi
+            done
+            exit "$diagnostic_status"
+          }
+          trap preserve_diagnostics EXIT
+          python3 Bootstrap/scheduler_window_controls.py \
+            --root "$RUNNER_TEMP/udp-source" --output "$diagnostic_dir" \
+            --require-nonstrict > "$diagnostic_dir/driver.log" 2>&1
+      - name: Verify privileged UDP Echo fixture startup and cleanup
+        if: ${{ matrix.name == 'integrated' && runner.os == 'macOS' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          diagnostic_dir="$RUNNER_TEMP/integrated-ui-fixture-controls"
+          diagnostic_records="$RUNNER_TEMP/udp-source/artifacts/ui-fixture-controls"
+          mkdir -p "$diagnostic_dir" "$diagnostic_records"
+          preserve_diagnostics() {
+            diagnostic_status=$?
+            trap - EXIT
+            python3 - "$diagnostic_dir" "$diagnostic_records" <<'PY'
+          from pathlib import Path
+          import shutil, sys
+          source, target = map(Path, sys.argv[1:])
+          for path in source.rglob('*'):
+              if path.is_file() and path.suffix in ('.json', '.log'):
+                  copied = target / path.relative_to(source)
+                  copied.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(path, copied)
+          PY
+            exit "$diagnostic_status"
+          }
+          trap preserve_diagnostics EXIT
+          python3 Bootstrap/integrated_ui_fixture_controls.py \
+            --root "$RUNNER_TEMP/udp-source" --output "$diagnostic_dir" \
+            --actual > "$diagnostic_dir/driver.log" 2>&1
       - name: Execute the exact candidate owner gates
         id: owner
         working-directory: ${{ runner.temp }}/udp-source
