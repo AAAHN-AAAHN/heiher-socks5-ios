@@ -1,0 +1,53 @@
+name: Finalize restored UDP Echo repository
+on:
+  push:
+    branches: [work/udp-echo-publish-20261028]
+permissions:
+  contents: read
+jobs:
+  store:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select the explicitly declared operation
+        id: operation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          mode = json.loads(Path('Bootstrap/ref-operations.json').read_bytes())['operation']
+          if mode not in ('archive', 'store', 'cleanup'):
+              raise SystemExit('Unknown repository operation')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('mode=' + mode + '\n')
+          PY
+      - name: Verify the bundle and store only exact Git objects
+        if: ${{ steps.operation.outputs.mode == 'store' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 Bootstrap/store_objects.py
+      - name: Apply the exact backup or cleanup plan
+        if: ${{ steps.operation.outputs.mode == 'archive' || steps.operation.outputs.mode == 'cleanup' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 Bootstrap/ref_maintenance.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: UDP-Echo-stored-objects-${{ github.run_id }}
+          path: |
+            Bootstrap/candidates.json
+            Bootstrap/ref-operations.json
+            artifacts/candidate-prepare/
+            artifacts/candidate-objects/
+            artifacts/ref-maintenance/
+          if-no-files-found: error
+          retention-days: 90
