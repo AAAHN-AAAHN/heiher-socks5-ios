@@ -1,12 +1,12 @@
 {
   "result": "PASS",
   "selected": [
-    "udp",
-    "statistics",
     "background",
     "integrated"
   ],
   "support": [
+    "udp",
+    "statistics",
     "server",
     "settings",
     "icon"
@@ -16,14 +16,14 @@
     "udp": "f87bc4c46370711f90e18db989804400795d5db1",
     "icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
     "server": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
-    "background": "a89beab64aa30a045f4c71f5c57e4129f330250c",
+    "background": "d6e1d9015ab25400b3ccfdd13ea339faa4fefbbd",
     "settings": "953ee8d720cf32311d82dad1bcb1b566333c5d62",
     "statistics": "ad9c5bab630ab6f9fe1188f0e3edc590f0b5dfc6",
-    "integrated": "a2c9e41da7c72e97f2a7e002e9cc0af382b923f6"
+    "integrated": "eb8ac9a0aac2c092faae462b256fb1cc01ec6426"
   },
   "macos_only": [],
-  "bundle_sha256": "a547dfb8769ad21a67ceb187cb45d7c4569f59c603e88e78cc3ff3508c0303df",
-  "bundle_bytes": 220578,
+  "bundle_sha256": "dc7194c7cf28157cf4e5b88d1cd83a287029574f8f04fcae6cb905e18d6a972e",
+  "bundle_bytes": 223875,
   "prerequisites": [
     "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
@@ -76,55 +76,31 @@
       "sha": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
     }
   ],
-  "remote_snapshot_time": "2026-10-28 13:26:48 UTC",
-  "remote_snapshot_sha256": "7f675c06bd0a95a20e8692b30656055bad0dd9c52a1c8d7e60c59a0c9efe5e88",
-  "frozen_heads_sha256": "998468364e131abd7619673a93547df9fa9c85fe75ba7090b795cee50d5e96d6",
+  "remote_snapshot_time": "2026-10-28 14:02:09 UTC",
+  "remote_snapshot_sha256": "4eb93fccfcc0cf20e14047c87adbaab5633b85a42fce506a581d1ba0f84a2b54",
+  "frozen_heads_sha256": "797d753cd5d6334ff26e93fd34fcf46d5c5331e6619ba5db05653ff9e361c2ef",
   "matrix": [
     {
-      "name": "udp",
-      "sha": "f87bc4c46370711f90e18db989804400795d5db1",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "udp",
-      "sha": "f87bc4c46370711f90e18db989804400795d5db1",
-      "os": "xcode-27",
-      "runtime": false
-    },
-    {
-      "name": "statistics",
-      "sha": "ad9c5bab630ab6f9fe1188f0e3edc590f0b5dfc6",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "statistics",
-      "sha": "ad9c5bab630ab6f9fe1188f0e3edc590f0b5dfc6",
-      "os": "xcode-27",
-      "runtime": true
-    },
-    {
       "name": "background",
-      "sha": "a89beab64aa30a045f4c71f5c57e4129f330250c",
+      "sha": "d6e1d9015ab25400b3ccfdd13ea339faa4fefbbd",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "background",
-      "sha": "a89beab64aa30a045f4c71f5c57e4129f330250c",
+      "sha": "d6e1d9015ab25400b3ccfdd13ea339faa4fefbbd",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "integrated",
-      "sha": "a2c9e41da7c72e97f2a7e002e9cc0af382b923f6",
+      "sha": "eb8ac9a0aac2c092faae462b256fb1cc01ec6426",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "integrated",
-      "sha": "a2c9e41da7c72e97f2a7e002e9cc0af382b923f6",
+      "sha": "eb8ac9a0aac2c092faae462b256fb1cc01ec6426",
       "os": "xcode-27",
       "runtime": true
     }
