@@ -1,4 +1,7 @@
-import SwiftUI
+import Foundation
+#if canImport(Combine)
+import Combine
+#endif
 import HevSocks5Server
 
 /// Owns the blocking engine call independently of which tab is visible.
