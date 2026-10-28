@@ -1,0 +1,81 @@
+name: Verify restored UDP Echo candidates
+on:
+  push:
+    branches: [work/udp-echo-build-20261028]
+permissions:
+  contents: read
+jobs:
+  import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      matrix: ${{ steps.import.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: import
+        run: python3 Bootstrap/import_candidates.py
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: UDP-Echo-import-${{ github.run_id }}
+          path: |
+            Bootstrap/
+            artifacts/candidate-import/
+          retention-days: 90
+  verify:
+    needs: import
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.import.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ matrix.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install exact formatter major
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y clang-format-18
+          else
+            brew install llvm@18
+            mkdir -p "$RUNNER_TEMP/format-only"
+            ln -sf "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
+            echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
+          fi
+      - name: Execute the exact candidate owner gates
+        env:
+          CANDIDATE: ${{ matrix.name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$CANDIDATE" in
+            udp) python3 Tests/udp_compat_audit.py ;;
+            statistics) python3 Tests/Statistics/audit.py ;;
+            *) bash Build/build.sh ;;
+          esac
+          if [ "$RUNNER_OS" = macOS ]; then
+            case "$CANDIDATE" in
+              server|settings|integrated) bash Build/check_swift_sdk.sh ;;
+              background) bash Tests/Background/check_audio_sdk.sh ;;
+            esac
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: UDP-Echo-${{ matrix.name }}-${{ runner.os }}-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 90

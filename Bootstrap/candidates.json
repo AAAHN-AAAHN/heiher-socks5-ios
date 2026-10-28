@@ -1,0 +1,37 @@
+{
+  "sha256": "3eff851219b56d78c044112888aa1d08f80d1a72a17674377461743c7a4081b3",
+  "candidates": [
+    {
+      "name": "main",
+      "sha": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+      "ref": "refs/heads/work/udp-echo-main-20261028"
+    },
+    {
+      "name": "udp",
+      "sha": "95734f4e50d0fc159f4372f8d85f67457eb0c0f2",
+      "ref": "refs/heads/work/udp-echo-udp-20261028"
+    }
+  ],
+  "matrix": [
+    {
+      "name": "main",
+      "sha": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+      "os": "ubuntu-24.04"
+    },
+    {
+      "name": "main",
+      "sha": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+      "os": "xcode-27"
+    },
+    {
+      "name": "udp",
+      "sha": "95734f4e50d0fc159f4372f8d85f67457eb0c0f2",
+      "os": "ubuntu-24.04"
+    },
+    {
+      "name": "udp",
+      "sha": "95734f4e50d0fc159f4372f8d85f67457eb0c0f2",
+      "os": "xcode-27"
+    }
+  ]
+}
