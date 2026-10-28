@@ -1,129 +1,32 @@
-name: Verify restored UDP Echo candidates
+name: Diagnose UDP Echo Darwin scheduling
 on:
   push:
     branches: [work/udp-echo-build-20261028]
 permissions:
   contents: read
 jobs:
-  prepare:
-    runs-on: ubuntu-24.04
+  scheduler-diagnostic:
+    runs-on: xcode-27
     timeout-minutes: 10
-    outputs:
-      matrix: ${{ steps.prepare.outputs.matrix }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - id: prepare
+      - name: Verify exact candidate objects without changing refs
         run: python3 Bootstrap/import_candidates.py
+      - name: Prepare unchanged Background production source
+        run: git worktree add --detach "$RUNNER_TEMP/scheduler-source" b3b14842ec42a3af319711de5bbea0363afd4a57
+      - name: Run diagnostic overlay with unchanged scheduler criteria
+        run: python3 Bootstrap/scheduler-diagnostic/run.py "$RUNNER_TEMP/scheduler-source"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: UDP-Echo-prepare-${{ github.run_id }}
+          name: UDP-Echo-Darwin-scheduler-diagnostic-${{ github.run_id }}
           path: |
-            Bootstrap/
             artifacts/candidate-prepare/
-          retention-days: 90
-  verify:
-    needs: prepare
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ matrix.runtime && 90 || 60 }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Verify candidate objects and create a detached local worktree
-        env:
-          CANDIDATE: ${{ matrix.name }}
-          CANDIDATE_SHA: ${{ matrix.sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 Bootstrap/import_candidates.py --candidate "$CANDIDATE" --sha "$CANDIDATE_SHA"
-          git worktree add --detach "$RUNNER_TEMP/udp-source" "$CANDIDATE_SHA"
-          mkdir -p "$RUNNER_TEMP/udp-source/artifacts/candidate-prepare"
-          cp artifacts/candidate-prepare/result.json "$RUNNER_TEMP/udp-source/artifacts/candidate-prepare/"
-      - name: Install exact formatter major
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "$RUNNER_OS" = Linux ]; then
-            sudo apt-get update -qq
-            sudo apt-get install -y clang-format-18
-          else
-            brew install llvm@18
-            mkdir -p "$RUNNER_TEMP/format-only"
-            ln -sf "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
-            echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
-          fi
-      - name: Execute the exact candidate owner gates
-        id: owner
-        working-directory: ${{ runner.temp }}/udp-source
-        env:
-          CANDIDATE: ${{ matrix.name }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          case "$CANDIDATE" in
-            udp) python3 Tests/udp_compat_audit.py ;;
-            statistics) python3 Tests/Statistics/audit.py ;;
-            *) bash Build/build.sh ;;
-          esac
-          if [ "$RUNNER_OS" = macOS ]; then
-            case "$CANDIDATE" in
-              server|settings|integrated) bash Build/check_swift_sdk.sh ;;
-              background) bash Tests/Background/check_audio_sdk.sh ;;
-            esac
-          fi
-      - name: Execute requested macOS runtime coverage
-        if: ${{ matrix.runtime }}
-        working-directory: ${{ runner.temp }}/udp-source
-        env:
-          CANDIDATE: ${{ matrix.name }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$RUNNER_OS" = macOS
-          case "$CANDIDATE" in
-            server) python3 Tests/ServerControl/ui_audit.py ;;
-            settings) python3 Tests/Settings/ui_audit.py ;;
-            background) python3 Tests/Background/check_async_ui.py ;;
-            icon) bash Tests/AppIcon/run_checks.sh ;;
-            statistics) python3 Tests/Statistics/ui_audit.py ;;
-            integrated)
-              python3 Build/verify_release.py > artifacts/integrated/package-review.log 2>&1
-              python3 Build/simulator_review.py > artifacts/integrated/simulator-review.log 2>&1
-              python3 Build/ui_review.py > artifacts/integrated/ui-review.log 2>&1
-              ;;
-            *) echo "Unsupported runtime candidate: $CANDIDATE" >&2; exit 1 ;;
-          esac
-      - name: Preserve the verified integrated framework
-        if: ${{ always() && matrix.name == 'integrated' && runner.os == 'macOS' && steps.owner.outcome == 'success' }}
-        working-directory: ${{ runner.temp }}/udp-source
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 Build/release_source.py check
-          ditto -c -k --keepParent \
-            .build/integrated-product-source/HevSocks5Server.xcframework \
-            artifacts/integrated/HevSocks5Server.xcframework.zip
-          shasum -a 256 artifacts/integrated/HevSocks5Server.xcframework.zip \
-            > artifacts/integrated/HevSocks5Server.xcframework.zip.sha256
-      - name: Record integrated source evidence
-        if: ${{ always() && matrix.name == 'integrated' }}
-        working-directory: ${{ runner.temp }}/udp-source
-        run: python3 Build/record_evidence.py
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
-        with:
-          name: UDP-Echo-${{ matrix.name }}-${{ runner.os }}-${{ github.run_id }}
-          path: ${{ runner.temp }}/udp-source/artifacts/
+            Bootstrap/scheduler-diagnostic/
+            ${{ runner.temp }}/scheduler-source/artifacts/background-scheduler-diagnostic/
           if-no-files-found: error
           retention-days: 90
