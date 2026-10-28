@@ -38,54 +38,58 @@ def main():
     yaml_guard = '        let yamlExcluded = CharacterSet(charactersIn: "\\u{FFFE}\\u{FFFF}")\n        guard fields.allSatisfy({ $0.rangeOfCharacter(from: yamlExcluded) == nil }) else {\n            throw ServerConfigurationError.invalid("Text fields must not contain U+FFFE or U+FFFF.")\n        }\n'
     assert after.count(yaml_guard) == 1, 'Missing or changed YAML scalar guard'
     assert after.replace(yaml_guard, '', 1).replace('ServerConfigurationError', 'SettingsError') == before
-    original_controller = show(INPUT, 'Socks5/Server/ServerController.swift').decode()
-    expected = original_controller.replace('func apply(_ settings: AppSettings, retry: Bool = false)',
-        'func apply(_ settings: ServerSettings, running: Bool, retry: Bool = false)').replace(
-        'desired = settings.serverRunning ? settings.server : nil', 'desired = running ? settings : nil')
-    expected = expected.replace('            current = desired\n',
-        '            // The prior native call has returned before this new intent begins.\n'
-        '            hev_socks5_server_prepare()\n            current = desired\n', 1)
-    assert controller == expected, 'Unexpected server lifecycle change outside the idle prepare boundary'
-    lifecycle_patch = (ROOT / 'Patches/hev-server-startup-stop.patch').read_bytes()
-    original_patch = show(INPUT, 'Patches/hev-server-startup-stop.patch')
-    assert lifecycle_patch.startswith(original_patch), 'Original pre-start cancellation fix changed'
-    extra = lifecycle_patch[len(original_patch):]
-    assert extra.startswith(b'diff --git a/src/hev-socks5-worker.c b/src/hev-socks5-worker.c\n')
-    assert re.findall(rb'^diff --git a/(\S+) b/', extra, re.M) == [
-        b'src/hev-socks5-worker.c', b'src/hev-socks5-proxy.c',
-        b'src/hev-socks5-proxy.h', b'src/hev-main.c', b'src/hev-main.h',
-        b'src/hev-socks5-proxy.c', b'src/hev-socks5-proxy.c']
+    controller_path = 'Socks5/Server/ServerController.swift'
+    if CONFIG['name'] == 'server-control':
+        assert controller_path in manifest['files'], 'Controller implementation must be hash-locked'
+    else:
+        assert (ROOT / controller_path).read_bytes() == show(manifest['branches']['feature/server-control'], controller_path)
+    assert 'final class ServerController: @MainActor ObservableObject' in controller
+    assert 'private(set) var run: Run?' in controller and 'guard currentID == id else' in controller
+    # Splitting the shared lifecycle prerequisite must preserve every prior hunk.
+    lifecycle_patch = (ROOT / 'Patches/hev-server-lifecycle.patch').read_bytes()
+    remaining_patch = (ROOT / 'Patches/hev-server-startup-stop.patch').read_bytes()
+    original_patch = show('7e40f951441cb226bc5e22a95d9c0658aba76939', 'Patches/hev-server-startup-stop.patch')
+    assert lifecycle_patch + remaining_patch == original_patch, 'Original lifecycle/authentication guards changed'
     # The native probe also reconstructs the exact upstream worker blob and checks
     # that this adds only the pre-yield Stop guard before compiling both versions.
     root = content('Socks5/AppRoot.swift')
     assert root.count('@StateObject private var server = ServerController()') == 1
     if 'settings' in FEATURES:
-        for path in ('Socks5/Settings/SettingsStore.swift', 'Socks5/Settings/SettingsView.swift', 'Socks5/AppRoot.swift'):
-            assert path in manifest.get('files', {}), 'Settings-owned changes must be explicitly hash-locked: ' + path
-        model_without_server = original[:original.index('struct ServerSettings:')] + original[original.index('enum SettingsError:'):]
-        model_without_server = model_without_server.replace('Settings file exceeds 64 KB.',
-                                                            'Settings file exceeds 65,536 bytes.')
-        # The asynchronous owner transports these value types between actors;
-        # Sendable changes no encoded field or validation behavior.
-        for declaration in ('struct AppSettings: Codable, Equatable',
-                            'enum Tab: String, Codable', 'struct Background: Codable, Equatable'):
-            model_without_server = model_without_server.replace(declaration + ' {', declaration + ', Sendable {')
-        assert content('Socks5/Settings/AppSettings.swift') == model_without_server
-        assert 'guard settings.loadState == .ready else { return }' in root
-        assert 'guard settings.acceptsNewIntent else {' in root
-        assert root.count('let previous = settings.serverRunningChange') == 2
-        assert root.count('if settings.serverRunningChange == previous { settings.set(') == 2
-        assert 'server.apply(settings.value.server, running: settings.value.serverRunning)' in root
-        assert '.onChange(of: settings.change, initial: true)' in root
-        assert '.onChange(of: settings.loadState)' in root
+        assert 'Socks5/Settings/SettingsStore.swift' in manifest.get('files', {}), 'Store changes must be explicitly hash-locked'
+        if CONFIG['name'] == 'integrated':
+            # Settings owns its asynchronous API and Sendable value model. Exact
+            # owner bytes replace the former synchronous implementation boundary.
+            owner = manifest['branches']['feature/settings-persistence']
+            for path in ('Socks5/Settings/SettingsView.swift', 'Socks5/Settings/AppSettings.swift',
+                         'Socks5/Settings/SettingsStore.swift'):
+                assert (ROOT / path).read_bytes() == show(owner, path), path
+        else:
+            for path in ('Socks5/Settings/AppSettings.swift', 'Socks5/Settings/SettingsView.swift'):
+                assert path in manifest['files'], 'Settings extension must be hash-locked: ' + path
+            assert 'periodicUDPEcho' in content('Socks5/Settings/AppSettings.swift')
+            assert 'contains(.periodicUDPEcho)' in content('Socks5/Settings/AppSettings.swift')
+        assert 'server.apply(value.server, running: value.serverRunning)' in root
         assert 'settings.binding(\\.server)' in root
     else:
         assert not (ROOT / 'Socks5/Settings').exists()
         assert 'requestedRunning = false' in root and '@State private var configuration = ServerSettings()' in root
     if 'background' in FEATURES:
         assert root.count('.modifier(BackgroundKeepAliveEvents(keepAlive: keepAlive))') == 1
-        assert 'keepAlive.setAudio(value.background.silentAudio)' in root
+        assert 'keepAlive.syncAudio(value.background.silentAudio)' in root
+        assert 'keepAlive.setAudio(enabled)' in root
         assert 'keepAlive.setLocation(value.background.continuousLocation)' in root
+    if CONFIG['name'] == 'integrated':
+        # Only the two malformed credential cases reject before class/worker setup.
+        # All other canonical owner assertions and process/listener cleanup remain.
+        probe = 'Tests/ServerControl/auth_startup_probe.c'
+        expected_probe = show(manifest['branches']['feature/server-control'], probe).decode()
+        expected_probe = expected_probe.replace(
+            '        assert (classes_ready == 1);',
+            '        /* UDP validates incomplete credentials before native initialization. */\n'
+            '        assert (classes_ready == ((i == 3 || i == 4) ? 0 : 1));\n'
+            '        if (i == 3 || i == 4)\n'
+            '            assert (!auth_calls && !user_calls);', 1)
+        assert content(probe) == expected_probe, 'Unexpected authentication probe adaptation'
     checked = 0
     for ref in manifest.get('branches', {}).values():
         subprocess.run(['git', '-C', str(ROOT), 'merge-base', '--is-ancestor', ref, 'HEAD'], check=True)

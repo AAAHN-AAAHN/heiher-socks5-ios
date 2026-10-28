@@ -1,9 +1,4 @@
 import Foundation
-#if canImport(Darwin)
-import Darwin
-#else
-import Glibc
-#endif
 
 /// Test transport only. The production controller calls the real linked engine.
 @main struct NativeControllerHost {
@@ -38,8 +33,8 @@ import Glibc
             let reply: [String: Any] = ["id": command.id, "running": server.isRunning,
                                         "status": server.status]
             let data = try JSONSerialization.data(withJSONObject: reply, options: .sortedKeys)
-            print("SERVER_CONTROL_RESULT " + String(decoding: data, as: UTF8.self))
-            fflush(stdout)
+            let line = "SERVER_CONTROL_RESULT " + String(decoding: data, as: UTF8.self) + "\n"
+            FileHandle.standardOutput.write(Data(line.utf8))
             if command.operation == "exit" { return }
         }
         // EOF is not normally used by these checks, but must not orphan the engine.

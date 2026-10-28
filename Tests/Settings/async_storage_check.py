@@ -19,7 +19,7 @@ HERE = Path(__file__).resolve().parent
 NAME = json.loads((ROOT / 'Build/features.json').read_text())['name']
 OUT = ROOT / 'artifacts' / NAME / 'async-storage'
 CASES = [
-    'normal', 'blocked-load', 'blocked-save', 'same-save', 'early-same-save',
+    'echo-blocked-load', 'echo-stale-import', 'normal', 'blocked-load', 'blocked-save', 'same-save', 'early-same-save',
     'early-overlap', 'save-failure', 'flush-retry', 'invalid-import', 'stale-import',
     'cancel-commit', 'cancel-corrupt-commit', 'supersede-commit', 'ordered-imports',
     'load-failure', 'migration', 'reentrant-edit', 'reentrant-load',

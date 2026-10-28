@@ -128,13 +128,13 @@ def compile_host(core, folder, old, log):
     if sys.platform != 'darwin':
         code = code.replace('import SwiftUI\n', 'import Foundation\n', 1)
         ui = folder / 'UI.swift'
-        ui.write_text('protocol ObservableObject {}\n@propertyWrapper struct Published<T> { var wrappedValue: T }\n')
+        ui.write_text('protocol ObservableObject: AnyObject { var objectWillChange: ObservableObjectPublisher { get } }\n@propertyWrapper struct Published<T> { var wrappedValue: T }\nfinal class ObservableObjectPublisher { var receive: (() -> Void)?; func send() { receive?() } }\n')
         sources.append(str(ui))
     controller.write_text(code)
     libraries = [core / 'bin/libhev-socks5-server.a', core / 'third-part/yaml/bin/libyaml.a',
                  core / 'third-part/hev-task-system/bin/libhev-task-system.a']
     executable = folder / 'controller-host'
-    subprocess.run(['swiftc', '-swift-version', '5', '-warnings-as-errors', '-I', str(include),
+    subprocess.run(['swiftc', '-swift-version', '5', '-strict-concurrency=complete', '-warnings-as-errors', '-I', str(include),
                     *sources, *map(str, libraries), '-Xlinker', '-lpthread', '-o', str(executable)],
                    stdout=log, stderr=subprocess.STDOUT, check=True, timeout=120)
     return executable

@@ -23,11 +23,12 @@ final class SettingsStore: @MainActor ObservableObject {
     private(set) var loadState = LoadState.loading
     private(set) var savePending = false
     private(set) var change = Change(revision: 0, origin: .load)
-    // Reuse accepted Change identities for the three direct service intents. A
+    // Reuse accepted Change identities for direct service intents. A
     // synchronous callback may edit an unrelated field without superseding Off.
     private(set) var audioChange = Change(revision: 0, origin: .load)
     private(set) var locationChange = Change(revision: 0, origin: .load)
     private(set) var serverRunningChange = Change(revision: 0, origin: .load)
+    private(set) var echoChange = Change(revision: 0, origin: .load)
     private(set) var revisionExhausted = false
     var acceptsNewIntent: Bool { revision != UInt64.max && !revisionExhausted }
     let fileURL: URL
@@ -108,17 +109,19 @@ final class SettingsStore: @MainActor ObservableObject {
         let audio: Change
         let location: Change
         let serverRunning: Change
+        let echo: Change
         let exhausted: Bool
     }
     private var lastPublished = ViewState(value: AppSettings(), error: nil, load: .loading,
         pending: false, change: Change(revision: 0, origin: .load),
         audio: Change(revision: 0, origin: .load), location: Change(revision: 0, origin: .load),
-        serverRunning: Change(revision: 0, origin: .load), exhausted: false)
+        serverRunning: Change(revision: 0, origin: .load),
+        echo: Change(revision: 0, origin: .load), exhausted: false)
 
     private func publishChanges() {
         let next = ViewState(value: value, error: errorMessage, load: loadState,
             pending: savePending, change: change, audio: audioChange, location: locationChange,
-            serverRunning: serverRunningChange, exhausted: revisionExhausted)
+            serverRunning: serverRunningChange, echo: echoChange, exhausted: revisionExhausted)
         guard next != lastPublished else { return }
         lastPublished = next
         objectWillChange.send()
@@ -149,7 +152,8 @@ final class SettingsStore: @MainActor ObservableObject {
             // service Off still remains reflected in memory, never a later On.
             if let enabled = newValue as? Bool, !enabled,
                path == \AppSettings.serverRunning || path == \AppSettings.background.silentAudio ||
-               path == \AppSettings.background.continuousLocation {
+               path == \AppSettings.background.continuousLocation ||
+               path == \AppSettings.background.periodicUDPEcho.enabled {
                 value[keyPath: path] = newValue
                 savePending = value != durable || saving != nil
             }
@@ -228,6 +232,10 @@ final class SettingsStore: @MainActor ObservableObject {
         if background || path == \AppSettings.background.silentAudio { audioChange = change }
         if background || path == \AppSettings.background.continuousLocation { locationChange = change }
         if whole || path == \AppSettings.serverRunning { serverRunningChange = change }
+        if background || path == \AppSettings.background.periodicUDPEcho ||
+            path == \AppSettings.background.periodicUDPEcho.enabled ||
+            path == \AppSettings.background.periodicUDPEcho.destinations ||
+            path == \AppSettings.background.periodicUDPEcho.period { echoChange = change }
     }
     private func advanceRevision() -> Bool {
         guard revision != UInt64.max, !revisionExhausted else {
@@ -473,7 +481,7 @@ final class SettingsStore: @MainActor ObservableObject {
     private nonisolated static func rollback(_ backup: URL?, target: URL) throws {
         if let backup {
             // Same directory/filesystem: atomically restore the original file or
-            // symlink, including an unreadable/oversized former configuration.
+            // symlink, including an unreadable former configuration.
             guard rename(backup.path, target.path) == 0 else {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
@@ -488,7 +496,7 @@ final class SettingsStore: @MainActor ObservableObject {
     private nonisolated static func read(_ url: URL) throws -> Data {
         let file = try FileHandle(forReadingFrom: url)
         defer { try? file.close() }
-        return try file.read(upToCount: 65_537) ?? Data()
+        return try file.readToEnd() ?? Data()
     }
     private nonisolated static func write(_ data: Data, _ url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

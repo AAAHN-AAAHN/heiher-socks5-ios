@@ -108,10 +108,10 @@ import Foundation
             do { _ = try injected.server.configuration(); preconditionFailure("YAML newline accepted") } catch {}
             check(true, "Unicode YAML line separator rejected")
         }
-        var oversized = AppSettings()
-        oversized.server.authPassword = String(repeating: "x", count: 70_000)
-        do { _ = try oversized.encoded(); preconditionFailure("Unreloadable JSON exported") } catch {}
-        check(true, "An oversized configuration cannot be exported as a valid snapshot")
+        var large = AppSettings()
+        large.background.periodicUDPEcho.destinations = String(repeating: "1.1.1.1,\n", count: 20_000)
+        check(try AppSettings.decoded(large.encoded()) == large,
+              "Large raw Echo settings round-trip without a byte cap")
         print("SUMMARY: \(checks) settings checks passed")
     }
 }
