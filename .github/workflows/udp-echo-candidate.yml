@@ -1,11 +1,11 @@
-name: Verify UDP Echo Darwin transport boundaries
+name: Verify Darwin TCP listener metadata correction
 on:
   push:
     branches: [work/udp-echo-build-20261028]
 permissions:
   contents: read
 jobs:
-  transport-diagnostic:
+  listener-fix:
     runs-on: xcode-27
     timeout-minutes: 15
     steps:
@@ -16,38 +16,21 @@ jobs:
           persist-credentials: false
       - name: Verify exact candidate objects without changing refs
         run: python3 Bootstrap/import_candidates.py
-      - name: Prepare exact production worktree
-        run: |
-          git worktree add --detach "$RUNNER_TEMP/transport-focused" f1083afc5726814ce4b5ecdae9c733c65168d49a
-          git worktree add --detach "$RUNNER_TEMP/native-focused" 8780daaecf27fed23c21434fad18aef04ede93f5
-      - name: Require complete transport suite with causal Off ordering
-        id: transport
-        continue-on-error: true
-        run: python3 Bootstrap/transport-diagnostic/run.py "$RUNNER_TEMP/transport-focused"
-      - name: Observe actual native wildcard listener without changing production
-        id: native
-        continue-on-error: true
-        run: python3 Bootstrap/native-diagnostic/run.py "$RUNNER_TEMP/native-focused"
-      - name: Require both diagnostic suites to pass
-        if: always()
-        env:
-          TRANSPORT: ${{ steps.transport.outcome }}
-          NATIVE: ${{ steps.native.outcome }}
-        run: test "$TRANSPORT" = success && test "$NATIVE" = success
+      - name: Prepare exact base worktree
+        run: git worktree add --detach "$RUNNER_TEMP/native-fix" 8780daaecf27fed23c21434fad18aef04ede93f5
+      - name: Require original native cases and real listener lifecycle regression
+        run: python3 Bootstrap/native-fix/run.py "$RUNNER_TEMP/native-fix"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: UDP-Echo-Darwin-transport-diagnostic-${{ github.run_id }}
+          name: UDP-Echo-Darwin-listener-fix-${{ github.run_id }}
           path: |
             artifacts/candidate-prepare/
-            Bootstrap/transport-diagnostic/
-            Bootstrap/native-diagnostic/
-            ${{ runner.temp }}/transport-focused/artifacts/background-transport-focused/*.json
-            ${{ runner.temp }}/transport-focused/artifacts/background-transport-focused/*.log
-            ${{ runner.temp }}/native-focused/artifacts/native-listener-focused/*.json
-            ${{ runner.temp }}/native-focused/artifacts/native-listener-focused/*.log
-            ${{ runner.temp }}/native-focused/artifacts/native-listener-focused/native/*.json
-            ${{ runner.temp }}/native-focused/artifacts/native-listener-focused/native/*.log
-            ${{ runner.temp }}/native-focused/artifacts/native-listener-focused/native/*.yml
+            Bootstrap/native-fix/
+            ${{ runner.temp }}/native-fix/artifacts/native-listener-fix/*.json
+            ${{ runner.temp }}/native-fix/artifacts/native-listener-fix/*.log
+            ${{ runner.temp }}/native-fix/artifacts/native-listener-fix/native/*.json
+            ${{ runner.temp }}/native-fix/artifacts/native-listener-fix/native/*.log
+            ${{ runner.temp }}/native-fix/artifacts/native-listener-fix/native/*.yml
           if-no-files-found: error
           retention-days: 90

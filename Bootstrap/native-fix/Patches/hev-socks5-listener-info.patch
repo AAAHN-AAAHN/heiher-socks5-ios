@@ -1,0 +1,165 @@
+diff --git a/src/hev-main.h b/src/hev-main.h
+--- a/src/hev-main.h
++++ b/src/hev-main.h
+@@ -15,2 +15,14 @@
+ #endif
++
++/* Read-only metadata for an actual ready TCP listener. No socket is borrowed.
++ * Returns 1 and copies a snapshot, or returns 0 and clears the output.
++ * port is host order; an IPv6 zone is a numeric local scope in address.
++ * Mapped wildcards retain the effective TCP bind's IPv4 family on Darwin. */
++typedef struct
++{
++    char address[64];
++    unsigned short port;
++    int ipv6_only;
++} HevSocks5ListenerInfo;
++int hev_socks5_server_listener_info (HevSocks5ListenerInfo *info);
+ 
+diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
+--- a/src/hev-socks5-proxy.c
++++ b/src/hev-socks5-proxy.c
+@@ -17,2 +17,3 @@
+ #include <stdatomic.h>
++#include <arpa/inet.h>
+ 
+@@ -30,2 +31,3 @@
+ #include "hev-socks5-proxy.h"
++#include "hev-main.h"
+ 
+@@ -56,2 +58,82 @@
+ static int signal_installed;
++static pthread_mutex_t listener_lock = PTHREAD_MUTEX_INITIALIZER;
++static HevSocks5ListenerInfo listener_info;
++static int listener_ready;
++
++static void
++listener_clear (void)
++{
++    pthread_mutex_lock (&listener_lock);
++    listener_ready = 0;
++    memset (&listener_info, 0, sizeof (listener_info));
++    pthread_mutex_unlock (&listener_lock);
++}
++
++int
++hev_socks5_server_listener_info (HevSocks5ListenerInfo *info)
++{
++    int ready;
++
++    if (!info)
++        return 0;
++    pthread_mutex_lock (&listener_lock);
++    ready = listener_ready;
++    *info = listener_info;
++    pthread_mutex_unlock (&listener_lock);
++    return ready;
++}
++
++static int
++listener_read (int fd, int ipv4, HevSocks5ListenerInfo *info)
++{
++    struct sockaddr_storage address = { 0 };
++    socklen_t length = sizeof (address);
++    char text[INET6_ADDRSTRLEN];
++    const void *ip;
++    unsigned int scope = 0;
++
++    if (getsockname (fd, (struct sockaddr *)&address, &length) < 0)
++        return -1;
++    if (address.ss_family == AF_INET && length >= sizeof (struct sockaddr_in)) {
++        struct sockaddr_in *v4 = (struct sockaddr_in *)&address;
++        ip = &v4->sin_addr;
++        info->port = ntohs (v4->sin_port);
++    } else if (address.ss_family == AF_INET6 &&
++               length >= sizeof (struct sockaddr_in6)) {
++        struct sockaddr_in6 *v6 = (struct sockaddr_in6 *)&address;
++        socklen_t size = sizeof (info->ipv6_only);
++        /* Darwin reports a mapped IPv4 wildcard as :: although this listener
++         * accepts only IPv4. Preserve its already resolved TCP bind family. */
++        if (ipv4 && IN6_IS_ADDR_UNSPECIFIED (&v6->sin6_addr))
++            v6->sin6_addr.s6_addr[10] = v6->sin6_addr.s6_addr[11] = 0xff;
++        ip = &v6->sin6_addr;
++        scope = v6->sin6_scope_id;
++        info->port = ntohs (v6->sin6_port);
++        if (getsockopt (fd, IPPROTO_IPV6, IPV6_V6ONLY, &info->ipv6_only,
++                        &size) < 0)
++            return -1;
++    } else
++        return -1;
++    if (!info->port || !inet_ntop (address.ss_family, ip, text, sizeof (text)))
++        return -1;
++    if (scope)
++        snprintf (info->address, sizeof (info->address), "%s%%%u", text, scope);
++    else
++        snprintf (info->address, sizeof (info->address), "%s", text);
++    return 0;
++}
++
++static void
++listener_publish (const HevSocks5ListenerInfo *info)
++{
++    pthread_mutex_lock (&listener_lock);
++    /* A Stop before or during init must not advertise a new usable run. Stop
++     * acquires SYNC_WAIT before clearing this snapshot. */
++    if (!(atomic_load (&tsync) &
++          (SYNC_STOP | SYNC_ABRT | SYNC_SENT | SYNC_WAIT))) {
++        listener_info = *info;
++        listener_ready = 1;
++    }
++    pthread_mutex_unlock (&listener_lock);
++}
+ 
+@@ -229,2 +311,3 @@
+     HevSocketFactory *factory;
++    HevSocks5ListenerInfo actual_listener = { 0 };
+     const char *listen_addr;
+@@ -238,2 +321,4 @@
+ 
++    listener_clear ();
++
+     LOG_D ("socks5 proxy init");
+@@ -285,5 +370,9 @@
+ 
+-        /* Skip worker 0 */
+-        if (i == 0)
++        /* Use one actual listener even when port 0 yields per-worker ports. */
++        if (i == 0) {
++            if (listener_read (fd, hev_socket_factory_is_ipv4 (factory),
++                               &actual_listener) < 0)
++                goto exit;
+             continue;
++        }
+ 
+@@ -323,2 +412,3 @@
+     atomic_fetch_or (&tsync, SYNC_SEND);
++    listener_publish (&actual_listener);
+ 
+@@ -341,2 +431,4 @@
+ 
++    listener_clear ();
++
+     atomic_store (&signal_worker, NULL);
+@@ -409,2 +501,3 @@
+ 
++    listener_clear ();
+     if (res & SYNC_SEND) {
+diff --git a/src/hev-socket-factory.c b/src/hev-socket-factory.c
+--- a/src/hev-socket-factory.c
++++ b/src/hev-socket-factory.c
+@@ -72,2 +72,8 @@
+ int
++hev_socket_factory_is_ipv4 (HevSocketFactory *self)
++{
++    return IN6_IS_ADDR_V4MAPPED (&self->addr.sin6_addr);
++}
++
++int
+ hev_socket_factory_get (HevSocketFactory *self)
+diff --git a/src/hev-socket-factory.h b/src/hev-socket-factory.h
+--- a/src/hev-socket-factory.h
++++ b/src/hev-socket-factory.h
+@@ -19,2 +19,3 @@
+ int hev_socket_factory_get (HevSocketFactory *self);
++int hev_socket_factory_is_ipv4 (HevSocketFactory *self);
+ 
