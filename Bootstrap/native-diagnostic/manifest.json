@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "candidate": "integrated",
+  "candidate_commit": "8780daaecf27fed23c21434fad18aef04ede93f5",
+  "owner_commit": "f1083afc5726814ce4b5ecdae9c733c65168d49a",
+  "purpose": "Diagnose actual native case 6 without production, case table, assertion, timeout, or retry changes.",
+  "overlay_files": {
+    "Tests/Background/check_udp_echo_native.py": {
+      "before_sha256": "3323a95d9df368818830a11b1074fa0dec81d5022fe7ec1a1b4ac5ae6b26dd16",
+      "after_sha256": "e85c232dc4cff26638e105e49c8a43a60769b4278d86fa07ae69e0bb6bcba492"
+    },
+    "socket_probe.py": {
+      "after_sha256": "0328249698edcb9544652e4a7d6b5847dc422948a3d72759a08581c23067e4bc"
+    }
+  },
+  "unchanged_candidate_files": {
+    "Build/features.json": "982d4eb57fbaf6ab4c905e9a5c2b008c100d92b7c8aa0ebc27e9f2c013b7e8de",
+    "Build/upstream.json": "bc35da2894d16e4416f40086f44b6dfc3a74f4fcbd8fc152ba66188269545fc6",
+    "Build/check.py": "f90ef6d925cfc7e833ae51a39ecf89bae7915f0651e41a9858aa8480f13dd230",
+    "Build/server_patch.py": "ff72c2f6186f39da9543c581cf2b185c0921beffea1e448e52db54365526a034",
+    "Patches/hev-netaddr-result.patch": "946b049fd7615de70680c0f81d6a4acc394973663067b7dfe51ca3f183587959",
+    "Patches/hev-server-lifecycle.patch": "df872f0a6a10d1dfbc4efd23f62c566a4698b6f2a79d6e2298068c39b6ac98a9",
+    "Patches/hev-server-startup-stop.patch": "e9d9a51850ee252a2c9f26128eecf1d18d98503823d39d2a1f96b28d942b1528",
+    "Patches/hev-session-setup.patch": "31e00f258d9c3f202a74c5554dd6ce6056f6893bc5b4a415a97224a3d45a1c1b",
+    "Patches/hev-socket-meter-core.patch": "1ad29324fe5a750e019848961f1e3417fef2ec1d2e59c82a6fec775337b1b704",
+    "Patches/hev-socket-meter-server.patch": "e1caf3260c830f845bd6222a8c2536fd5aef449090b4082a28933fdd9e44f1cc",
+    "Patches/hev-socket-meter-task.patch": "2f3ab4d3f392ee30cf03bd56999de98234a7a277cee562fa0b9e37e09e7c289c",
+    "Patches/hev-socket-meter-writer.patch": "ad0c3f1b2bc5a4fd127a690b3aeec9ac42a229ee53e264a09d08b2c96bb1b5c7",
+    "Patches/hev-socks5-listener-info.patch": "424cd095dbbfd6ffb894786943f8dd97c38d8f434989116a2f650fd5ee11c1a2",
+    "Patches/hev-udp-domain.patch": "63145cb1494a81eed18b9be2a6db711964d161724ccbef1c2d992fc71c4cd996",
+    "Patches/hev-udp-dynamic-buffer.patch": "f2fa747b7a7615df34d2c86e9dc2b3c2a801f0f0de9ff141a1e187bd9ccbd726",
+    "Patches/hev-udp-peer-filter.patch": "d63846d2ed05efdd78b28949fac1cc5c1ae63f9d726bf6b8cdc4ab2d114e2b18",
+    "Patches/hev-udp-port-zero.patch": "9cd0a43550a6128046f81d11bd16971e426386e2656e3e8f16fa790d57bbb315",
+    "Patches/hev-udp-sockaddr.patch": "ab4b5439d550aa4a1e384638548e7a8a851bb2fee5d8677271341044ddaa17da",
+    "Socks5/BackgroundKeepAlive/Socks5UDPClient.swift": "57da93313e01f5c3938f0be3b112de58afeeaf0aab5013ca9a8c20278d377465",
+    "Socks5/BackgroundKeepAlive/PeriodicUDPEchoService.swift": "f2247c1f185e45fba62dca8bb6b5843df1346147b15775b3d4582555e517a674",
+    "Socks5/BackgroundKeepAlive/PeriodicUDPEchoStore.swift": "95fca19be76523779dbdfcf6da36d8e61477a44c53b84cd5ab8bac8e05ba5aea",
+    "Socks5/BackgroundKeepAlive/Socks5ServerEndpoint.swift": "d219e11ac4fcf7b46c0ba472419b261c8958beef39f6fcac89c1e22ea8734cc1",
+    "Tests/Background/UDPEchoNativeServer.c": "ed469e7242c4bf972db7bf52dd94f194654492d11b4b5dcb592dce3124a8acbc",
+    "Tests/Background/UDPEchoNativeProbe.swift": "e802f58c52e0699b94c862971a167ff82c04e43694dd64ae64b69cc77314421a",
+    "Tests/Background/UDPEchoTransportProbe.swift": "6f5df6872c606626d1aafa6e76dc6961e6ebda504b124c0c72b6a907473ccec8",
+    "Tests/Background/UDPEchoSchedulerProbe.swift": "f89e8cbc444d85cbc5abe28188222fa6e70d900655047c3f7010f9f2fe2cf3e3"
+  },
+  "native_sources": {
+    ".": "318a2ffebfd87a12b72dbac95a65ca27143eb01b",
+    "src/core": "dadbb54bf7509f6dea3c1b30e45198efa400679c",
+    "third-part/hev-task-system": "4039d2fdbb3577af380fa0096b90d0ad99969dfa",
+    "third-part/yaml": "94441ec8777eb319936735a58b376963d09c73d4"
+  },
+  "native_stack": "Build/check.py checkout CORE; Build/check.py apply CORE (all Integrated candidate patches)",
+  "commands": [
+    "python3 SOCKET_PROBE --output ARTIFACTS/socket-probe.json",
+    "python3 Tests/Background/check_udp_echo_native.py --native CORE --output ARTIFACTS/native"
+  ],
+  "execution": "Run the OS observation separately before the unmodified 12-case native suite. Propagate native process exit unchanged; do not retry or mask failure.",
+  "local_validation": {
+    "syntax": "passed",
+    "all_original_assertion_expressions": "identical AST",
+    "original_native_transport_cases": "identical AST (8 transports + 3 mixed + 1 restart)"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "base_commit": "f1083afc5726814ce4b5ecdae9c733c65168d49a",
+  "scope": "Test-only handshake-Off causal ordering and preserved failed-case diagnostics. No production/timer/QoS changes. Exact original EOF and zero-datagram assertions retained; completed greeting and zero subsequent TCP I/O additionally asserted.",
+  "files": [
+    {
+      "path": "Tests/Background/UDPEchoTransportProbe.swift",
+      "before_sha256": "6f5df6872c606626d1aafa6e76dc6961e6ebda504b124c0c72b6a907473ccec8",
+      "after_sha256": "f931e5c1ca829642739cece332d26ba7b043a13227fb804b586ebe6b6d3fa91a",
+      "bytes": 7108
+    },
+    {
+      "path": "Tests/Background/UDPEchoTransportTests.py",
+      "before_sha256": "7d9095f42bbba060af749e6846f80aa6215503960774ccc5163eda8bfe38b590",
+      "after_sha256": "9983165ff22ec16b3fcea0ae661f64906939bb4dd006dabae92c7086d4c6f4e6",
+      "bytes": 13674
+    }
+  ],
+  "production_client": {
+    "path": "Socks5/BackgroundKeepAlive/Socks5UDPClient.swift",
+    "sha256": "57da93313e01f5c3938f0be3b112de58afeeaf0aab5013ca9a8c20278d377465"
+  },
+  "focused_command": "python3 Tests/Background/UDPEchoTransportTests.py --output artifacts/background-transport-focused"
+}
