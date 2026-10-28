@@ -65,13 +65,18 @@ def main():
                 document = dict(version=1, server=options, serverRunning=True,
                     background=dict(continuousLocation=False, silentAudio=False), selectedTab='background')
                 external = case_dir / 'external.json'; external.write_text(json.dumps(document))
+                # The legacy input intentionally omits Echo. Its decoded defaults
+                # are part of the complete current-schema document written to disk.
+                document['background']['periodicUDPEcho'] = dict(
+                    enabled=False, destinations='1.1.1.1', period='1000')
                 with (output / f'workers{workers}.log').open('wb') as log:
                     host = native.Host(executable, log)
                     try:
                         response = host.request('import-file', path=str(external))
                         assert not response['operationError']
                         native.wait_auth(port, 'user', '\u00e9')
-                        assert json.loads(file.read_text()) == document
+                        saved = json.loads(file.read_text())
+                        assert saved == document, (saved, document)
                         record(workers, 'coordinated-import-starts-real-server')
                         host.request('set-password', password='e\u0301')
                         native.wait_auth(port, 'user', 'e\u0301')
