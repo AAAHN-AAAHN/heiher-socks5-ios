@@ -164,8 +164,9 @@ final class IntegrationUITests: XCTestCase {
             reveal(field)
             XCTAssertTrue(field.isEnabled)
             field.tap()
-            let previous = field.value as? String ?? ""
-            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: previous.count) + text)
+            // A tap may place the insertion point before the existing text.
+            field.typeKey("a", modifierFlags: .command)
+            field.typeText(text)
             XCTAssertEqual(field.value as? String, text)
         }
         @MainActor func server(running: Bool) {
