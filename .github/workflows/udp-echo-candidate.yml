@@ -12,6 +12,7 @@ jobs:
     outputs:
       matrix: ${{ steps.prepare.outputs.matrix }}
       runtime-matrix: ${{ steps.runtime.outputs.matrix }}
+      runtime-required: ${{ steps.runtime.outputs.required }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -28,9 +29,9 @@ jobs:
           rows = json.load(open('Bootstrap/candidates.json'))['matrix']
           assert {row['name'] for row in rows} <= {'udp', 'statistics', 'background', 'integrated'}
           rows = [row for row in rows if row.get('runtime')]
-          assert rows
           with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
               stream.write('matrix=' + json.dumps({'include': rows}, separators=(',', ':')) + '\n')
+              stream.write('required=' + str(bool(rows)).lower() + '\n')
           PYCODE
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
@@ -50,6 +51,8 @@ jobs:
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -104,7 +107,17 @@ jobs:
           esac
           if [ "$RUNNER_OS" = macOS ]; then
             case "$CANDIDATE" in
-              udp|statistics) bash Build/build.sh ;;
+              udp)
+                xcodebuild -version > artifacts/udp-final-audit/toolchain.txt
+                xcrun --sdk iphoneos --show-sdk-version | tee -a artifacts/udp-final-audit/toolchain.txt | grep -E '^27\.'
+                xcrun swiftc --version >> artifacts/udp-final-audit/toolchain.txt
+                sw_vers >> artifacts/udp-final-audit/toolchain.txt
+                xcrun swiftc -typecheck -swift-version 5 -warnings-as-errors \
+                  -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -target arm64-apple-ios17.2 \
+                  -I HevSocks5Server.xcframework/ios-arm64/Headers \
+                  Socks5/Socks5App.swift Socks5/ContentView.swift \
+                  > artifacts/udp-final-audit/ios-swift-typecheck.log 2>&1
+                ;;
               server|settings|integrated) bash Build/check_swift_sdk.sh ;;
               background) bash Tests/Background/check_audio_sdk.sh ;;
             esac
@@ -112,6 +125,11 @@ jobs:
               python3 Build/verify_release.py > artifacts/integrated/package-review.log 2>&1
             fi
           fi
+      - name: Build exact Apple products for the audited owner
+        if: ${{ runner.os == 'macOS' && (matrix.name == 'udp' || matrix.name == 'statistics') }}
+        env:
+          CANDIDATE: ${{ matrix.name }}
+        run: python3 Bootstrap/package_audited_owner.py --candidate "$CANDIDATE" --root "$RUNNER_TEMP/udp-source"
       - name: Preserve exact generated native products
         if: ${{ runner.os == 'macOS' }}
         working-directory: ${{ runner.temp }}/udp-source
@@ -166,6 +184,7 @@ jobs:
 
   runtime:
     name: runtime (${{ matrix.name }}, ${{ matrix.sha }}, ${{ matrix.os }}, ${{ matrix.runtime }})
+    if: ${{ always() && needs.prepare.result == 'success' && needs.prepare.outputs.runtime-required == 'true' }}
     needs: [prepare, build]
     strategy:
       fail-fast: false

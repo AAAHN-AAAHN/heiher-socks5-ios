@@ -40,19 +40,7 @@
     {
       "name": "udp",
       "sha": "681db4de805be22eae537c6562b0b8cbc84767cc",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "udp",
-      "sha": "681db4de805be22eae537c6562b0b8cbc84767cc",
       "os": "xcode-27",
-      "runtime": false
-    },
-    {
-      "name": "statistics",
-      "sha": "dd27d10f59162b1623f2702d757d444836f8dd70",
-      "os": "ubuntu-24.04",
       "runtime": false
     },
     {
@@ -64,20 +52,8 @@
     {
       "name": "background",
       "sha": "4155949ad1d32d02b31c09ebe8338f1bdf4c1fde",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "background",
-      "sha": "4155949ad1d32d02b31c09ebe8338f1bdf4c1fde",
       "os": "xcode-27",
       "runtime": true
-    },
-    {
-      "name": "integrated",
-      "sha": "71abb048fec73c5fd162e88f92e83ba57e1fc5aa",
-      "os": "ubuntu-24.04",
-      "runtime": false
     },
     {
       "name": "integrated",

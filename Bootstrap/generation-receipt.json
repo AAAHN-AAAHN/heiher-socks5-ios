@@ -21,7 +21,12 @@
     "icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
     "integrated": "71abb048fec73c5fd162e88f92e83ba57e1fc5aa"
   },
-  "macos_only": [],
+  "macos_only": [
+    "udp",
+    "statistics",
+    "background",
+    "integrated"
+  ],
   "bundle_sha256": "92fdacc64530ebc029af5b2f43d3bf5245e721651bff66cee4a9cb3c8966c6de",
   "bundle_bytes": 244458,
   "prerequisites": [
@@ -83,19 +88,7 @@
     {
       "name": "udp",
       "sha": "681db4de805be22eae537c6562b0b8cbc84767cc",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "udp",
-      "sha": "681db4de805be22eae537c6562b0b8cbc84767cc",
       "os": "xcode-27",
-      "runtime": false
-    },
-    {
-      "name": "statistics",
-      "sha": "dd27d10f59162b1623f2702d757d444836f8dd70",
-      "os": "ubuntu-24.04",
       "runtime": false
     },
     {
@@ -107,20 +100,8 @@
     {
       "name": "background",
       "sha": "4155949ad1d32d02b31c09ebe8338f1bdf4c1fde",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "background",
-      "sha": "4155949ad1d32d02b31c09ebe8338f1bdf4c1fde",
       "os": "xcode-27",
       "runtime": true
-    },
-    {
-      "name": "integrated",
-      "sha": "71abb048fec73c5fd162e88f92e83ba57e1fc5aa",
-      "os": "ubuntu-24.04",
-      "runtime": false
     },
     {
       "name": "integrated",
