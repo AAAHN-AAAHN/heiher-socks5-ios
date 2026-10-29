@@ -1,5 +1,5 @@
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index a118dcfe670d0bdf39d1d5fe46fc6b34d052d24c..db7682284981c9687e2516cb3d325ce94108203f 100644
+index a118dcfe670d0bdf39d1d5fe46fc6b34d052d24c..fdfadd28ebb01f61accd632840a203ab4a46dddd 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
 @@ -9,6 +9,10 @@
@@ -1041,7 +1041,7 @@ index a118dcfe670d0bdf39d1d5fe46fc6b34d052d24c..db7682284981c9687e2516cb3d325ce9
          if (!HEV_SOCKS5 (self)->udp_associated) {
              if (connect (fd, (struct sockaddr *)&taddr[i], sizeof (taddr[i])) <
                  0)
-@@ -421,76 +1008,88 @@
+@@ -421,76 +1008,102 @@
              HEV_SOCKS5 (self)->udp_associated = 1;
          }
  
@@ -1153,6 +1153,20 @@ index a118dcfe670d0bdf39d1d5fe46fc6b34d052d24c..db7682284981c9687e2516cb3d325ce9
 +}
 +
 +static int
++udp_datagram_error_clear (int fd, int error)
++{
++    if (error == ECONNREFUSED || error == ECONNRESET || error == EHOSTUNREACH ||
++        error == ENETUNREACH || error == EHOSTDOWN || error == ENETDOWN ||
++        error == EMSGSIZE) {
++        socklen_t length = sizeof (error);
++        /* Darwin peeks leave the error pending. Clear it without consuming
++         * a datagram that may have arrived after the failed size query. */
++        return getsockopt (fd, SOL_SOCKET, SO_ERROR, &error, &length) == 0;
++    }
++    return 0;
++}
++
++static int
 +hev_socks5_udp_fwd_f (HevSocks5UDP *self, int fd, unsigned int num, int *bind,
 +                      UDPBuffer *buffers, UDPWorkspace *workspace)
 +{
@@ -1182,7 +1196,7 @@ index a118dcfe670d0bdf39d1d5fe46fc6b34d052d24c..db7682284981c9687e2516cb3d325ce9
          int n, ret;
  
          for (i = 0, n = 0; i < res; i++) {
-@@ -505,6 +1104,10 @@
+@@ -505,6 +1118,10 @@
              family = hev_socks5_get_addr_family (HEV_SOCKS5 (self));
              ret = hev_socks5_addr_into_sockaddr6 (svec[i].addr, &addr[n],
                                                    &family);
@@ -1193,7 +1207,7 @@ index a118dcfe670d0bdf39d1d5fe46fc6b34d052d24c..db7682284981c9687e2516cb3d325ce9
              if (ret < 0) {
                  LOG_D ("%p socks5 udp sockaddr", self);
                  continue;
-@@ -526,15 +1129,20 @@
+@@ -526,15 +1143,20 @@
              struct sockaddr *addr = dvec[0].msg_hdr.msg_name;
              ret = skptr->binder (HEV_SOCKS5 (self), fd, addr);
              if (ret < 0) {
@@ -1216,7 +1230,18 @@ index a118dcfe670d0bdf39d1d5fe46fc6b34d052d24c..db7682284981c9687e2516cb3d325ce9
              if (ret <= 0) {
                  if (ret == -2)
                      return -1;
-@@ -553,29 +1161,55 @@
+@@ -545,6 +1167,10 @@
+     } else {
+         if (res == -1 && errno == EAGAIN)
+             return 0;
++        if (res == -1 &&
++            HEV_SOCKS5 (self)->type == HEV_SOCKS5_TYPE_UDP_IN_UDP &&
++            udp_datagram_error_clear (hev_socks5_udp_get_fd (self), errno))
++            return 1;
+         LOG_D ("%p socks5 udp fwd f recv", self);
+         return -1;
+     }
+@@ -553,33 +1179,61 @@
  }
  
  static int
@@ -1287,7 +1312,13 @@ index a118dcfe670d0bdf39d1d5fe46fc6b34d052d24c..db7682284981c9687e2516cb3d325ce9
      }
      if (res <= 0) {
          if (res == -1 && errno == EAGAIN)
-@@ -593,60 +1227,73 @@
+             return 0;
++        if (res == -1 && udp_datagram_error_clear (fd, errno))
++            return 1;
+         LOG_D ("%p socks5 udp fwd b recv send", self);
+         return -1;
+     }
+@@ -593,60 +1247,73 @@
      HevTask *task = hev_task_self ();
      int res_f = 1, res_b = 1;
      int bind = 0;
