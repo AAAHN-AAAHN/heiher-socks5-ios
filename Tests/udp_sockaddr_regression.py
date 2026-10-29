@@ -11,6 +11,7 @@ import ipaddress
 import json
 import pathlib
 import secrets
+import select
 import socket
 import socketserver
 import struct
@@ -209,6 +210,23 @@ def main():
                     for size in (1, 64, 512, 1200, 1400, 64):
                         exchange(udp, destination, size)
             check('UDP %s hint=%s, six payloads' % (host, hint), single)
+
+        for host, destination in [('127.0.0.1', udp4), ('::1', udp6)]:
+            def closed_destination(host=host, destination=destination):
+                family = socket.AF_INET6 if ':' in host else socket.AF_INET
+                with socket.socket(family, socket.SOCK_DGRAM) as reserve:
+                    reserve.bind((host, 0))
+                    closed = reserve.getsockname()[:2]
+                with association((host, port), 'known') as (tcp, udp):
+                    exchange(udp, destination, 64)
+                    for _ in range(3):
+                        udp.send(b'\x00\x00\x00' + encode(*closed) + b'\x00')
+                        time.sleep(0.02)
+                        exchange(udp, destination, 64)
+                    assert not select.select([tcp], [], [], 0)[0], (
+                        'Destination error changed the UDP control connection')
+            check('UDP %s closed destination preserves association' % host,
+                  closed_destination)
 
         def concurrent():
             with contextlib.ExitStack() as associations:

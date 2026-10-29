@@ -2,10 +2,8 @@
 #include <sys/socket.h>
 
 ssize_t stream_datagram_recv (int fd, void *buf, size_t length, int flags);
-#if defined(__APPLE__)
 int stream_datagram_getsockopt (int fd, int level, int option, void *value,
                                 socklen_t *length);
-#endif
 
 /* Actual production codec/forwarder; completed I/O and resolution are controlled.
  * No rewritten parser, forward loop, timer, buffer helper, or application API. */
@@ -16,9 +14,7 @@ int stream_datagram_getsockopt (int fd, int level, int option, void *value,
 #define hev_task_io_socket_sendmmsg stream_sendmmsg
 #define hev_socks5_addr_into_sockaddr6 stream_resolve
 #define recv stream_datagram_recv
-#if defined(__APPLE__)
 #define getsockopt stream_datagram_getsockopt
-#endif
 /* The composed audit aliases meter I/O for inherited fixtures. Keep this send
  * boundary distinct so bypassing udp_sendmmsg's meter hook is still detected. */
 #ifdef hev_meter_sendmmsg
@@ -36,9 +32,7 @@ int stream_datagram_getsockopt (int fd, int level, int option, void *value,
 #undef hev_task_io_socket_sendmmsg
 #undef hev_socks5_addr_into_sockaddr6
 #undef recv
-#if defined(__APPLE__)
 #undef getsockopt
-#endif
 
 #include <assert.h>
 #include <stdio.h>
@@ -118,10 +112,25 @@ static unsigned char backward_payloads[4][31];
 static unsigned backward_case, backward_calls, backward_accepted;
 static unsigned backward_receive_index;
 static int backward_active;
+static int datagram_error, datagram_error_fd, datagram_error_receive;
+static int datagram_error_consumed;
 
 ssize_t
 stream_datagram_recv (int fd, void *buf, size_t length, int flags)
 {
+    if (datagram_error && fd == datagram_error_fd && datagram_error_consumed &&
+        (flags & MSG_PEEK)) {
+        errno = EAGAIN;
+        return -1;
+    }
+    if (datagram_error && fd == datagram_error_fd && !datagram_error_receive &&
+        (flags & MSG_PEEK)) {
+        errno = datagram_error;
+        return -1;
+    }
+    if (datagram_error && fd == datagram_error_fd && datagram_error_receive &&
+        (flags & MSG_PEEK))
+        return 1;
     if (backward_active && fd == 23 && (flags & MSG_PEEK)) {
         if (backward_receive_index < 4)
             return backward_lengths[backward_receive_index];
@@ -131,11 +140,28 @@ stream_datagram_recv (int fd, void *buf, size_t length, int flags)
     return recv (fd, buf, length, flags);
 }
 
-#if defined(__APPLE__)
 int
 stream_datagram_getsockopt (int fd, int level, int option, void *value,
                             socklen_t *length)
 {
+    if (datagram_error && fd == datagram_error_fd && level == SOL_SOCKET &&
+        option == SO_ERROR) {
+        assert (*length == sizeof (int));
+        *(int *)value = datagram_error;
+        datagram_error_consumed++;
+        return 0;
+    }
+#if defined(__APPLE__)
+    if (datagram_error && fd == datagram_error_fd && level == SOL_SOCKET &&
+        option == SO_NREAD) {
+        if (!datagram_error_receive && !datagram_error_consumed) {
+            errno = datagram_error;
+            return -1;
+        }
+        assert (*length == sizeof (int));
+        *(int *)value = datagram_error_consumed ? 0 : 1;
+        return 0;
+    }
     if (backward_active && fd == 23 && level == SOL_SOCKET &&
         option == SO_NREAD) {
         assert (*length == sizeof (int));
@@ -144,15 +170,19 @@ stream_datagram_getsockopt (int fd, int level, int option, void *value,
                             0;
         return 0;
     }
+#endif
     return getsockopt (fd, level, option, value, length);
 }
-#endif
 
 int
 stream_recvmmsg (int fd, void *messages, unsigned count, int flags,
                  HevTaskIOYielder yielder, void *self)
 {
     struct mmsghdr *vector = messages;
+    if (datagram_error && fd == datagram_error_fd && datagram_error_receive) {
+        errno = datagram_error;
+        return -1;
+    }
     assert (backward_active && fd == 23 && count == 1);
     assert (flags == MSG_DONTWAIT && yielder == task_io_yielder && self);
     for (unsigned i = 0; i < count; i++) {
@@ -1079,6 +1109,80 @@ backward_boundaries (void)
         FORWARD_EXPECT_METER ? "checked" : "UDP only");
 }
 
+static void
+datagram_receive_errors (void)
+{
+    const struct
+    {
+        int error, result;
+    } errors[] = { { ECONNREFUSED, 1 }, { ECONNRESET, 1 }, { EHOSTUNREACH, 1 },
+                   { ENETUNREACH, 1 },  { EHOSTDOWN, 1 },  { ENETDOWN, 1 },
+                   { EMSGSIZE, 1 },     { EAGAIN, 0 },     { EBADF, -1 },
+                   { EIO, -1 } };
+    HevObjectClass klass = { .iface = get_iface };
+    HevSocks5 self = { .base.klass = &klass,
+                       .type = HEV_SOCKS5_TYPE_UDP_IN_UDP };
+    unsigned char data[UDP_BUF_SIZE];
+    UDPBuffer slot = { .base = data, .capacity = sizeof (data) };
+    UDPBuffers owner = { .slots = &slot, .count = 1 };
+    UDPWorkspace workspace;
+    void *allocation = udp_workspace_new (&workspace, 1, NULL);
+    int bind = 1;
+    assert (allocation);
+    slot.owner = &owner;
+    /* The actual forwarders must consume a datagram error without permanently
+     * disabling a direction. Fault the size query and the subsequent receive;
+     * model Darwin's pending peek error until SO_ERROR consumes it. */
+    for (int backward = 0; backward < 2; backward++) {
+        datagram_error_fd = backward ? 23 : 19;
+        for (datagram_error_receive = 0; datagram_error_receive < 2;
+             datagram_error_receive++) {
+            for (size_t i = 0; i < sizeof (errors) / sizeof (*errors); i++) {
+                int result;
+                self.timeout = 60000;
+                datagram_error = errors[i].error;
+                datagram_error_consumed = 0;
+                result = backward ? hev_socks5_udp_fwd_b (&self, 23, 1, &slot,
+                                                          &workspace) :
+                                    hev_socks5_udp_fwd_f (&self, 23, 1, &bind,
+                                                          &slot, &workspace);
+                if (result != errors[i].result)
+                    fprintf (
+                        stderr,
+                        "datagram receive error %d, direction %d, receive %d: result %d, expected %d\n",
+                        datagram_error, backward, datagram_error_receive,
+                        result, errors[i].result);
+                assert (result == errors[i].result);
+                assert (self.timeout == 60000 && bind == 1);
+                assert (datagram_error_consumed == (errors[i].result == 1));
+                if (errors[i].result == 1) {
+                    result = backward ?
+                                 hev_socks5_udp_fwd_b (&self, 23, 1, &slot,
+                                                       &workspace) :
+                                 hev_socks5_udp_fwd_f (&self, 23, 1, &bind,
+                                                       &slot, &workspace);
+                    assert (result == 0 && datagram_error_consumed == 1);
+                }
+                datagram_error = 0;
+                if (backward && errors[i].result == 1) {
+                    backward_active = 1;
+                    backward_case = 0;
+                    backward_calls = backward_accepted = forward_meter_calls =
+                        0;
+                    assert (backward_receive_send (&self) == 1);
+                    assert (backward_accepted == 15 && backward_calls == 1);
+                    assert (self.timeout == 60000);
+                    backward_active = 0;
+                }
+                cases++;
+            }
+        }
+    }
+    hev_free (allocation);
+    puts (
+        "PASS: datagram receive errors preserve both forwarding directions and later replies; EAGAIN and structural errors remain distinct");
+}
+
 typedef struct
 {
     HevSocks5 *self;
@@ -1169,6 +1273,7 @@ main (void)
     forward_boundaries ();
     forward_receive_boundaries ();
     backward_boundaries ();
+    datagram_receive_errors ();
     assert (!hev_task_system_init ());
     task = hev_task_new (-1);
     assert (task);
