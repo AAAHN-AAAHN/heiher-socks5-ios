@@ -181,7 +181,17 @@ final class IntegrationUITests: XCTestCase {
             XCTAssertTrue(waitUntil { Self.handshake() == running }, "Actual native listener must follow Start/Stop")
         }
         @MainActor func saved() {
-            app.tabBars.buttons["Settings"].tap()
+            if app.keyboards.firstMatch.exists {
+                // Scroll the real form to dismiss its keyboard before tab navigation.
+                let form = app.collectionViews.firstMatch.exists ?
+                    app.collectionViews.firstMatch : app.scrollViews.firstMatch
+                form.swipeDown()
+                XCTAssertTrue(waitUntil { !app.keyboards.firstMatch.exists },
+                              "Keyboard must close before tab navigation")
+            }
+            let tab = app.tabBars.buttons["Settings"]
+            XCTAssertTrue(waitUntil { tab.isHittable }, "Settings tab must be reachable")
+            tab.tap()
             let export = app.buttons["Export JSON"]
             XCTAssertTrue(export.waitForExistence(timeout: 5))
             XCTAssertTrue(waitUntil {
