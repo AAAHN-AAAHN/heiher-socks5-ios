@@ -10,6 +10,9 @@ struct BackgroundKeepAliveView: View {
     @Binding var audioEnabled: Bool
     var acceptsNewIntent = true
 
+    private enum InputField: Hashable { case destinations, period }
+    @FocusState private var focusedInput: InputField?
+
     var body: some View {
         NavigationStack {
             Form {
@@ -51,11 +54,13 @@ struct BackgroundKeepAliveView: View {
                                                              set: { udpEcho.setDestinations($0) }), axis: .vertical)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .focused($focusedInput, equals: .destinations)
                         .disabled(!acceptsNewIntent)
                         .accessibilityIdentifier("background.udpEcho.destinations")
                     TextField("Period (ms)", text: Binding(get: { udpEcho.period },
                                                           set: { udpEcho.setPeriod($0) }))
                         .keyboardType(.numberPad)
+                        .focused($focusedInput, equals: .period)
                         .disabled(!acceptsNewIntent)
                         .accessibilityIdentifier("background.udpEcho.period")
                     Text(udpEcho.state).font(.footnote)
@@ -75,6 +80,14 @@ struct BackgroundKeepAliveView: View {
                 }
             }
             .navigationTitle("Background")
+            .toolbar {
+                if focusedInput != nil {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { focusedInput = nil }
+                            .accessibilityIdentifier("background.udpEcho.done")
+                    }
+                }
+            }
         }
     }
 }
