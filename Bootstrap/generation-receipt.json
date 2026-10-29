@@ -1,15 +1,15 @@
 {
   "result": "PASS",
   "selected": [
-    "background"
+    "integrated"
   ],
   "support": [
     "udp",
     "statistics",
+    "background",
     "server",
     "settings",
-    "icon",
-    "integrated"
+    "icon"
   ],
   "heads": {
     "main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
@@ -19,13 +19,11 @@
     "server": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
     "settings": "953ee8d720cf32311d82dad1bcb1b566333c5d62",
     "icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
-    "integrated": "71abb048fec73c5fd162e88f92e83ba57e1fc5aa"
+    "integrated": "f738fc7c7b8377b45afce0860879ebafd711820d"
   },
-  "macos_only": [
-    "background"
-  ],
-  "bundle_sha256": "96cc897c4f4eac920341b9c477932f23ef0b0ce1d9d8b51a5f974b5c7707d1e5",
-  "bundle_bytes": 244452,
+  "macos_only": [],
+  "bundle_sha256": "87eea869afd1a0df92183274d8a95fc99e40063ba6aeb137ecd493bfa2388d8e",
+  "bundle_bytes": 245496,
   "prerequisites": [
     "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
@@ -80,17 +78,23 @@
   ],
   "remote_snapshot_time": "2026-10-29 08:17:05 UTC",
   "remote_snapshot_sha256": "d470e1be64a68337a07f02f5953d29889e4af67ec69bf017d79dd51b3914f3e6",
-  "frozen_heads_sha256": "9a9ce1c1bc3949747d86e2be3551fb7f4a53eebaacfc4f192f75cd81cb6ab1c7",
+  "frozen_heads_sha256": "90e9073c317c6ab52931068be9d63701d3ea12f7f6520b7dcbafe0cf513f4cc7",
   "matrix": [
     {
-      "name": "background",
-      "sha": "4155949ad1d32d02b31c09ebe8338f1bdf4c1fde",
+      "name": "integrated",
+      "sha": "f738fc7c7b8377b45afce0860879ebafd711820d",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "integrated",
+      "sha": "f738fc7c7b8377b45afce0860879ebafd711820d",
       "os": "xcode-27",
       "runtime": true
     }
   ],
   "remote_mutations": false,
   "actual_importer_verified": true,
-  "bundle_upload_path": "/workspace/scratch/bc9656eced06/analysis/resumption/selective-background-retry-20261029/prepared/Bootstrap/candidates.bundle",
+  "bundle_upload_path": "/workspace/scratch/bc9656eced06/analysis/resumption/selective-integrated-retry-20261029/prepared/Bootstrap/candidates.bundle",
   "scope": "Local bundle and read-only preparation verified; CI runtime results are not implied."
 }
