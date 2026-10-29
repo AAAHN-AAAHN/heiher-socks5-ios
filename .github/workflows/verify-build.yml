@@ -139,10 +139,10 @@ jobs:
           merge-multiple: true
       - name: Verify and restore the exact producer source, framework and phase evidence
         run: python3 Build/review_handoff.py restore .build/integrated-input/review-input.tar.gz
-      - name: Original and remapped Simulator installs, saved tabs and real TCP
-        run: python3 Build/simulator_review.py > artifacts/integrated/simulator-review.log 2>&1
       - name: Actual integrated UI, saved intent and native response
         run: python3 Build/ui_review.py > artifacts/integrated/ui-review.log 2>&1
+      - name: Original and remapped Simulator installs, saved tabs and real TCP
+        run: python3 Build/simulator_review.py > artifacts/integrated/simulator-review.log 2>&1
       - name: Remove the consumed product source
         if: always()
         run: rm -rf .build/integrated-product-source

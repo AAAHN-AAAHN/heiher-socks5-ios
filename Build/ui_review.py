@@ -216,18 +216,20 @@ def main():
         (ROOT / 'Tests/Integration/IntegrationUITests.swift').read_bytes() + b'\n' +
         (ROOT / 'Tests/Background/AsyncAudioUITests.swift').read_bytes() + b'\n' +
         (ROOT / 'Tests/Statistics/StatisticsUITests.swift').read_bytes())
-    runtimes = json.loads(output('xcrun', 'simctl', 'list', 'runtimes', '-j'))['runtimes']
-    runtime = next(r for r in runtimes if r.get('isAvailable') and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-27'))
-    types = json.loads(output('xcrun', 'simctl', 'list', 'devicetypes', '-j'))['devicetypes']
-    device = next(d for d in types if d['name'] == 'iPhone 16')
-    identifier = output('xcrun', 'simctl', 'create', 'Integrated UI Review', device['identifier'], runtime['identifier'])
-    (OUT / 'environment.json').write_text(json.dumps({'runtime': runtime, 'device': device, 'udid': identifier}, indent=2))
-    failure = None; cleanup = []; fixture = None
+    failure = None; cleanup = []; fixture = None; identifier = None
     try:
-        run(['xcrun', 'simctl', 'boot', identifier], 'boot.log')
-        run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'ready.log', timeout=120)
+        # Start the bound UDP7 responder before CoreSimulator and retain it for
+        # the entire UI run. Echo/drop changes reuse these same sockets.
         fixture = UDPEchoFixture()
         fixture.configure_test_runner(app)
+        runtimes = json.loads(output('xcrun', 'simctl', 'list', 'runtimes', '-j'))['runtimes']
+        runtime = next(r for r in runtimes if r.get('isAvailable') and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-27'))
+        types = json.loads(output('xcrun', 'simctl', 'list', 'devicetypes', '-j'))['devicetypes']
+        device = next(d for d in types if d['name'] == 'iPhone 16')
+        identifier = output('xcrun', 'simctl', 'create', 'Integrated UI Review', device['identifier'], runtime['identifier'])
+        (OUT / 'environment.json').write_text(json.dumps({'runtime': runtime, 'device': device, 'udid': identifier}, indent=2))
+        run(['xcrun', 'simctl', 'boot', identifier], 'boot.log')
+        run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'ready.log', timeout=120)
         # Keep test failures, runtime warnings and explicit attachments; avoid the
         # optional bulk system-diagnostic collection that stalled after runner exit.
         test_failure = None
@@ -287,11 +289,12 @@ def main():
                 fixture.close()
             except Exception as exc:
                 cleanup.append('UDP Echo fixture: ' + str(exc))
-        for action in ('shutdown', 'delete'):
-            try:
-                run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=30)
-            except Exception as exc:
-                cleanup.append(str(exc))
+        if identifier is not None:
+            for action in ('shutdown', 'delete'):
+                try:
+                    run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=30)
+                except Exception as exc:
+                    cleanup.append(str(exc))
     (OUT / 'cleanup.json').write_text(json.dumps(cleanup, indent=2))
     if failure:
         raise failure
