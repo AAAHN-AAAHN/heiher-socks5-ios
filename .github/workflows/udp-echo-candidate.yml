@@ -1,57 +1,272 @@
-name: Diagnose UDP Echo fixture across Simulator boot
+name: Complete exact UDP Echo candidate verification
 on:
   push:
     branches: [work/udp-echo-build-20261028]
 permissions:
   contents: read
+  actions: read
 jobs:
-  simulator-fixture-diagnostic:
-    name: Simulator fixture startup diagnostic (xcode-27)
-    runs-on: xcode-27
-    timeout-minutes: 15
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.prepare.outputs.matrix }}
+      runtime-matrix: ${{ steps.runtime.outputs.matrix }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Verify immutable diagnostic source
-        env:
-          CANDIDATE_SHA: 4cc1a53416df1f888603df448126392c611b2bb9
+      - id: prepare
+        run: python3 Bootstrap/import_candidates.py
+      - id: runtime
         shell: bash
         run: |
-          set -euo pipefail
-          python3 Bootstrap/import_candidates.py --candidate integrated --sha "$CANDIDATE_SHA"
-          git worktree add --detach "$RUNNER_TEMP/udp-source" "$CANDIDATE_SHA"
-          mkdir -p "$RUNNER_TEMP/udp-source/artifacts/simulator-fixture-controls"
-          cp artifacts/candidate-prepare/result.json "$RUNNER_TEMP/udp-source/artifacts/simulator-fixture-controls/source-prepare.json"
-      - name: Compare real fixture startup before and after Simulator boot
-        shell: bash
-        run: |
-          set -euo pipefail
-          diagnostic_output="$RUNNER_TEMP/udp-source/artifacts/simulator-fixture-controls"
-          python3 Bootstrap/integrated_simulator_fixture_controls.py \
-            --root "$RUNNER_TEMP/udp-source" --output "$diagnostic_output" \
-            > "$diagnostic_output/driver.log" 2>&1
-      - name: Record source preservation
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          diagnostic_source="$RUNNER_TEMP/udp-source"
-          if [ -d "$diagnostic_source" ]; then
-            git -C "$diagnostic_source" rev-parse HEAD > "$diagnostic_source/artifacts/simulator-fixture-controls/tested-commit.txt"
-            git -C "$diagnostic_source" diff --exit-code HEAD -- > "$diagnostic_source/artifacts/simulator-fixture-controls/source-worktree.log"
-            git -C "$diagnostic_source" diff --cached --exit-code HEAD -- > "$diagnostic_source/artifacts/simulator-fixture-controls/source-index.log"
-          fi
+          python3 - <<'PYCODE'
+          import json, os
+          rows = json.load(open('Bootstrap/candidates.json'))['matrix']
+          assert {row['name'] for row in rows} <= {'udp', 'statistics', 'background', 'integrated'}
+          rows = [row for row in rows if row.get('runtime')]
+          assert rows
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('matrix=' + json.dumps({'include': rows}, separators=(',', ':')) + '\n')
+          PYCODE
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: UDP-Echo-simulator-fixture-diagnostic-${{ github.run_id }}
+          name: UDP-Echo-prepare-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            Bootstrap/integrated_simulator_fixture_controls.py
-            Bootstrap/candidates.json
-            Bootstrap/generation-receipt.json
-            ${{ runner.temp }}/udp-source/artifacts/simulator-fixture-controls/
+            Bootstrap/
+            artifacts/candidate-prepare/
+          if-no-files-found: error
+          retention-days: 90
+
+  build:
+    name: build (${{ matrix.name }}, ${{ matrix.sha }}, ${{ matrix.os }}, ${{ matrix.runtime }})
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify candidate objects and create a detached local worktree
+        env:
+          CANDIDATE: ${{ matrix.name }}
+          CANDIDATE_SHA: ${{ matrix.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 Bootstrap/import_candidates.py --candidate "$CANDIDATE" --sha "$CANDIDATE_SHA"
+          git worktree add --detach "$RUNNER_TEMP/udp-source" "$CANDIDATE_SHA"
+          mkdir -p "$RUNNER_TEMP/udp-source/artifacts/candidate-prepare"
+          cp artifacts/candidate-prepare/result.json "$RUNNER_TEMP/udp-source/artifacts/candidate-prepare/"
+      - name: Install exact formatter major
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y clang-format-18
+          else
+            brew install llvm@18
+            mkdir -p "$RUNNER_TEMP/format-only"
+            ln -sf "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
+            echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
+          fi
+      - name: Execute the exact candidate owner gates
+        working-directory: ${{ runner.temp }}/udp-source
+        env:
+          CANDIDATE: ${{ matrix.name }}
+          BUILD_IPA: '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = macOS ] && [ "$CANDIDATE" = integrated ]; then
+            mkdir -p artifacts/integrated
+            {
+              xcodebuild -version
+              xcrun --sdk iphoneos --show-sdk-version
+              swiftc --version
+              sw_vers
+            } > artifacts/integrated/environment.txt
+          fi
+          case "$CANDIDATE" in
+            udp) python3 Tests/udp_compat_audit.py ;;
+            statistics) python3 Tests/Statistics/audit.py ;;
+            *) bash Build/build.sh ;;
+          esac
+          if [ "$RUNNER_OS" = macOS ]; then
+            case "$CANDIDATE" in
+              udp|statistics) bash Build/build.sh ;;
+              server|settings|integrated) bash Build/check_swift_sdk.sh ;;
+              background) bash Tests/Background/check_audio_sdk.sh ;;
+            esac
+            if [ "$CANDIDATE" = integrated ]; then
+              python3 Build/verify_release.py > artifacts/integrated/package-review.log 2>&1
+            fi
+          fi
+      - name: Preserve exact generated native products
+        if: ${{ runner.os == 'macOS' }}
+        working-directory: ${{ runner.temp }}/udp-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/native-product
+          python3 - <<'PYCODE'
+          import hashlib, json, os, pathlib, subprocess
+          root = pathlib.Path('.')
+          framework = root / '.build/core/HevSocks5Server.xcframework'
+          files = {}
+          for path in sorted(framework.rglob('*')):
+              assert not path.is_symlink()
+              if path.is_file():
+                  raw = path.read_bytes()
+                  files[str(path.relative_to(framework))] = {'size': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(), 'mode': path.stat().st_mode & 0o777}
+          assert files
+          record = {'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(), 'tree': subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(), 'helper_commit': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'], 'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'framework': files}
+          (root / 'artifacts/native-product/identity.json').write_text(json.dumps(record, indent=2) + '\n')
+          PYCODE
+          ditto -c -k --keepParent .build/core/HevSocks5Server.xcframework artifacts/native-product/HevSocks5Server.xcframework.zip
+          shasum -a 256 artifacts/native-product/HevSocks5Server.xcframework.zip > artifacts/native-product/SHA256SUMS.txt
+      - name: Package source-bound inputs for a fresh macOS runtime
+        if: ${{ matrix.runtime }}
+        env:
+          CANDIDATE: ${{ matrix.name }}
+        run: python3 Bootstrap/runtime_handoff.py pack --candidate "$CANDIDATE" --root "$RUNNER_TEMP/udp-source" --output "$RUNNER_TEMP/udp-source/artifacts/runtime-input/$CANDIDATE"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ matrix.runtime }}
+        with:
+          name: UDP-Echo-runtime-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/udp-source/artifacts/runtime-input/${{ matrix.name }}/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Record immutable tested source
+        if: always()
+        working-directory: ${{ runner.temp }}/udp-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD > artifacts/candidate-prepare/tested-commit.txt
+          git diff --exit-code HEAD -- > artifacts/candidate-prepare/source-worktree.log
+          git diff --cached --exit-code HEAD -- > artifacts/candidate-prepare/source-index.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: UDP-Echo-build-${{ matrix.name }}-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/udp-source/artifacts/
+          if-no-files-found: error
+          retention-days: 90
+
+  runtime:
+    name: runtime (${{ matrix.name }}, ${{ matrix.sha }}, ${{ matrix.os }}, ${{ matrix.runtime }})
+    needs: [prepare, build]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.runtime-matrix) }}
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify candidate objects and create a detached local worktree
+        env:
+          CANDIDATE: ${{ matrix.name }}
+          CANDIDATE_SHA: ${{ matrix.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 Bootstrap/import_candidates.py --candidate "$CANDIDATE" --sha "$CANDIDATE_SHA"
+          git worktree add --detach "$RUNNER_TEMP/udp-source" "$CANDIDATE_SHA"
+          mkdir -p "$RUNNER_TEMP/udp-source/artifacts/candidate-prepare"
+          cp artifacts/candidate-prepare/result.json "$RUNNER_TEMP/udp-source/artifacts/candidate-prepare/"
+      - name: Retrieve and verify the immutable producer artifact
+        env:
+          CANDIDATE: ${{ matrix.name }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 Bootstrap/ci_evidence.py download --candidate "$CANDIDATE" --output "$RUNNER_TEMP/runtime-download"
+          python3 Bootstrap/runtime_handoff.py restore --candidate "$CANDIDATE" --root "$RUNNER_TEMP/udp-source" --artifact "$RUNNER_TEMP/runtime-download/runtime-input.zip" --metadata "$RUNNER_TEMP/runtime-download/artifact.json" --producer-job build
+      - name: Execute requested macOS runtime coverage
+        working-directory: ${{ runner.temp }}/udp-source
+        env:
+          CANDIDATE: ${{ matrix.name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$CANDIDATE" in
+            background)
+              python3 Tests/Background/native_inputs.py verify
+              python3 Tests/Background/check_async_ui.py
+              ;;
+            statistics)
+              server_ref=$(python3 -c 'import json; print(json.load(open("Build/upstream.json"))["sources"]["."])')
+              git clone --no-checkout https://github.com/heiher/hev-socks5-server.git .build/statistics-final-audit/core
+              git -C .build/statistics-final-audit/core checkout --detach "$server_ref"
+              git -C .build/statistics-final-audit/core submodule update --init --recursive
+              python3 Build/check.py checkout .build/statistics-final-audit/core
+              python3 Tests/Statistics/ui_audit.py
+              ;;
+            integrated)
+              python3 Build/ui_review.py > artifacts/integrated/ui-review.log 2>&1
+              python3 Build/simulator_review.py > artifacts/integrated/simulator-review.log 2>&1
+              ;;
+            *) echo "Unsupported runtime candidate: $CANDIDATE" >&2; exit 1 ;;
+          esac
+      - name: Record immutable tested source
+        if: always()
+        working-directory: ${{ runner.temp }}/udp-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD > artifacts/candidate-prepare/tested-commit.txt
+          git diff --exit-code HEAD -- > artifacts/candidate-prepare/source-worktree.log
+          git diff --cached --exit-code HEAD -- > artifacts/candidate-prepare/source-index.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: UDP-Echo-runtime-results-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/udp-source/artifacts/
+            ${{ runner.temp }}/runtime-download/artifact.json
+          if-no-files-found: error
+          retention-days: 90
+
+  verify:
+    name: verify (${{ matrix.name }}, ${{ matrix.sha }}, ${{ matrix.os }}, ${{ matrix.runtime }})
+    if: ${{ always() && needs.prepare.result == 'success' }}
+    needs: [prepare, build, runtime]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Conclude exact-source owner and runtime verification
+        env:
+          CANDIDATE: ${{ matrix.name }}
+          PLATFORM: ${{ matrix.os }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 Bootstrap/ci_evidence.py gate --candidate "$CANDIDATE" --platform "$PLATFORM" --output artifacts/final-gate
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: UDP-Echo-final-gate-${{ matrix.name }}-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/final-gate/
           if-no-files-found: error
           retention-days: 90
