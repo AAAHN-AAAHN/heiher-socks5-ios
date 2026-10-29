@@ -182,10 +182,10 @@ final class IntegrationUITests: XCTestCase {
         }
         @MainActor func saved() {
             if app.keyboards.firstMatch.exists {
-                // Scroll the real form to dismiss its keyboard before tab navigation.
-                let form = app.collectionViews.firstMatch.exists ?
-                    app.collectionViews.firstMatch : app.scrollViews.firstMatch
-                form.swipeDown()
+                let done = app.buttons["background.udpEcho.done"]
+                XCTAssertTrue(done.waitForExistence(timeout: 5))
+                XCTAssertTrue(done.isHittable, "Done must be reachable above the keyboard")
+                done.tap()
                 XCTAssertTrue(waitUntil { !app.keyboards.firstMatch.exists },
                               "Keyboard must close before tab navigation")
             }
