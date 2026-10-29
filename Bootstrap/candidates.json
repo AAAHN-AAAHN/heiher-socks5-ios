@@ -37,12 +37,6 @@
     {
       "name": "integrated",
       "sha": "158cee90aab1d833222f704bfb7893f30c8008d4",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "integrated",
-      "sha": "158cee90aab1d833222f704bfb7893f30c8008d4",
       "os": "xcode-27",
       "runtime": true
     }

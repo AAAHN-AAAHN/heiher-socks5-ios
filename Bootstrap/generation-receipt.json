@@ -21,7 +21,9 @@
     "icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
     "integrated": "158cee90aab1d833222f704bfb7893f30c8008d4"
   },
-  "macos_only": [],
+  "macos_only": [
+    "integrated"
+  ],
   "bundle_sha256": "8bc1d804787021edd30c26fc70facdce98134833b4fdb7ce1b03bcc6d3496b11",
   "bundle_bytes": 246493,
   "prerequisites": [
@@ -76,16 +78,10 @@
       "sha": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
     }
   ],
-  "remote_snapshot_time": "2026-10-29 08:17:05 UTC",
-  "remote_snapshot_sha256": "d470e1be64a68337a07f02f5953d29889e4af67ec69bf017d79dd51b3914f3e6",
+  "remote_snapshot_time": "2026-10-29 19:33:25 UTC",
+  "remote_snapshot_sha256": "71f5468e6a2ffe0f24d311acab2f6a7cdae570f177bb58477d00c31dd989a219",
   "frozen_heads_sha256": "91b20105755de09dfe60206f778c109d1ec1e63e6eb7b2f0021562caae754517",
   "matrix": [
-    {
-      "name": "integrated",
-      "sha": "158cee90aab1d833222f704bfb7893f30c8008d4",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
     {
       "name": "integrated",
       "sha": "158cee90aab1d833222f704bfb7893f30c8008d4",
@@ -95,6 +91,6 @@
   ],
   "remote_mutations": false,
   "actual_importer_verified": true,
-  "bundle_upload_path": "/workspace/scratch/bc9656eced06/analysis/resumption/selective-integrated-retry-v2-20261029/prepared/Bootstrap/candidates.bundle",
+  "bundle_upload_path": "/workspace/scratch/bc9656eced06/analysis/resumption/selective-integrated-macos-retry-20261030/prepared/Bootstrap/candidates.bundle",
   "scope": "Local bundle and read-only preparation verified; CI runtime results are not implied."
 }
