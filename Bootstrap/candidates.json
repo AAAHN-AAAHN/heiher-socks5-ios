@@ -1,11 +1,6 @@
 {
-  "sha256": "50a1eb495e0e4475219d2d020b583d1771a897567a997482bc75eee02bfec8b0",
+  "sha256": "378cb79f2ac11651e73a3cdc8bdc92d39cb1292c954edfafc6e80823f84df03f",
   "candidates": [
-    {
-      "name": "udp",
-      "sha": "e50f434be2610ef00713d39363963542db0020e2",
-      "ref": "refs/heads/work/udp-echo-udp-20261028"
-    },
     {
       "name": "statistics",
       "sha": "a55184fca134ce16b64335ac2f88b31b1161cd81",
@@ -15,14 +10,13 @@
       "name": "background",
       "sha": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
       "ref": "refs/heads/work/udp-echo-background-20261028"
-    },
-    {
-      "name": "integrated",
-      "sha": "efae8be3f8ccb60fdb447a4175abebbecc2767de",
-      "ref": "refs/heads/work/udp-echo-integrated-20261028"
     }
   ],
   "support": [
+    {
+      "name": "udp",
+      "sha": "e50f434be2610ef00713d39363963542db0020e2"
+    },
     {
       "name": "server",
       "sha": "bf0789c68670078def846d7e3778e7f5cfe9e77f"
@@ -34,28 +28,14 @@
     {
       "name": "icon",
       "sha": "5d5327d4513b587e2a2e948fa20f588a04f1376f"
+    },
+    {
+      "name": "integrated",
+      "sha": "efae8be3f8ccb60fdb447a4175abebbecc2767de"
     }
   ],
   "matrix": [
     {
-      "name": "udp",
-      "sha": "e50f434be2610ef00713d39363963542db0020e2",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "udp",
-      "sha": "e50f434be2610ef00713d39363963542db0020e2",
-      "os": "xcode-27",
-      "runtime": false
-    },
-    {
-      "name": "statistics",
-      "sha": "a55184fca134ce16b64335ac2f88b31b1161cd81",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
       "name": "statistics",
       "sha": "a55184fca134ce16b64335ac2f88b31b1161cd81",
       "os": "xcode-27",
@@ -64,24 +44,6 @@
     {
       "name": "background",
       "sha": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "background",
-      "sha": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
-      "os": "xcode-27",
-      "runtime": true
-    },
-    {
-      "name": "integrated",
-      "sha": "efae8be3f8ccb60fdb447a4175abebbecc2767de",
-      "os": "ubuntu-24.04",
-      "runtime": false
-    },
-    {
-      "name": "integrated",
-      "sha": "efae8be3f8ccb60fdb447a4175abebbecc2767de",
       "os": "xcode-27",
       "runtime": true
     }
