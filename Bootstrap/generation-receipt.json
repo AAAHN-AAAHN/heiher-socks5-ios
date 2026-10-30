@@ -1,29 +1,29 @@
 {
   "result": "PASS",
   "selected": [
+    "udp",
+    "statistics",
     "background",
     "integrated"
   ],
   "support": [
-    "udp",
-    "statistics",
     "server",
     "settings",
     "icon"
   ],
   "heads": {
     "main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
-    "udp": "681db4de805be22eae537c6562b0b8cbc84767cc",
-    "statistics": "dd27d10f59162b1623f2702d757d444836f8dd70",
-    "background": "2f3949e21465c16a001192b82c54f61e386fa833",
+    "udp": "e50f434be2610ef00713d39363963542db0020e2",
+    "statistics": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+    "background": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
     "server": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
     "settings": "953ee8d720cf32311d82dad1bcb1b566333c5d62",
     "icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
-    "integrated": "94c24d1db1c1a21cc023a8e218d27b925cf35ef1"
+    "integrated": "efae8be3f8ccb60fdb447a4175abebbecc2767de"
   },
   "macos_only": [],
-  "bundle_sha256": "af4cf3af64cdd0ba5e1f1ad6b4cfd8484dbaf1a273fecf86eaf836d2457c0f5f",
-  "bundle_bytes": 250147,
+  "bundle_sha256": "50a1eb495e0e4475219d2d020b583d1771a897567a997482bc75eee02bfec8b0",
+  "bundle_bytes": 263430,
   "prerequisites": [
     "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
@@ -76,37 +76,61 @@
       "sha": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
     }
   ],
-  "remote_snapshot_time": "2026-10-29T23:03:43Z",
-  "remote_snapshot_sha256": "0c808539fb05d17a30de986d4301efd4a33b23bc83563c59edc4d6d25bf909ce",
-  "frozen_heads_sha256": "5d9a7525e7993757a62471a36b355cbd00e5594cb58010af4b155e98680e9a54",
+  "remote_snapshot_time": "2026-10-30 00:39:40 UTC",
+  "remote_snapshot_sha256": "e02ea120a4493ba71c3598186d0c87e4f9c3018130b4abe4c8150caf37dd6a3b",
+  "frozen_heads_sha256": "f48d9edbe59576c03ee9498872df4a62be332912c8dd8fc01418c7636ebae2d3",
   "matrix": [
     {
+      "name": "udp",
+      "sha": "e50f434be2610ef00713d39363963542db0020e2",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "udp",
+      "sha": "e50f434be2610ef00713d39363963542db0020e2",
+      "os": "xcode-27",
+      "runtime": false
+    },
+    {
+      "name": "statistics",
+      "sha": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "statistics",
+      "sha": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
       "name": "background",
-      "sha": "2f3949e21465c16a001192b82c54f61e386fa833",
+      "sha": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "background",
-      "sha": "2f3949e21465c16a001192b82c54f61e386fa833",
+      "sha": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "integrated",
-      "sha": "94c24d1db1c1a21cc023a8e218d27b925cf35ef1",
+      "sha": "efae8be3f8ccb60fdb447a4175abebbecc2767de",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "integrated",
-      "sha": "94c24d1db1c1a21cc023a8e218d27b925cf35ef1",
+      "sha": "efae8be3f8ccb60fdb447a4175abebbecc2767de",
       "os": "xcode-27",
       "runtime": true
     }
   ],
   "remote_mutations": false,
   "actual_importer_verified": true,
-  "bundle_upload_path": "/workspace/scratch/bc9656eced06/analysis/resumption/selective-input-dismissal-20261030/prepared/Bootstrap/candidates.bundle",
+  "bundle_upload_path": "/workspace/scratch/bc9656eced06/analysis/resumption/selective-udp-fixture-hardening-20261030/prepared/Bootstrap/candidates.bundle",
   "scope": "Local bundle and read-only preparation verified; CI runtime results are not implied."
 }

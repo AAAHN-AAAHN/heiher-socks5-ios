@@ -1,26 +1,28 @@
 {
-  "sha256": "af4cf3af64cdd0ba5e1f1ad6b4cfd8484dbaf1a273fecf86eaf836d2457c0f5f",
+  "sha256": "50a1eb495e0e4475219d2d020b583d1771a897567a997482bc75eee02bfec8b0",
   "candidates": [
     {
+      "name": "udp",
+      "sha": "e50f434be2610ef00713d39363963542db0020e2",
+      "ref": "refs/heads/work/udp-echo-udp-20261028"
+    },
+    {
+      "name": "statistics",
+      "sha": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+      "ref": "refs/heads/work/udp-echo-statistics-20261028"
+    },
+    {
       "name": "background",
-      "sha": "2f3949e21465c16a001192b82c54f61e386fa833",
+      "sha": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
       "ref": "refs/heads/work/udp-echo-background-20261028"
     },
     {
       "name": "integrated",
-      "sha": "94c24d1db1c1a21cc023a8e218d27b925cf35ef1",
+      "sha": "efae8be3f8ccb60fdb447a4175abebbecc2767de",
       "ref": "refs/heads/work/udp-echo-integrated-20261028"
     }
   ],
   "support": [
-    {
-      "name": "udp",
-      "sha": "681db4de805be22eae537c6562b0b8cbc84767cc"
-    },
-    {
-      "name": "statistics",
-      "sha": "dd27d10f59162b1623f2702d757d444836f8dd70"
-    },
     {
       "name": "server",
       "sha": "bf0789c68670078def846d7e3778e7f5cfe9e77f"
@@ -36,26 +38,50 @@
   ],
   "matrix": [
     {
+      "name": "udp",
+      "sha": "e50f434be2610ef00713d39363963542db0020e2",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "udp",
+      "sha": "e50f434be2610ef00713d39363963542db0020e2",
+      "os": "xcode-27",
+      "runtime": false
+    },
+    {
+      "name": "statistics",
+      "sha": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "statistics",
+      "sha": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
       "name": "background",
-      "sha": "2f3949e21465c16a001192b82c54f61e386fa833",
+      "sha": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "background",
-      "sha": "2f3949e21465c16a001192b82c54f61e386fa833",
+      "sha": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "integrated",
-      "sha": "94c24d1db1c1a21cc023a8e218d27b925cf35ef1",
+      "sha": "efae8be3f8ccb60fdb447a4175abebbecc2767de",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "integrated",
-      "sha": "94c24d1db1c1a21cc023a8e218d27b925cf35ef1",
+      "sha": "efae8be3f8ccb60fdb447a4175abebbecc2767de",
       "os": "xcode-27",
       "runtime": true
     }
