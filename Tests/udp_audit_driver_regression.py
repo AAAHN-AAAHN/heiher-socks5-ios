@@ -3,6 +3,7 @@
 import ast
 import errno
 import hashlib
+import json
 import socket
 from types import SimpleNamespace
 from pathlib import Path
@@ -77,6 +78,56 @@ class AuditDriverTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('Assertions are required', result.stderr)
             self.assertFalse(marker.exists())
+
+
+    def test_actual_single_unknown_ipv6_failure_is_not_an_observation(self):
+        # Actual run40970758829/attempt1, Integrated94c24d1, helperfae8d91.
+        # Artifact12942504617 SHA256:
+        # 73000e1238c591c89ce651ac26d9c169b2a11c274e308bee4f76b714e927f360
+        # Member: integrated/native/udp-buffered/limit-fixed-unknown-1.json
+        rows = [{'test': 'UDP 127.0.0.1 hint=0.0.0.0, six payloads', 'passed': True},
+         {'test': 'UDP 127.0.0.1 hint=::1, six payloads', 'passed': True},
+         {'test': 'UDP 127.0.0.1 hint=known, six payloads', 'passed': True},
+         {'test': 'UDP ::1 hint=::, six payloads',
+          'passed': False,
+          'error': 'AssertionError: UDP/TCP setup REP=0x01'},
+         {'test': 'UDP ::1 hint=known, six payloads', 'passed': True},
+         {'test': 'UDP 127.0.0.1 closed destination preserves association', 'passed': True},
+         {'test': 'UDP ::1 closed destination preserves association', 'passed': True},
+         {'test': 'UDP three associations and one closed',
+          'passed': False,
+          'error': 'TimeoutError: timed out'},
+         {'test': 'UDP three 24-datagram bursts, unordered replies', 'passed': True},
+         {'test': 'TCP echo 127.0.0.1', 'passed': True},
+         {'test': 'TCP echo ::1', 'passed': True}]
+        recorded = (json.dumps(rows, indent=2) + '\n').encode()
+        self.assertEqual(hashlib.sha256(recorded).hexdigest(),
+                         'a66743e97bc6ac3a3f634704083b55c610442cbda5a8f5f5a3e9ac2901c12c3f')
+        blob = '7a11d2e4d83f7057ddc509c8ccc06e6bbe7a7ee4'
+        source = subprocess.check_output(['git', '-C', str(audit.ROOT), 'show', blob])
+        self.assertEqual(hashlib.sha1(b'blob ' + str(len(source)).encode() + b'\0' + source).hexdigest(), blob)
+        old = SimpleNamespace(__file__=audit.__file__, __name__='udp_audit_before_observation_scope')
+        exec(compile(source, audit.__file__, 'exec'), old.__dict__)
+        for label, module in [('old', old), ('current', audit)]:
+            with self.subTest(version=label), tempfile.TemporaryDirectory() as directory:
+                out = Path(directory)
+                def replay(args, name, cwd=None, timeout=180):
+                    self.assertEqual(timeout, 90)
+                    self.assertIn('--allow-failures', args)
+                    Path(args[args.index('--output') + 1]).write_bytes(recorded)
+                with patch.multiple(module, OUT=out, CORE=out / 'unused-core', SUMMARY=[]), patch.object(
+                        module, 'run', side_effect=replay) as run:
+                    options = ('--fixed-udp-port', '--workers', '1')
+                    if label == 'old':
+                        self.assertEqual(module.network('limit-fixed-unknown-1', *options, observation=True), rows)
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, 'outside the fixed-unknown') as failure:
+                            module.network('limit-fixed-unknown-1', *options, observation=True)
+                        self.assertIn('UDP ::1 hint=::, six payloads', str(failure.exception))
+                        self.assertIn('AssertionError: UDP/TCP setup REP=0x01', str(failure.exception))
+                    self.assertEqual(run.call_count, 1)
+                    self.assertEqual(module.SUMMARY[-1]['failed'], [row for row in rows if not row['passed']])
+                    self.assertEqual((out / 'limit-fixed-unknown-1.json').read_bytes(), recorded)
 
 
 class PortReservationTests(unittest.TestCase):
