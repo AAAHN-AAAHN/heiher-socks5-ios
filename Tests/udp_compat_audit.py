@@ -35,17 +35,68 @@ def patch(name, repo, reverse=False):
     run([*args, ROOT / 'Patches' / name], name + '.apply.log')
 
 
-def network(name, *options, observation=False):
+def network(name, *options, observation=False, negative_control=False):
+    if negative_control and (observation or (name, options) not in (
+            ('control-unpatched', ()),
+            ('control-unpatched-fixed', ('--fixed-udp-port',)),
+            ('control-port-only', ()),
+            ('control-address-only', ()))):
+        raise RuntimeError('Unrecognized negative control: ' + name)
+    if observation and (name, options) not in (
+            ('limit-fixed-unknown-1', ('--fixed-udp-port', '--workers', '1')),
+            ('limit-fixed-unknown-4', ('--fixed-udp-port', '--workers', '4'))):
+        raise RuntimeError('Unrecognized fixed-unknown observation: ' + name)
     args = [sys.executable, ROOT / 'Tests/udp_sockaddr_regression.py',
             CORE / 'bin/hev-socks5-server', '--output', OUT / (name + '.json'),
             *options]
-    if observation:
+    if observation or negative_control:
         args.append('--allow-failures')
     run(args, name + '.log', timeout=90)
     rows = json.loads((OUT / (name + '.json')).read_text())
+    failed = [row for row in rows if not row['passed']]
     SUMMARY.append({'profile': name, 'observation_only': observation,
-                    'passed': sum(row['passed'] for row in rows),
-                    'failed': [row for row in rows if not row['passed']]})
+                    'negative_control': negative_control,
+                    'passed': sum(row['passed'] for row in rows), 'failed': failed})
+    if observation:
+        for row in failed:
+            contexts = [event for event in row.get('events', [])
+                        if event.get('phase') == 'concurrent-data-failure']
+            context = contexts[0] if len(contexts) == 1 else {}
+            peers = context.get('associations', [])
+            site = row.get('exception_site', {})
+            location = (site.get('function'), site.get('line'))
+            io_sites = [('concurrent', "udp.send(b'\\x00\\x00\\x00' + encode(*udp4) + payload)"), ('concurrent', 'reply = udp.recv(65535)'), ('exchange', "udp.send(b'\\x00\\x00\\x00' + encode(*destination) + payload)"), ('exchange', 'reply = udp.recv(65535)')]
+            payload_sites = [('concurrent', 'assert reply[3 + offset:] == payload'), ('exchange', "assert reply[3 + offset:] == payload, 'Payload mismatch'")]
+            # Only these original socket operations or payload-ownership
+            # assertions can belong to this boundary. Header/source/setup,
+            # programming and cleanup errors must still fail the gate.
+            kind = row.get('exception_type')
+            eligible_error = (row.get('exception_module') == 'builtins'
+                              and Path(site.get('filename', '')).name == 'udp_sockaddr_regression.py'
+                              and ((kind in ('TimeoutError', 'ConnectionRefusedError') and location in io_sites)
+                                   or (kind == 'AssertionError' and location in payload_sites))
+                              and row.get('error') == context.get('error')
+                              and kind == context.get('exception_type')
+                              and row.get('exception_module') == context.get('exception_module')
+                              and site == context.get('exception_site'))
+            in_scope = (eligible_error and row['test'] == 'UDP three associations and one closed'
+                        and context.get('data_phase') in ('initial-send', 'initial-receive', 'survivor-exchange')
+                        and len(peers) == 3)
+            if in_scope:
+                tcp_clients = [tuple(peer['tcp_local']) for peer in peers]
+                udp_clients = [tuple(peer['udp_local']) for peer in peers]
+                controls = {tuple(peer['tcp_peer']) for peer in peers}
+                relays = {tuple(peer['relay']) for peer in peers}
+                in_scope = (len(set(tcp_clients)) == len(set(udp_clients)) == 3
+                            and len({peer[0] for peer in tcp_clients}) == 1
+                            and {peer[0] for peer in tcp_clients} == {peer[0] for peer in udp_clients}
+                            and all(peer['requested'] == ['0.0.0.0', 0] for peer in peers)
+                            and len(controls) == len(relays) == 1
+                            and next(iter(controls))[1] == next(iter(relays))[1]
+                            and all(peer[1] and peer[1] != next(iter(relays))[1] for peer in udp_clients))
+            if not in_scope:
+                raise RuntimeError('Failure outside the fixed-unknown multi-association data boundary: '
+                                   + json.dumps(row, sort_keys=True))
     return rows
 
 
@@ -146,17 +197,17 @@ def main():
 
     # Negative controls distinguish the two repairs; these are not pass claims.
     build()
-    baseline = network('control-unpatched', observation=True)
-    network('control-unpatched-fixed', '--fixed-udp-port', observation=True)
+    baseline = network('control-unpatched', negative_control=True)
+    network('control-unpatched-fixed', '--fixed-udp-port', negative_control=True)
     run(['make', 'clean'], 'clean.log', CORE)
     patch('hev-udp-port-zero.patch', CORE)
     build()
-    port_only = network('control-port-only', observation=True)
+    port_only = network('control-port-only', negative_control=True)
     run(['make', 'clean'], 'clean.log', CORE)
     patch('hev-udp-port-zero.patch', CORE, reverse=True)
     patch('hev-udp-sockaddr.patch', CORE / 'src/core')
     build()
-    address_only = network('control-address-only', observation=True)
+    address_only = network('control-address-only', negative_control=True)
     run(['make', 'clean'], 'clean.log', CORE)
     patch('hev-udp-port-zero.patch', CORE)
     build()
