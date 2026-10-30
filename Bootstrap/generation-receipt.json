@@ -1,12 +1,12 @@
 {
   "result": "PASS",
   "selected": [
-    "statistics",
-    "background",
     "integrated"
   ],
   "support": [
     "udp",
+    "statistics",
+    "background",
     "server",
     "settings",
     "icon"
@@ -22,12 +22,10 @@
     "integrated": "efae8be3f8ccb60fdb447a4175abebbecc2767de"
   },
   "macos_only": [
-    "statistics",
-    "background",
     "integrated"
   ],
-  "bundle_sha256": "a7dec7b7e08d43200c685a09da6815c471de377a5aaea1543475748dd41b41e4",
-  "bundle_bytes": 263428,
+  "bundle_sha256": "67e761bd51711701b5163a067125e8d3ae55174c87815ce63702c193f16dab7c",
+  "bundle_bytes": 264293,
   "prerequisites": [
     "9baac92fb4508d9e1b96f00744a91ff1cae77003",
     "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
@@ -80,22 +78,10 @@
       "sha": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
     }
   ],
-  "remote_snapshot_time": "2026-10-30T02:37:59.898118+00:00",
-  "remote_snapshot_sha256": "a6e0f11a66648eb62060c2628153b8fb3282a5868c79e4a2d5ad00ed52714f48",
+  "remote_snapshot_time": "2026-10-30 before selective Integrated DNS retry preparation",
+  "remote_snapshot_sha256": "6efa421d4340d16fa47f9f8d28c0399c7590d54acfc63bdfd9825907fa898e72",
   "frozen_heads_sha256": "f48d9edbe59576c03ee9498872df4a62be332912c8dd8fc01418c7636ebae2d3",
   "matrix": [
-    {
-      "name": "statistics",
-      "sha": "a55184fca134ce16b64335ac2f88b31b1161cd81",
-      "os": "xcode-27",
-      "runtime": true
-    },
-    {
-      "name": "background",
-      "sha": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
-      "os": "xcode-27",
-      "runtime": true
-    },
     {
       "name": "integrated",
       "sha": "efae8be3f8ccb60fdb447a4175abebbecc2767de",
@@ -105,6 +91,6 @@
   ],
   "remote_mutations": false,
   "actual_importer_verified": true,
-  "bundle_upload_path": "/workspace/scratch/bc9656eced06/analysis/resumption/selective-macos-three-recheck-20261030/prepared/Bootstrap/candidates.bundle",
+  "bundle_upload_path": "/workspace/scratch/bc9656eced06/analysis/resumption/selective-integrated-dns-retry-20261030/prepared/Bootstrap/candidates.bundle",
   "scope": "Local bundle and read-only preparation verified; CI runtime results are not implied."
 }
