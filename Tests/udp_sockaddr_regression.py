@@ -19,6 +19,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import traceback
 
 
 class DatagramEcho(socketserver.BaseRequestHandler):
@@ -84,38 +85,80 @@ def decode_bytes(data):
             struct.unpack('!H', data[1 + size:3 + size])[0]), 3 + size
 
 
-def handshake(tcp, command, address):
+def record(trace, phase, **values):
+    if trace is not None:
+        trace(phase, **values)
+
+
+def handshake(tcp, command, address, trace=None):
+    endpoint = {'tcp_local': tcp.getsockname()[:2], 'tcp_peer': tcp.getpeername()[:2]}
+    record(trace, 'greeting-send', **endpoint)
     tcp.sendall(b'\x05\x01\x00')
-    assert exact(tcp, 2) == b'\x05\x00', 'Authentication failed'
-    tcp.sendall(bytes([5, command, 0]) + encode(*address))
-    ver, rep, reserved, kind = exact(tcp, 4)
+    greeting = exact(tcp, 2)
+    record(trace, 'greeting-reply', reply_hex=greeting.hex(), **endpoint)
+    assert greeting == b'\x05\x00', 'Authentication failed'
+    request = bytes([5, command, 0]) + encode(*address)
+    record(trace, 'request-send', command=command, requested=address,
+           request_hex=request.hex(), **endpoint)
+    tcp.sendall(request)
+    header = exact(tcp, 4)
+    record(trace, 'reply-header', reply_hex=header.hex(), **endpoint)
+    ver, rep, reserved, kind = header
     assert (ver, reserved) == (5, 0), 'Invalid response header'
     assert rep == 0, 'UDP/TCP setup REP=0x%02x' % rep
     size = {1: 4, 4: 16}[kind]
-    return decode_bytes(bytes([kind]) + exact(tcp, size + 2))[0]
+    encoded = bytes([kind]) + exact(tcp, size + 2)
+    relay = decode_bytes(encoded)[0]
+    record(trace, 'reply-address', reply_hex=(header[:3] + encoded).hex(),
+           address=relay, **endpoint)
+    return relay
 
 
 @contextlib.contextmanager
-def association(proxy, hint):
+def association(proxy, hint, fixed_udp_port=False, trace=None):
+    record(trace, 'tcp-connect', proxy=proxy, hint=hint)
     with socket.create_connection(proxy, timeout=1.5) as tcp:
         family = socket.AF_INET6 if ':' in proxy[0] else socket.AF_INET
-        with socket.socket(family, socket.SOCK_DGRAM) as udp:
-            udp.bind((tcp.getsockname()[0], 0))
+        endpoint = {'tcp_local': tcp.getsockname()[:2], 'tcp_peer': tcp.getpeername()[:2]}
+        record(trace, 'tcp-connected', **endpoint)
+        with contextlib.ExitStack() as sockets:
+            # Only repeat a local ephemeral choice equal to the fixed relay port.
+            # No handshake, REP failure, I/O failure or test case is retried.
+            for attempt in range(8):
+                udp = sockets.enter_context(socket.socket(family, socket.SOCK_DGRAM))
+                udp.bind((tcp.getsockname()[0], 0))
+                local = udp.getsockname()[:2]
+                record(trace, 'udp-source-bound', attempt=attempt + 1, udp_local=local,
+                       excluded_fixed_port=proxy[1] if fixed_udp_port else None, **endpoint)
+                if not fixed_udp_port or local[1] != proxy[1]:
+                    break
+                udp.close()
+                record(trace, 'udp-source-port-collision-released', udp_local=local, **endpoint)
+            else:
+                raise RuntimeError('Client UDP ephemeral selection repeatedly chose the fixed relay port')
             requested = udp.getsockname()[:2] if hint == 'known' else (hint, 0)
-            relay = handshake(tcp, 3, requested)
+            relay = handshake(tcp, 3, requested, trace)
             host = ipaddress.ip_address(relay[0])
             if host.version == 6 and host.ipv4_mapped:
                 host = host.ipv4_mapped
             assert not host.is_unspecified and relay[1], 'Unusable relay: %r' % (relay,)
             udp.connect((str(host), relay[1]))
             udp.settimeout(1.5)
-            yield tcp, udp
+            record(trace, 'association-ready', udp_local=local, requested=requested,
+                   relay=udp.getpeername()[:2], **endpoint)
+            try:
+                yield tcp, udp
+            finally:
+                record(trace, 'association-release', udp_local=local, **endpoint)
 
 
-def exchange(udp, destination, size):
+def exchange(udp, destination, size, trace=None):
     payload = secrets.token_bytes(size)
+    record(trace, 'udp-send', destination=destination, payload_size=size)
     udp.send(b'\x00\x00\x00' + encode(*destination) + payload)
+    record(trace, 'udp-receive', destination=destination, payload_size=size)
     reply = udp.recv(65535)
+    record(trace, 'udp-reply-check', reply_size=len(reply))
     assert reply[:3] == b'\x00\x00\x00', 'Invalid SOCKS5 UDP prefix'
     source, offset = decode_bytes(reply[3:])
     assert source == destination, 'Wrong source: %r, expected %r' % (source, destination)
@@ -124,7 +167,7 @@ def exchange(udp, destination, size):
 
 @contextlib.contextmanager
 def proxy_server(binary, log_path, workers=1, fixed_udp_port=False, unbound=False,
-                 udp_buffer_count=10):
+                 udp_buffer_count=10, trace=None):
     with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as reserve:
         # Reserve the same dual-stack wildcard scope used by the actual server.
         reserve.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
@@ -144,8 +187,13 @@ def proxy_server(binary, log_path, workers=1, fixed_udp_port=False, unbound=Fals
 ''' % (workers, port, port if fixed_udp_port else 0,
        '' if unbound else "  bind-address-v4: '0.0.0.0'\n  bind-address-v6: '::'\n",
        udp_buffer_count))
+        saved_config = pathlib.Path(log_path).with_suffix('.yml')
+        saved_config.write_bytes(conf.read_bytes())
+        record(trace, 'proxy-config', path=str(saved_config), tcp_port=port,
+               udp_port=port if fixed_udp_port else 0, workers=workers)
         proc = subprocess.Popen([binary, str(conf)], stdout=log, stderr=subprocess.STDOUT)
         try:
+            record(trace, 'proxy-started', pid=proc.pid, returncode=proc.poll())
             for _ in range(100):
                 if proc.poll() is not None:
                     raise RuntimeError('Proxy exited: %s' % proc.returncode)
@@ -158,12 +206,17 @@ def proxy_server(binary, log_path, workers=1, fixed_udp_port=False, unbound=Fals
                 raise RuntimeError('Proxy startup timed out')
             yield port
         finally:
-            proc.terminate()
             try:
-                proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait()
+                record(trace, 'proxy-before-cleanup', pid=proc.pid, returncode=proc.poll())
+            finally:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+                finally:
+                    record(trace, 'proxy-after-cleanup', pid=proc.pid, returncode=proc.poll())
 
 
 def main():
@@ -183,32 +236,50 @@ def main():
     output = pathlib.Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     results = []
+    current_test = None
+    events = []
+
+    def trace(phase, **values):
+        event = {'test': current_test, 'phase': phase, 'monotonic_ns': time.monotonic_ns(), **values}
+        events.append(event)
+        diagnostics.write(json.dumps(event) + '\n')
+        diagnostics.flush()
 
     def check(name, action):
+        nonlocal current_test
+        current_test = name
+        events.clear()
         try:
             action()
             row = {'test': name, 'passed': True}
         except Exception as exc:
-            row = {'test': name, 'passed': False, 'error': '%s: %s' % (type(exc).__name__, exc)}
+            site = traceback.extract_tb(exc.__traceback__)[-1]
+            row = {'test': name, 'passed': False, 'error': '%s: %s' % (type(exc).__name__, exc),
+                   'exception_type': type(exc).__name__, 'exception_module': type(exc).__module__,
+                   'exception_site': {'filename': site.filename, 'function': site.name,
+                                      'line_number': site.lineno, 'line': site.line},
+                   'traceback': traceback.format_exc(), 'events': list(events)}
         results.append(row)
         print(json.dumps(row), flush=True)
+        current_test = None
 
     with contextlib.ExitStack() as stack:
+        diagnostics = stack.enter_context(output.with_suffix('.events.jsonl').open('w'))
         udp4 = stack.enter_context(echo_server('127.0.0.1'))
         udp6 = stack.enter_context(echo_server('::1'))
         tcp4 = stack.enter_context(echo_server('127.0.0.1', udp=False))
         tcp6 = stack.enter_context(echo_server('::1', udp=False))
         port = stack.enter_context(proxy_server(str(pathlib.Path(args.binary).resolve()),
                                                 output.with_suffix('.server.log'), args.workers,
-                                                args.fixed_udp_port, args.unbound))
+                                                args.fixed_udp_port, args.unbound, trace=trace))
         for host, hint in [('127.0.0.1', '0.0.0.0'), ('127.0.0.1', '::1'),
                            ('127.0.0.1', 'known'), ('::1', '::'), ('::1', 'known')]:
             destination = udp6 if ':' in host else udp4
 
             def single(host=host, hint=hint, destination=destination):
-                with association((host, port), hint) as (_, udp):
+                with association((host, port), hint, args.fixed_udp_port, trace) as (_, udp):
                     for size in (1, 64, 512, 1200, 1400, 64):
-                        exchange(udp, destination, size)
+                        exchange(udp, destination, size, trace)
             check('UDP %s hint=%s, six payloads' % (host, hint), single)
 
         for host, destination in [('127.0.0.1', udp4), ('::1', udp6)]:
@@ -217,12 +288,12 @@ def main():
                 with socket.socket(family, socket.SOCK_DGRAM) as reserve:
                     reserve.bind((host, 0))
                     closed = reserve.getsockname()[:2]
-                with association((host, port), 'known') as (tcp, udp):
-                    exchange(udp, destination, 64)
+                with association((host, port), 'known', args.fixed_udp_port, trace) as (tcp, udp):
+                    exchange(udp, destination, 64, trace)
                     for _ in range(3):
                         udp.send(b'\x00\x00\x00' + encode(*closed) + b'\x00')
                         time.sleep(0.02)
-                        exchange(udp, destination, 64)
+                        exchange(udp, destination, 64, trace)
                     assert not select.select([tcp], [], [], 0)[0], (
                         'Destination error changed the UDP control connection')
             check('UDP %s closed destination preserves association' % host,
@@ -231,27 +302,49 @@ def main():
         def concurrent():
             with contextlib.ExitStack() as associations:
                 hint = 'known' if args.known_concurrent else '0.0.0.0'
-                items = [associations.enter_context(association(('127.0.0.1', port), hint))
-                         for _ in range(3)]
+                items = [associations.enter_context(association(
+                    ('127.0.0.1', port), hint, args.fixed_udp_port, trace)) for _ in range(3)]
                 payloads = [secrets.token_bytes(64) for _ in items]
-                for (_, udp), payload in zip(items, payloads):
-                    udp.send(b'\x00\x00\x00' + encode(*udp4) + payload)
-                for (_, udp), payload in zip(items, payloads):
-                    reply = udp.recv(65535)
-                    source, offset = decode_bytes(reply[3:])
-                    assert reply[:3] == b'\x00\x00\x00' and source == udp4
-                    assert reply[3 + offset:] == payload
-                items[0][0].close()
-                items[0][1].close()
-                time.sleep(0.1)
-                for _, udp in items[1:]:
-                    exchange(udp, udp4, 1200)
+                endpoints = [{'tcp_local': tcp.getsockname()[:2], 'tcp_peer': tcp.getpeername()[:2],
+                              'udp_local': udp.getsockname()[:2], 'relay': udp.getpeername()[:2],
+                              'requested': udp.getsockname()[:2] if hint == 'known' else (hint, 0)}
+                             for tcp, udp in items]
+                record(trace, 'concurrent-data-ready', associations=endpoints)
+                phase = 'initial-send'
+                try:
+                    for index, ((_, udp), payload) in enumerate(zip(items, payloads)):
+                        record(trace, 'concurrent-initial-send', association=index)
+                        udp.send(b'\x00\x00\x00' + encode(*udp4) + payload)
+                    phase = 'initial-receive'
+                    for index, ((_, udp), payload) in enumerate(zip(items, payloads)):
+                        record(trace, 'concurrent-initial-receive', association=index)
+                        reply = udp.recv(65535)
+                        source, offset = decode_bytes(reply[3:])
+                        assert reply[:3] == b'\x00\x00\x00' and source == udp4
+                        assert reply[3 + offset:] == payload
+                    phase = 'close-first'
+                    record(trace, 'concurrent-close-first', association=0)
+                    items[0][0].close()
+                    items[0][1].close()
+                    time.sleep(0.1)
+                    phase = 'survivor-exchange'
+                    for index, (_, udp) in enumerate(items[1:], 1):
+                        record(trace, 'concurrent-survivor-exchange', association=index)
+                        exchange(udp, udp4, 1200, trace)
+                except Exception as exc:
+                    site = traceback.extract_tb(exc.__traceback__)[-1]
+                    record(trace, 'concurrent-data-failure', data_phase=phase, associations=endpoints,
+                           error='%s: %s' % (type(exc).__name__, exc),
+                           exception_type=type(exc).__name__, exception_module=type(exc).__module__,
+                           exception_site={'filename': site.filename, 'function': site.name,
+                                           'line_number': site.lineno, 'line': site.line})
+                    raise
         check('UDP three associations and one closed', concurrent)
 
         def burst():
-            with association(('127.0.0.1', port), '0.0.0.0') as (_, udp):
+            with association(('127.0.0.1', port), '0.0.0.0', args.fixed_udp_port, trace) as (_, udp):
                 # Establish the peer before queuing a vector-sized burst.
-                exchange(udp, udp4, 64)
+                exchange(udp, udp4, 64, trace)
                 for _ in range(3):
                     pending = {secrets.token_bytes(128) for _ in range(24)}
                     for payload in pending:
@@ -269,16 +362,16 @@ def main():
         if args.unbound:
             for first, second in ((udp4, udp6), (udp6, udp4)):
                 def mixed(first=first, second=second):
-                    with association(('127.0.0.1', port), '0.0.0.0') as (_, udp):
+                    with association(('127.0.0.1', port), '0.0.0.0', args.fixed_udp_port, trace) as (_, udp):
                         for _ in range(6):
-                            exchange(udp, first, 64)
-                            exchange(udp, second, 512)
+                            exchange(udp, first, 64, trace)
+                            exchange(udp, second, 512, trace)
                 check('UDP mixed external families, first=' + first[0], mixed)
 
         for destination in (tcp4, tcp6):
             def tcp_test(destination=destination):
                 with socket.create_connection(('127.0.0.1', port), timeout=1.5) as tcp:
-                    handshake(tcp, 1, destination)
+                    handshake(tcp, 1, destination, trace)
                     data = secrets.token_bytes(16384)
                     tcp.sendall(data)
                     assert exact(tcp, len(data)) == data
