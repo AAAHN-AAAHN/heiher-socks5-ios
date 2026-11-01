@@ -10,6 +10,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -24,18 +25,23 @@ jobs:
           import json, os
           from pathlib import Path
           mode = json.loads(Path('Bootstrap/ref-operations.json').read_bytes())['operation']
-          if mode not in ('archive', 'store', 'cleanup'):
+          if mode not in ('archive', 'store', 'publish', 'dispatch', 'cleanup'):
               raise SystemExit('Unknown repository operation')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
               stream.write('mode=' + mode + '\n')
           PY
+      - name: Verify publication and cleanup boundaries without network mutations
+        run: python3 -m unittest discover -s Bootstrap -p test_ref_maintenance.py -v
       - name: Verify the bundle and store only exact Git objects
         if: ${{ steps.operation.outputs.mode == 'store' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 Bootstrap/store_objects.py
-      - name: Apply the exact backup or cleanup plan
-        if: ${{ steps.operation.outputs.mode == 'archive' || steps.operation.outputs.mode == 'cleanup' }}
+      - name: Verify the exact final candidate objects before publication
+        if: ${{ steps.operation.outputs.mode == 'publish' || steps.operation.outputs.mode == 'dispatch' }}
+        run: python3 Bootstrap/import_candidates.py
+      - name: Apply the exact archive, publication, dispatch or cleanup plan
+        if: ${{ steps.operation.outputs.mode != 'store' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 Bootstrap/ref_maintenance.py

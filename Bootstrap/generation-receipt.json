@@ -1,0 +1,136 @@
+{
+  "result": "PASS",
+  "selected": [
+    "udp",
+    "statistics",
+    "background",
+    "integrated"
+  ],
+  "support": [
+    "server",
+    "settings",
+    "icon"
+  ],
+  "heads": {
+    "main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+    "udp": "e50f434be2610ef00713d39363963542db0020e2",
+    "statistics": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+    "background": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
+    "server": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
+    "settings": "953ee8d720cf32311d82dad1bcb1b566333c5d62",
+    "icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
+    "integrated": "8bec30de328543f8f23b79a736385ed0e80aaa88"
+  },
+  "macos_only": [],
+  "bundle_sha256": "b688b3c753c801fed996583f4f574471e52f62119ab9cb07099ccf5cc02e2a2b",
+  "bundle_bytes": 265736,
+  "prerequisites": [
+    "9baac92fb4508d9e1b96f00744a91ff1cae77003",
+    "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
+    "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+    "7e40f951441cb226bc5e22a95d9c0658aba76939",
+    "c6935dbfbc6fecb7d7f573db0d5149bb0afc61b9",
+    "c1722e48f99e140b98cc436979b8ffc49ca0fa63",
+    "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
+    "e9d8e75f96f4cc96cb53604edd30e5077c87032c"
+  ],
+  "verified_remote_exclusions": [
+    {
+      "ref": "refs/heads/feature/app-icon",
+      "sha": "d268d0bb8fb91fce426b9eef377e1456690fba47"
+    },
+    {
+      "ref": "refs/heads/feature/background",
+      "sha": "48b7ae84fa4d2667aa52850271fab089fc6fcc2e"
+    },
+    {
+      "ref": "refs/heads/feature/icmp-relay",
+      "sha": "60fa64b5c98aadaaee349e6e12c50bd2f9b32ac2"
+    },
+    {
+      "ref": "refs/heads/feature/server-control",
+      "sha": "e6663544b9394c0e743108fd4f169c8c7baf7490"
+    },
+    {
+      "ref": "refs/heads/feature/settings-persistence",
+      "sha": "45a592b81fda404edb63710067349276f72a986a"
+    },
+    {
+      "ref": "refs/heads/feature/traffic-statistics",
+      "sha": "fc54f9aebe07c2460b98d3b2bc18a971911ff0d0"
+    },
+    {
+      "ref": "refs/heads/feature/udp-compat",
+      "sha": "4d64d2dbfc37ef04fef326fde6133dbceba90e97"
+    },
+    {
+      "ref": "refs/heads/main",
+      "sha": "19aec84fbc929678bb0f05b89c76d490ada6f8b7"
+    },
+    {
+      "ref": "refs/heads/release/integrated",
+      "sha": "e82e590412e5b5cbcd531827a81f845596ee16f6"
+    },
+    {
+      "ref": "refs/heads/work/udp-echo-main-20261028",
+      "sha": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
+    }
+  ],
+  "remote_snapshot_time": "2026-11-01T06:38:12.779Z",
+  "remote_snapshot_sha256": "fd563d09fc8259396ed2fc72db020034fd82341c21ba0d3be8b96d3b624a5c8d",
+  "frozen_heads_sha256": "ae95b13d2f83100a4c9b13fd4a293e97f1b7d88b0f6f553777a3c8ff2eebf564",
+  "matrix": [
+    {
+      "name": "udp",
+      "sha": "e50f434be2610ef00713d39363963542db0020e2",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "udp",
+      "sha": "e50f434be2610ef00713d39363963542db0020e2",
+      "os": "xcode-27",
+      "runtime": false
+    },
+    {
+      "name": "statistics",
+      "sha": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "statistics",
+      "sha": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
+      "name": "background",
+      "sha": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "background",
+      "sha": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
+      "name": "integrated",
+      "sha": "8bec30de328543f8f23b79a736385ed0e80aaa88",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "integrated",
+      "sha": "8bec30de328543f8f23b79a736385ed0e80aaa88",
+      "os": "xcode-27",
+      "runtime": true
+    }
+  ],
+  "remote_mutations": false,
+  "actual_importer_verified": true,
+  "bundle_upload_path": "/workspace/scratch/ca72ed89c9a6/analysis/execution-20261101/publication/preparation-8bec30de/prepared/Bootstrap/candidates.bundle",
+  "scope": "Local bundle and read-only preparation verified; CI runtime results are not implied."
+}

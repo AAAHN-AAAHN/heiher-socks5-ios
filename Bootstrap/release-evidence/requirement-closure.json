@@ -1,0 +1,367 @@
+{
+  "schema_version": 2,
+  "result": "PASS",
+  "scope": "PREPUBLICATION_CANDIDATE28_ONLY",
+  "final_heads": {
+    "main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+    "feature/udp-compat": "e50f434be2610ef00713d39363963542db0020e2",
+    "feature/traffic-statistics": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+    "feature/background": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
+    "feature/server-control": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
+    "feature/settings-persistence": "953ee8d720cf32311d82dad1bcb1b566333c5d62",
+    "feature/app-icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
+    "release/integrated": "8bec30de328543f8f23b79a736385ed0e80aaa88"
+  },
+  "source_heads8": {
+    "main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+    "udp": "e50f434be2610ef00713d39363963542db0020e2",
+    "statistics": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+    "background": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
+    "server": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
+    "settings": "953ee8d720cf32311d82dad1bcb1b566333c5d62",
+    "icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
+    "integrated": "8bec30de328543f8f23b79a736385ed0e80aaa88"
+  },
+  "unresolved": [],
+  "evidence": "Bootstrap/release-evidence/evidence-index.json sha256:ac465512f95a72bdbdba3a6c5d3f2079b089db1892cb36c2df787e07c70d3cc9",
+  "evidence_index": {
+    "published_path": "Bootstrap/release-evidence/evidence-index.json",
+    "bytes": 1015572,
+    "sha256": "ac465512f95a72bdbdba3a6c5d3f2079b089db1892cb36c2df787e07c70d3cc9"
+  },
+  "final_substantive_D": {
+    "package_alias": "current_e",
+    "transport": "EXACT_ORIGINAL_E_CONTIGUOUS_BINARY_PARTS_V1",
+    "outer_bytes": 567922486,
+    "outer_sha256": "dc6deb003ab3970f490397f4fc0fcefc11210b2effcab1d30ed771919659824c",
+    "member": "analysis/execution-20261101/closure/candidate28-substantive-review-D-run41289757170-final.json",
+    "member_bytes": 169153,
+    "member_sha256": "0ccb3bf54731a979f622193e3eded0efc0d5ed131df98202c857fef87bca65e6",
+    "member_namespace": "reconstructed_original_E_ZIP",
+    "parts_manifest_member": "PARTS-MANIFEST.json",
+    "parts_manifest_bytes": 1239,
+    "parts_manifest_sha256": "f46087f7c1aaf707da8bc99d77002ad8c604fc7741a72305867cc0563cf63507",
+    "ordered_transport_parts": [
+      {
+        "alias": "current_e_part01",
+        "index": 1,
+        "container_file_name": "Socks5-evidence-E-20261101-part01.zip",
+        "library_file_id": "libfile_6d0e861be2d881918134311cbd254899",
+        "file_id": "file_00000000899881f58c2dd2bcafd67ce9",
+        "actual_version": 0,
+        "outer_bytes": 314576003,
+        "outer_sha256": "8973b20a3b94c573de9ae3cd7070dcff66c484f605d719026847d8d1755f9803",
+        "chunk_member": "Socks5-candidate-evidence-20261101-run41289757170.zip.part01",
+        "chunk_offset": 0,
+        "chunk_bytes": 314572800,
+        "chunk_sha256": "b7bdaed3747939079b2b0ba8c3d33dc604c63710081b97d36576655f316a0b41"
+      },
+      {
+        "alias": "current_e_part02",
+        "index": 2,
+        "container_file_name": "Socks5-evidence-E-20261101-part02.zip",
+        "library_file_id": "libfile_d9d8ffeb68e8819194f59279f3a06a4f",
+        "file_id": "file_00000000ed0081f5a30f133b640382a7",
+        "actual_version": 0,
+        "outer_bytes": 253352889,
+        "outer_sha256": "6555be4a0ebf6bc851d361e6392711289a75408a4a558ed3952fda1bd7817256",
+        "chunk_member": "Socks5-candidate-evidence-20261101-run41289757170.zip.part02",
+        "chunk_offset": 314572800,
+        "chunk_bytes": 253349686,
+        "chunk_sha256": "d082ab63e780b815dfa687db5eec68db8839493095cc5edd7a453bc5a297dfb4"
+      }
+    ],
+    "single_saved_E_file_claimed": false
+  },
+  "actual_original_full16": {
+    "package_alias": "current_e",
+    "transport": "EXACT_ORIGINAL_E_CONTIGUOUS_BINARY_PARTS_V1",
+    "outer_bytes": 567922486,
+    "outer_sha256": "dc6deb003ab3970f490397f4fc0fcefc11210b2effcab1d30ed771919659824c",
+    "member": "analysis/execution-20261101/closure/original-full16-41289757170-verification.json",
+    "member_bytes": 9335,
+    "member_sha256": "0604295e710dd2adb276b3490efef8a05cbe33371e6219b89a9f44f2178cf75d",
+    "member_namespace": "reconstructed_original_E_ZIP",
+    "parts_manifest_member": "PARTS-MANIFEST.json",
+    "parts_manifest_bytes": 1239,
+    "parts_manifest_sha256": "f46087f7c1aaf707da8bc99d77002ad8c604fc7741a72305867cc0563cf63507",
+    "ordered_transport_parts": [
+      {
+        "alias": "current_e_part01",
+        "index": 1,
+        "container_file_name": "Socks5-evidence-E-20261101-part01.zip",
+        "library_file_id": "libfile_6d0e861be2d881918134311cbd254899",
+        "file_id": "file_00000000899881f58c2dd2bcafd67ce9",
+        "actual_version": 0,
+        "outer_bytes": 314576003,
+        "outer_sha256": "8973b20a3b94c573de9ae3cd7070dcff66c484f605d719026847d8d1755f9803",
+        "chunk_member": "Socks5-candidate-evidence-20261101-run41289757170.zip.part01",
+        "chunk_offset": 0,
+        "chunk_bytes": 314572800,
+        "chunk_sha256": "b7bdaed3747939079b2b0ba8c3d33dc604c63710081b97d36576655f316a0b41"
+      },
+      {
+        "alias": "current_e_part02",
+        "index": 2,
+        "container_file_name": "Socks5-evidence-E-20261101-part02.zip",
+        "library_file_id": "libfile_d9d8ffeb68e8819194f59279f3a06a4f",
+        "file_id": "file_00000000ed0081f5a30f133b640382a7",
+        "actual_version": 0,
+        "outer_bytes": 253352889,
+        "outer_sha256": "6555be4a0ebf6bc851d361e6392711289a75408a4a558ed3952fda1bd7817256",
+        "chunk_member": "Socks5-candidate-evidence-20261101-run41289757170.zip.part02",
+        "chunk_offset": 314572800,
+        "chunk_bytes": 253349686,
+        "chunk_sha256": "d082ab63e780b815dfa687db5eec68db8839493095cc5edd7a453bc5a297dfb4"
+      }
+    ],
+    "single_saved_E_file_claimed": false
+  },
+  "candidate_domains28": [
+    {
+      "id": "C01",
+      "result": "PASS",
+      "original_requirement_ko": "일반 SOCKS5 client 경로 준비와 응답 독립 UDP Echo 송신"
+    },
+    {
+      "id": "C02",
+      "result": "PASS",
+      "original_requirement_ko": "목적지 응답·수신 가능성 검사, RTT, 응답 timeout·backoff·대상 제외 없이 송신"
+    },
+    {
+      "id": "C03",
+      "result": "PASS",
+      "original_requirement_ko": "recoverable UDP 오류 뒤 일반 중계와 후속 응답 유지"
+    },
+    {
+      "id": "C04",
+      "result": "PASS",
+      "original_requirement_ko": "fixed relay·동일IP·sourceport0 다중 association의 지원 경계와 원본 실패를 명시"
+    },
+    {
+      "id": "C05",
+      "result": "PASS",
+      "original_requirement_ko": "UI 위치·Off/1.1.1.1/1000 기본값·유효 입력과 실제 로컬 상태 표시"
+    },
+    {
+      "id": "C06",
+      "result": "PASS",
+      "original_requirement_ko": "정규화 고유IP65,536·원문/JSON 임의 byte cap 제거·잘못된 새 입력이 옛 송신을 정지"
+    },
+    {
+      "id": "C07",
+      "result": "PASS",
+      "original_requirement_ko": "최대2 association·단일 queue/timer·유한 batch·최신 pending 병합·no backlog"
+    },
+    {
+      "id": "C08",
+      "result": "PASS",
+      "original_requirement_ko": "최신 Off·입력·실행 identity와 실제 I/O admission, FD/callback 수명 보호"
+    },
+    {
+      "id": "C09",
+      "result": "PASS",
+      "original_requirement_ko": "실제 서버 startsnapshot/listener만 발견·일반 TCP/auth/ASSOCIATE로 준비"
+    },
+    {
+      "id": "C10",
+      "result": "PASS",
+      "original_requirement_ko": "각 실제 socket의 positive bytes·실제 peer·동일 위치 중복없음·오류0"
+    },
+    {
+      "id": "C11",
+      "result": "PASS",
+      "original_requirement_ko": "Statistics foreground만 .0/.5 갱신·실제elapsed·Total/Speed동시·process 누적"
+    },
+    {
+      "id": "C12",
+      "result": "PASS",
+      "original_requirement_ko": "GCD queue-owned writer와 peer In/Out 경계·누적보존"
+    },
+    {
+      "id": "C13",
+      "result": "PASS",
+      "original_requirement_ko": "SettingsStore 단일owner·version1 additive·strict decode·raw UTF8·구Ping미이전"
+    },
+    {
+      "id": "C14",
+      "result": "PASS",
+      "original_requirement_ko": "Off먼저·atomicJSON·active1/latest1·늦은load/import/save 무효화·정확한실패표시"
+    },
+    {
+      "id": "C15",
+      "result": "PASS",
+      "original_requirement_ko": "원래silentWAV와하나의실제AV작업·Off/releasebarrier·안전한최대복구·finiteclaim"
+    },
+    {
+      "id": "C16",
+      "result": "PASS",
+      "original_requirement_ko": "Audio·Location·Server·Echo 독립intent와latest manager identity"
+    },
+    {
+      "id": "S01",
+      "result": "PASS",
+      "original_requirement_ko": "before9/base8/final8 mapping 및각baseline조상·Ping/ICMP배제"
+    },
+    {
+      "id": "S02",
+      "result": "PASS",
+      "original_requirement_ko": "원본upstream·일반보완·nativepins와기능소유branch구분"
+    },
+    {
+      "id": "S03",
+      "result": "PASS",
+      "original_requirement_ko": "실제owner상속·parentpins·Integrated feature membership232일치"
+    },
+    {
+      "id": "S04",
+      "result": "PASS",
+      "original_requirement_ko": "최신 Background 입력완료 UI와 Integrated 실제버튼 시험·원래 assertions/timeout 유지"
+    },
+    {
+      "id": "A01",
+      "result": "PASS",
+      "original_requirement_ko": "모든owner최종소스8·manifests·fullrecoverablebundle·hash"
+    },
+    {
+      "id": "A02",
+      "result": "PASS",
+      "original_requirement_ko": "새framework/unsignedIPA/dSYM의exactsource와제품8제공범위"
+    },
+    {
+      "id": "A03",
+      "result": "PASS",
+      "original_requirement_ko": "제품owner와actualtransitiveparent만현재head로검사하고unrelated옛선언보존"
+    },
+    {
+      "id": "V01",
+      "result": "PASS",
+      "original_requirement_ko": "최종8owner×2platform의actual16gate"
+    },
+    {
+      "id": "V02",
+      "result": "PASS",
+      "original_requirement_ko": "준비/producer/runtime/finalgate를구별"
+    },
+    {
+      "id": "V03",
+      "result": "PASS",
+      "original_requirement_ko": "원래실패·음성대조군·warn·observationalfailure보존"
+    },
+    {
+      "id": "V04",
+      "result": "PASS",
+      "original_requirement_ko": "최신 Background source의 actual producer/runtime/final gate·원본 UI/cleanup 증거"
+    },
+    {
+      "id": "G01",
+      "result": "PASS",
+      "original_requirement_ko": "final8requirementclosure에지원경계와실제16행결합"
+    }
+  ],
+  "later_domains10": [
+    {
+      "id": "G02",
+      "original_requirement_ko": "freshleases로atomic8update+ICMPdelete 및실제receipt/refs",
+      "scope": "POSTPUBLICATION",
+      "status": "PENDING_ACTUAL_LATER_RECEIPTS"
+    },
+    {
+      "id": "G03",
+      "original_requirement_ko": "canonical8exactsource실제성공·17ownjobs/49steps",
+      "scope": "POSTPUBLICATION",
+      "status": "PENDING_ACTUAL_LATER_RECEIPTS"
+    },
+    {
+      "id": "G04",
+      "original_requirement_ko": "실제GitHubparent검사",
+      "scope": "POSTPUBLICATION",
+      "status": "PENDING_ACTUAL_LATER_RECEIPTS"
+    },
+    {
+      "id": "G05",
+      "original_requirement_ko": "최종helper소스/plan/history보존후atomiccleanup4",
+      "scope": "POSTPUBLICATION",
+      "status": "PENDING_ACTUAL_LATER_RECEIPTS"
+    },
+    {
+      "id": "G06",
+      "original_requirement_ko": "완료후8owner토폴로지·ICMP/helper부재·tags27/old9archive/unrelatedrefs보존",
+      "scope": "POSTPUBLICATION",
+      "status": "PENDING_ACTUAL_LATER_RECEIPTS"
+    },
+    {
+      "id": "R01",
+      "original_requirement_ko": "5원칙별구체적근거와이득/비용·실제남은항목",
+      "scope": "FINAL_REPORT_AND_DELIVERY",
+      "status": "PENDING_ACTUAL_LATER_RECEIPTS"
+    },
+    {
+      "id": "R02",
+      "original_requirement_ko": "183원문보존·최신지시우선·복원회수한계",
+      "scope": "FINAL_REPORT_AND_DELIVERY",
+      "status": "PENDING_ACTUAL_LATER_RECEIPTS"
+    },
+    {
+      "id": "R03",
+      "original_requirement_ko": "실제접근가능한산출물과hash/회수검증·현재/역사구분",
+      "scope": "FINAL_REPORT_AND_DELIVERY",
+      "status": "PENDING_ACTUAL_LATER_RECEIPTS"
+    },
+    {
+      "id": "R04",
+      "original_requirement_ko": "미실행실기기/24h/LiveContainer/물리출력한계정확보고",
+      "scope": "FINAL_REPORT_AND_DELIVERY",
+      "status": "PENDING_ACTUAL_LATER_RECEIPTS"
+    },
+    {
+      "id": "R05",
+      "original_requirement_ko": "승인작업끝까지수행후완료와보고·미완료를완료로표현금지",
+      "scope": "FINAL_REPORT_AND_DELIVERY",
+      "status": "PENDING_ACTUAL_LATER_RECEIPTS"
+    }
+  ],
+  "unresolved_scope": "Empty means the root-approved candidate28 content plus required prepublication full16/storage checks are complete. The ten later domains remain pending and are not included in this candidate unresolved array.",
+  "actual_saved_packages": {
+    "current_e_part01": {
+      "library_file_id": "libfile_6d0e861be2d881918134311cbd254899",
+      "file_id": "file_00000000899881f58c2dd2bcafd67ce9",
+      "actual_version": 0,
+      "outer_bytes": 314576003,
+      "outer_sha256": "8973b20a3b94c573de9ae3cd7070dcff66c484f605d719026847d8d1755f9803"
+    },
+    "current_e_part02": {
+      "library_file_id": "libfile_d9d8ffeb68e8819194f59279f3a06a4f",
+      "file_id": "file_00000000ed0081f5a30f133b640382a7",
+      "actual_version": 0,
+      "outer_bytes": 253352889,
+      "outer_sha256": "6555be4a0ebf6bc851d361e6392711289a75408a4a558ed3952fda1bd7817256"
+    },
+    "current_source_v2": {
+      "library_file_id": "libfile_3be95c4dded081918b0afb1000b021bf",
+      "file_id": "file_0000000065ac81f5ae5544a6f0e0cb2c",
+      "actual_version": 4,
+      "outer_bytes": 13949369,
+      "outer_sha256": "5e175f5fbaedb214e996178c1c2ad3c64696bee722128219e695efa30e012c22"
+    },
+    "selected_products": {
+      "library_file_id": "libfile_048f19b19eec8191a0c9e49e42447672",
+      "file_id": "file_00000000be6881f5836118437b4cfc2c",
+      "actual_version": 2,
+      "outer_bytes": 17349622,
+      "outer_sha256": "5249ee8c6854637e8bd709dae1aac7cd5920d1b0c89dc880553e607db418354c"
+    }
+  },
+  "current_E_transport": {
+    "transport": "EXACT_ORIGINAL_E_CONTIGUOUS_BINARY_PARTS_V1",
+    "original_outer_bytes": 567922486,
+    "original_outer_sha256": "dc6deb003ab3970f490397f4fc0fcefc11210b2effcab1d30ed771919659824c",
+    "ordered_saved_part_aliases": [
+      "current_e_part01",
+      "current_e_part02"
+    ],
+    "single_saved_E_file_claimed": false
+  },
+  "whole_task_complete": false,
+  "publication_canonical_liveparents_helpercleanup_or_final_delivery_complete": false
+}
