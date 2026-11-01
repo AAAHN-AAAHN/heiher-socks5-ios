@@ -1,5 +1,5 @@
 {
-  "operation": "publish",
+  "operation": "dispatch",
   "old_heads": {
     "main": "19aec84fbc929678bb0f05b89c76d490ada6f8b7",
     "feature/udp-compat": "4d64d2dbfc37ef04fef326fde6133dbceba90e97",
@@ -221,5 +221,14 @@
     },
     "unresolved": [],
     "evidence": "Bootstrap/release-evidence/requirement-closure.json sha256:5838d8772e60575343a3a6a96f237ef62f6d8ccd3b6d49ac267c305741afb21f"
+  },
+  "canonical_retry": {
+    "branch": "feature/server-control",
+    "failed_run_id": 41332860144,
+    "failed_run_attempt": 1,
+    "failed_job_id": 124926431851,
+    "failed_step": "Actual server-control UI and native listener on iOS 27 Simulator",
+    "observed_failure": "simctl bootstatus timed out at 120 seconds before the xcodebuild UI test; shutdown/delete also timed out at 30 seconds. App assertion failure and underlying host cause are not established.",
+    "test_conditions_and_source_unchanged": true
   }
 }
