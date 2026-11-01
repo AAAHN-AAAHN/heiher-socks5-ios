@@ -225,45 +225,49 @@
   "canonical_retries": [
     {
       "branch": "release/integrated",
-      "failed_run_id": 41332855090,
+      "failed_run_id": 41338124364,
       "failed_run_attempt": 1,
-      "failed_job_id": 124926417360,
-      "failed_step": "Exact latest composition, native and model checks; ARM64 archive on macOS",
-      "observed_failure": "Original wildcard6 accepted5/datagramWrites55 but udpReadBytes44 != fixture.reply_bytes55. Historical cause is not established.",
-      "test_conditions_and_source_unchanged": true,
-      "maximum_fresh_runs_in_this_plan": 1
-    },
-    {
-      "branch": "feature/background",
-      "failed_run_id": 41332856832,
-      "failed_run_attempt": 1,
-      "failed_job_id": 124929512438,
-      "failed_step": "Validate source, test native code, and archive iOS on macOS",
-      "observed_failure": "Original wildcard6 accepted5/datagramWrites55 but udpReadBytes44 != fixture.reply_bytes55. Historical cause is not established.",
+      "failed_job_id": 124955337528,
+      "failed_step": "Actual integrated UI, saved intent and native response",
+      "observed_failure": "Original UI4 failed: saved Audio On relaunch observed0 vs1; final Echo Off observed1 vs0; subsequent Server/Statistics initial-state failures after unreached Echo cleanup. Both producers succeeded; Simulator review skipped. Historical cause remains unresolved.",
       "test_conditions_and_source_unchanged": true,
       "maximum_fresh_runs_in_this_plan": 1
     }
   ],
-  "transport_diagnostic": {
-    "run_id": 41337310026,
+  "ui_state_diagnostic": {
+    "run_id": 41357797782,
     "run_attempt": 1,
-    "helper_sha": "8d6bcde33ed916af160bd3c716828578d7a20067",
-    "job_id": 124939750019,
-    "artifact_id": 13096090521,
-    "artifact_bytes": 45199932,
-    "artifact_sha256": "d73b6fb2a819971a81ff7576c1e27f695397f6a180205b41c651ee10f89760e5",
-    "original_selected_case_count": 1,
-    "original_full_case_count": 25,
-    "traced_copy_selected_case_count": 1,
-    "all_three_actual_process_exit_codes": [
-      0,
+    "job_id": 125001510153,
+    "helper_sha": "457f9f38722d353a0a24ca8ca9a820a773559558",
+    "artifact_id": 13104591653,
+    "artifact_bytes": 16901595,
+    "artifact_sha256": "88a01d0057c646f3958f51992ea9eabccbed73d97527d5d0570345c2380bfa73",
+    "conclusion": "success",
+    "UI4": {
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    "canonical_gate_credit": 0,
+    "source_sha": "8bec30de328543f8f23b79a736385ed0e80aaa88",
+    "source_baseline_311_unchanged_before_after": true,
+    "temporary_app_instrumentation": {
+      "files": 4,
+      "insertion_blocks": 46,
+      "independent_exact_reverse_to_Git": true
+    },
+    "original_UI_sources_assertions_and_timeouts_unchanged": true,
+    "actual_build_and_test_exit_codes": [
       0,
       0
     ],
-    "source_sha": "8bec30de328543f8f23b79a736385ed0e80aaa88",
-    "original_sources_assertions_and_timeouts_unchanged": true,
+    "actual_UI_invocations": 1,
     "historical_failure_cause_resolved": false,
-    "canonical_gate_credit": 0,
-    "reason": "The unchanged selected/full originals both passed, and the traced copy consumed all five replies before Off. No concrete production regression was established. One fixed full canonical run per previously failed owner includes the original preceding build workload and all downstream gates, without changing sources, assertions, timeouts or skipping any required job. Prior failures remain failures; no retry-until-success loop."
+    "root_decision": {
+      "path": "analysis/execution-20261102/integrated-ui-canonical-failure/conditional-confirmation-preparation/single-full-confirmation-decision.json",
+      "bytes": 5791,
+      "sha256": "a0e599f943a146211fe0b4c5d7bc3271fd490e34c0aae2ee7a2d79beb6a5aade"
+    },
+    "reason": "One fixed full uninstrumented Integrated confirmation follows actual diagnostic UI4 PASS and exact positive Audio/Echo state traces. No specific source correction is established. Instrumentation can alter timing, so no diagnostic canonical credit. Both platform producers and the complete downstream UI/Simulator gates must run in one fresh attempt on unchanged source, assertions and timeouts. Prior failures remain failures; no retry-until-success loop."
   }
 }

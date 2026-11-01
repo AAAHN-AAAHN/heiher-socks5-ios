@@ -1,4 +1,4 @@
-"""Request exactly one fresh Background and Integrated run after fixed diagnosis."""
+"""Request one fresh full Integrated run only after the UI state diagnostic is reviewed."""
 import json
 import os
 
@@ -24,24 +24,24 @@ def main():
         maintenance.require(plan["operation"] == "dispatch", "Unexpected retry plan")
         retries = plan["canonical_retries"]
         maintenance.require([row["branch"] for row in retries] ==
-                            ["release/integrated", "feature/background"],
-                            "Exactly these two ordered full runs are permitted")
+                            ["release/integrated"],
+                            "Exactly one full Integrated run is permitted")
         preflight = {}
         maintenance.execute(plan, preflight, check_only=True)
         result["original_preflight_result"] = preflight["result"]
 
-        diagnostic = plan["transport_diagnostic"]
+        diagnostic = plan["ui_state_diagnostic"]
         run, jobs = maintenance.run_jobs(diagnostic["run_id"], diagnostic["run_attempt"])
         maintenance.require(run["head_sha"] == diagnostic["helper_sha"]
                             and run["head_branch"] == "work/udp-echo-udp-20261028"
-                            and run["path"] == ".github/workflows/udp-echo-transport-diagnostic.yml"
+                            and run["path"] == ".github/workflows/udp-echo-ui-diagnostic.yml"
                             and run["event"] == "push" and run["conclusion"] == "success",
                             "Fixed diagnostic identity or result differs")
         maintenance.require(set(jobs) == {diagnostic["job_id"]},
                             "Fixed diagnostic job inventory differs")
         job = maintenance.successful_job(jobs, diagnostic["job_id"], diagnostic["run_id"])
-        for step in ("Run the fixed original selected, original full, and traced-copy selected trials",
-                     "Preserve actual outputs and exact diagnostic recipes"):
+        for step in ("Run one original UI4 invocation with only temporary-app state logging",
+                     "Preserve every actual outcome and exact diagnostic recipe"):
             maintenance.successful_step(job, step)
         artifact = maintenance.api("actions/artifacts/" + str(diagnostic["artifact_id"]))
         maintenance.require(artifact["id"] == diagnostic["artifact_id"]
@@ -86,7 +86,7 @@ def main():
         maintenance.require(maintenance.refs("heads") == heads,
                             "A head changed during the fixed dispatch")
         maintenance.require(maintenance.refs("tags") == tags, "Tags changed during retry")
-        result["result"] = "PASS_REQUESTED_TWO_NEW_RUNS_NOT_CANONICAL_ACCEPTANCE"
+        result["result"] = "PASS_REQUESTED_ONE_NEW_RUN_NOT_CANONICAL_ACCEPTANCE"
     except Exception as error:
         result["error"] = str(error)
         raise
