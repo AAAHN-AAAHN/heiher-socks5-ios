@@ -183,10 +183,31 @@ class UDPEchoFixture:
         assert not self.errors, self.errors
 
 
-def run(args, log, timeout=180, cwd=ROOT):
-    with (OUT / log).open('w') as stream:
-        subprocess.run([str(a) for a in args], cwd=cwd, stdout=stream,
-                       stderr=subprocess.STDOUT, check=True, timeout=timeout)
+def run(args, log, timeout=180, cwd=ROOT, timing=False):
+    command = list(map(str, args))
+    started_unix, started = time.time(), time.monotonic()
+    failure = None
+    try:
+        with (OUT / log).open('w') as stream:
+            subprocess.run(command, cwd=cwd, stdout=stream,
+                           stderr=subprocess.STDOUT, check=True, timeout=timeout)
+    except Exception as exc:
+        failure = exc
+        raise
+    finally:
+        if timing:
+            record = {'command': command, 'log': log, 'timeout_seconds': timeout,
+                      'started_unix': started_unix, 'finished_unix': time.time(),
+                      'elapsed_seconds': time.monotonic() - started,
+                      'failure': type(failure).__name__ if failure else None,
+                      'returncode': getattr(failure, 'returncode', None) if failure else 0}
+            try:
+                with (OUT / 'ui-command-timings.jsonl').open('a') as stream:
+                    stream.write(json.dumps(record) + '\n')
+            except Exception as timing_failure:
+                if failure is None:
+                    raise
+                write_diagnostic('UI command timing could not be saved: ' + repr(timing_failure))
 
 
 def output(*args):
@@ -196,7 +217,8 @@ def output(*args):
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for marker in ('SUCCESS.txt', 'advisory-check.txt', 'app-sha256.txt', 'final-settings.json',
-                   'udp-echo-fixture.json', 'udp-echo-helper.json', 'udp-echo-helper.log'):
+                   'udp-echo-fixture.json', 'udp-echo-helper.json', 'udp-echo-helper.log',
+                   'ui-command-timings.jsonl'):
         (OUT / marker).unlink(missing_ok=True)
     if not __debug__ or sys.platform != 'darwin' or WORK.exists():
         raise SystemExit('Use assertions, the Apple toolchain and a clean UI workspace')
@@ -234,12 +256,17 @@ def main():
         # optional bulk system-diagnostic collection that stalled after runner exit.
         test_failure = None
         try:
-            run(['xcodebuild', 'test', '-project', app / 'Socks5.xcodeproj', '-scheme', 'StatisticsUIAudit',
-                 '-destination', 'platform=iOS Simulator,id=' + identifier, '-parallel-testing-enabled', 'NO',
-                 '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
-                 '-collect-test-diagnostics', 'never',
-                 'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES',
-                 'MARKETING_VERSION=3.0.0', 'CURRENT_PROJECT_VERSION=1'], 'ui-test.log', timeout=900)
+            arguments = ['-project', app / 'Socks5.xcodeproj', '-scheme', 'StatisticsUIAudit',
+                         '-destination', 'platform=iOS Simulator,id=' + identifier,
+                         '-parallel-testing-enabled', 'NO', '-derivedDataPath', WORK / 'DerivedData',
+                         'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES',
+                         'MARKETING_VERSION=3.0.0', 'CURRENT_PROJECT_VERSION=1']
+            # Compile the identical test target before measuring UI execution.
+            # Cold SDK/module compilation must not consume the four tests' budget.
+            run(['xcodebuild', 'build-for-testing', *arguments], 'ui-build.log', timeout=900, timing=True)
+            run(['xcodebuild', 'test-without-building', *arguments,
+                 '-resultBundlePath', OUT / 'UI.xcresult', '-collect-test-diagnostics', 'never'],
+                'ui-test.log', timeout=900, timing=True)
         except Exception as exc:
             test_failure = exc
         diagnostic_failure = None
@@ -262,7 +289,7 @@ def main():
             raise diagnostic_failure
         console = (OUT / 'ui-test.log').read_text()
         result_text = (OUT / 'xcresult.json').read_text()
-        for text in (console, result_text):
+        for text in ((OUT / 'ui-build.log').read_text(), console, result_text):
             if 'This method can lead to UI unresponsiveness' in text:
                 raise RuntimeError('Main-thread synchronous audio advisory remains')
         summary = json.loads((OUT / 'test-summary.json').read_text())
