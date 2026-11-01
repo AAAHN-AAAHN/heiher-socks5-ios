@@ -1,0 +1,39 @@
+name: Diagnostic only - historical legacy worker
+on:
+  push:
+    branches: [work/udp-echo-build-20261028]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose_legacy_worker_only:
+    name: Fixed historical legacy-worker diagnosis (not candidate)
+    if: ${{ contains(github.event.head_commit.message, '[legacy-worker-diagnostic]') }}
+    runs-on: xcode-27
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Restore failed historical fixture and execute the fixed comparison plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 Bootstrap/legacy-worker-diagnostic/run_legacy_worker_diagnostic.py \
+            --helper "$GITHUB_WORKSPACE" \
+            --pins "$GITHUB_WORKSPACE/Bootstrap/legacy-worker-diagnostic/historical-fixture-pins.json" \
+            --patcher "$GITHUB_WORKSPACE/Bootstrap/legacy-worker-diagnostic/instrument_legacy_worker.py" \
+            --output "$RUNNER_TEMP/legacy-worker-diagnostic-evidence"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Diagnostic-LegacyWorker-historical-618b3d2-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/legacy-worker-diagnostic-evidence/
+          if-no-files-found: error
+          retention-days: 90

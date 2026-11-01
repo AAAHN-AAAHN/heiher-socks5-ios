@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "scope": "Exact failed historical legacy-worker fixture; diagnostic only, no candidate or product acceptance",
+  "repository": "AAAHN-AAAHN/heiher-socks5-ios",
+  "origin_run_id": 41281429043,
+  "origin_attempt": 1,
+  "origin_workflow_path": ".github/workflows/udp-echo-candidate.yml",
+  "origin_producer_job_id": 124774003268,
+  "origin_producer_job_name": "build (integrated, 8bec30de328543f8f23b79a736385ed0e80aaa88, xcode-27, true)",
+  "origin_helper": {
+    "commit": "38b1525975397c3cd060f7de7c75452739c04591",
+    "tree": "7a7a34ff1171519f7d4f5f2dc0b164ff2c0b60d6"
+  },
+  "origin_candidate_source": "8bec30de328543f8f23b79a736385ed0e80aaa88",
+  "historical_commit": "618b3d2b413937aaad7373ee2af9e693ec81b84a",
+  "historical_entry_sha256": "3c328e52f33d5c731306a535b6bb923eb1bce27e89eb0367b67c213be761017d",
+  "artifact": {
+    "id": 13073983955,
+    "name": "UDP-Echo-build-integrated-macOS-41281429043-1",
+    "size_in_bytes": 98519917,
+    "digest": "sha256:0ac8fd966f88c8066fb8784963a06ddd2e9377fa06879d105c127b4da453859d"
+  },
+  "archive_member_count": 881,
+  "members": [
+    {
+      "member": "background-historical/check_async_session-failure-background-history-iens6bic/historical-provenance.json",
+      "saved_name": "historical-provenance.json",
+      "bytes": 409,
+      "sha256": "333a2ea64bde204f32117d446de106af7cd92a779fc5fd10ebf4f1b606db436a",
+      "zip_external_mode": 33188
+    },
+    {
+      "member": "background-historical/check_async_session-failure-background-history-iens6bic/legacy-worker/optimized/Controller.swift",
+      "saved_name": "Controller.swift",
+      "bytes": 28019,
+      "sha256": "0595d9f05d35f1f63d5e5b6ab6ce8e7487bf8e96560e10403febce382f34a6ec",
+      "zip_external_mode": 33188
+    },
+    {
+      "member": "background-historical/check_async_session-failure-background-history-iens6bic/legacy-worker/optimized/PlatformMocks.swift",
+      "saved_name": "PlatformMocks.swift",
+      "bytes": 12966,
+      "sha256": "59f9aed88294a478bd54c1d5a548a213b2d8c38c37bce6b7d800806d1a678648",
+      "zip_external_mode": 33188
+    },
+    {
+      "member": "background-historical/check_async_session-failure-background-history-iens6bic/legacy-worker/optimized/Test.swift",
+      "saved_name": "Test.swift",
+      "bytes": 1653,
+      "sha256": "91d5f6acdcbae6a32269cfa42653acf33aba1048b297a4314f68774f9e10519f",
+      "zip_external_mode": 33188
+    },
+    {
+      "member": "background-historical/check_async_session-failure-background-history-iens6bic/legacy-worker/optimized/test-True",
+      "saved_name": "test-True",
+      "bytes": 283496,
+      "sha256": "f05e5e7f6ed8ab7b8237eab789725c93b1ab53b80e32ed5553a4a28aba763c41",
+      "zip_external_mode": 33261
+    },
+    {
+      "member": "background-historical/check_async_session-failure-background-history-iens6bic/legacy-worker/optimized/failure.json",
+      "saved_name": "failure.json",
+      "bytes": 782,
+      "sha256": "bf5dff32fe5388b944bb41c5753202b7e1e2b673a0b45f59e651f59efd0bafc1",
+      "zip_external_mode": 33188
+    }
+  ],
+  "instrumentation": {
+    "helper_path": "Bootstrap/legacy-worker-diagnostic/instrument_legacy_worker.py",
+    "patcher_sha256": "8b0bd328506cdd5dd45e5e6290018e74e022f2af9ca74b0cd2597bd00295e1c9",
+    "insertion_blocks": 15,
+    "after_test_sha256": "f36946571301a108017aef06178251ea718eec6db3c8426e88c67f56c8f78303"
+  },
+  "helper_recipe_paths": [
+    "Bootstrap/legacy-worker-diagnostic/historical-fixture-pins.json",
+    "Bootstrap/legacy-worker-diagnostic/instrument_legacy_worker.py",
+    "Bootstrap/legacy-worker-diagnostic/run_legacy_worker_diagnostic.py",
+    ".github/workflows/legacy-worker-diagnostic.yml"
+  ],
+  "required_stdout_pass_markers": [
+    "PASS: actual legacy adapter waits on a utility worker while the main run loop remains responsive",
+    "PASS: legacy adapter propagates successful release and activation errors without main-thread setActive"
+  ],
+  "fixed_plan": {
+    "compile_count": 2,
+    "compile_cap_seconds_each": 90,
+    "compile_arguments": [
+      "swiftc",
+      "-swift-version",
+      "5",
+      "-warnings-as-errors",
+      "-O"
+    ],
+    "trial_variants": [
+      "uninstrumented",
+      "instrumented",
+      "instrumented",
+      "instrumented"
+    ],
+    "execution_cap_seconds_each": 30,
+    "original_inner_transition_deadline_seconds": 2,
+    "original_failed_binary_executed": false,
+    "retry_until_success": false
+  }
+}
