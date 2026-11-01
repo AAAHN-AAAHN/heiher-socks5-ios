@@ -1,0 +1,83 @@
+name: Diagnostic only - historical Integrated Audio intent
+on:
+  push:
+    branches: [work/udp-echo-build-20261028]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose_audio_only:
+    name: Audio intent diagnostic using historical producer inputs (not candidate)
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[audio-diagnostic]') }}
+    runs-on: xcode-27
+    timeout-minutes: 45
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      HISTORICAL_INTEGRATED_SHA: efae8be3f8ccb60fdb447a4175abebbecc2767de
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Preserve the actual diagnostic recipe
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/audio-diagnostic/recipe
+          cp Bootstrap/audio-diagnostic/*.py Bootstrap/audio-diagnostic/*.json artifacts/audio-diagnostic/recipe/
+          cp .github/workflows/audio-tap-diagnostic.yml artifacts/audio-diagnostic/recipe/
+          git rev-parse HEAD > artifacts/audio-diagnostic/recipe/actual-helper-sha.txt
+          git rev-parse 'HEAD^{tree}' > artifacts/audio-diagnostic/recipe/actual-helper-tree.txt
+      - name: Import current bundle objects and detach the explicitly historical source
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The concurrently running current candidate may use a new Integrated
+          # SHA. Import its exact objects/ancestry without claiming the older
+          # diagnostic source is the current candidate matrix row.
+          python3 Bootstrap/import_candidates.py
+          git cat-file -e "$HISTORICAL_INTEGRATED_SHA^{commit}"
+          git worktree add --detach "$RUNNER_TEMP/audio-diagnostic-source" "$HISTORICAL_INTEGRATED_SHA"
+          cp artifacts/candidate-prepare/result.json artifacts/audio-diagnostic/recipe/object-import-only.json
+      - name: Validate original API identities and restore historical framework bytes and modes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 Bootstrap/audio-diagnostic/restore_diagnostic_input.py \
+            --helper "$GITHUB_WORKSPACE" \
+            --root "$RUNNER_TEMP/audio-diagnostic-source" \
+            --pins Bootstrap/audio-diagnostic/historical-input-pins.json \
+            --output "$GITHUB_WORKSPACE/artifacts/audio-diagnostic/inputs"
+      - name: Build once and run the fixed diagnostic plan with original assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 Bootstrap/audio-diagnostic/run_audio_diagnostic.py \
+            --root "$RUNNER_TEMP/audio-diagnostic-source" \
+            --input-evidence "$GITHUB_WORKSPACE/artifacts/audio-diagnostic/inputs" \
+            --pins Bootstrap/audio-diagnostic/historical-input-pins.json \
+            --patcher "$GITHUB_WORKSPACE/Bootstrap/audio-diagnostic/instrument_audio_intent.py" \
+            --output "$GITHUB_WORKSPACE/artifacts/audio-diagnostic/execution" \
+            --work "$RUNNER_TEMP/audio-diagnostic-work"
+      - name: Record original source identity after the diagnostic regardless of outcome
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/audio-diagnostic/post-run
+          if [ -d "$RUNNER_TEMP/audio-diagnostic-source" ]; then
+            git -C "$RUNNER_TEMP/audio-diagnostic-source" rev-parse HEAD > artifacts/audio-diagnostic/post-run/source-sha.txt
+            git -C "$RUNNER_TEMP/audio-diagnostic-source" diff --exit-code HEAD -- > artifacts/audio-diagnostic/post-run/source-worktree.log
+            git -C "$RUNNER_TEMP/audio-diagnostic-source" diff --cached --exit-code HEAD -- > artifacts/audio-diagnostic/post-run/source-index.log
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Diagnostic-Audio-historical-efae8-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/audio-diagnostic/
+          if-no-files-found: error
+          retention-days: 90

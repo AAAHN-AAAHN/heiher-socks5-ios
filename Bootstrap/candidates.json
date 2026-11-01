@@ -1,9 +1,9 @@
 {
-  "sha256": "67e761bd51711701b5163a067125e8d3ae55174c87815ce63702c193f16dab7c",
+  "sha256": "1272850dd1104d590502ba3525d3f5fa5c57d6de96d3d8d72958e4f98aa453b0",
   "candidates": [
     {
       "name": "integrated",
-      "sha": "efae8be3f8ccb60fdb447a4175abebbecc2767de",
+      "sha": "8bec30de328543f8f23b79a736385ed0e80aaa88",
       "ref": "refs/heads/work/udp-echo-integrated-20261028"
     }
   ],
@@ -36,7 +36,13 @@
   "matrix": [
     {
       "name": "integrated",
-      "sha": "efae8be3f8ccb60fdb447a4175abebbecc2767de",
+      "sha": "8bec30de328543f8f23b79a736385ed0e80aaa88",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "integrated",
+      "sha": "8bec30de328543f8f23b79a736385ed0e80aaa88",
       "os": "xcode-27",
       "runtime": true
     }

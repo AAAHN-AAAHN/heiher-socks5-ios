@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "scope": "Historical verified producer inputs for diagnostic execution only; never a candidate same-run receipt or selected product.",
+  "repository": "AAAHN-AAAHN/heiher-socks5-ios",
+  "origin_run_id": 41274082138,
+  "origin_attempt": 1,
+  "origin_workflow_path": ".github/workflows/udp-echo-candidate.yml",
+  "origin_producer_job_id": 124752623516,
+  "origin_producer_job_name": "build (integrated, efae8be3f8ccb60fdb447a4175abebbecc2767de, xcode-27, true)",
+  "origin_helper": {
+    "commit": "924b62f5bcd6e529b5419155afdd83156c5b33f7",
+    "tree": "387ff3eb19588d9415dd7ee29c42ae8a66560e3b"
+  },
+  "source": {
+    "commit": "efae8be3f8ccb60fdb447a4175abebbecc2767de",
+    "tree": "8567f9573151a18443bb45cb0c0b65386fed6860"
+  },
+  "native_pins": {
+    ".": "318a2ffebfd87a12b72dbac95a65ca27143eb01b",
+    "src/core": "dadbb54bf7509f6dea3c1b30e45198efa400679c",
+    "third-part/hev-task-system": "4039d2fdbb3577af380fa0096b90d0ad99969dfa",
+    "third-part/yaml": "94441ec8777eb319936735a58b376963d09c73d4"
+  },
+  "input_artifact": {
+    "id": 13072452446,
+    "name": "UDP-Echo-runtime-integrated-41274082138-1",
+    "size_in_bytes": 2196805,
+    "digest": "sha256:44149dae46c00447b4ce18d00e6f04bb3b153ddf352116c4d5d7860925f70963"
+  },
+  "producer_artifact": {
+    "id": 13071754568,
+    "name": "UDP-Echo-build-integrated-macOS-41274082138-1",
+    "size_in_bytes": 105626465,
+    "digest": "sha256:d2be462313c649b995a318f21ff72eaf1ff5f09229166d4fce873c1e522ce63f"
+  },
+  "producer_receipt_sha256": "8981669a499dd3ddb70949af4c5a454e190e2d340617327a01b4f24372921e1d",
+  "producer_receipt_bytes": 992,
+  "archive_sha256": "3e0ab40a4ab8f95ddf626fba055d4affd856b91a93ac78419ed0107ce047a481",
+  "archive_size": 2196687,
+  "manifest_sha256": "ff497aab1ad02721a608593fd5b03d8e32c36c53ec8048e0041c114ac195034b",
+  "manifest_file_count": 319,
+  "framework_file_count": 16,
+  "ipa": {
+    "mode": 420,
+    "sha256": "f7b8bdb73ef59bca90c19ab8fedf32b81a5474cf3d18cbff691c19d9b91a2327",
+    "size": 443562
+  },
+  "validator_sha256": {
+    "Bootstrap/runtime_handoff.py": "740994d1ee17733b2a1f68bc65e756c053206ab8eccf90ed5a28de266440e7e1",
+    "Build/review_handoff.py": "9f2122c1661e52495deea7f094fb3659574280e2f73bfe34064d3c839a2432bd",
+    "Build/release_source.py": "c90aee96146fa2fa2ed0dd40bbf4cac9f1b4677506920a4dbb42c6316f80383b"
+  },
+  "original_candidate_workflow_sha256": "93d18041333e09f350b0113c3cce5961f8a0af720fe49e94492044280bbae90c",
+  "ui_source_sha256": {
+    "Build/ui_review.py": "3714fe7252494b3336212f5961e0315f9a36e39d98e8cc51f80341030ebaea9f",
+    "Tests/Statistics/ui_audit.py": "c94f9b0a87b45140a30252d8e535455fcb383c323c0301456bac9ad8d649a469",
+    "Tests/Integration/IntegrationUITests.swift": "b193689139fcbe4752eb1cfe73ab4bfd09da75e12b3566fbc74331205a6fb8da",
+    "Tests/Background/AsyncAudioUITests.swift": "14cfa19dbd0c8a167b3ea0f1d7412456a74449cbdd3843e8a15f46d03c34f260",
+    "Tests/Statistics/StatisticsUITests.swift": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
+  }
+}
