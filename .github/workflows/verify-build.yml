@@ -45,8 +45,13 @@ jobs:
         env:
           DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
         if: runner.os == 'macOS' && github.ref == 'refs/heads/feature/server-control'
-        id: ui
         run: python3 Tests/ServerControl/ui_audit.py
+      - name: Actual persistence, restart and JSON on iOS 27 Simulator
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+        if: runner.os == 'macOS' && github.ref == 'refs/heads/feature/settings-persistence'
+        id: ui
+        run: python3 Tests/Settings/ui_audit.py
       - name: Record exact tested source
         if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         run: python3 Build/record_evidence.py
@@ -60,5 +65,5 @@ jobs:
         if: ${{ always() && steps.ui.outcome != '' && steps.ui.outcome != 'skipped' }}
         with:
           name: Feature-UI-${{ runner.os }}
-          path: artifacts/server-control-ui-audit/
+          path: artifacts/settings-persistence-ui-audit/
           retention-days: 30
