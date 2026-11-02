@@ -1,38 +1,25 @@
-name: Audit traffic statistics without IPA packaging
+name: Verify server and persistent-settings boundaries
 on:
   push:
-    branches: [feature/traffic-statistics]
+    branches: [feature/server-control, feature/settings-persistence]
   workflow_dispatch:
-  workflow_call:
-    inputs:
-      ref:
-        required: true
-        type: string
 permissions:
   contents: read
 jobs:
-  udp-prerequisite:
-    uses: ./.github/workflows/udp-compat-audit.yml
-    with:
-      ref: b05db817684d6b006353d5062fdba756d739faea
   verify:
-    needs: udp-prerequisite
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, xcode-27]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
           fetch-depth: 0
-      - name: Prepare this audit output
-        id: build
-        run: python3 Tests/Statistics/audit.py --prepare
-      - name: Install upstream formatter
+      - name: Install formatter without replacing the compiler
         shell: bash
         run: |
           set -euo pipefail
@@ -45,35 +32,33 @@ jobs:
             ln -s "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
             echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
           fi
-      - name: Record the actual iOS 27 toolchain
+      - name: Native, lifecycle and persistence checks without IPA
+        shell: bash
+        id: build
+        env:
+          BUILD_IPA: '0'
+        run: bash Build/build.sh
+      - name: Actual iOS 27 API type checks
         if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts/statistics-final-audit
-          xcodebuild -version | tee artifacts/statistics-final-audit/toolchain.txt
-          xcrun --sdk iphoneos --show-sdk-version | tee -a artifacts/statistics-final-audit/toolchain.txt | grep -E '^27\.'
-          xcrun swiftc --version >> artifacts/statistics-final-audit/toolchain.txt
-          sw_vers >> artifacts/statistics-final-audit/toolchain.txt
-      - name: Verify statistics-only sources, native accounting and Swift types
-        shell: bash
-        run: python3 Tests/Statistics/audit.py
-      - name: Exercise actual Server controls and tabs on iOS 27 Simulator
+        run: bash Build/check_swift_sdk.sh
+      - name: Actual server-control UI and native listener on iOS 27 Simulator
         env:
           DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
-        if: runner.os == 'macOS'
-        shell: bash
+        if: runner.os == 'macOS' && github.ref == 'refs/heads/feature/server-control'
         id: ui
-        run: python3 Tests/Statistics/ui_audit.py
+        run: python3 Tests/ServerControl/ui_audit.py
+      - name: Record exact tested source
+        if: ${{ always() && steps.build.outputs.artifact_path != '' }}
+        run: python3 Build/record_evidence.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         with:
-          name: Statistics-final-audit-${{ runner.os }}
+          name: Socks5-${{ steps.build.outputs.composition }}-${{ runner.os }}
           path: ${{ steps.build.outputs.artifact_path }}
           retention-days: 30
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: ${{ always() && steps.ui.outcome != '' && steps.ui.outcome != 'skipped' }}
         with:
-          name: Statistics-UI-${{ runner.os }}
-          path: artifacts/statistics-ui-audit/
+          name: Feature-UI-${{ runner.os }}
+          path: artifacts/server-control-ui-audit/
           retention-days: 30
