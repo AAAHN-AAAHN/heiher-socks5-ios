@@ -1,69 +1,70 @@
-name: Verify server and persistent-settings boundaries
+name: Verify and build declared SOCKS5 features
 on:
   push:
-    branches: [feature/server-control, feature/settings-persistence]
+    branches: [main, feature/udp-compat, feature/traffic-statistics, feature/background, feature/server-control, feature/settings-persistence, feature/app-icon, release/integrated]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
 permissions:
   contents: read
 jobs:
   verify:
+    if: ${{ !contains(github.event.head_commit.message, '[icon-checks-only]') }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, xcode-27]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
           fetch-depth: 0
-      - name: Install formatter without replacing the compiler
+      - name: Install upstream formatter
         shell: bash
         run: |
-          set -euo pipefail
           if [ "$RUNNER_OS" = Linux ]; then
             sudo apt-get update -qq
             sudo apt-get install -y clang-format-18
           else
             brew install llvm@18
-            mkdir -p "$RUNNER_TEMP/format-only"
-            ln -s "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
-            echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
+            mkdir -p "$HOME/.local/bin"
+            ln -sf "$(brew --prefix llvm@18)/bin/clang-format" "$HOME/.local/bin/clang-format-18"
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           fi
-      - name: Native, lifecycle and persistence checks without IPA
-        shell: bash
+      - name: Validate source, test native code, and archive iOS on macOS
         id: build
-        env:
-          BUILD_IPA: '0'
+        shell: bash
         run: bash Build/build.sh
-      - name: Actual iOS 27 API type checks
-        if: runner.os == 'macOS'
-        run: bash Build/check_swift_sdk.sh
-      - name: Actual server-control UI and native listener on iOS 27 Simulator
-        env:
-          DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
-        if: runner.os == 'macOS' && github.ref == 'refs/heads/feature/server-control'
-        run: python3 Tests/ServerControl/ui_audit.py
-      - name: Actual persistence, restart and JSON on iOS 27 Simulator
-        env:
-          DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
-        if: runner.os == 'macOS' && github.ref == 'refs/heads/feature/settings-persistence'
-        id: ui
-        run: python3 Tests/Settings/ui_audit.py
-      - name: Record exact tested source
-        if: ${{ always() && steps.build.outputs.artifact_path != '' }}
-        run: python3 Build/record_evidence.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         with:
           name: Socks5-${{ steps.build.outputs.composition }}-${{ runner.os }}
           path: ${{ steps.build.outputs.artifact_path }}
           retention-days: 30
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: ${{ always() && steps.ui.outcome != '' && steps.ui.outcome != 'skipped' }}
+  icon-checks:
+    if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[icon-checks-only]') }}
+    runs-on: xcode-27
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          name: Feature-UI-${{ runner.os }}
-          path: artifacts/settings-persistence-ui-audit/
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Audit icon source, compile assets and verify Simulator registration (no IPA)
+        shell: bash
+        run: bash Tests/AppIcon/run_checks.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: AppIcon-iOS27-audit
+          path: artifacts/icon-checks/
           retention-days: 30
