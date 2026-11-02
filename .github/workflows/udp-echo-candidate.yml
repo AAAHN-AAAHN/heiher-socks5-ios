@@ -83,6 +83,51 @@ jobs:
             ln -sf "$(brew --prefix llvm@18)/bin/clang-format" "$RUNNER_TEMP/format-only/clang-format-18"
             echo "$RUNNER_TEMP/format-only" >> "$GITHUB_PATH"
           fi
+      - name: Demonstrate bounded UDP reply observation coordination
+        if: ${{ runner.os == 'Linux' && matrix.name == 'background' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/udp-observation-original" d1539f429b6a0e993adc9d50f816c3a29c3fac32
+          diagnostic_status=0
+          python3 Bootstrap/transport_observation_regression.py \
+            --original-root "$RUNNER_TEMP/udp-observation-original" \
+            --proposed-root "$RUNNER_TEMP/udp-source" \
+            --swiftc "$(command -v swiftc)" \
+            --output "$RUNNER_TEMP/udp-observation-comparison" || diagnostic_status=$?
+          python3 - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          temporary = Path(os.environ['RUNNER_TEMP'])
+          origin = temporary / 'udp-observation-comparison'
+          target = temporary / 'udp-source/artifacts/transport-observation-regression'
+          target.mkdir(parents=True, exist_ok=False)
+          names = ['focused-regression.json']
+          for variant in ('original', 'proposed'):
+              names += [variant + '/' + name for name in (
+                  'compile/command.json', 'compile/stdout.log', 'compile/stderr.log',
+                  'trial/process/command.json', 'trial/process/stdout.log',
+                  'trial/process/stderr.log', 'trial/trial.json')]
+          copied, missing, executables = [], [], []
+          for name in names:
+              path = origin / name
+              if not path.is_file():
+                  missing.append(name)
+                  continue
+              assert not path.is_symlink()
+              data = path.read_bytes()
+              destination = target / name
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              destination.write_bytes(data)
+              copied.append({'path': name, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
+          for variant in ('original', 'proposed'):
+              path = origin / variant / 'transport-probe'
+              if path.is_file():
+                  data = path.read_bytes()
+                  executables.append({'variant': variant, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(), 'mode': path.stat().st_mode & 0o777})
+          (target / 'capture.json').write_text(json.dumps({'explicit_expected_files': names, 'copied': copied, 'missing': missing, 'compiled_executable_identities': executables, 'helper_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'], 'run_attempt': os.environ['GITHUB_RUN_ATTEMPT']}, indent=2) + '\n')
+          PYCODE
+          exit "$diagnostic_status"
       - name: Execute the exact candidate owner gates
         working-directory: ${{ runner.temp }}/udp-source
         env:
