@@ -109,6 +109,7 @@ jobs:
     runs-on: xcode-27
     timeout-minutes: 45
     env:
+      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
       REVIEW_INPUT_ARTIFACT_ID: ${{ needs.verify-macos.outputs.review-artifact-id }}
       REVIEW_INPUT_ARTIFACT_DIGEST: ${{ needs.verify-macos.outputs.review-artifact-digest }}
       REVIEW_INPUT_SHA256: ${{ needs.verify-macos.outputs.review-archive-sha256 }}
