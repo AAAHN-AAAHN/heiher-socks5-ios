@@ -22,13 +22,17 @@ private final class Probe: @unchecked Sendable {
     var pending = false
     var finished = false
     var greetingOffAcknowledged = false
+    var observationWindowElapsed = false
+    var finishScheduled = false
+    let expectedReplyBytes: Int?
     let mode: String
     let target: Socks5UDPClient.Address
     let configuration: Socks5UDPClient.Configuration
     let generation: UInt64
 
-    init(mode: String, server: String, port: UInt16, target: String) {
+    init(mode: String, server: String, port: UInt16, target: String, expectedReplyBytes: Int? = nil) {
         self.mode = mode
+        self.expectedReplyBytes = expectedReplyBytes
         self.target = Socks5UDPClient.Address(host: target, port: 7)!
         let credentials: Socks5UDPClient.Credentials?
         if mode == "auth" || mode == "auth-long" || mode == "reject-auth" || mode == "wrong-auth" {
@@ -53,7 +57,13 @@ private final class Probe: @unchecked Sendable {
                 }
             }
         }
-        queue.asyncAfter(deadline: .now() + .milliseconds(650)) { [self] in finish() }
+        queue.asyncAfter(deadline: .now() + .milliseconds(650)) { [self] in
+            // Only the independent positive fixture opts into reply observation.
+            // Silence, Off, negative and five-argument native callers stop here.
+            guard expectedReplyBytes != nil else { finish(); return }
+            observationWindowElapsed = true
+            finishAfterExpectedReplies()
+        }
         guard done.wait(timeout: .now() + 5) == .success else { fatalError("Transport probe stalled") }
         // Cancellation handlers execute on this same queue before the snapshot.
         let result: [String: Any] = queue.sync {
@@ -85,7 +95,10 @@ private final class Probe: @unchecked Sendable {
             greetingOffAcknowledged = true
         }
         if peer.port != configuration.server.port {
-            if sent { datagramWrites += count } else { udpReadBytes += count }
+            if sent { datagramWrites += count } else {
+                udpReadBytes += count
+                finishAfterExpectedReplies()
+            }
         }
     }
 
@@ -122,6 +135,15 @@ private final class Probe: @unchecked Sendable {
         }
     }
 
+    private func finishAfterExpectedReplies() {
+        guard observationWindowElapsed, let expectedReplyBytes,
+              udpReadBytes >= expectedReplyBytes, !finished, !finishScheduled else { return }
+        finishScheduled = true
+        // Do not stop the client reentrantly from its receive observer. The
+        // existing five-second semaphore and six-second process caps still apply.
+        queue.async { [self] in finish() }
+    }
+
     private func finish() {
         guard !finished else { return }
         finished = true
@@ -153,8 +175,16 @@ private struct Main {
             print("PASS: numeric addresses, mapped identity, scope and credential byte equality")
             return
         }
-        precondition(CommandLine.arguments.count == 5)
+        precondition(CommandLine.arguments.count == 5 || CommandLine.arguments.count == 6)
+        let expectedReplyBytes: Int?
+        if CommandLine.arguments.count == 6 {
+            guard let count = Int(CommandLine.arguments[5]), count > 0 else {
+                fatalError("Invalid positive-fixture reply byte count")
+            }
+            expectedReplyBytes = count
+        } else { expectedReplyBytes = nil }
         Probe(mode: CommandLine.arguments[1], server: CommandLine.arguments[2],
-              port: UInt16(CommandLine.arguments[3])!, target: CommandLine.arguments[4]).run()
+              port: UInt16(CommandLine.arguments[3])!, target: CommandLine.arguments[4],
+              expectedReplyBytes: expectedReplyBytes).run()
     }
 }

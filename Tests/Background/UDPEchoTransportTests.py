@@ -39,8 +39,10 @@ def address(connection, kind):
 
 
 class Fixture:
-    def __init__(self, mode, family, target):
+    def __init__(self, mode, family, target, *, delay_last_reply=False):
         self.mode, self.family, self.target = mode, family, target
+        self.delay_last_reply = delay_last_reply
+        self.delayed_reply = None
         self.host = "127.0.0.1" if family == socket.AF_INET else "::1"
         self.listener = socket.socket(family, socket.SOCK_STREAM)
         self.relay = socket.socket(family, socket.SOCK_DGRAM)
@@ -167,6 +169,17 @@ class Fixture:
                     if self.mode == "foreign":
                         with socket.socket(self.family, socket.SOCK_DGRAM) as stranger:
                             stranger.sendto(b"foreign-data-must-not-count", sender)
+                    if self.delay_last_reply and len(self.datagrams) == 5:
+                        # A bounded regression: release the last reply after the
+                        # old fixed650ms stop, without delaying any client send.
+                        started = time.monotonic_ns()
+                        time.sleep(0.7)
+                        self.delayed_reply = {
+                            "started_monotonic_ns": started,
+                            "released_monotonic_ns": time.monotonic_ns(),
+                            "datagrams_received": len(self.datagrams),
+                            "reply_bytes_before_release": self.reply_bytes,
+                        }
                     for reply in replies:
                         self.relay.sendto(reply, sender)
                         self.reply_bytes += len(reply)
@@ -189,6 +202,20 @@ class Fixture:
         self.thread.join(3)
         assert not self.thread.is_alive(), "fixture leaked its thread"
         assert self.error is None, self.error
+
+
+def expected_reply_bytes(mode, target):
+    # This oracle comes from this independent peer's packet/reply protocol; it
+    # never schedules client sends or relaxes the final actual-byte equality.
+    if mode not in {
+        "echo", "auth", "auth-long", "domain", "wildcard4", "wildcard6",
+        "burst", "foreign", "io-faults", "io-drop", "delayed-last-reply",
+    }:
+        return None
+    family = socket.AF_INET6 if ":" in target else socket.AF_INET
+    packet_bytes = 4 + len(socket.inet_pton(family, target)) + 2 + 1
+    reply_bytes = packet_bytes + (80 * (0 + 1 + 4) if mode == "burst" else 0)
+    return (4 if mode == "io-drop" else 5) * reply_bytes
 
 
 def main():
@@ -214,6 +241,7 @@ def main():
         "domain", "wildcard4", "wildcard6", "burst", "foreign", "control-close", "control-data")]
     cases += [("echo", socket.AF_INET6, "::1"), ("domain", socket.AF_INET6, "::1"),
               ("echo", socket.AF_INET, "::1"), ("echo", socket.AF_INET6, "127.0.0.1")]
+    cases += [("delayed-last-reply", socket.AF_INET, "127.0.0.1")]
     fault_library = options.output / "socket-faults.so"
     if platform.system() == "Linux":
         assert options.clang, "clang is required for real socket fault boundaries"
@@ -226,17 +254,22 @@ def main():
         assert cases, "no matching cases"
     results = []
     for mode, family, target in cases:
-        fixture_mode = "auth-long" if mode.startswith("io-") else mode
-        fixture = Fixture(fixture_mode, family, target)
+        fixture_mode = ("auth-long" if mode.startswith("io-") else
+                        "wildcard6" if mode == "delayed-last-reply" else mode)
+        fixture = Fixture(fixture_mode, family, target,
+                          delay_last_reply=mode == "delayed-last-reply")
         environment = os.environ.copy()
         if mode.startswith("io-"):
             environment["LD_PRELOAD"] = str(fault_library.resolve())
             environment["UDP_ECHO_IO_FAULTS"] = "1"
             if mode == "io-drop":
                 environment["UDP_ECHO_DROP_ONCE"] = "1"
-        result = subprocess.run([str(executable), fixture_mode, fixture.host,
-                                 str(fixture.listener.getsockname()[1]), target],
-                                capture_output=True, text=True, timeout=6, env=environment)
+        arguments = [str(executable), fixture_mode, fixture.host,
+                     str(fixture.listener.getsockname()[1]), target]
+        expected_reply_count = expected_reply_bytes(mode, target)
+        if expected_reply_count is not None:
+            arguments.append(str(expected_reply_count))
+        result = subprocess.run(arguments, capture_output=True, text=True, timeout=6, env=environment)
         try:
             fixture.finish()
         finally:
@@ -247,6 +280,9 @@ def main():
                 "returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr,
                 "fixture_error": fixture.error, "post_off_byte": fixture.post_off_byte,
                 "fixture_thread_alive": fixture.thread.is_alive(),
+                "expected_reply_bytes": expected_reply_count,
+                "fixture_reply_bytes": fixture.reply_bytes,
+                "delayed_reply": fixture.delayed_reply,
             }, indent=2) + "\n")
         assert result.returncode == 0, (mode, result.stderr, result.stdout)
         data = json.loads(result.stdout)
