@@ -14,7 +14,7 @@ import tarfile
 import threading
 import time
 from release_source import PRODUCT, check_product, check_source
-from simulator_diagnostics import capture_failure, output_bytes, record_command, warning
+from simulator_diagnostics import capture_failure, observed_run, output_bytes, record_command, warning
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'artifacts/integrated/simulator'
@@ -24,7 +24,8 @@ def run(*args, timeout=120, log=None):
     started, started_unix = time.monotonic(), time.time()
     failure = result = None
     try:
-        result = subprocess.run([str(x) for x in args], capture_output=True, text=True, timeout=timeout, cwd=ROOT)
+        result = observed_run([str(x) for x in args], out=OUT,
+                              capture_output=True, text=True, timeout=timeout, cwd=ROOT)
         if log:
             (OUT / log).write_bytes(output_bytes(result.stdout) + output_bytes(result.stderr))
         if result.returncode:
@@ -159,7 +160,8 @@ def tcp_echo(proxy_port):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    for marker in ('SUCCESS.txt', 'results.json', 'simulator-command-timings.jsonl'):
+    for marker in ('SUCCESS.txt', 'results.json', 'simulator-command-timings.jsonl',
+                   'process-observations.jsonl'):
         (OUT / marker).unlink(missing_ok=True)
     check_product()
     with (OUT / 'app-build.log').open('w') as log:
@@ -272,8 +274,7 @@ def main():
                     run('xcrun', 'simctl', action, device, timeout=30, log='cleanup-' + action + '.log')
                 except Exception as error:
                     cleanup.append({'action': action, 'error': repr(error)})
-            if cleanup:
-                capture_failure(OUT, 'cleanup', device, cleanup)
+                    capture_failure(OUT, 'cleanup-' + action, device, error)
         (OUT / 'cleanup.json').write_text(json.dumps(cleanup, indent=2))
     if cleanup:
         preserve_failed_app(app)

@@ -18,7 +18,7 @@ import zipfile
 import hashlib
 import xml.etree.ElementTree as ET
 from release_source import PRODUCT, check_product, check_source
-from simulator_diagnostics import capture_failure, output_bytes, record_command, warning
+from simulator_diagnostics import capture_failure, observed_run, output_bytes, record_command, warning
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'artifacts/integrated/ui'
@@ -190,8 +190,8 @@ def run(args, log, timeout=180, cwd=ROOT, timing=False):
     failure = None
     try:
         with (OUT / log).open('w') as stream:
-            subprocess.run(command, cwd=cwd, stdout=stream,
-                           stderr=subprocess.STDOUT, check=True, timeout=timeout)
+            observed_run(command, out=OUT, cwd=cwd, stdout=stream,
+                         stderr=subprocess.STDOUT, check=True, timeout=timeout)
     except Exception as exc:
         failure = exc
         raise
@@ -216,7 +216,8 @@ def output(*args, log=None):
     started, started_unix = time.monotonic(), time.time()
     failure = None
     try:
-        value = subprocess.check_output(command, text=True, cwd=ROOT, timeout=60)
+        value = observed_run(command, out=OUT, stdout=subprocess.PIPE,
+                             text=True, cwd=ROOT, timeout=60, check=True).stdout
         if log:
             (OUT / log).write_bytes(output_bytes(value))
         return value.strip()
@@ -238,7 +239,8 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for marker in ('SUCCESS.txt', 'advisory-check.txt', 'app-sha256.txt', 'final-settings.json',
                    'udp-echo-fixture.json', 'udp-echo-helper.json', 'udp-echo-helper.log',
-                   'ui-command-timings.jsonl', 'ui-control-command-timings.jsonl'):
+                   'ui-command-timings.jsonl', 'ui-control-command-timings.jsonl',
+                   'process-observations.jsonl'):
         (OUT / marker).unlink(missing_ok=True)
     if not __debug__ or sys.platform != 'darwin' or WORK.exists():
         raise SystemExit('Use assertions, the Apple toolchain and a clean UI workspace')
@@ -344,14 +346,14 @@ def main():
                 fixture.close()
             except Exception as exc:
                 cleanup.append('UDP Echo fixture: ' + str(exc))
+                capture_failure(OUT, 'cleanup-udp-fixture', identifier, exc)
         if identifier is not None:
             for action in ('shutdown', 'delete'):
                 try:
                     run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=30)
                 except Exception as exc:
                     cleanup.append(str(exc))
-        if cleanup:
-            capture_failure(OUT, 'cleanup', identifier, cleanup)
+                    capture_failure(OUT, 'cleanup-' + action, identifier, exc)
     (OUT / 'cleanup.json').write_text(json.dumps(cleanup, indent=2))
     if failure:
         raise failure

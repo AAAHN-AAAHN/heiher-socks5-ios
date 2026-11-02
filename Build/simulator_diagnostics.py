@@ -40,6 +40,68 @@ def output_bytes(value):
     return value if isinstance(value, bytes) else value.encode('utf-8')
 
 
+def observed_run(command, *, out, timeout, cwd=None, capture_output=False,
+                 text=False, stdout=None, stderr=None, check=False):
+    """Run one command with the original deadline and observe its process boundary.
+
+    A timeout remains a timeout even if poll() observes that the child exited.
+    This distinguishes a live child from an exited child with inherited PIPEs;
+    it does not infer when the Simulator itself finished changing state.
+    """
+    if capture_output:
+        if stdout is not None or stderr is not None:
+            raise ValueError('capture_output cannot be combined with stdout/stderr')
+        stdout = stderr = subprocess.PIPE
+    started = time.monotonic()
+    observation = {'command': list(map(str, command)), 'timeout_seconds': timeout,
+                   'started_unix': time.time(), 'pid': None,
+                   'stdout_is_pipe': stdout == subprocess.PIPE,
+                   'stderr_is_pipe': stderr == subprocess.PIPE}
+    failure = None
+    try:
+        with subprocess.Popen(command, cwd=cwd, stdout=stdout, stderr=stderr,
+                              text=text) as process:
+            observation['pid'] = process.pid
+            observation['communication_started_unix'] = time.time()
+            observation['deadline_unix'] = observation['communication_started_unix'] + timeout
+            try:
+                output, errors = process.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                # Record before killing/reaping our child or starting any other
+                # simctl command. poll() never changes a timeout into a pass.
+                observation['timeout_observation'] = {
+                    'observed_unix': time.time(),
+                    'elapsed_seconds': time.monotonic() - started,
+                    'poll_returncode': process.poll(),
+                    'stdout_pipe_closed': getattr(process.stdout, 'closed', None),
+                    'stderr_pipe_closed': getattr(process.stderr, 'closed', None)}
+                process.kill()
+                process.wait()
+                raise
+            except BaseException:
+                process.kill()
+                raise
+            observation['returncode'] = process.poll()
+            if check and observation['returncode']:
+                raise subprocess.CalledProcessError(observation['returncode'], command,
+                                                    output=output, stderr=errors)
+            return subprocess.CompletedProcess(command, observation['returncode'], output, errors)
+    except BaseException as error:
+        failure = error
+        raise
+    finally:
+        observation['finished_unix'] = time.time()
+        observation['elapsed_seconds'] = time.monotonic() - started
+        observation['failure'] = type(failure).__name__ if failure else None
+        try:
+            with (Path(out) / 'process-observations.jsonl').open('a') as stream:
+                stream.write(json.dumps(observation) + '\n')
+        except Exception as error:
+            if failure is None:
+                raise
+            warning('Process boundary evidence could not be saved: ' + repr(error))
+
+
 def capture_failure(out, phase, device, failure):
     """Best effort, at most 20 seconds of diagnostic command time per capture."""
     try:
