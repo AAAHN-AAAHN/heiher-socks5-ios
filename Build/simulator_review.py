@@ -14,15 +14,29 @@ import tarfile
 import threading
 import time
 from release_source import PRODUCT, check_product, check_source
+from simulator_diagnostics import capture_failure, output_bytes, record_command, warning
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'artifacts/integrated/simulator'
 
 
-def run(*args, timeout=120):
+def run(*args, timeout=120, log=None):
+    started, started_unix = time.monotonic(), time.time()
+    failure = result = None
     try:
         result = subprocess.run([str(x) for x in args], capture_output=True, text=True, timeout=timeout, cwd=ROOT)
+        if log:
+            (OUT / log).write_bytes(output_bytes(result.stdout) + output_bytes(result.stderr))
+        if result.returncode:
+            raise RuntimeError(f'{args}: exit {result.returncode}\n{result.stdout}\n{result.stderr}')
+        return result.stdout.strip()
     except subprocess.TimeoutExpired as error:
+        failure = error
+        if log:
+            try:
+                (OUT / log).write_bytes(output_bytes(error.stdout) + output_bytes(error.stderr))
+            except Exception as log_error:
+                warning('Failed to retain timed-out command output: ' + repr(log_error))
         # communicate() retains partial bytes even with text=True. Keep them in
         # the original redirected log without replacing the original timeout.
         for stream, data in ((sys.stdout, error.stdout), (sys.stderr, error.stderr)):
@@ -37,9 +51,12 @@ def run(*args, timeout=120):
                 except Exception:
                     pass  # A failed diagnostic write must not hide the timeout.
         raise
-    if result.returncode:
-        raise RuntimeError(f'{args}: exit {result.returncode}\n{result.stdout}\n{result.stderr}')
-    return result.stdout.strip()
+    except Exception as error:
+        failure = error
+        raise
+    finally:
+        record_command(OUT, 'simulator-command-timings.jsonl', args, timeout,
+                       started, started_unix, failure, getattr(result, 'returncode', None))
 
 
 def preserve_failed_app(app, device=None):
@@ -142,7 +159,7 @@ def tcp_echo(proxy_port):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    for marker in ('SUCCESS.txt', 'results.json'):
+    for marker in ('SUCCESS.txt', 'results.json', 'simulator-command-timings.jsonl'):
         (OUT / marker).unlink(missing_ok=True)
     check_product()
     with (OUT / 'app-build.log').open('w') as log:
@@ -155,21 +172,28 @@ def main():
     app = ROOT / '.build/integrated-simulator/Socks5.app'
     info = plistlib.loads((app / 'Info.plist').read_bytes())
     assert info['DTSDKName'].startswith('iphonesimulator27.')
-    runtimes = json.loads(run('xcrun', 'simctl', 'list', 'runtimes', '-j'))['runtimes']
-    runtime = next(r for r in runtimes if r['isAvailable'] and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-27'))
-    types = json.loads(run('xcrun', 'simctl', 'list', 'devicetypes', '-j'))['devicetypes']
-    device_type = next(t['identifier'] for t in types if t['name'] == 'iPhone 16')
-    device = run('xcrun', 'simctl', 'create', 'Integrated Eight Branch Review', device_type, runtime['identifier'])
-    (OUT / 'environment.json').write_text(json.dumps({'runtime': runtime, 'device_type': device_type,
-        'scope': 'Production app on Simulator, preseeded JSON. No physical device, installer, UI tap or background-delivery claim.'}, indent=2))
     outcomes = []
     def record(result):
         outcomes.append(result)
         (OUT / 'results.json').write_text(json.dumps(outcomes, indent=2) + '\n')
     installation_started = False
+    device = None
+    phase = 'selection'
     try:
-        run('xcrun', 'simctl', 'boot', device)
-        (OUT / 'boot.log').write_text(run('xcrun', 'simctl', 'bootstatus', device, '-b', timeout=240))
+        runtimes = json.loads(run('xcrun', 'simctl', 'list', 'runtimes', '-j'))['runtimes']
+        runtime = next(r for r in runtimes if r['isAvailable'] and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-27'))
+        types = json.loads(run('xcrun', 'simctl', 'list', 'devicetypes', '-j'))['devicetypes']
+        device_type = next(t['identifier'] for t in types if t['name'] == 'iPhone 16')
+        phase = 'create'
+        device = run('xcrun', 'simctl', 'create', 'Integrated Eight Branch Review', device_type, runtime['identifier'])
+        phase = 'environment'
+        (OUT / 'environment.json').write_text(json.dumps({'runtime': runtime, 'device_type': device_type, 'udid': device,
+            'scope': 'Production app on Simulator, preseeded JSON. No physical device, installer, UI tap or background-delivery claim.'}, indent=2))
+        phase = 'boot'
+        run('xcrun', 'simctl', 'boot', device, log='boot-request.log')
+        phase = 'bootstatus'
+        run('xcrun', 'simctl', 'bootstatus', device, '-b', timeout=240, log='boot.log')
+        phase = 'scenarios'
         for suffix in ('', '.REMAPTEST'):
             bundle = 'hev.Socks5' + suffix
             label = 'original' if not suffix else 'remapped'
@@ -235,19 +259,21 @@ def main():
             record({'identity': label, 'case': 'saved-stop', 'passed': True})
             run('xcrun', 'simctl', 'uninstall', device, bundle)
         success_text = ('PASS: saved tabs, Start/relaunch/TCP and Stop in original/remapped Simulator installs. Not a physical SideStore/LiveContainer or background audio test.\n')
-    except Exception:
+    except Exception as error:
+        capture_failure(OUT, phase, device, error)
         if installation_started:
             preserve_failed_app(app, device)
         raise
     finally:
         cleanup = []
-        for action in ('shutdown', 'delete'):
-            try:
-                result = subprocess.run(['xcrun', 'simctl', action, device], capture_output=True, timeout=30)
-                if result.returncode:
-                    cleanup.append({'action': action, 'exit': result.returncode, 'stderr': result.stderr.decode(errors='replace')})
-            except subprocess.TimeoutExpired:
-                cleanup.append({'action': action, 'error': 'timeout'})
+        if device is not None:
+            for action in ('shutdown', 'delete'):
+                try:
+                    run('xcrun', 'simctl', action, device, timeout=30, log='cleanup-' + action + '.log')
+                except Exception as error:
+                    cleanup.append({'action': action, 'error': repr(error)})
+            if cleanup:
+                capture_failure(OUT, 'cleanup', device, cleanup)
         (OUT / 'cleanup.json').write_text(json.dumps(cleanup, indent=2))
     if cleanup:
         preserve_failed_app(app)

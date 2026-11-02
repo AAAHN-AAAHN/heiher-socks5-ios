@@ -18,6 +18,7 @@ import zipfile
 import hashlib
 import xml.etree.ElementTree as ET
 from release_source import PRODUCT, check_product, check_source
+from simulator_diagnostics import capture_failure, output_bytes, record_command, warning
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'artifacts/integrated/ui'
@@ -195,7 +196,7 @@ def run(args, log, timeout=180, cwd=ROOT, timing=False):
         failure = exc
         raise
     finally:
-        if timing:
+        if timing or command[:2] == ['xcrun', 'simctl']:
             record = {'command': command, 'log': log, 'timeout_seconds': timeout,
                       'started_unix': started_unix, 'finished_unix': time.time(),
                       'elapsed_seconds': time.monotonic() - started,
@@ -210,15 +211,34 @@ def run(args, log, timeout=180, cwd=ROOT, timing=False):
                 write_diagnostic('UI command timing could not be saved: ' + repr(timing_failure))
 
 
-def output(*args):
-    return subprocess.check_output(list(map(str, args)), text=True, cwd=ROOT, timeout=60).strip()
+def output(*args, log=None):
+    command = list(map(str, args))
+    started, started_unix = time.monotonic(), time.time()
+    failure = None
+    try:
+        value = subprocess.check_output(command, text=True, cwd=ROOT, timeout=60)
+        if log:
+            (OUT / log).write_bytes(output_bytes(value))
+        return value.strip()
+    except Exception as error:
+        failure = error
+        if log and isinstance(error, subprocess.TimeoutExpired):
+            try:
+                (OUT / log).write_bytes(output_bytes(error.stdout) + output_bytes(error.stderr))
+            except Exception as log_error:
+                warning('Failed to retain UI control output: ' + repr(log_error))
+        raise
+    finally:
+        record_command(OUT, 'ui-control-command-timings.jsonl', command, 60,
+                       started, started_unix, failure,
+                       getattr(failure, 'returncode', None) if failure else 0)
 
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for marker in ('SUCCESS.txt', 'advisory-check.txt', 'app-sha256.txt', 'final-settings.json',
                    'udp-echo-fixture.json', 'udp-echo-helper.json', 'udp-echo-helper.log',
-                   'ui-command-timings.jsonl'):
+                   'ui-command-timings.jsonl', 'ui-control-command-timings.jsonl'):
         (OUT / marker).unlink(missing_ok=True)
     if not __debug__ or sys.platform != 'darwin' or WORK.exists():
         raise SystemExit('Use assertions, the Apple toolchain and a clean UI workspace')
@@ -239,19 +259,26 @@ def main():
         (ROOT / 'Tests/Background/AsyncAudioUITests.swift').read_bytes() + b'\n' +
         (ROOT / 'Tests/Statistics/StatisticsUITests.swift').read_bytes())
     failure = None; cleanup = []; fixture = None; identifier = None
+    phase = 'fixture-start'
     try:
         # Start the bound UDP7 responder before CoreSimulator and retain it for
         # the entire UI run. Echo/drop changes reuse these same sockets.
         fixture = UDPEchoFixture()
         fixture.configure_test_runner(app)
-        runtimes = json.loads(output('xcrun', 'simctl', 'list', 'runtimes', '-j'))['runtimes']
+        phase = 'selection'
+        runtimes = json.loads(output('xcrun', 'simctl', 'list', 'runtimes', '-j', log='runtimes.json'))['runtimes']
         runtime = next(r for r in runtimes if r.get('isAvailable') and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-27'))
-        types = json.loads(output('xcrun', 'simctl', 'list', 'devicetypes', '-j'))['devicetypes']
+        types = json.loads(output('xcrun', 'simctl', 'list', 'devicetypes', '-j', log='device-types.json'))['devicetypes']
         device = next(d for d in types if d['name'] == 'iPhone 16')
-        identifier = output('xcrun', 'simctl', 'create', 'Integrated UI Review', device['identifier'], runtime['identifier'])
+        phase = 'create'
+        identifier = output('xcrun', 'simctl', 'create', 'Integrated UI Review', device['identifier'], runtime['identifier'], log='created-device.txt')
+        phase = 'environment'
         (OUT / 'environment.json').write_text(json.dumps({'runtime': runtime, 'device': device, 'udid': identifier}, indent=2))
+        phase = 'boot'
         run(['xcrun', 'simctl', 'boot', identifier], 'boot.log')
+        phase = 'bootstatus'
         run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'ready.log', timeout=120)
+        phase = 'ui-tests'
         # Keep test failures, runtime warnings and explicit attachments; avoid the
         # optional bulk system-diagnostic collection that stalled after runner exit.
         test_failure = None
@@ -310,6 +337,7 @@ def main():
         run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'source-index.log')
     except Exception as exc:
         failure = exc
+        capture_failure(OUT, phase, identifier, exc)
     finally:
         if fixture is not None:
             try:
@@ -322,6 +350,8 @@ def main():
                     run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=30)
                 except Exception as exc:
                     cleanup.append(str(exc))
+        if cleanup:
+            capture_failure(OUT, 'cleanup', identifier, cleanup)
     (OUT / 'cleanup.json').write_text(json.dumps(cleanup, indent=2))
     if failure:
         raise failure

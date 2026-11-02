@@ -39,11 +39,12 @@ Linux UDP GSO groups pass through the same socket observer as ordinary UDP sends
 
 Statistics owns the native accounting, snapshot aggregation and display as separate responsibilities. The integrated release inherits the same implementation; `AppRoot` only connects the feature to the application's tabs. Other feature branches do not own or duplicate the meter.
 
-Three Statistics patches follow the seven inherited UDP patches in `Build/features.json`, producing one ordered ten-patch native composition:
+Four Statistics patches follow the eight inherited UDP patches in `Build/features.json`, producing one ordered twelve-patch native composition:
 
 - `hev-socket-meter-task.patch` observes successful socket results, including partial WAITALL and multi-message progress before an error or yield. Existing helper entries use a null observer and retain their I/O behavior.
 - `hev-socket-meter-core.patch` owns the common worker/IP counters and connects both peer roles to the observed socket helpers. TCP retains peer references, including the address supplied by accept; UDP uses the actual message peer and caches its connected relay peer separately from the TCP control peer.
 - `hev-socket-meter-server.patch` owns worker lifecycle integration and the public endpoint snapshot API.
+- `hev-socket-meter-writer.patch` exposes a caller-owned serialized socket-I/O writer using the same counter store.
 
 The UDP prefix includes nonempty NAME identity and bounded construction, actual CONNECT BND replies, task-appropriate startup DNS, DNS reply and initializer lifetime, worker authentication publication/reference ownership, library signal reload lifetime, session class initialization before worker threads start and terminal handling across setup waits. The Statistics patches apply to that exact native preimage and retain their existing accounting changes. UDP owns those transport and setup invariants; Statistics owns observation and aggregation of the socket work that actually completes.
 
@@ -77,7 +78,7 @@ The retained `traffic_statistics_model.swift` and per-IP model tests cover elaps
 
 ## Operation and limitations
 
-The inherited UDP fixed-port, multiple-unknown-peer restriction remains. Statistics does not change routing, prove remote delivery or identify a device behind a shared IP. The UDP prerequisite supplies session class initialization and terminal setup handling. The Statistics-only composition retains the upstream worker pre-wait early-Stop race; the separate ServerControl feature supplies that correction.
+The inherited UDP fixed-port, multiple-unknown-peer restriction remains. Statistics does not change routing, prove remote delivery or identify a device behind a shared IP. The UDP prerequisite supplies session class initialization and terminal setup handling. The inherited `hev-server-lifecycle.patch` corrects the worker pre-wait early-Stop race.
 
 Physical iOS 27 SideStore standalone and LiveContainer guest operation, device resource measurements and non-Linux native runtimes require separate execution evidence. A configured minimum iOS version or a successful source build does not establish those results.
 

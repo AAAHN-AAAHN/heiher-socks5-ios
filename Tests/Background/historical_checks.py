@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Retain old tests against their exact old implementation, never the new facade.
+"""Retain old controls against their exact old implementation, never the facade.
 
 This local-only disposable Git worktree executes no build, archive or remote action.
-Its evidence is labeled historical. Current-service tests run in separate drivers.
+Its evidence is labeled historical. Declared fixture revisions preserve and hash
+both entry versions. Current-service tests run in separate drivers.
 """
 import hashlib
 import json
@@ -22,25 +23,39 @@ ENTRIES = {'run_checks.py', 'check_async_session.py', 'check_interruption_policy
            'check_final_recovery.py', 'check_session_ownership.py'}
 
 
-def run_historical(entry, arguments=()):
+def run_historical(entry, arguments=(), *, entry_revision=None):
     assert entry in ENTRIES
     source = subprocess.check_output(['git', '-C', str(ROOT), 'show', BASE + ':Tests/Background/' + entry])
     directory = ROOT / 'artifacts/background-historical'
     directory.mkdir(parents=True, exist_ok=True)
     label = Path(entry).stem + ('-' + '-'.join(arguments) if arguments else '')
-    print('HISTORICAL BASELINE ONLY:', BASE, entry, *arguments, flush=True)
+    executed_source, revision = (entry_revision(source) if entry_revision else (source, None))
+    provenance = {
+        'historical_commit': BASE, 'entry': entry, 'arguments': list(arguments),
+        'entry_sha256': hashlib.sha256(source).hexdigest(),
+        'executed_entry_sha256': hashlib.sha256(executed_source).hexdigest(),
+        'fixture_revision': revision,
+        'scope': ('Exact historical controller and retained original negative controls; declared fixture revision, not an exact historical test pass.'
+                  if revision else 'Exact historical controller and retained negative controls; no current-code or Apple playback claim.')
+    }
+    if revision:
+        (directory / (label + '-original-entry.py')).write_bytes(source)
+        (directory / (label + '-executed-entry.py')).write_bytes(executed_source)
+        print('DECLARED HISTORICAL FIXTURE REVISION:', json.dumps(revision, sort_keys=True), flush=True)
+    print('HISTORICAL IMPLEMENTATION, REVISED TEST:' if revision else 'HISTORICAL BASELINE ONLY:',
+          BASE, entry, *arguments, flush=True)
     with tempfile.TemporaryDirectory(prefix='background-history-') as temporary:
         checkout = Path(temporary) / 'source'
         subprocess.run(['git', '-C', str(ROOT), 'worktree', 'add', '-q', '--detach', str(checkout), BASE], check=True)
         try:
             assert (checkout / 'Tests/Background' / entry).read_bytes() == source
+            if revision:
+                (checkout / 'Tests/Background' / entry).write_bytes(executed_source)
             result = subprocess.run([sys.executable, str(checkout / 'Tests/Background' / entry), *arguments],
                                     cwd=checkout, capture_output=True, text=True)
             (directory / (label + '.log')).write_text(result.stdout + result.stderr)
             (directory / (label + '.json')).write_text(json.dumps({
-                'historical_commit': BASE, 'entry': entry, 'arguments': list(arguments),
-                'entry_sha256': hashlib.sha256(source).hexdigest(), 'exit': result.returncode,
-                'scope': 'Exact historical controller and retained negative controls; no current-code or Apple playback claim.'
+                **provenance, 'exit': result.returncode,
             }, indent=2) + '\n')
             print(result.stdout, end='', flush=True)
             if result.stderr: print(result.stderr, end='', file=sys.stderr, flush=True)
@@ -55,10 +70,9 @@ def run_historical(entry, arguments=()):
                     destination = directory / (label + '-failure-' + checkout.parent.name)
                     shutil.copytree(failure, destination)
                     (destination / 'historical-provenance.json').write_text(json.dumps({
-                        'historical_commit': BASE, 'entry': entry, 'arguments': list(arguments),
-                        'entry_sha256': hashlib.sha256(source).hexdigest(),
+                        **provenance,
                         'source_relative_path': 'artifacts/audio-checks/async-session-failure',
-                        'scope': 'Generated historical failure evidence copied before disposable checkout cleanup; no current-code pass claim.'
+                        'failure_preservation': 'Generated historical failure evidence copied before disposable checkout cleanup; no current-code pass claim.'
                     }, indent=2) + '\n')
                     print('PRESERVED HISTORICAL FAILURE EVIDENCE:', destination, flush=True)
             except Exception as preservation_error:
@@ -68,4 +82,5 @@ def run_historical(entry, arguments=()):
                     raise
             finally:
                 subprocess.run(['git', '-C', str(ROOT), 'worktree', 'remove', '--force', str(checkout)], check=True)
-    print('PASS HISTORICAL BASELINE ONLY:', entry, flush=True)
+    print('PASS HISTORICAL IMPLEMENTATION WITH DECLARED FIXTURE REVISION:' if revision else
+          'PASS HISTORICAL BASELINE ONLY:', entry, flush=True)
