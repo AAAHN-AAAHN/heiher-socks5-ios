@@ -1,53 +1,48 @@
-name: Exact Integrated UI state-boundary diagnostic
+name: Diagnose exact Background and Simulator failure boundaries
 on:
   push:
     branches: [work/udp-echo-udp-20261028]
 permissions:
   contents: read
-  actions: read
 jobs:
-  ui-state-diagnostic:
-    name: One original UI4 run with temporary-app state traces (xcode-27)
+  preparation:
     runs-on: xcode-27
-    timeout-minutes: 45
+    timeout-minutes: 15
     steps:
-      - name: Check out the exact diagnostic helper
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
-          path: helper
           fetch-depth: 0
           persist-credentials: false
-      - name: Check out the unchanged Integrated source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: 8bec30de328543f8f23b79a736385ed0e80aaa88
-          path: exact-source
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Download the exact successful producer handoff for this diagnostic
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          artifact-ids: '13097822204'
-          run-id: '41338124364'
-          repository: AAAHN-AAAHN/heiher-socks5-ios
-          github-token: ${{ github.token }}
-          path: diagnostic-input
-          merge-multiple: true
-      - name: Run one original UI4 invocation with only temporary-app state logging
-        shell: bash
-        run: |
-          python3 helper/Bootstrap/run_integrated_ui_diagnostic.py --source exact-source --archive diagnostic-input/review-input.tar.gz --output ui-diagnostic-output
-      - name: Preserve every actual outcome and exact diagnostic recipe
+      - name: Compare one exact preparation fixture with one observed copy
+        run: python3 Bootstrap/diagnose_preparation_worker.py --repo . --output artifacts/preparation-diagnostic --mode debug
+      - name: Verify causal preparation and explicit blocking rejection in both modes
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        run: python3 Bootstrap/check_causal_preparation_worker.py --repo . --fixture Bootstrap/PreparationWorkerCausalTests.swift --output artifacts/causal-preparation-check
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
         with:
-          name: Integrated-UI-state-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          name: Preparation-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ui-diagnostic-output/
-            helper/Bootstrap/run_integrated_ui_diagnostic.py
-            helper/Bootstrap/instrument_ui_state_boundaries.py
-            helper/.github/workflows/udp-echo-ui-diagnostic.yml
+            artifacts/preparation-diagnostic/
+            artifacts/causal-preparation-check/
           if-no-files-found: error
-          include-hidden-files: true
-          retention-days: 30
+          retention-days: 90
+  simulator:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Observe the fixed UI and production device lifecycle sequence
+        run: python3 Bootstrap/simulator_lifecycle_probe.py --output artifacts/simulator-lifecycle-diagnostic
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Simulator-lifecycle-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/simulator-lifecycle-diagnostic/
+          if-no-files-found: error
+          retention-days: 90
