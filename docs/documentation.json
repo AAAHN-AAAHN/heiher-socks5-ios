@@ -2,7 +2,7 @@
   "branch": "feature/traffic-statistics",
   "frozen_source": "25fc0d7a4d0c3fe47f6acddd0863785c3fda0c6b",
   "parents": {
-    "feature/udp-compat": "e50f434be2610ef00713d39363963542db0020e2"
+    "feature/udp-compat": "b05db817684d6b006353d5062fdba756d739faea"
   },
   "owned_documents": [
     "README.md",
