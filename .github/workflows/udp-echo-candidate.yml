@@ -27,7 +27,7 @@ jobs:
           python3 - <<'PYCODE'
           import json, os
           rows = json.load(open('Bootstrap/candidates.json'))['matrix']
-          assert {row['name'] for row in rows} <= {'udp', 'statistics', 'background', 'integrated'}
+          assert {row['name'] for row in rows} <= {'main', 'udp', 'statistics', 'background', 'server', 'settings', 'icon', 'integrated'}
           rows = [row for row in rows if row.get('runtime')]
           with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
               stream.write('matrix=' + json.dumps({'include': rows}, separators=(',', ':')) + '\n')
@@ -270,18 +270,26 @@ jobs:
         run: |
           set -euo pipefail
           case "$CANDIDATE" in
+            server|settings) core=.build/core ;;
+            statistics) core=.build/statistics-final-audit/core ;;
+            *) core= ;;
+          esac
+          if [ -n "$core" ]; then
+            server_ref=$(python3 -c 'import json; print(json.load(open("Build/upstream.json"))["sources"]["."])')
+            git clone --no-checkout https://github.com/heiher/hev-socks5-server.git "$core"
+            git -C "$core" checkout --detach "$server_ref"
+            git -C "$core" submodule update --init --recursive
+            python3 Build/check.py checkout "$core"
+          fi
+          case "$CANDIDATE" in
+            server) python3 Tests/ServerControl/ui_audit.py ;;
+            settings) python3 Tests/Settings/ui_audit.py ;;
+            icon) bash Tests/AppIcon/run_checks.sh ;;
             background)
               python3 Tests/Background/native_inputs.py verify
               python3 Tests/Background/check_async_ui.py
               ;;
-            statistics)
-              server_ref=$(python3 -c 'import json; print(json.load(open("Build/upstream.json"))["sources"]["."])')
-              git clone --no-checkout https://github.com/heiher/hev-socks5-server.git .build/statistics-final-audit/core
-              git -C .build/statistics-final-audit/core checkout --detach "$server_ref"
-              git -C .build/statistics-final-audit/core submodule update --init --recursive
-              python3 Build/check.py checkout .build/statistics-final-audit/core
-              python3 Tests/Statistics/ui_audit.py
-              ;;
+            statistics) python3 Tests/Statistics/ui_audit.py ;;
             integrated)
               python3 Build/ui_review.py > artifacts/integrated/ui-review.log 2>&1
               python3 Build/simulator_review.py > artifacts/integrated/simulator-review.log 2>&1

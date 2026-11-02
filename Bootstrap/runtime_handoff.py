@@ -23,7 +23,13 @@ import tempfile
 import zipfile
 
 HELPER = Path(__file__).resolve().parents[1]
-NAMES = {"background": "background", "statistics": "traffic-statistics", "integrated": "integrated"}
+NAMES = {"background": "background", "statistics": "traffic-statistics", "integrated": "integrated",
+         "server": "server-control", "settings": "settings-persistence", "icon": "app-icon"}
+BUILD_OWNERS = ("server", "settings", "icon")
+BUILD_EVIDENCE = ("SUCCESS.txt", "tested-commit.txt", "source.zip", "features.json")
+SDK_EVIDENCE = ("sdk-success.txt", "toolchain.txt", "ios-sdk-typecheck.log",
+                "compiled-headers/hev-main.h", "compiled-headers/module.modulemap",
+                "compiled-headers/source-commit.txt", "compiled-headers/SHA256SUMS.txt")
 FRAMEWORK = ".build/core/HevSocks5Server.xcframework"
 BACKGROUND = ("SUCCESS.txt", "tested-commit.txt", "built-framework.json",
               "compiled-headers/hev-main.h", "compiled-headers/module.modulemap",
@@ -171,6 +177,9 @@ def integrated(root):
 
 
 def evidence_paths(candidate):
+    if candidate in BUILD_OWNERS:
+        names = BUILD_EVIDENCE + (() if candidate == "icon" else SDK_EVIDENCE)
+        return [NAMES[candidate] + "/" + name for name in names]
     if candidate == "background":
         return ["background/" + name for name in BACKGROUND] + ["audio-checks/" + name for name in AUDIO]
     return ["statistics-final-audit/" + name for name in STATISTICS]
@@ -191,10 +200,12 @@ def collect(candidate, root, source):
         native.verify()
         payloads.update({"framework/" + name: item for name, item in files_below(root / FRAMEWORK, root).items()})
     else:
-        # Statistics' successful audit reverses its patches to clean pinned Git
-        # inputs. Its UI audit builds its own Simulator library on the fresh host.
+        # Successful owner builds reverse their patches to clean pinned inputs.
+        # Server, Settings and Statistics rebuild their Simulator library on the
+        # fresh host; Icon tests its original committed baseline framework.
         check = load_module("candidate_build_check", root / "Build/check.py")
-        check.clean_native(root / ".build/statistics-final-audit/core")
+        native = ".build/statistics-final-audit/core" if candidate == "statistics" else ".build/core"
+        check.clean_native(root / native)
     for name in evidence_paths(candidate):
         unlinked(root / "artifacts" / name, root)
         payloads["evidence/" + name] = read_file(root / "artifacts" / name)
@@ -210,16 +221,36 @@ def validate_payloads(candidate, root, source, manifest, payloads):
     framework = {name[len("framework/"):]: item for name, item in payloads.items() if name.startswith("framework/")}
     require(set(evidence) == set(evidence_paths(candidate)) and len(evidence) + len(framework) == len(payloads),
             "Missing or extra payload evidence")
-    prefix = "audio-checks" if candidate == "background" else "statistics-final-audit"
+    prefix = ("audio-checks" if candidate == "background" else
+              "statistics-final-audit" if candidate == "statistics" else NAMES[candidate])
     require(evidence[prefix + "/SUCCESS.txt"][0].startswith(b"PASS:"), "Missing successful SDK/audit marker")
     require(evidence[prefix + "/tested-commit.txt"][0].decode().strip() == source["commit"],
             "SDK/audit tested another source")
-    # The existing raw Git blob/mode archive check is shared by both owners.
+    # Reuse the original raw Git blob/mode archive check for every owner.
     check = load_module("candidate_build_check", root / "Build/check.py")
     with tempfile.TemporaryDirectory(prefix="runtime-source-proof-") as temporary:
         archive = Path(temporary) / "source.zip"
         archive.write_bytes(evidence[prefix + "/source.zip"][0])
         check.archive(archive, source["commit"])
+    if candidate in BUILD_OWNERS:
+        require(not framework, "This runtime does not consume a transferred framework")
+        require(evidence[prefix + "/features.json"][0] == read_file(root / "Build/features.json")[0],
+                "Transferred build composition differs from candidate source")
+        if candidate != "icon":
+            require(evidence[prefix + "/sdk-success.txt"][0].startswith(b"PASS:"),
+                    "Missing successful same-source SDK marker")
+            require(re.search(rb"(?m)^27\.[^\r\n]*$", evidence[prefix + "/toolchain.txt"][0]),
+                    "Missing iOS 27 SDK identity")
+            headers = prefix + "/compiled-headers/"
+            require(evidence[headers + "source-commit.txt"][0].decode().strip() == source["commit"],
+                    "Prepared native headers are from another source")
+            require(all(evidence[headers + name][0] for name in ("hev-main.h", "module.modulemap")),
+                    "Missing compiled native header bytes")
+            expected = "".join(sha256(evidence[headers + name][0]) + "  " + name + "\n"
+                               for name in ("hev-main.h", "module.modulemap"))
+            require(evidence[headers + "SHA256SUMS.txt"][0] == expected.encode(),
+                    "Prepared header checksum differs")
+        return
     if candidate == "statistics":
         require(not framework, "Statistics audit did not produce an XCFramework")
         hashes = json_bytes(evidence[prefix + "/statistics-source-hashes.json"][0])
@@ -459,8 +490,10 @@ def restore(args):
               "input_artifact_size": metadata["size_in_bytes"], "producer_job": metadata["verified_producer_job"],
               "archive_sha256": receipt["archive_sha256"],
               "scope": "Exact producer inputs restored; Simulator and UI remain separate required gates."}
-    if args.candidate == "statistics":
+    if args.candidate in ("server", "settings", "statistics"):
         result["native_runtime_input"] = "Fresh clean Git checkout at native_pins; ui_audit.py builds the Simulator library."
+    elif args.candidate == "icon":
+        result["native_runtime_input"] = "The exact candidate's committed baseline framework; run_checks.sh executes the original icon audit."
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     with receipt_path.open("xb") as stream:
         stream.write(encoded(result))
