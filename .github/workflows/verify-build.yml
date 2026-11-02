@@ -59,6 +59,8 @@ jobs:
         shell: bash
         run: python3 Tests/Statistics/audit.py
       - name: Exercise actual Server controls and tabs on iOS 27 Simulator
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
         if: runner.os == 'macOS'
         shell: bash
         id: ui
