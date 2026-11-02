@@ -1,48 +1,48 @@
-name: Diagnose exact Background and Simulator failure boundaries
+name: Bounded Simulator supported-pair comparison
 on:
   push:
     branches: [work/udp-echo-udp-20261028]
 permissions:
   contents: read
 jobs:
-  preparation:
+  # Two separate jobs; verify actual host allocation from receipts, one pinned pair and one owned empty device per job.
+  # Root merges this job into the existing helper diagnostic workflow.
+  simulator-runtime-comparison:
     runs-on: xcode-27
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: '27.0'
+            build: '24A434'
+            device_type: 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
+          - version: '27.1'
+            build: '24A94425'
+            device_type: 'com.apple.CoreSimulator.SimDeviceType.iPhone-Duo'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 0
           persist-credentials: false
-      - name: Compare one exact preparation fixture with one observed copy
-        run: python3 Bootstrap/diagnose_preparation_worker.py --repo . --output artifacts/preparation-diagnostic --mode debug
-      - name: Verify causal preparation and explicit blocking rejection in both modes
+      - name: One pinned empty-device lifecycle with original deadlines
+        shell: bash
+        env:
+          COMPARE_RUNTIME_VERSION: ${{ matrix.version }}
+          COMPARE_RUNTIME_BUILD: ${{ matrix.build }}
+          COMPARE_DEVICE_TYPE: ${{ matrix.device_type }}
+        run: |
+          set -euo pipefail
+          python3 Bootstrap/simulator_runtime_compare.py \
+            --runtime-version "$COMPARE_RUNTIME_VERSION" \
+            --runtime-build "$COMPARE_RUNTIME_BUILD" \
+            --device-type "$COMPARE_DEVICE_TYPE" \
+            --output "$RUNNER_TEMP/simulator-runtime-comparison"
+      - name: Preserve all actual diagnostic bytes including failure
         if: always()
-        run: python3 Bootstrap/check_causal_preparation_worker.py --repo . --fixture Bootstrap/PreparationWorkerCausalTests.swift --output artifacts/causal-preparation-check
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Preparation-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            artifacts/preparation-diagnostic/
-            artifacts/causal-preparation-check/
-          if-no-files-found: error
-          retention-days: 90
-  simulator:
-    runs-on: xcode-27
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Observe the fixed UI and production device lifecycle sequence
-        run: python3 Bootstrap/simulator_lifecycle_probe.py --output artifacts/simulator-lifecycle-diagnostic
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
-        with:
-          name: Simulator-lifecycle-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/simulator-lifecycle-diagnostic/
+          name: Simulator-runtime-comparison-${{ matrix.version }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simulator-runtime-comparison
           if-no-files-found: error
           retention-days: 90
