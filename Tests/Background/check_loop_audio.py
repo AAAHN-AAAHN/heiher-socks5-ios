@@ -553,7 +553,7 @@ def main():
     parser.add_argument('--negative-only', action='store_true')
     parser.add_argument('--case', choices=FACADE_CASES)
     args = parser.parse_args()
-    standalone = json.loads((ROOT / 'Build/features.json').read_text())['features'] == ['background']
+    standalone = json.loads((ROOT / 'Build/features.json').read_text())['name'] == 'background'
     if args.group == 'standalone-root' and not standalone:
         raise SystemExit('Standalone Background root checks require its owner checkout; Release owns a different root.')
     source = (OWNED / 'LoopAudioService.swift').read_text()

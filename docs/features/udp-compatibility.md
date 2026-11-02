@@ -54,7 +54,7 @@ Common task data-I/O helpers retry only a raw `-1/EINTR` without losing byte or 
 
 The Swift application sources remain the upstream versions. The feature's existing `Socks5/Info.plist` and project settings also declare a single application scene and a local-network usage description. One scene keeps the interface aligned with the process-wide native server, and the description explains access by devices on the hotspot or local network. These application configuration declarations are separate from UDP framing, peer checks and buffer management.
 
-The feature applies seven ordered patches from `Build/features.json`. Each path inside a patch is relative to its declared application root.
+The feature applies eight ordered patches from `Build/features.json`. Each path inside a patch is relative to its declared application root.
 
 | Patch | Application root | Responsibility |
 | --- | --- | --- |
@@ -65,6 +65,7 @@ The feature applies seven ordered patches from `Build/features.json`. Each path 
 | `hev-netaddr-result.patch` | `.` | Task-appropriate DNS execution, result interpretation, reply lifetime and shared aide initialization. |
 | `hev-udp-domain.patch` | `src/core` | Bounded, nonempty NAME construction and validation before I/O, peer learning, frame completion and lookup. |
 | `hev-session-setup.patch` | `.` | Session class initialization, request/reply handling, terminal setup, worker authentication ownership, signal reload lifetime and pool/resource failures, including shared atomic reference destruction. |
+| `hev-server-lifecycle.patch` | `.` | Pre-start and pre-wait Stop handling and explicit preparation of a new server invocation. |
 
 Empty-payload acceptance and destination-error progress belong to the upstream core; the custom patches retain the stronger validation, adaptive capacity, peer policy and Darwin send correction. The public message representation remains address, contiguous buffer and length. The existing association owns the sockets; its native task owns buffer lifetime and cleanup scheduling.
 
