@@ -131,7 +131,7 @@ final class IntegrationUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         app.launch()
         let state = app.staticTexts["background.udpEcho.state"]
-        let destination = app.descendants(matching: .any)
+        let destination = app.textFields
             .matching(identifier: "background.udpEcho.destinations").firstMatch
         let period = app.textFields["background.udpEcho.period"]
 
@@ -165,8 +165,8 @@ final class IntegrationUITests: XCTestCase {
             XCTAssertTrue(field.isEnabled)
             field.tap()
             // A tap may place the insertion point before the existing text.
-            field.typeKey("a", modifierFlags: .command)
-            field.typeText(text)
+            app.typeKey("a", modifierFlags: .command)
+            app.typeText(text)
             XCTAssertEqual(field.value as? String, text)
         }
         @MainActor func server(running: Bool) {
