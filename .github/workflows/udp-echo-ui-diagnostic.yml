@@ -1,25 +1,17 @@
-name: Bounded Simulator supported-pair comparison
+name: Bounded installed-Xcode 27.0 Simulator diagnostic
 on:
   push:
     branches: [work/udp-echo-udp-20261028]
 permissions:
   contents: read
 jobs:
-  # Two separate jobs; verify actual host allocation from receipts, one pinned pair and one owned empty device per job.
-  # Root merges this job into the existing helper diagnostic workflow.
+  # One alternative supported configuration; the existing 27.1 control ran on another host.
+  # An empty-device result provides no app, candidate, or sole-cause credit.
   simulator-runtime-comparison:
     runs-on: xcode-27
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - version: '27.0'
-            build: '24A434'
-            device_type: 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
-          - version: '27.1'
-            build: '24A94425'
-            device_type: 'com.apple.CoreSimulator.SimDeviceType.iPhone-Duo'
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -28,9 +20,9 @@ jobs:
       - name: One pinned empty-device lifecycle with original deadlines
         shell: bash
         env:
-          COMPARE_RUNTIME_VERSION: ${{ matrix.version }}
-          COMPARE_RUNTIME_BUILD: ${{ matrix.build }}
-          COMPARE_DEVICE_TYPE: ${{ matrix.device_type }}
+          COMPARE_RUNTIME_VERSION: '27.0'
+          COMPARE_RUNTIME_BUILD: '24A434'
+          COMPARE_DEVICE_TYPE: 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
         run: |
           set -euo pipefail
           python3 Bootstrap/simulator_runtime_compare.py \
@@ -42,7 +34,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Simulator-runtime-comparison-${{ matrix.version }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: Simulator-xcode27.0-pinned-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/simulator-runtime-comparison
           if-no-files-found: error
           retention-days: 90

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One explicitly pinned empty-Simulator lifecycle, for a two-job comparison.
+"""One explicitly pinned empty-Simulator lifecycle using installed Xcode 27.0.
 
 No app install, test replacement, retry, global shutdown, service reset or
 candidate credit. A different result between jobs is evidence of an
@@ -18,15 +18,16 @@ from simulator_comparison_diagnostics import capture_failure, observed_run
 
 RUNTIME_PAIRS = {
     "27.0": {"build": "24A434", "device_type": "com.apple.CoreSimulator.SimDeviceType.iPhone-16"},
-    "27.1": {"build": "24A94425", "device_type": "com.apple.CoreSimulator.SimDeviceType.iPhone-Duo"},
 }
-EXPECTED_SDK = "27.1"
+EXPECTED_SDK = "27.0"
+EXPECTED_XCODE = "Xcode 27.0\nBuild version 27A266a"
+EXPECTED_DEVELOPER_DIR = "/Applications/Xcode_27.app/Contents/Developer"
 LIMITS = {"create": 60, "boot": 180, "bootstatus": 120, "shutdown": 30, "delete": 30}
 
 
 def select_exact(runtimes, device_types, version, build, device_identifier, sdk):
     if RUNTIME_PAIRS.get(version) != {"build": build, "device_type": device_identifier} or sdk != EXPECTED_SDK:
-        raise ValueError("Comparison requires the declared runtime/build/device pair and Simulator SDK 27.1")
+        raise ValueError("Comparison requires the declared runtime/build/device pair and Simulator SDK 27.0")
     identifier = "com.apple.CoreSimulator.SimRuntime.iOS-" + version.replace(".", "-")
     matches = [r for r in runtimes if r.get("identifier") == identifier]
     if len(matches) != 1:
@@ -40,6 +41,22 @@ def select_exact(runtimes, device_types, version, build, device_identifier, sdk)
     if len(devices) != 1 or device_identifier not in {d.get("identifier") for d in runtime.get("supportedDeviceTypes", [])}:
         raise ValueError("Pinned device type is not supported by this runtime")
     return runtime, devices[0]
+
+
+def validate_toolchain(xcode, sdk, developer_dir, simctl_path, xcodebuild_path):
+    """Reject a changed installation before creating any device."""
+    if developer_dir != EXPECTED_DEVELOPER_DIR:
+        raise ValueError("DEVELOPER_DIR differs from the declared installed Xcode 27.0 path")
+    if xcode != EXPECTED_XCODE or sdk != EXPECTED_SDK:
+        raise ValueError("Actual Xcode version/build or Simulator SDK differs from the fixed diagnostic input")
+    expected = Path(EXPECTED_DEVELOPER_DIR).resolve()
+    resolved = {}
+    for name, value in (("simctl", simctl_path), ("xcodebuild", xcodebuild_path)):
+        tool = Path(value)
+        if not tool.is_absolute() or tool.name != name or not tool.resolve().is_relative_to(expected):
+            raise ValueError("Selected " + name + " is outside the declared Xcode developer directory")
+        resolved[name] = str(tool.resolve())
+    return {"developer_directory": str(expected), "resolved_tools": resolved}
 
 
 def lifecycle(run, capture, runtime, device_type):
@@ -95,6 +112,8 @@ def main():
         "schema": 1, "started_unix": time.time(), "requested_runtime": args.runtime_version,
         "requested_build": args.runtime_build, "expected_sdk": EXPECTED_SDK,
         "device_type_identifier": args.device_type, "limits_seconds": LIMITS,
+        "expected_xcode": EXPECTED_XCODE, "expected_developer_dir": EXPECTED_DEVELOPER_DIR,
+        "developer_dir_environment": os.environ.get("DEVELOPER_DIR"),
         "helper_sha": os.environ.get("GITHUB_SHA"), "repository": os.environ.get("GITHUB_REPOSITORY"),
         "run_id": os.environ.get("GITHUB_RUN_ID"), "attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
         "runner_name": os.environ.get("RUNNER_NAME"), "runner_os": os.environ.get("RUNNER_OS"),
@@ -102,7 +121,7 @@ def main():
         "runner_environment": os.environ.get("RUNNER_ENVIRONMENT"), "image_os": os.environ.get("ImageOS"),
         "commands": calls, "planned_devices": 1, "product_pass": False, "candidate_credit": False,
         "scope": "One owned empty device in one job. Actual runner/host identity and boot time are recorded; separate jobs alone do not prove fresh or distinct hosts. No application/UI assertion executes. No retry, host reset, runtime fallback or timeout change.",
-        "comparison_limits": "The two available runtime builds have disjoint supported device types. Runtime and device type vary together; host allocation may also differ and must be checked from actual receipts. This is a supported-pair environment probe, not an isolated runtime-version causal experiment. SDK equality does not imply that a runtime supports a requested device.",
+        "comparison_limits": "This one job selects installed Xcode 27.0 while retaining iOS 27.0 build 24A434 and iPhone 16 from the existing Xcode 27.1 control (run 41519414260 attempt 1). Host allocation, timing and service state can differ; the runner label does not pin an immutable image. This tests an alternative supported toolchain configuration and does not isolate a sole causal variable or prove an app gate. SDK equality does not imply runtime device support.",
         "preparation_limits": "The before snapshot adds read-only runtime image inventory and host-log work. Those queries may initialize or warm CoreSimulator services; the original UI harness does not perform identical pre-boot work. This probe does not reproduce the original workload or prove its failure cause.",
         "declared_pairs": RUNTIME_PAIRS,
         "capture_scope": "Folders failure-before, failure-after-ready-before-cleanup and failure-after-cleanup are read-only snapshots, not failure assertions. Diagnostics have a separate 20-second command-time budget; optional diagnostic timeouts never change the lifecycle result.",
@@ -141,6 +160,11 @@ def main():
         report["source_files"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (Path(__file__), Path(__file__).with_name("simulator_comparison_diagnostics.py"))}
         report["xcode"] = run(["xcodebuild", "-version"], 30, "xcode-version").strip()
         report["sdk"] = run(["xcrun", "--sdk", "iphonesimulator", "--show-sdk-version"], 30, "simulator-sdk").strip()
+        report["simctl_path"] = run(["xcrun", "--find", "simctl"], 30, "simctl-path").strip()
+        report["xcodebuild_path"] = run(["xcrun", "--find", "xcodebuild"], 30, "xcodebuild-path").strip()
+        report["toolchain_validation"] = validate_toolchain(report["xcode"], report["sdk"],
+                                                            report["developer_dir_environment"],
+                                                            report["simctl_path"], report["xcodebuild_path"])
         report["macos"] = run(["sw_vers"], 30, "macos-version").strip()
         report["host_name"] = run(["hostname"], 30, "host-name").strip()
         report["hardware"] = run(["sysctl", "hw.ncpu", "hw.memsize", "hw.machine", "kern.boottime"], 30, "hardware").strip()
