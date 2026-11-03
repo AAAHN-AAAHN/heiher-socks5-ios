@@ -2,10 +2,11 @@
 """Bounded, read-only evidence for the isolated supported-pair comparison.
 
 Never starts/stops a device, restarts a service, retries a failed gate, or changes
-its result. Original process-control calls, deadlines and snapshots remain
-unchanged. This proposal adds only a separate NOTE_EXIT observer and timing
-markers; the instrumented process runner is no longer byte-identical.
-Host evidence is collected even when a device has not finished boot.
+its result. Original process-control calls and deadlines remain unchanged.
+This diagnostic retains NOTE_EXIT observation, adds at most one bounded sample
+of an original simctl child, and prioritizes focused post-stage host logs within
+the original snapshot command budget. Observation finalization runs only after
+all original lifecycle commands, cleanup and snapshots have completed.
 """
 import json
 from pathlib import Path
@@ -296,6 +297,149 @@ def output_bytes(value):
     return value if isinstance(value, bytes) else value.encode('utf-8')
 
 
+# One optional stack observation of the first already-slow original child.
+# No original process handle, timeout, kill, wait, or result is changed.
+_SAMPLE_THRESHOLDS = {"bootstatus": (120, 90), "shutdown": (30, 20)}
+_SAMPLE_ATTEMPTED = False
+_SAMPLE_STATES = []
+_SAMPLE_OUTPUT_LIMIT = 8 * 1024 * 1024
+_SAMPLE_CHILD = (
+    "import os, resource, sys\n"
+    "resource.setrlimit(resource.RLIMIT_FSIZE, (8388608, 8388608))\n"
+    "os.execv('/usr/bin/sample', ['/usr/bin/sample', sys.argv[1], "
+    "'1', '10', '-mayDie', '-file', sys.argv[2]])\n"
+)
+
+
+def _sample_worker(state):
+    global _SAMPLE_ATTEMPTED
+    record = state['record']
+    sampler = None
+    try:
+        if state['stop'].wait(record['trigger_after_seconds']):
+            record['status'] = 'original_command_finished_before_trigger'
+            return
+        if _SAMPLE_ATTEMPTED:
+            record['status'] = 'one_sample_limit_already_used'
+            return
+        _SAMPLE_ATTEMPTED = True
+        record['triggered'] = _exit_stamp()
+        if state['stop'].is_set():
+            record['status'] = 'original_command_finished_at_trigger'
+            return
+        report = Path(record['profile_file'])
+        log = Path(record['sampler_log'])
+        with log.open('xb') as stream:
+            # The separate child lowers only its own file-size limit, then execs
+            # Apple's sampler. Regular files retain partial evidence on failure.
+            sampler = subprocess.Popen(
+                [sys.executable, '-c', _SAMPLE_CHILD,
+                 str(record['original_pid']), str(report)],
+                stdout=stream, stderr=subprocess.STDOUT, start_new_session=True)
+            record['sampler_pid'] = sampler.pid
+            record['sampler_started'] = _exit_stamp()
+            try:
+                record['returncode'] = sampler.wait(timeout=6)
+                record['status'] = 'completed' if sampler.returncode == 0 else 'sampler_failed'
+            except subprocess.TimeoutExpired:
+                record['status'] = 'sampler_timeout'
+                sampler.kill()
+                try:
+                    record['returncode'] = sampler.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    record['sampler_reap_incomplete'] = True
+        record['original_command_finished_before_sample_completed'] = state['stop'].is_set()
+    except BaseException as error:
+        record['status'] = 'observation_failed'
+        record['error'] = _exit_error(error)
+        if sampler is not None and sampler.returncode is None:
+            try:
+                sampler.kill()
+                record['returncode'] = sampler.wait(timeout=1)
+            except BaseException as cleanup_error:
+                record['sampler_cleanup_error'] = _exit_error(cleanup_error)
+    finally:
+        try:
+            record['finished'] = _exit_stamp()
+            record['files'] = {}
+            for key in ('profile_file', 'sampler_log'):
+                path = Path(record[key])
+                if path.is_file():
+                    record['files'][key] = {'bytes': path.stat().st_size,
+                                            'at_output_limit': path.stat().st_size >= _SAMPLE_OUTPUT_LIMIT}
+            Path(record['receipt_file']).write_text(json.dumps(record, indent=2) + '\n')
+        except BaseException as error:
+            warning('Stack observation receipt could not be saved: ' + repr(error))
+        finally:
+            state['done'].set()
+
+
+def _sample_begin(command, pid, timeout, out):
+    argv = list(map(str, command))
+    if (len(argv) < 3 or argv[:2] != ['xcrun', 'simctl']
+            or argv[2] not in _SAMPLE_THRESHOLDS
+            or timeout != _SAMPLE_THRESHOLDS[argv[2]][0]):
+        return None
+    state = {'stop': threading.Event(), 'done': threading.Event()}
+    stem = Path(out) / ('stack-' + argv[2] + '-' + str(pid))
+    state['record'] = {
+        'schema': 1, 'command': argv, 'original_pid': pid,
+        'original_timeout_seconds': timeout,
+        'trigger_after_seconds': _SAMPLE_THRESHOLDS[argv[2]][1],
+        'armed': _exit_stamp(), 'status': 'armed',
+        'profile_file': str(stem) + '.sample.txt',
+        'sampler_log': str(stem) + '.sampler.log',
+        'receipt_file': str(stem) + '.json',
+        'requested_sample_duration_seconds': 1, 'sample_interval_ms': 10,
+        'sampler_wait_seconds': 6, 'sampler_reap_wait_seconds': 1,
+        'per_output_file_limit_bytes': _SAMPLE_OUTPUT_LIMIT,
+        'original_process_control_untouched': True,
+        'profiling_can_perturb_timing': True, 'candidate_credit': False,
+        'interpretation': 'Validate the sample PID/image and time interval; missing, '
+                          'late or capped output is not proof of a cause.'}
+    _SAMPLE_STATES.append(state)
+    try:
+        _thread.start_new_thread(_sample_worker, (state,))
+    except BaseException as error:
+        warning('Stack observation could not start: ' + repr(error))
+        state['done'].set()
+    return state
+
+
+def finish_stack_observation(out):
+    """Finalize only after the original lifecycle and cleanup have finished."""
+    record = {'schema': 1, 'started': _exit_stamp(), 'wait_budget_seconds': 8,
+              'original_lifecycle_already_finished': True, 'candidate_credit': False,
+              'workers': [], 'scope': 'Observation finalization only; no original '
+              'command or device is touched. Incomplete evidence stays explicit.'}
+    try:
+        deadline = time.monotonic() + record['wait_budget_seconds']
+        for state in _SAMPLE_STATES:
+            state['stop'].set()
+        for state in _SAMPLE_STATES:
+            state['done'].wait(max(0, deadline - time.monotonic()))
+            done = state['done'].is_set()
+            sample = state['record']
+            row = {'original_pid': sample['original_pid'], 'worker_completed': done,
+                   'receipt_file': sample['receipt_file'],
+                   'receipt_exists': Path(sample['receipt_file']).is_file()}
+            if done:
+                row.update(status=sample['status'],
+                           sampler_reap_incomplete=sample.get('sampler_reap_incomplete', False),
+                           sampler_cleanup_error=sample.get('sampler_cleanup_error'))
+            record['workers'].append(row)
+        record['all_worker_receipts_complete'] = all(
+            x['worker_completed'] and x['receipt_exists']
+            and not x.get('sampler_reap_incomplete')
+            and not x.get('sampler_cleanup_error') for x in record['workers'])
+        record['finished'] = _exit_stamp()
+        (Path(out) / 'stack-observer-finalization.json').write_text(json.dumps(record, indent=2) + '\n')
+    except BaseException as error:
+        record['error'] = _exit_error(error)
+        warning('Stack observation finalization incomplete: ' + repr(error))
+    return record
+
+
 def observed_run(command, *, out, timeout, cwd=None, capture_output=False,
                  text=False, stdout=None, stderr=None, check=False):
     """Run one command with the original deadline and observe its process boundary.
@@ -315,6 +459,7 @@ def observed_run(command, *, out, timeout, cwd=None, capture_output=False,
                    'stderr_is_pipe': stderr == subprocess.PIPE}
     failure = None
     kernel_observer = None
+    sample_observer = None
     try:
         with subprocess.Popen(command, cwd=cwd, stdout=stdout, stderr=stderr,
                               text=text) as process:
@@ -324,6 +469,7 @@ def observed_run(command, *, out, timeout, cwd=None, capture_output=False,
             observation['deadline_unix'] = observation['communication_started_unix'] + timeout
             try:
                 _exit_mark(kernel_observer, 'communicate_enter')
+                sample_observer = _sample_begin(command, process.pid, timeout, out)
                 output, errors = process.communicate(timeout=timeout)
                 _exit_mark(kernel_observer, 'communicate_return')
             except subprocess.TimeoutExpired:
@@ -354,6 +500,9 @@ def observed_run(command, *, out, timeout, cwd=None, capture_output=False,
         failure = error
         raise
     finally:
+        if sample_observer is not None:
+            sample_observer['stop'].set()
+            observation['stack_observation_receipt'] = sample_observer['record']['receipt_file']
         observation['finished_unix'] = time.time()
         observation['elapsed_seconds'] = time.monotonic() - started
         observation['failure'] = type(failure).__name__ if failure else None
@@ -380,6 +529,14 @@ def capture_failure(out, phase, device, failure):
                      'OR process == "Simulator" OR subsystem BEGINSWITH "com.apple.CoreSimulator" '
                      'OR process == "simdiskimaged" OR process == "diskarbitrationd" '
                      'OR process == "cryptexd" OR subsystem CONTAINS[c] "cryptex"')
+        if phase != 'before':
+            # Previous late snapshots exhausted their budget in old generic
+            # DiskArbitration rows. Preserve the actual failure window first.
+            predicate = ('process == "CoreSimulatorService" '
+                         'OR process BEGINSWITH "SimLaunchHost" '
+                         'OR process == "simdiskimaged" '
+                         'OR subsystem BEGINSWITH "com.apple.CoreSimulator" '
+                         'OR eventMessage CONTAINS[c] "24A434"')
         if device:
             # Device identifiers come from simctl create; JSON quoting prevents
             # interpretation as additional log-predicate syntax.
@@ -390,9 +547,11 @@ def capture_failure(out, phase, device, failure):
             ('virtual-memory', ['/usr/bin/vm_stat'], 2),
             ('disk', ['/bin/df', '-k', str(Path(out).resolve())], 2),
             ('devices', ['xcrun', 'simctl', 'list', 'devices', '-j'], 4),
-            ('host-core-simulator', ['/usr/bin/log', 'show', '--last', '5m',
+            ('host-core-simulator', ['/usr/bin/log', 'show', '--last', '5m' if phase == 'before' else '3m',
                                     '--style', 'compact', '--info', '--predicate', predicate], 10),
         ]
+        if phase != 'before':
+            checks = [checks[-1], *checks[:-1]]
         for label, command, limit in checks:
             remaining = deadline - time.monotonic()
             item = {'name': label, 'command': command}

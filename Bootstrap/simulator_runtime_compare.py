@@ -14,7 +14,7 @@ import re
 import sys
 import time
 
-from simulator_comparison_diagnostics import capture_failure, observed_run
+from simulator_comparison_diagnostics import capture_failure, observed_run, finish_stack_observation
 
 RUNTIME_PAIRS = {
     "27.0": {"build": "24A434", "device_type": "com.apple.CoreSimulator.SimDeviceType.iPhone-16"},
@@ -178,6 +178,7 @@ def main():
     except Exception as error:
         failure = error
         capture("selection", None, error)
+    report["stack_observation_finalization"] = finish_stack_observation(out)
     report["result"] = "DIAGNOSTIC_PASS" if failure is None else "DIAGNOSTIC_FAIL"
     if failure is not None:
         report["original_failure"] = {"type": type(failure).__name__, "message": repr(failure)}
