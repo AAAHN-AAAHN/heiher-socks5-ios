@@ -1,0 +1,156 @@
+{
+  "schema": 1,
+  "scope": "Previously verified actual417023 producer bytes used only as historical origin of a separate new diagnostic. Never same-run candidate evidence or selected product.",
+  "repository": "AAAHN-AAAHN/heiher-socks5-ios",
+  "origin_run_id": 41702375215,
+  "origin_attempt": 1,
+  "origin_workflow_path": ".github/workflows/udp-echo-candidate.yml",
+  "origin_producer_job_id": 126148796271,
+  "origin_producer_job_name": "build (integrated, 0bcc1931314661549bdd5f71f6fdb0b6c9c97f08, xcode-27, true)",
+  "origin_helper": {
+    "commit": "4a4e2a3cf725ed7e0b8de5758e6883c12a08e191",
+    "tree": "676a6d6f21f34dd36f4d0fe995930ba55573e9f0"
+  },
+  "source": {
+    "commit": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
+    "tree": "06c8b0ec36c56fba9ab0c9719a9ee8cf10b22931"
+  },
+  "native_pins": {
+    ".": "318a2ffebfd87a12b72dbac95a65ca27143eb01b",
+    "src/core": "dadbb54bf7509f6dea3c1b30e45198efa400679c",
+    "third-part/hev-task-system": "4039d2fdbb3577af380fa0096b90d0ad99969dfa",
+    "third-part/yaml": "94441ec8777eb319936735a58b376963d09c73d4"
+  },
+  "input_artifact": {
+    "id": 13268335010,
+    "name": "UDP-Echo-runtime-integrated-41702375215-1",
+    "size_in_bytes": 2207063,
+    "digest": "sha256:a7de04cc639515b8f0fb08286be0ceed1975447bdc8fb83cdd0ce08cfa4e86a5"
+  },
+  "producer_artifact": {
+    "id": 13267329800,
+    "name": "UDP-Echo-build-integrated-macOS-41702375215-1",
+    "size_in_bytes": 105758392,
+    "digest": "sha256:a17a402651cdca2f55313120fbc54678a9805191d1c3baa8936b496166982ed8"
+  },
+  "producer_receipt_sha256": "33d669f7f73e440bbd7184454a4f58d90f284e6a46ca9fc696bcdc9047dfb8f9",
+  "producer_receipt_bytes": 992,
+  "archive_sha256": "b702cc0fe3cac989c4163364d5e017f80c08f6e0d3a0194ff06dbbb85012e659",
+  "archive_size": 2206967,
+  "manifest_sha256": "898bc9fe7c243ca8742751b0cd2bed66afc2b65f7c8aaf25be65c7edcdb349cb",
+  "manifest_file_count": 321,
+  "framework_file_count": 16,
+  "ipa": {
+    "mode": 420,
+    "sha256": "f73f408022433adfc81f3a9978c8a298d880433d2e69725114fdba0adb8250ae",
+    "size": 443562
+  },
+  "validator_sha256": {
+    "Bootstrap/runtime_handoff.py": "228dbcc1e3e28e682e1d956fd91a9100add223e613bb4aa09d47231e16499580",
+    "Build/review_handoff.py": "9f2122c1661e52495deea7f094fb3659574280e2f73bfe34064d3c839a2432bd",
+    "Build/release_source.py": "c90aee96146fa2fa2ed0dd40bbf4cac9f1b4677506920a4dbb42c6316f80383b"
+  },
+  "original_candidate_workflow_sha256": "31ed3c7631141da56c2d4b40ef633609b1a69ae0f3ec65088248406b105dbc37",
+  "ui_source_sha256": {
+    "Build/ui_review.py": "3a155a9c78b5acdd5f40b3057d3077c309c4a5ff8545a509e8da1d591e50ad30",
+    "Tests/Statistics/ui_audit.py": "c94f9b0a87b45140a30252d8e535455fcb383c323c0301456bac9ad8d649a469",
+    "Tests/Integration/IntegrationUITests.swift": "653848576ca4233e3bc88331b77edddbfc3b61c49f88c508e00d11d9a7eff20b",
+    "Tests/Background/AsyncAudioUITests.swift": "14cfa19dbd0c8a167b3ea0f1d7412456a74449cbdd3843e8a15f46d03c34f260",
+    "Tests/Statistics/StatisticsUITests.swift": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
+  },
+  "source_input_helper": {
+    "commit": "4a4e2a3cf725ed7e0b8de5758e6883c12a08e191",
+    "tree": "676a6d6f21f34dd36f4d0fe995930ba55573e9f0"
+  },
+  "source_input_files": {
+    "Bootstrap/import_candidates.py": {
+      "bytes": 5295,
+      "sha256": "1e647ab8a266a64097c5cc543f22d6a2c58010bfba8988b10fa4809589a6367e"
+    },
+    "Bootstrap/candidates.json": {
+      "bytes": 1309,
+      "sha256": "2868303d39b1b8acda2f96d147365e67764931adea60513819255919954bedc0"
+    },
+    "Bootstrap/candidates.bundle": {
+      "bytes": 99614,
+      "sha256": "ca54b016ca7ea05f8c6a0848dac521c6ea633d9863423255af99daa08789a83b"
+    },
+    "Bootstrap/audio-diagnostic/instrument_audio_intent.py": {
+      "bytes": 15868,
+      "sha256": "f6634afacf620c5ed875fdbd8bd261b545ef00a417529b7af65ee0acf080ba43"
+    }
+  },
+  "original_restorer_sha256": "c8bddfbadc6c9453a5b4a056f46cd4e6b1076a043528d649a053de5a5cad7d3b",
+  "original_ui_generated_source": {
+    "bytes": 51370,
+    "sha256": "7ffda21f8a1395cb00cad85d1b6d212859a69d7f43fde9254f3250f3c098ba82",
+    "XCTAssert_calls": 135,
+    "XCTFail_calls": 1,
+    "total_assertion_calls": 136,
+    "original_selected_test_count": 4
+  },
+  "minimal_observation": {
+    "original_AppRoot_sha256": "cdda09cc9d08d4a0b63bd1e210a1f44fe3f9ef8ae6f09e7bd7effdbd03c5af6d",
+    "diagnostic_AppRoot_sha256": "65b9b85d047767a0944ee1a3253a9c8b1efa3226a5effd815950e470cdae9ed8",
+    "diagnostic_AppRoot_bytes": 10053,
+    "retained_labels": [
+      "shared-logger",
+      "root-state-logger",
+      "root-apply-enter",
+      "root-service-return",
+      "root-guard-drop",
+      "root-settings-return",
+      "root-restore-audio-enter",
+      "root-restore-audio-return"
+    ],
+    "retained_block_sha256": {
+      "shared-logger": "758ae64dc449ef796dfb4c405baad07e4d30176e876316b0fea3a0e3435a783b",
+      "root-state-logger": "238868de092a496ac911eefcf70d54f3a523567f154dfd4c972d4380e3341b76",
+      "root-apply-enter": "e10a5ce5ca32056e8eb03bafdae4b450a5ee004e0ead22aa772c862fc2cf492c",
+      "root-service-return": "6bc3c4d7eb96579074fae7476a920ab36de50073293d8b36bf22660b84a3f1a8",
+      "root-guard-drop": "2b09a7893f9bdc385422fef0c2fc0f71e1e42daadfcdaeb5444e5b40c4d0e8c5",
+      "root-settings-return": "1a1cf56b0a511981be4fe2cd9d653480ecd3a068b626ff0ce0e66a1c9cd16345",
+      "root-restore-audio-enter": "a1e9b7083d106a1781b0617f251373fdc9d7653856a730ef58a2a1d41682d2dd",
+      "root-restore-audio-return": "d71faf601c6520b74f74f810197f0dd57309a2b7c4c45bee470553778a67a99d"
+    }
+  },
+  "original_deadlines_seconds": {
+    "create": 60,
+    "boot": 180,
+    "bootstatus": 120,
+    "build_for_testing": 900,
+    "test_without_building": 900,
+    "shutdown": 30,
+    "delete": 30
+  },
+  "staged_preflight_sha256": "50f18d556978a4274949d34a8dcafe8af1098c9c0ffc3b2912d3f10e4bc0568c",
+  "required_runtime": {
+    "identifier": "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
+    "version": "27.0",
+    "buildversion": "24A434"
+  },
+  "required_device": {
+    "identifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16",
+    "name": "iPhone 16"
+  },
+  "candidate_credit": false,
+  "service_refresh": {
+    "source_sha256": {
+      "Bootstrap/simulator_runtime_compare.py": "a855b4e2cf0481f389776a56876345ffbb43f41b744b69d853c15b17bc80de81",
+      "Bootstrap/simulator_comparison_diagnostics.py": "2674479d846b113204ba0b3c2184f81ba045c5f519c3d1d78c8c04611980e4e0",
+      "Bootstrap/watch_runtime_preflight.py": "e50a7b7d39b8abf80698b9c5401cbe09b9d48b66059c96ee06e6695b32e88c02",
+      "Bootstrap/ios_runtime_signature_preflight.py": "cd8024e1c37a2596ab39b53f6cac4f29c4c625d321e445febf36883d6c0ff3ef",
+      "Bootstrap/ios_runtime_staged_preflight.py": "50f18d556978a4274949d34a8dcafe8af1098c9c0ffc3b2912d3f10e4bc0568c",
+      "Bootstrap/ios_runtime_service_refresh.py": "11eb509dcfd933eb0f2dd0a7fbf67883e106feb4ca77400bdf516c4071b16c12"
+    },
+    "workflow_step_id": "audio_service_once",
+    "post_exit_scope": "actual_workflow_post_service_process_exit",
+    "actual_source_parent_at_preparation": {
+      "commit": "26ebfa59b202fb1473825a7b7c17a4ec1beb2b74",
+      "tree": "85dd87d47ded78cd60bddce7a54049d7bcecb382"
+    },
+    "runtime_result_required_from_this_same_future_Audio_run": true,
+    "prior_environment_probe_is_not_reused_as_this_run_receipt": true,
+    "candidate_credit": false
+  }
+}
