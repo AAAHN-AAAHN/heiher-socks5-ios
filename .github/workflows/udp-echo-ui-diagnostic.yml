@@ -25,7 +25,32 @@ jobs:
           COMPARE_DEVICE_TYPE: 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
         run: |
           set -euo pipefail
-          python3 Bootstrap/simulator_runtime_compare.py \
+          control_cache_root="${RUNNER_TOOL_CACHE:-}"
+          if [[ -z "$control_cache_root" || "$control_cache_root" != /* ]]; then
+            printf '%s\n' 'FAIL: RUNNER_TOOL_CACHE must identify the existing absolute tool-cache root.'
+            exit 1
+          fi
+          control_cache_dir="$control_cache_root/Python/3.14.9/arm64"
+          control_python="$control_cache_dir/bin/python3.14"
+          if [[ ! -d "$control_cache_dir" || ! -f "${control_cache_dir}.complete" || ! -x "$control_python" ]]; then
+            printf 'FAIL: required completed cache entry is unavailable: %s\n' "$control_cache_dir"
+            exit 1
+          fi
+          printf 'Selected existing cache entry: %s\n' "$control_cache_dir"
+          "$control_python" - <<'PY'
+          import platform
+          import sys
+          if sys.implementation.name != 'cpython':
+              raise SystemExit('FAIL: cached interpreter must be CPython.')
+          if tuple(sys.version_info) != (3, 14, 9, 'final', 0):
+              raise SystemExit(f'FAIL: expected CPython 3.14.9 final; observed {sys.version_info!r}.')
+          if sys.platform != 'darwin' or platform.machine() != 'arm64':
+              raise SystemExit('FAIL: cached interpreter must execute as Darwin arm64.')
+          if not __debug__:
+              raise SystemExit('FAIL: assertions must remain enabled.')
+          print('PASS: cached CPython 3.14.9 final, Darwin arm64, assertions enabled. No lifecycle or application gate credit.')
+          PY
+          "$control_python" Bootstrap/simulator_runtime_compare.py \
             --runtime-version "$COMPARE_RUNTIME_VERSION" \
             --runtime-build "$COMPARE_RUNTIME_BUILD" \
             --device-type "$COMPARE_DEVICE_TYPE" \
