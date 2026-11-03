@@ -235,6 +235,184 @@ def output(*args, log=None):
                        getattr(failure, 'returncode', None) if failure else 0)
 
 
+def ui_test_source():
+    """Prepare independent case entry in the temporary XCTest target only."""
+    entries = (
+        ('Tests/Integration/IntegrationUITests.swift',
+         ('testServerControlsAndTabNavigation',
+          'testPeriodicUDPEchoThroughRunningServerAndPersistence')),
+        ('Tests/Background/AsyncAudioUITests.swift', ()),
+        ('Tests/Statistics/StatisticsUITests.swift',
+         ('testServerControlsAndTabNavigation',)),
+    )
+    hook = b'        try IntegratedUITestFixture.prepare()\n'
+    parts = []
+    for path, methods in entries:
+        original = (ROOT / path).read_bytes()
+        if b'IntegratedUITestFixture' in original:
+            raise RuntimeError('Entry preparation already present: ' + path)
+        updated = original
+        for method in methods:
+            header = ('    @MainActor func ' + method + '() throws {\n').encode()
+            if updated.count(header) != 1:
+                raise RuntimeError('Expected a unique original UI case: ' + path + ':' + method)
+            updated = updated.replace(header, header + hook, 1)
+        if updated.replace(hook, b'') != original:
+            raise RuntimeError('An original UI test body changed: ' + path)
+        parts.append(updated)
+    generated = b'\n'.join(parts)
+    if generated.count(hook) != 3:
+        raise RuntimeError('Expected exactly three case-entry preparations')
+    return generated + rb'''
+// Entry-only preparation for the generated temporary XCTest source.
+// This prepares each selected case. It never repairs state after that case.
+@MainActor
+private enum IntegratedUITestFixture {
+    static func prepare() throws {
+        let app = XCUIApplication()
+        defer {
+            app.terminate()
+            XCUIDevice.shared.orientation = .portrait
+        }
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+
+        // Observe the loaded settings before deciding whether an intent is Off.
+        // The app may restore saved On/Start while loading its ordinary file.
+        try saved(app)
+        try selectTab("Background", in: app)
+        @MainActor func toggle() -> XCUIElement {
+            let row = app.switches["background.udpEcho.enabled"]
+            let backing = row.switches.firstMatch
+            return backing.exists ? backing : row
+        }
+        try reveal(toggle(), in: app)
+        try require(waitUntil {
+            toggle().value as? String == "0" || toggle().value as? String == "1"
+        }, "The actual UDP Echo switch must report an ordinary On/Off value")
+        if toggle().value as? String == "1" { toggle().tap() }
+        try require(waitUntil { toggle().value as? String == "0" },
+                    "The case's initial UDP Echo intent must be Off")
+        let state = app.staticTexts["background.udpEcho.state"]
+        try reveal(state, in: app)
+        try require(waitUntil(timeout: 10) { state.label == "Off" },
+                    "The actual UDP Echo service must settle to Off")
+
+        try selectTab("Server", in: app)
+        let start = app.buttons["Start"]
+        let stop = app.buttons["Stop"]
+        try reveal(start, in: app)
+        try reveal(stop, in: app)
+        try require(waitUntil { start.isEnabled || stop.isEnabled },
+                    "The real Server controls must leave their transition state")
+        if stop.isEnabled { stop.tap() }
+        try require(waitUntil { start.isEnabled && !stop.isEnabled },
+                    "The case's initial server intent must be Stop")
+        try saved(app)
+        // Defer terminates this preparation process before the unchanged case
+        // launches its own process. No probe adds traffic to its zero baseline.
+    }
+
+    private static func selectTab(_ name: String, in app: XCUIApplication) throws {
+        let tab = app.tabBars.buttons[name]
+        try require(tab.waitForExistence(timeout: 10), "The \(name) tab must exist")
+        try require(waitUntil { tab.isHittable }, "The \(name) tab must be reachable")
+        tab.tap()
+    }
+
+    private static func saved(_ app: XCUIApplication) throws {
+        try selectTab("Settings", in: app)
+        let export = app.buttons["Export JSON"]
+        try require(export.waitForExistence(timeout: 5), "The real Settings page must load")
+        try reveal(export, in: app)
+        // These are the original periodic case's actual persistence indicators.
+        // There is no invented Saved label and no private file/preference access.
+        try require(waitUntil {
+            export.isHittable && export.isEnabled &&
+                !app.staticTexts["Loading saved settings..."].exists &&
+                !app.staticTexts["Saving changes..."].exists &&
+                !app.buttons["Retry Save"].exists
+        }, "Accepted initial settings must be durable before process recreation")
+    }
+
+    private static func reveal(_ element: XCUIElement, in app: XCUIApplication) throws {
+        if element.exists && element.isHittable { return }
+        let collection = app.collectionViews.firstMatch
+        let scroll = app.scrollViews.firstMatch
+        try require(waitUntil { collection.exists || scroll.exists },
+                    "The actual page must expose a scrollable container")
+        let form = collection.exists ? collection : scroll
+        for attempt in 0..<12 {
+            if element.exists && element.isHittable { return }
+            let target = element.exists ? element.frame : .null
+            let viewport = visibleViewport(of: form, in: app)
+            let moveDown: Bool
+            if element.exists && usable(target) && usable(viewport) {
+                if target.minY < viewport.minY {
+                    moveDown = true
+                } else if target.maxY > viewport.maxY {
+                    moveDown = false
+                } else {
+                    moveDown = target.midY < viewport.midY
+                }
+            } else {
+                // Invalid/absent frames use exactly this bounded fallback:
+                // attempts 0...5 down, attempts 6...11 up, at most 12 swipes.
+                moveDown = attempt < 6
+            }
+            if moveDown { form.swipeDown() } else { form.swipeUp() }
+        }
+        try require(element.exists && element.isHittable,
+                    "Use the actual control reachable within twelve swipes")
+    }
+
+    private static func visibleViewport(of form: XCUIElement,
+                                        in app: XCUIApplication) -> CGRect {
+        guard form.exists, app.exists else { return .null }
+        let formFrame = form.frame
+        let appFrame = app.frame
+        guard usable(formFrame), usable(appFrame) else { return .null }
+        var viewport = formFrame.intersection(appFrame)
+        guard usable(viewport) else { return .null }
+        let tabBar = app.tabBars.firstMatch
+        if tabBar.exists {
+            let tabFrame = tabBar.frame
+            if usable(tabFrame), viewport.intersects(tabFrame) {
+                viewport = CGRect(x: viewport.minX, y: viewport.minY,
+                                  width: viewport.width,
+                                  height: max(0, min(viewport.maxY, tabFrame.minY) - viewport.minY))
+            }
+        }
+        return usable(viewport) ? viewport : .null
+    }
+
+    private static func usable(_ frame: CGRect) -> Bool {
+        !frame.isNull && !frame.isInfinite && !frame.isEmpty &&
+            frame.origin.x.isFinite && frame.origin.y.isFinite &&
+            frame.size.width.isFinite && frame.size.height.isFinite
+    }
+
+    private static func waitUntil(timeout: TimeInterval = 5,
+                                  _ condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if condition() { return true }
+            Thread.sleep(forTimeInterval: 0.05)
+        } while Date() < deadline
+        return false
+    }
+
+    private static func require(_ condition: Bool, _ message: String) throws {
+        guard condition else {
+            // A setup failure is an uncaught test error, never a skip or success.
+            throw NSError(domain: "IntegratedUITestFixture", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: message])
+        }
+    }
+}
+'''
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for marker in ('SUCCESS.txt', 'advisory-check.txt', 'app-sha256.txt', 'final-settings.json',
@@ -256,10 +434,7 @@ def main():
     builder.OUT = OUT
     builder.add_test_target(app)
     # The target remains in the temporary project, never the committed app target.
-    (app / 'StatisticsUITests.swift').write_bytes(
-        (ROOT / 'Tests/Integration/IntegrationUITests.swift').read_bytes() + b'\n' +
-        (ROOT / 'Tests/Background/AsyncAudioUITests.swift').read_bytes() + b'\n' +
-        (ROOT / 'Tests/Statistics/StatisticsUITests.swift').read_bytes())
+    (app / 'StatisticsUITests.swift').write_bytes(ui_test_source())
     failure = None; cleanup = []; fixture = None; identifier = None
     phase = 'fixture-start'
     try:
