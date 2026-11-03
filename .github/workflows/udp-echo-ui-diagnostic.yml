@@ -1,4 +1,4 @@
-name: Stage one exact installed iOS disk image before the pinned Simulator lifecycle
+name: Refresh one own-UID Simulator service after the exact staged runtime preflight
 on:
   push:
     branches: [work/udp-echo-udp-20261028]
@@ -52,6 +52,9 @@ jobs:
           PY
           "$control_python" Bootstrap/ios_runtime_staged_preflight.py \
             --output "$RUNNER_TEMP/ios-runtime-staged-preflight"
+          "$control_python" Bootstrap/ios_runtime_service_refresh.py \
+            --preflight "$RUNNER_TEMP/ios-runtime-staged-preflight" \
+            --output "$RUNNER_TEMP/ios-runtime-service-refresh"
           "$control_python" Bootstrap/simulator_runtime_compare.py \
             --runtime-version "$COMPARE_RUNTIME_VERSION" \
             --runtime-build "$COMPARE_RUNTIME_BUILD" \
@@ -71,5 +74,13 @@ jobs:
         with:
           name: Simulator-iOS-runtime-staged-preflight-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ios-runtime-staged-preflight
+          if-no-files-found: error
+          retention-days: 90
+      - name: Preserve own-UID service refresh and exact runtime binding including rejection
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Simulator-own-UID-service-refresh-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ios-runtime-service-refresh
           if-no-files-found: error
           retention-days: 90
