@@ -23,6 +23,10 @@ from watch_runtime_preflight import IOS, WATCH, canonical, decode, inventory
 
 IOS_ASSET = Path("/System/Library/AssetsV2/com_apple_MobileAsset_iOSSimulatorRuntime/3e800c38767f9f2c5fc86acdad7adf44565e051a.asset/AssetData")
 WATCH_ASSET = "/System/Library/AssetsV2/com_apple_MobileAsset_watchOSSimulatorRuntime/3f39f470a745ea5cc62fc1967054b0dcf8fb0875.asset/AssetData"
+WATCH_MOUNTS = ("/Library/Developer/CoreSimulator/Volumes/watchOS_24R362",
+                "/private/var/run/com.apple.security.cryptexd/mnt/watchOS_24R362")
+WATCH_BUNDLE_SUFFIX = "/Library/Developer/CoreSimulator/Profiles/Runtimes/watchOS 27.0.simruntime"
+WATCH_FS_FIELDS = ("device", "inode", "mode", "uid", "gid", "is_directory", "is_regular")
 IMAGES = Path("/Library/Developer/CoreSimulator/Images")
 VOLUMES = Path("/Library/Developer/CoreSimulator/Volumes")
 DEVICE = "com.apple.CoreSimulator.SimDeviceType.iPhone-16"
@@ -119,7 +123,7 @@ def assess_old_cryptex(before, after):
     return "original_asset_retained_unusable_cryptex_mount_preferred"
 
 
-def assess_scope(before, after, old_id, new_id=None):
+def assess_scope(before, after, old_id, new_id=None, *, before_fs, after_fs):
     inventory(before)
     inventory(after)
     before_watch, after_watch = watch_records(before), watch_records(after)
@@ -129,14 +133,41 @@ def assess_scope(before, after, old_id, new_id=None):
                      "unusableErrorMessage", "unusableSubstate", "unusableErrorDetail"}
     watch_templates = {canonical({field: value for field, value in row.items() if field not in watch_dynamic})
                        for row in before_watch.values()}
+    for row in (*before_watch.values(), *after_watch.values()):
+        for field, paths in (("mountPath", WATCH_MOUNTS),
+                             ("runtimeBundlePath", tuple(path + WATCH_BUNDLE_SUFFIX for path in WATCH_MOUNTS))):
+            if field in row and row[field] not in paths:
+                raise ValueError("Watch path is outside the two actually observed exact mount aliases")
+        if ("mountPath" in row and "runtimeBundlePath" in row
+                and row["runtimeBundlePath"] != row["mountPath"] + WATCH_BUNDLE_SUFFIX):
+            raise ValueError("Watch mount and bundle paths name different aliases")
     for key, row in after_watch.items():
         stable = canonical({field: value for field, value in row.items() if field not in watch_dynamic})
         if stable not in watch_templates:
             raise ValueError("Watch metadata changed beyond the observed same-asset transition fields: " + key)
+        for field in ("path", "parentMountPath"):
+            current = after_fs[key][field]
+            if (current.get("capture") != "observed"
+                    or not any(current == before_fs[old_key][field] for old_key in before_watch)):
+                raise ValueError("Watch asset filesystem identity changed: " + key + ":" + field)
         for field in ("mountPath", "runtimeBundlePath"):
             observed_paths = {value[field] for value in before_watch.values() if isinstance(value.get(field), str)}
-            if field in row and row[field] not in observed_paths:
-                raise ValueError("Watch mount/bundle path differs from the observed same-asset path: " + key)
+            current = after_fs[key][field]
+            if current.get("capture") in ("field_absent", "unavailable"):
+                if row["state"] not in ("Unusable", "Copying", "Deleting"):
+                    raise ValueError("Ready watch mount/bundle filesystem identity is unavailable: " + key)
+                continue
+            if (current.get("capture") != "observed" or current.get("value") != row.get(field)
+                    or current.get("resolved_path") != row.get(field)):
+                raise ValueError("Watch mount/bundle capture does not name its exact path: " + key)
+            if row[field] not in observed_paths:
+                # Run417180/a1 observed the same device/inode at these two paths.
+                # Admit that exact relocation only with its before/after FS proof.
+                matches = [before_fs[old_key][field] for old_key in before_watch
+                           if before_fs[old_key][field].get("capture") == "observed"
+                           and before_fs[old_key][field].get("resolved_path") == before_watch[old_key].get(field)]
+                if not any(all(current.get(name) == old.get(name) for name in WATCH_FS_FIELDS) for old in matches):
+                    raise ValueError("Watch new mount alias does not preserve the observed filesystem object: " + key + ":" + field)
     protected = set(before) - set(before_watch) - {old_id}
     if any(key not in after or canonical(before[key]) != canonical(after[key]) for key in protected):
         raise ValueError("Another iOS/tvOS/xrOS or unrelated runtime changed or disappeared")
@@ -282,7 +313,7 @@ def main():
               "commands": [], "runtime_snapshots": {}, "original_lifecycle_may_run": False,
               "product_pass": False, "candidate_credit": False,
               "scope": "One direct .dmg from the exact installed iOS 24A434 MobileAsset is added once with default copy/clone, then only the one new same-build UUID is verified once. Source DMG identity/content and every other iOS/tvOS/xrOS record/filesystem identity remain unchanged. No move/async, download, runtime delete/unmount, force, reinstall, reset, permission/group change, old-UUID verify, fallback or retry.",
-              "watch_scope": "Only the already-observed watchOS27.0/24R362 asset may show Ready/Unusable/Copying/Deleting records, registration additions/removals or missing mount metadata. Full raw deltas are retained; no claim of watch immutability or proof of independence from staging is made.",
+              "watch_scope": "Only the same watchOS27.0/24R362 asset may show Ready/Unusable/Copying/Deleting records or registration additions/removals. Its exact Volumes/watchOS_24R362 and cryptexd/mnt/watchOS_24R362 aliases require unchanged asset identity and the same observed filesystem object at any newly used path. Missing/unavailable mount captures are recorded only for Unusable/Copying/Deleting records. Full raw deltas remain; no watch immutability or independence from staging is claimed.",
               "comparison_limits": "Actual prior run41713042397/a1 reported selected iOS verify exit1/-67054; that does not establish past lifecycle timeout causation. Add/verify and whole-file hashing can warm caches and services. Preflight success proves neither application success nor which image the later unchanged driver ultimately selects; actual lifecycle selected_runtime.bundlePath must be compared with expected_later_lifecycle_bundle_path in the artifacts. No new application or candidate credit.",
               "timing_limits": "One add wait180s, one new-UUID verify wait120s, at most fourteen distinct metadata waits10s, and at most four DMG hash reads with a separate 60s processing check. Own subprocess failure permits only its kill and a one-second reap wait; killing the CLI does not prove server-side staging has stopped. Filesystem reads, process creation and scheduling are not hard wall-clock bounded. Original lifecycle and 15-minute job timeouts are unchanged."}
     used = set()
@@ -400,7 +431,7 @@ def main():
         save()
         run("add-exact-installed-dmg", ["xcrun", "simctl", "runtime", "add", str(source_path)], ADD_TIMEOUT)
         added, added_fs = snapshot("after-add")
-        scope = assess_scope(before, added, old_id)
+        scope = assess_scope(before, added, old_id, before_fs=before_fs, after_fs=added_fs)
         report["scope_after_add"] = scope
         new_id = scope["new_uuid"]
         require_same_filesystem(before_fs, added_fs, scope["protected_uuids"])
@@ -413,7 +444,7 @@ def main():
         new_fs = added_fs[new_id]
         run("verify-new-staged-ios", ["xcrun", "simctl", "runtime", "verify", new_id], VERIFY_TIMEOUT)
         final, final_fs = snapshot("after-verify")
-        final_scope = assess_scope(before, final, old_id, new_id)
+        final_scope = assess_scope(before, final, old_id, new_id, before_fs=before_fs, after_fs=final_fs)
         report["scope_after_verify"] = final_scope
         require_same_filesystem(before_fs, final_fs, final_scope["protected_uuids"])
         require_same_filesystem(before_fs, final_fs, [old_id], ("path", "parentMountPath"))
