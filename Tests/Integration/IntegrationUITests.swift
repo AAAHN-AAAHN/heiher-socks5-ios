@@ -346,8 +346,18 @@ final class IntegrationUITests: XCTestCase {
         var response = Data()
         var buffer = [UInt8](repeating: 0, count: 1024)
         while !response.contains(10) && response.count < 16_384 {
+            let receiveStartedUnix = Date().timeIntervalSince1970
+            let receiveStarted = ProcessInfo.processInfo.systemUptime
             let count = buffer.withUnsafeMutableBytes { Darwin.recv(fd, $0.baseAddress, $0.count, 0) }
-            guard count > 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+            let receiveErrno = errno
+            guard count > 0 else {
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(receiveErrno), userInfo: [
+                    NSLocalizedDescriptionKey: "UDP Echo fixture recv: command=\(command), " +
+                        "count=\(count), errno=\(receiveErrno), received_bytes=\(response.count), " +
+                        "started_unix=\(receiveStartedUnix), finished_unix=\(Date().timeIntervalSince1970), " +
+                        "elapsed_seconds=\(ProcessInfo.processInfo.systemUptime - receiveStarted)"
+                ])
+            }
             response.append(contentsOf: buffer.prefix(count))
         }
         return try JSONDecoder().decode(EchoObservation.self, from: response)

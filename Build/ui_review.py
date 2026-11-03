@@ -79,14 +79,16 @@ class UDPEchoFixture:
                 raise
         self.events = []
         self.errors = []
+        self.control_observations = []
         self.epoch = 0
         owner = self
 
         class Control(socketserver.StreamRequestHandler):
             def handle(self):
                 self.request.settimeout(5)
+                command = None
                 try:
-                    command = self.rfile.readline(32).decode('ascii').rstrip('\n')
+                    command = owner.observe_control('read', lambda: self.rfile.readline(32)).decode('ascii').rstrip('\n')
                     if command not in ('reply', 'drop', 'snapshot'):
                         raise ValueError('Unknown fixture command')
                     if command != 'snapshot':
@@ -96,7 +98,9 @@ class UDPEchoFixture:
                 except Exception as error:
                     owner.errors.append(repr(error))
                     result = {'error': repr(error)}
-                self.wfile.write(json.dumps(result).encode() + b'\n')
+                payload = json.dumps(result).encode() + b'\n'
+                owner.observe_control('write', lambda: self.wfile.write(payload),
+                                      command=command, requested_bytes=len(payload))
 
         try:
             self.control = socketserver.TCPServer(('127.0.0.1', 0), Control)
@@ -108,8 +112,9 @@ class UDPEchoFixture:
         self.thread.start()
 
     def record(self, name, command='snapshot'):
-        observed = (self.module.command(self.helper, command) if self.helper is not None else
-                    echo_command(self.echo, command))
+        observed = self.observe_control('ipc', lambda: (
+            self.module.command(self.helper, command) if self.helper is not None else
+            echo_command(self.echo, command)), event=name, command=command)
         packets = {int(family): values for family, values in observed['packets'].items()}
         result = {'epoch': self.epoch, 'replies': observed['replies'],
                   'counts': {str(family): len(values) for family, values in packets.items()},
@@ -123,6 +128,35 @@ class UDPEchoFixture:
             event['packets'] = packets
         self.events.append(event)
         return result
+
+    def observe_control(self, stage, operation, **details):
+        started = time.monotonic()
+        record = {'stage': stage, 'started_unix': time.time(), **details}
+        self.control_observations.append(record)
+        value = None
+        failure = None
+        try:
+            value = operation()
+            return value
+        except BaseException as error:
+            failure = error
+            raise
+        finally:
+            record.update(finished_unix=time.time(),
+                          elapsed_seconds=time.monotonic() - started,
+                          returned_bytes=len(value) if isinstance(value, bytes) else
+                                         value if isinstance(value, int) else None,
+                          failure=type(failure).__name__ if failure else None,
+                          errno=getattr(failure, 'errno', None),
+                          error=repr(failure) if failure else None)
+
+    def save_control_observations(self):
+        try:
+            records = [dict(record) for record in self.control_observations]
+            (OUT / 'udp-echo-control.jsonl').write_text(
+                ''.join(json.dumps(record) + '\n' for record in records))
+        except Exception as error:
+            write_diagnostic('UDP Echo control diagnostic failed: ' + repr(error))
 
     def record_helper(self, stage, error=None):
         if self.helper_diagnostic is None:
@@ -179,6 +213,7 @@ class UDPEchoFixture:
             try:
                 self.finish_echo()
             finally:
+                self.save_control_observations()
                 (OUT / 'udp-echo-fixture.json').write_text(json.dumps(
                     {'events': self.events, 'errors': self.errors}, indent=2) + '\n')
         assert not self.errors, self.errors
@@ -417,6 +452,7 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for marker in ('SUCCESS.txt', 'advisory-check.txt', 'app-sha256.txt', 'final-settings.json',
                    'udp-echo-fixture.json', 'udp-echo-helper.json', 'udp-echo-helper.log',
+                   'udp-echo-control.jsonl',
                    'ui-command-timings.jsonl', 'ui-control-command-timings.jsonl',
                    'process-observations.jsonl'):
         (OUT / marker).unlink(missing_ok=True)
@@ -517,6 +553,7 @@ def main():
         capture_failure(OUT, phase, identifier, exc)
     finally:
         if fixture is not None:
+            fixture.save_control_observations()
             try:
                 fixture.close()
             except Exception as exc:
