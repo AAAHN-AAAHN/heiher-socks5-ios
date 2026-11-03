@@ -20,7 +20,7 @@
     "settings": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
     "background": "e002fb55e95c35006683f8c8b182e99cd53b837c",
     "icon": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
-    "integrated": "5fc669f059161075ff815d54389b81c0e66c928a"
+    "integrated": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08"
   },
   "previous_candidate_heads": {
     "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
@@ -30,25 +30,25 @@
     "settings": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
     "background": "e002fb55e95c35006683f8c8b182e99cd53b837c",
     "icon": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
-    "integrated": "7a8dbf7058b2677c3a4a8b7a4fe496bd97a96af6"
+    "integrated": "5fc669f059161075ff815d54389b81c0e66c928a"
   },
   "macos_only": [],
   "matrix": [
     {
       "name": "integrated",
-      "sha": "5fc669f059161075ff815d54389b81c0e66c928a",
+      "sha": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "integrated",
-      "sha": "5fc669f059161075ff815d54389b81c0e66c928a",
+      "sha": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
       "os": "xcode-27",
       "runtime": true
     }
   ],
-  "bundle_sha256": "544bf704020b38240b2a30059b437f8574515274c440f8ae68f071ff85f0c416",
-  "bundle_bytes": 97582,
+  "bundle_sha256": "ca54b016ca7ea05f8c6a0848dac521c6ea633d9863423255af99daa08789a83b",
+  "bundle_bytes": 99614,
   "prerequisites": [
     "8bec30de328543f8f23b79a736385ed0e80aaa88",
     "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
@@ -71,11 +71,10 @@
   },
   "actual_remote_captures": {
     "heads": {
-      "path": "/workspace/scratch/630ba41d6484/completion-20261103/simulator-fix/kernel-exit-observer-proposal/remote-execution/postupdate-heads.json",
-      "bytes": 11391,
-      "sha256": "10855026467fdbd968e26e500c9063ad13797c1504fb6df8426ccf17291fca0d",
-      "requested_utc": "2026-11-03T03:05:10.317Z",
-      "received_utc": "2026-11-03T03:05:10.812Z",
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/observations/preparation-heads.json",
+      "bytes": 13172,
+      "sha256": "2f3df736c8d619b0667045a6200bed94819c9354c435709be52ec50b3432a59b",
+      "fetched_at": "2026-11-03 19:06:24 UTC",
       "refs": {
         "refs/heads/feature/app-icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
         "refs/heads/feature/background": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
@@ -85,18 +84,17 @@
         "refs/heads/feature/udp-compat": "e50f434be2610ef00713d39363963542db0020e2",
         "refs/heads/main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
         "refs/heads/release/integrated": "8bec30de328543f8f23b79a736385ed0e80aaa88",
-        "refs/heads/work/udp-echo-build-20261028": "7875c96e11384908c2f8a0260b50de4d52f2c4cb",
+        "refs/heads/work/udp-echo-build-20261028": "87abc82b5230f893de4c401ff96e826f35d93c74",
         "refs/heads/work/udp-echo-main-20261028": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
         "refs/heads/work/udp-echo-publish-20261028": "f6cd633480b938fbe1e27b4bacaf4e286f4193d2",
-        "refs/heads/work/udp-echo-udp-20261028": "57ddbada58b3d681addf621420e348e9a5172185"
+        "refs/heads/work/udp-echo-udp-20261028": "1b218ad379d83222a7e5ea4a37c610fa90088ef1"
       }
     },
     "tags": {
-      "path": "/workspace/scratch/630ba41d6484/completion-20261103/simulator-fix/kernel-exit-observer-proposal/remote-execution/postupdate-tags.json",
-      "bytes": 31509,
-      "sha256": "41a3beff716707ab098bbccdd305d7b1b3bd05abeadb817269643980d502f9dd",
-      "requested_utc": "2026-11-03T03:05:10.317Z",
-      "received_utc": "2026-11-03T03:05:10.764Z",
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/observations/preparation-tags.json",
+      "bytes": 36446,
+      "sha256": "156b9c8c2853860e20900feb7ee63eeb71bf9b882d1babba9e13c9e3f08d555d",
+      "fetched_at": "2026-11-03 19:06:24 UTC",
       "refs": {
         "refs/tags/archive/2026-09-22/audit/statistics-final-20260921": "31ef4a7baa15f76e7c7cdbc1ed11216c1fa2f93e",
         "refs/tags/archive/2026-09-22/audit/udp-patches-20260921": "eccd78c41103e6d31e305eebc4e176864d442d48",
@@ -128,11 +126,83 @@
       }
     }
   },
-  "helper_base_commit": "7875c96e11384908c2f8a0260b50de4d52f2c4cb",
-  "source_saved_bundle_sha256": "e8cf9f0700d5736abf9566784d76d65638bd4516b9a3f754f09f203e951ae145",
-  "source_saved_evidence_sha256": "e6d97efa6c731e5b01a6031a1b633fed4e9de6b682be53a293b0afe14bcaafc8",
-  "source_saved_readback_sha256": "119bbee3badbebae25689f294cccda70d58b63c0ed572cf1c50317e3902d5489",
-  "manifest_sha256": "79b11e69879fdb50e9f638cd8182e2d6490e0b183bf7c0ce48f13472b40fd283",
+  "helper_base_commit": "87abc82b5230f893de4c401ff96e826f35d93c74",
+  "source_generation_evidence": {
+    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/source-fixture-observation-v1/source-generation.json",
+    "bytes": 919,
+    "sha256": "69b0cb02547f7d7ac45e7a8b96ea7f64efc714f0d9cc742da8ef1c8d88f10d38",
+    "native_generation": {
+      "recorded_utc": "2026-11-03T19:03:11.040902+00:00",
+      "previous_source": "5fc669f059161075ff815d54389b81c0e66c928a",
+      "implementation_commit": "c7665674101f162f0ad2d291926c0620d69231f5",
+      "source_commit": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
+      "source_tree": "06c8b0ec36c56fba9ab0c9719a9ee8cf10b22931",
+      "implementation_paths": [
+        "Build/ui_review.py",
+        "Tests/Integration/IntegrationUITests.swift"
+      ],
+      "baseline_paths": [
+        "Build/documentation-baseline.json",
+        "docs/documentation.json"
+      ],
+      "app_and_native_patch_changes": [],
+      "purpose": "Record the missing exact fixture recv and host operation boundaries; no runtime fix or gate acceptance claimed",
+      "original_deadlines_assertions_and_test_bodies_preserved": true,
+      "new_remote_mutations": 0,
+      "new_CI_runs": 0,
+      "local_source_commits": 2,
+      "patch_sha256": "8dca2d026add00cb67cc919cd88bce97a973a650ad2c0e808c206351182b6f51"
+    }
+  },
+  "source_heads_evidence": {
+    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/source-fixture-observation-v1/heads8.json",
+    "sha256": "58db06fc30539d42e1145bbf6875c902e09fb6e0e0a5376ed0fab6c6460459ce"
+  },
+  "source_immediate_previous_heads_evidence": {
+    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/source-fixture-observation-v1/heads8-before.json",
+    "sha256": "19d58e4c90472fbf6a8b316b1520efb200af6dd16bb04683c5353dcac9ecb0a0"
+  },
+  "seed_roots": [
+    "5d5327d4513b587e2a2e948fa20f588a04f1376f",
+    "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
+    "bf0789c68670078def846d7e3778e7f5cfe9e77f",
+    "953ee8d720cf32311d82dad1bcb1b566333c5d62",
+    "a55184fca134ce16b64335ac2f88b31b1161cd81",
+    "e50f434be2610ef00713d39363963542db0020e2",
+    "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+    "8bec30de328543f8f23b79a736385ed0e80aaa88",
+    "87abc82b5230f893de4c401ff96e826f35d93c74",
+    "f6cd633480b938fbe1e27b4bacaf4e286f4193d2",
+    "1b218ad379d83222a7e5ea4a37c610fa90088ef1",
+    "31ef4a7baa15f76e7c7cdbc1ed11216c1fa2f93e",
+    "eccd78c41103e6d31e305eebc4e176864d442d48",
+    "99680a3bcdb6a3270767dcc43b1d9133866714b2",
+    "6a9d7930fe2cdf103a1b8ad80c157dc60fcc2bfc",
+    "790167ae72155a138969840885e710a9fb36473f",
+    "b68dbb9ca7d4d028111666915eba951911857b1d",
+    "ed1c7cae63eea6906502540f378ef835dba343a9",
+    "0be4e061443ca7e705f1133dcf4483897bbefb04",
+    "9e1ed7513f9b1b0c61f7a8930ad4be06556a55d7",
+    "12e3eba0fb0d25ef4af03b435af269e85e581209",
+    "31d09c8edf796f83882610ce90775a2deafca0aa",
+    "b3590d3887584281002b2d2c033280d127ad7685",
+    "7dae9e89f13242dad429786f431cbe45ba71975c",
+    "51eed67071d4be701277e371e7db1a65203a7bb2",
+    "83d350d28d6a31e7730cfa74b49f58d2af642397",
+    "b668c256ecbd411cdb5efedd10afe7efbffae759",
+    "563d3d197d3e64de5bacb07da4f66e0ab9c3ba34",
+    "d268d0bb8fb91fce426b9eef377e1456690fba47",
+    "48b7ae84fa4d2667aa52850271fab089fc6fcc2e",
+    "60fa64b5c98aadaaee349e6e12c50bd2f9b32ac2",
+    "e6663544b9394c0e743108fd4f169c8c7baf7490",
+    "45a592b81fda404edb63710067349276f72a986a",
+    "fc54f9aebe07c2460b98d3b2bc18a971911ff0d0",
+    "4d64d2dbfc37ef04fef326fde6133dbceba90e97",
+    "19aec84fbc929678bb0f05b89c76d490ada6f8b7",
+    "e82e590412e5b5cbcd531827a81f845596ee16f6"
+  ],
+  "source_absent_from_remote_only_seed_before_import": true,
+  "manifest_sha256": "2868303d39b1b8acda2f96d147365e67764931adea60513819255919954bedc0",
   "original_importer_sha256": "1e647ab8a266a64097c5cc543f22d6a2c58010bfba8988b10fa4809589a6367e",
   "actual_importer_verified": false,
   "original_importer_main": "PENDING: no clean newly committed helper or actual CI prepare exists yet; no HEAD/env simulation performed.",
@@ -229,13 +299,13 @@
       },
       {
         "owner": "integrated",
-        "source": "5fc669f059161075ff815d54389b81c0e66c928a",
+        "source": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
         "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
         "returncode": 1
       },
       {
         "owner": "integrated",
-        "source": "5fc669f059161075ff815d54389b81c0e66c928a",
+        "source": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
         "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
         "returncode": 1
       }
@@ -259,7 +329,7 @@
   "remote_mutations": false,
   "CI_runs": 0,
   "application_gate_credit": 0,
-  "scope": "New Integrated5fc entry-fixture validation inputs only. Other four candidate Mac failures remain open; this is not a retry of their failed runtime jobs.",
-  "started_utc": "2026-11-03T03:11:46.760206+00:00",
-  "completed_utc": "2026-11-03T03:11:47.546098+00:00"
+  "scope": "New Integrated0bcc fixture-boundary observation inputs only. Existing failure receipts remain unchanged; other four candidate Mac failures remain open. No unchanged failed runtime job retry and no application gate credit.",
+  "started_utc": "2026-11-03T19:09:01.825853+00:00",
+  "completed_utc": "2026-11-03T19:09:02.816459+00:00"
 }
