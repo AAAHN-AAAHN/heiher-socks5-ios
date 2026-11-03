@@ -1,71 +1,40 @@
-name: Observe the original Integrated handshake and installed toolchain
+name: Observe child NOTE_EXIT during one pinned empty Simulator lifecycle
 on:
   push:
     branches: [work/udp-echo-udp-20261028]
 permissions:
   contents: read
-  actions: read
 jobs:
-  integrated-handshake-diagnostic:
+  # One diagnostic run; NOTE_EXIT adds no application or candidate gate credit.
+  # Different runner IDs alone do not prove different physical hosts.
+  simulator-kernel-exit-observation:
     runs-on: xcode-27
-    timeout-minutes: 45
+    timeout-minutes: 15
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
-      PYTHONDONTWRITEBYTECODE: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 0
           persist-credentials: false
-          path: diagnostic
-      - name: Read the exact original producer helper
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: 7875c96e11384908c2f8a0260b50de4d52f2c4cb
-          fetch-depth: 0
-          persist-credentials: false
-          path: producer
-      - name: Observe one original UI run without changing its assertions or deadlines
+      - name: One original empty-device lifecycle with independent exit observation
+        shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
+          COMPARE_RUNTIME_VERSION: '27.0'
+          COMPARE_RUNTIME_BUILD: '24A434'
+          COMPARE_DEVICE_TYPE: 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
         run: |
           set -euo pipefail
-          python3 diagnostic/Bootstrap/run_integrated_handshake_diagnostic.py \
-            --producer-helper "$GITHUB_WORKSPACE/producer" \
-            --source "$RUNNER_TEMP/udp-source" \
-            --output "$RUNNER_TEMP/handshake-diagnostic"
-      - name: Preserve diagnostic observations and original UI results including failure
+          python3 Bootstrap/simulator_runtime_compare.py \
+            --runtime-version "$COMPARE_RUNTIME_VERSION" \
+            --runtime-build "$COMPARE_RUNTIME_BUILD" \
+            --device-type "$COMPARE_DEVICE_TYPE" \
+            --output "$RUNNER_TEMP/simulator-runtime-comparison"
+      - name: Preserve actual lifecycle and exit observations including failure
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Integrated-handshake-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/handshake-diagnostic/
-            ${{ runner.temp }}/udp-source/artifacts/
-          if-no-files-found: error
-          retention-days: 90
-
-  installed-toolchain-readonly:
-    runs-on: xcode-27
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - name: Read installed toolchain and global component identities with a fixed query budget
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 Bootstrap/toolchain_readonly_preflight.py \
-            --output "$RUNNER_TEMP/toolchain-readonly-preflight"
-      - name: Preserve all actual read-only observations including failure
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: Toolchain-readonly-preflight-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/toolchain-readonly-preflight
+          name: Simulator-kernel-exit-observer-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/simulator-runtime-comparison
           if-no-files-found: error
           retention-days: 90
