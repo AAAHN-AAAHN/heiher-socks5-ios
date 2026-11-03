@@ -61,10 +61,106 @@ jobs:
       - name: Exercise actual Server controls and tabs on iOS 27 Simulator
         env:
           DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+          RUNTIME_COMMON_SOURCE_REF: ${{ inputs.ref }}
         if: runner.os == 'macOS'
         shell: bash
         id: ui
-        run: python3 Tests/Statistics/ui_audit.py
+        run: |
+          set -euo pipefail
+          runtime_common_preparation_applied=1
+          runtime_common_legacy_record_status=0
+          runtime_common_after_status=0
+          if [ -n "${RUNTIME_COMMON_SOURCE_REF:-}" ] && [ -z "$(git ls-tree HEAD -- Build/runtime_environment.py)" ]; then
+            runtime_common_preparation_applied=0
+          # Only an explicit original input whose Git tree lacks the new helper takes this path.
+          # No downloaded helper, current consumer pin or preparation credit is substituted.
+          if python3 - <<'RUNTIME_LEGACY_RECORD'
+          import hashlib, json, os, pathlib, subprocess
+          root = pathlib.Path.cwd()
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          source = {'commit': git('rev-parse', 'HEAD'), 'tree': git('rev-parse', 'HEAD^{tree}')}
+          helper_entry = git('ls-tree', 'HEAD', '--', 'Build/runtime_environment.py')
+          if not os.environ.get('RUNTIME_COMMON_SOURCE_REF') or helper_entry:
+              raise SystemExit('Legacy fallback requires an explicit original input and an absent tracked helper path')
+          out = root / 'artifacts/statistics-ui-audit/runtime-preparation'
+          for item in (out / 'legacy-unavailable.json', out, *out.parents):
+              if item.is_symlink():
+                  raise SystemExit('Linked legacy preparation output is rejected: ' + str(item))
+              if item == root:
+                  break
+          out.mkdir(parents=True, exist_ok=True)
+          result = {'schema': 'legacy-explicit-input-preparation-unavailable-v1',
+                    'result': 'PREPARATION_UNAVAILABLE_ORIGINAL_CONSUMER_STILL_REQUIRED',
+                    'actual_input_ref': os.environ['RUNTIME_COMMON_SOURCE_REF'], 'source': source,
+                    'helper_path': 'Build/runtime_environment.py', 'helper_git_entry': None,
+                    'actual_caller_github_sha': os.environ['GITHUB_SHA'],
+                    'repository': os.environ['GITHUB_REPOSITORY'], 'run_id': os.environ['GITHUB_RUN_ID'],
+                    'attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'job': os.environ['GITHUB_JOB'],
+                    'preparation_applied': False, 'formal_current_source_credit': False,
+                    'hidden_helper_download': False,
+                    'original_command': 'python3 Tests/Statistics/ui_audit.py',
+                    'scope': 'The unchanged pinned checkout selected this explicit legacy input. This record neither claims a caller checkout nor replaces any original test or source check.'}
+          with (out / 'legacy-unavailable.json').open('x') as stream:
+              json.dump(result, stream, indent=2); stream.write('\n')
+          RUNTIME_LEGACY_RECORD
+          then
+            runtime_common_legacy_record_status=0
+          else
+            runtime_common_legacy_record_status=$?
+          fi
+          else
+            runtime_common_source_root="$(pwd -P)"
+            runtime_common_source_commit="$(git rev-parse HEAD)"
+            runtime_common_source_tree="$(git rev-parse 'HEAD^{tree}')"
+            runtime_common_cache="${RUNNER_TOOL_CACHE:?}/Python/3.14.9/arm64"
+            runtime_common_python="$runtime_common_cache/bin/python3.14"
+            if [[ ! -f "${runtime_common_cache}.complete" || ! -x "$runtime_common_python" ]]; then
+              printf 'Required completed CPython3.14.9 arm64 cache is unavailable.\n' >&2
+              exit 1
+            fi
+            runtime_common_helper=Build/runtime_environment.py
+            runtime_common_args=(--owner statistics
+              --source-root "$runtime_common_source_root" --source-commit "$runtime_common_source_commit" --source-tree "$runtime_common_source_tree")
+            if [ -n "${RUNTIME_COMMON_SOURCE_REF:-}" ]; then
+              runtime_common_args+=(--mode workflow-input --workflow-input-ref "$RUNTIME_COMMON_SOURCE_REF")
+            else
+              runtime_common_args+=(--mode canonical --control-root "$runtime_common_source_root" --control-commit "$GITHUB_SHA" --control-tree "$runtime_common_source_tree")
+            fi
+            runtime_common_invoke() {
+              "$runtime_common_python" "$runtime_common_helper" "$@" "${runtime_common_args[@]}"
+            }
+            # Capture real process status even under the original set -e discipline.
+            if runtime_common_invoke prepare; then
+              runtime_common_prepare_status=0
+            else
+              runtime_common_prepare_status=$?
+            fi
+            if runtime_common_invoke record-prepare-exit --actual-status "$runtime_common_prepare_status"; then
+              runtime_common_record_status=0
+            else
+              runtime_common_record_status=$?
+            fi
+            if [ "$runtime_common_prepare_status" -ne 0 ]; then exit "$runtime_common_prepare_status"; fi
+            if [ "$runtime_common_record_status" -ne 0 ]; then exit "$runtime_common_record_status"; fi
+            runtime_common_invoke before --consumer statistics-ui
+          fi
+          # The single original command remains required even if legacy limitation recording failed.
+          if python3 Tests/Statistics/ui_audit.py; then
+            runtime_common_original_status=0
+          else
+            runtime_common_original_status=$?
+          fi
+          if [ "$runtime_common_preparation_applied" -eq 1 ]; then
+            if runtime_common_invoke after --consumer statistics-ui --actual-status "$runtime_common_original_status"; then
+              runtime_common_after_status=0
+            else
+              runtime_common_after_status=$?
+            fi
+          fi
+          if [ "$runtime_common_original_status" -ne 0 ]; then exit "$runtime_common_original_status"; fi
+          if [ "$runtime_common_legacy_record_status" -ne 0 ]; then exit "$runtime_common_legacy_record_status"; fi
+          if [ "$runtime_common_after_status" -ne 0 ]; then exit "$runtime_common_after_status"; fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         with:

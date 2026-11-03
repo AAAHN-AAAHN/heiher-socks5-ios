@@ -2,11 +2,11 @@
   "branch": "release/integrated",
   "frozen_source": "c7665674101f162f0ad2d291926c0620d69231f5",
   "parents": {
-    "feature/app-icon": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
+    "feature/app-icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
     "feature/background": "e002fb55e95c35006683f8c8b182e99cd53b837c",
-    "feature/server-control": "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
-    "feature/settings-persistence": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
-    "feature/traffic-statistics": "545d8690f30e82be990c536b3b2932d6d292c92f",
+    "feature/server-control": "992c146ccf6232957728eed0e201e790974e19b3",
+    "feature/settings-persistence": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+    "feature/traffic-statistics": "5bb13783e30b155ef69a18a897f721258090f2d7",
     "feature/udp-compat": "b05db817684d6b006353d5062fdba756d739faea"
   },
   "owned_documents": [
