@@ -285,17 +285,133 @@ jobs:
             python3 Build/check.py checkout "$core"
           fi
           case "$CANDIDATE" in
-            server) python3 Tests/ServerControl/ui_audit.py ;;
-            settings) python3 Tests/Settings/ui_audit.py ;;
-            icon) bash Tests/AppIcon/run_checks.sh ;;
+            server|settings|statistics|icon|integrated)
+              runtime_common_source_root="$(pwd -P)"
+              runtime_common_source_commit="$(git rev-parse HEAD)"
+              runtime_common_source_tree="$(git rev-parse 'HEAD^{tree}')"
+              runtime_common_cache="${RUNNER_TOOL_CACHE:?}/Python/3.14.9/arm64"
+              runtime_common_python="$runtime_common_cache/bin/python3.14"
+              if [[ ! -f "${runtime_common_cache}.complete" || ! -x "$runtime_common_python" ]]; then
+                printf 'Required completed CPython3.14.9 arm64 cache is unavailable.\n' >&2
+                exit 1
+              fi
+              runtime_common_helper=Build/runtime_environment.py
+              if [ "$CANDIDATE" = icon ]; then runtime_common_helper=Tests/AppIcon/runtime_environment.py; fi
+              runtime_common_args=(--mode candidate --owner "$CANDIDATE"
+                --source-root "$runtime_common_source_root" --source-commit "$runtime_common_source_commit" --source-tree "$runtime_common_source_tree")
+              runtime_common_control_root="${GITHUB_WORKSPACE:?}"
+              runtime_common_control_tree="$(git -C "$runtime_common_control_root" rev-parse 'HEAD^{tree}')"
+              runtime_common_args+=(--control-root "$runtime_common_control_root" --control-commit "$GITHUB_SHA" --control-tree "$runtime_common_control_tree")
+              runtime_common_invoke() {
+                "$runtime_common_python" "$runtime_common_helper" "$@" "${runtime_common_args[@]}"
+              }
+              # Capture real process status even under the original set -e discipline.
+              if runtime_common_invoke prepare; then
+                runtime_common_prepare_status=0
+              else
+                runtime_common_prepare_status=$?
+              fi
+              if runtime_common_invoke record-prepare-exit --actual-status "$runtime_common_prepare_status"; then
+                runtime_common_record_status=0
+              else
+                runtime_common_record_status=$?
+              fi
+              if [ "$runtime_common_prepare_status" -ne 0 ]; then exit "$runtime_common_prepare_status"; fi
+              if [ "$runtime_common_record_status" -ne 0 ]; then exit "$runtime_common_record_status"; fi
+              ;;
+          esac
+          case "$CANDIDATE" in
+            server)
+              runtime_common_invoke before --consumer server-ui
+              if python3 Tests/ServerControl/ui_audit.py; then
+                runtime_common_original_status=0
+              else
+                runtime_common_original_status=$?
+              fi
+              if runtime_common_invoke after --consumer server-ui --actual-status "$runtime_common_original_status"; then
+                runtime_common_after_status=0
+              else
+                runtime_common_after_status=$?
+              fi
+              if [ "$runtime_common_original_status" -ne 0 ]; then exit "$runtime_common_original_status"; fi
+              if [ "$runtime_common_after_status" -ne 0 ]; then exit "$runtime_common_after_status"; fi
+              ;;
+            settings)
+              runtime_common_invoke before --consumer settings-ui
+              if python3 Tests/Settings/ui_audit.py; then
+                runtime_common_original_status=0
+              else
+                runtime_common_original_status=$?
+              fi
+              if runtime_common_invoke after --consumer settings-ui --actual-status "$runtime_common_original_status"; then
+                runtime_common_after_status=0
+              else
+                runtime_common_after_status=$?
+              fi
+              if [ "$runtime_common_original_status" -ne 0 ]; then exit "$runtime_common_original_status"; fi
+              if [ "$runtime_common_after_status" -ne 0 ]; then exit "$runtime_common_after_status"; fi
+              ;;
+            icon)
+              runtime_common_invoke before --consumer icon-ui
+              if bash Tests/AppIcon/run_checks.sh; then
+                runtime_common_original_status=0
+              else
+                runtime_common_original_status=$?
+              fi
+              if runtime_common_invoke after --consumer icon-ui --actual-status "$runtime_common_original_status"; then
+                runtime_common_after_status=0
+              else
+                runtime_common_after_status=$?
+              fi
+              if [ "$runtime_common_original_status" -ne 0 ]; then exit "$runtime_common_original_status"; fi
+              if [ "$runtime_common_after_status" -ne 0 ]; then exit "$runtime_common_after_status"; fi
+              ;;
             background)
               python3 Tests/Background/native_inputs.py verify
               python3 Tests/Background/check_async_ui.py
               ;;
-            statistics) python3 Tests/Statistics/ui_audit.py ;;
+            statistics)
+              runtime_common_invoke before --consumer statistics-ui
+              if python3 Tests/Statistics/ui_audit.py; then
+                runtime_common_original_status=0
+              else
+                runtime_common_original_status=$?
+              fi
+              if runtime_common_invoke after --consumer statistics-ui --actual-status "$runtime_common_original_status"; then
+                runtime_common_after_status=0
+              else
+                runtime_common_after_status=$?
+              fi
+              if [ "$runtime_common_original_status" -ne 0 ]; then exit "$runtime_common_original_status"; fi
+              if [ "$runtime_common_after_status" -ne 0 ]; then exit "$runtime_common_after_status"; fi
+              ;;
             integrated)
-              python3 Build/ui_review.py > artifacts/integrated/ui-review.log 2>&1
-              python3 Build/simulator_review.py > artifacts/integrated/simulator-review.log 2>&1
+              runtime_common_invoke before --consumer integrated-ui
+              if python3 Build/ui_review.py > artifacts/integrated/ui-review.log 2>&1; then
+                runtime_common_original_status=0
+              else
+                runtime_common_original_status=$?
+              fi
+              if runtime_common_invoke after --consumer integrated-ui --actual-status "$runtime_common_original_status"; then
+                runtime_common_after_status=0
+              else
+                runtime_common_after_status=$?
+              fi
+              if [ "$runtime_common_original_status" -ne 0 ]; then exit "$runtime_common_original_status"; fi
+              if [ "$runtime_common_after_status" -ne 0 ]; then exit "$runtime_common_after_status"; fi
+              runtime_common_invoke before --consumer integrated-simulator
+              if python3 Build/simulator_review.py > artifacts/integrated/simulator-review.log 2>&1; then
+                runtime_common_original_status=0
+              else
+                runtime_common_original_status=$?
+              fi
+              if runtime_common_invoke after --consumer integrated-simulator --actual-status "$runtime_common_original_status"; then
+                runtime_common_after_status=0
+              else
+                runtime_common_after_status=$?
+              fi
+              if [ "$runtime_common_original_status" -ne 0 ]; then exit "$runtime_common_original_status"; fi
+              if [ "$runtime_common_after_status" -ne 0 ]; then exit "$runtime_common_after_status"; fi
               ;;
             *) echo "Unsupported runtime candidate: $CANDIDATE" >&2; exit 1 ;;
           esac

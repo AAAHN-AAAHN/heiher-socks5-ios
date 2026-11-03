@@ -1,54 +1,102 @@
 {
   "result": "PASS_LOCAL_INPUT_PREPARATION_ONLY",
   "selected": [
+    "statistics",
+    "server",
+    "settings",
+    "icon",
     "integrated"
   ],
   "support": [
     "main",
     "udp",
-    "statistics",
-    "server",
-    "settings",
-    "background",
-    "icon"
+    "background"
   ],
   "heads": {
-    "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
-    "udp": "b05db817684d6b006353d5062fdba756d739faea",
-    "statistics": "545d8690f30e82be990c536b3b2932d6d292c92f",
-    "server": "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
-    "settings": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
     "background": "e002fb55e95c35006683f8c8b182e99cd53b837c",
-    "icon": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
-    "integrated": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08"
+    "icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+    "integrated": "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
+    "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+    "server": "992c146ccf6232957728eed0e201e790974e19b3",
+    "settings": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+    "statistics": "5bb13783e30b155ef69a18a897f721258090f2d7",
+    "udp": "b05db817684d6b006353d5062fdba756d739faea"
   },
   "previous_candidate_heads": {
-    "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
-    "udp": "b05db817684d6b006353d5062fdba756d739faea",
-    "statistics": "545d8690f30e82be990c536b3b2932d6d292c92f",
-    "server": "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
-    "settings": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
     "background": "e002fb55e95c35006683f8c8b182e99cd53b837c",
     "icon": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
-    "integrated": "5fc669f059161075ff815d54389b81c0e66c928a"
+    "integrated": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
+    "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+    "server": "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
+    "settings": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
+    "statistics": "545d8690f30e82be990c536b3b2932d6d292c92f",
+    "udp": "b05db817684d6b006353d5062fdba756d739faea"
   },
   "macos_only": [],
   "matrix": [
     {
+      "name": "statistics",
+      "sha": "5bb13783e30b155ef69a18a897f721258090f2d7",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "statistics",
+      "sha": "5bb13783e30b155ef69a18a897f721258090f2d7",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
+      "name": "server",
+      "sha": "992c146ccf6232957728eed0e201e790974e19b3",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "server",
+      "sha": "992c146ccf6232957728eed0e201e790974e19b3",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
+      "name": "settings",
+      "sha": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "settings",
+      "sha": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
+      "name": "icon",
+      "sha": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "icon",
+      "sha": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
       "name": "integrated",
-      "sha": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
+      "sha": "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "integrated",
-      "sha": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
+      "sha": "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
       "os": "xcode-27",
       "runtime": true
     }
   ],
-  "bundle_sha256": "ca54b016ca7ea05f8c6a0848dac521c6ea633d9863423255af99daa08789a83b",
-  "bundle_bytes": 99614,
+  "bundle_sha256": "04aeee1bbc6ba503dbf9f3d3abfe26a956c90b31b6537b0f7af4fb10a5eb1827",
+  "bundle_bytes": 146765,
   "prerequisites": [
     "8bec30de328543f8f23b79a736385ed0e80aaa88",
     "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
@@ -71,10 +119,18 @@
   },
   "actual_remote_captures": {
     "heads": {
-      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/observations/preparation-heads.json",
-      "bytes": 13172,
-      "sha256": "2f3df736c8d619b0667045a6200bed94819c9354c435709be52ec50b3432a59b",
-      "fetched_at": "2026-11-03 19:06:24 UTC",
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/canonical-runtime-candidate-preparation-v1/observations/fresh-heads-v1.json",
+      "bytes": 13096,
+      "sha256": "0e7368bc4073df0aabe7fda416214975b76728c5fb216db3a2f4d12612419d7a",
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/AAAHN-AAAHN/heiher-socks5-ios/git/refs/heads",
+        "tool": "mcp__codex_apps__github_fetch",
+        "arguments": {
+          "url": "https://api.github.com/repos/AAAHN-AAAHN/heiher-socks5-ios/git/refs/heads"
+        }
+      },
+      "received_utc": "2026-11-03T23:26:20.212Z",
       "refs": {
         "refs/heads/feature/app-icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
         "refs/heads/feature/background": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
@@ -84,17 +140,25 @@
         "refs/heads/feature/udp-compat": "e50f434be2610ef00713d39363963542db0020e2",
         "refs/heads/main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
         "refs/heads/release/integrated": "8bec30de328543f8f23b79a736385ed0e80aaa88",
-        "refs/heads/work/udp-echo-build-20261028": "87abc82b5230f893de4c401ff96e826f35d93c74",
+        "refs/heads/work/udp-echo-build-20261028": "4a4e2a3cf725ed7e0b8de5758e6883c12a08e191",
         "refs/heads/work/udp-echo-main-20261028": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
         "refs/heads/work/udp-echo-publish-20261028": "f6cd633480b938fbe1e27b4bacaf4e286f4193d2",
-        "refs/heads/work/udp-echo-udp-20261028": "1b218ad379d83222a7e5ea4a37c610fa90088ef1"
+        "refs/heads/work/udp-echo-udp-20261028": "00934b6da46325949ed21ad0f6f327a06433b818"
       }
     },
     "tags": {
-      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/observations/preparation-tags.json",
-      "bytes": 36446,
-      "sha256": "156b9c8c2853860e20900feb7ee63eeb71bf9b882d1babba9e13c9e3f08d555d",
-      "fetched_at": "2026-11-03 19:06:24 UTC",
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/canonical-runtime-candidate-preparation-v1/observations/fresh-tags-v1.json",
+      "bytes": 36008,
+      "sha256": "623b8725ce0b1503a42aca5da07cf8ea968e6e1e37b671c91c4a4544de74a16c",
+      "request": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/AAAHN-AAAHN/heiher-socks5-ios/git/refs/tags",
+        "tool": "mcp__codex_apps__github_fetch",
+        "arguments": {
+          "url": "https://api.github.com/repos/AAAHN-AAAHN/heiher-socks5-ios/git/refs/tags"
+        }
+      },
+      "received_utc": "2026-11-03T23:26:20.197Z",
       "refs": {
         "refs/tags/archive/2026-09-22/audit/statistics-final-20260921": "31ef4a7baa15f76e7c7cdbc1ed11216c1fa2f93e",
         "refs/tags/archive/2026-09-22/audit/udp-patches-20260921": "eccd78c41103e6d31e305eebc4e176864d442d48",
@@ -126,41 +190,500 @@
       }
     }
   },
-  "helper_base_commit": "87abc82b5230f893de4c401ff96e826f35d93c74",
+  "helper_base_commit": "4a4e2a3cf725ed7e0b8de5758e6883c12a08e191",
   "source_generation_evidence": {
-    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/source-fixture-observation-v1/source-generation.json",
-    "bytes": 919,
-    "sha256": "69b0cb02547f7d7ac45e7a8b96ea7f64efc714f0d9cc742da8ef1c8d88f10d38",
+    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/canonical-runtime-source-generation-v1/source-generation.json",
+    "bytes": 16590,
+    "sha256": "4f12c71adb69eb138baecb5875d95c69df1fad38734b6ce9c2929eed5694f948",
     "native_generation": {
-      "recorded_utc": "2026-11-03T19:03:11.040902+00:00",
-      "previous_source": "5fc669f059161075ff815d54389b81c0e66c928a",
-      "implementation_commit": "c7665674101f162f0ad2d291926c0620d69231f5",
-      "source_commit": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
-      "source_tree": "06c8b0ec36c56fba9ab0c9719a9ee8cf10b22931",
-      "implementation_paths": [
-        "Build/ui_review.py",
-        "Tests/Integration/IntegrationUITests.swift"
+      "status": "PASS_LOCAL_SOURCE_GENERATION_ONLY",
+      "original_heads8": {
+        "background": "e002fb55e95c35006683f8c8b182e99cd53b837c",
+        "icon": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
+        "integrated": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
+        "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+        "server": "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
+        "settings": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
+        "statistics": "545d8690f30e82be990c536b3b2932d6d292c92f",
+        "udp": "b05db817684d6b006353d5062fdba756d739faea"
+      },
+      "heads8": {
+        "background": "e002fb55e95c35006683f8c8b182e99cd53b837c",
+        "icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+        "integrated": "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
+        "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+        "server": "992c146ccf6232957728eed0e201e790974e19b3",
+        "settings": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+        "statistics": "5bb13783e30b155ef69a18a897f721258090f2d7",
+        "udp": "b05db817684d6b006353d5062fdba756d739faea"
+      },
+      "commits": [
+        {
+          "label": "server-runtime-environment-source",
+          "base": "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
+          "sha": "d588d97b62a155627d0952eece1e3840e0159faa",
+          "tree": "5b21294b51bf60e019e4e88ef8676970b522135a",
+          "parents": [
+            "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
+            "0e030aedbd4127e9215b38bb23dd6e38c5872546"
+          ],
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Build/runtime_environment.py",
+            "docs/feature-membership.json"
+          ],
+          "new_paths": [
+            "Build/runtime_environment.py"
+          ],
+          "created_utc": "2026-11-03T23:24:53+00:00"
+        },
+        {
+          "label": "server-runtime-environment-approval",
+          "base": "d588d97b62a155627d0952eece1e3840e0159faa",
+          "sha": "992c146ccf6232957728eed0e201e790974e19b3",
+          "tree": "a7443b2b90cf57298478f255c94136f3fcfd35e6",
+          "parents": [
+            "d588d97b62a155627d0952eece1e3840e0159faa"
+          ],
+          "changed_paths": [
+            "Build/documentation-baseline.json",
+            "docs/documentation.json"
+          ],
+          "new_paths": [],
+          "created_utc": "2026-11-03T23:24:54+00:00"
+        },
+        {
+          "label": "statistics-runtime-environment-source",
+          "base": "545d8690f30e82be990c536b3b2932d6d292c92f",
+          "sha": "81b2be5f3e012feebb60b7dd6436eec569a98a86",
+          "tree": "740fcea93baaea8a862d632ccda464b3e939b1c6",
+          "parents": [
+            "545d8690f30e82be990c536b3b2932d6d292c92f",
+            "b05db817684d6b006353d5062fdba756d739faea"
+          ],
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Build/runtime_environment.py"
+          ],
+          "new_paths": [
+            "Build/runtime_environment.py"
+          ],
+          "created_utc": "2026-11-03T23:24:55+00:00"
+        },
+        {
+          "label": "statistics-runtime-environment-approval",
+          "base": "81b2be5f3e012feebb60b7dd6436eec569a98a86",
+          "sha": "5bb13783e30b155ef69a18a897f721258090f2d7",
+          "tree": "f9bb2c3549e3e0b94d1f6ca813c50ea8dee99d8b",
+          "parents": [
+            "81b2be5f3e012feebb60b7dd6436eec569a98a86"
+          ],
+          "changed_paths": [
+            "Build/documentation-baseline.json",
+            "docs/documentation.json"
+          ],
+          "new_paths": [],
+          "created_utc": "2026-11-03T23:24:56+00:00"
+        },
+        {
+          "label": "icon-runtime-environment-source",
+          "base": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
+          "sha": "f547de58e8c22c20abc64b9f21a0d9ef41f93995",
+          "tree": "78d9fd6b89c7d78d7f8f69f3709375fab5b09c55",
+          "parents": [
+            "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
+            "0e030aedbd4127e9215b38bb23dd6e38c5872546"
+          ],
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Tests/AppIcon/runtime_environment.py"
+          ],
+          "new_paths": [
+            "Tests/AppIcon/runtime_environment.py"
+          ],
+          "created_utc": "2026-11-03T23:24:57+00:00"
+        },
+        {
+          "label": "icon-runtime-environment-approval",
+          "base": "f547de58e8c22c20abc64b9f21a0d9ef41f93995",
+          "sha": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+          "tree": "4ba6d691703eb350d8aaf3c523956fd28f21ed1e",
+          "parents": [
+            "f547de58e8c22c20abc64b9f21a0d9ef41f93995"
+          ],
+          "changed_paths": [
+            "Build/documentation-baseline.json",
+            "docs/documentation.json"
+          ],
+          "new_paths": [],
+          "created_utc": "2026-11-03T23:24:58+00:00"
+        },
+        {
+          "label": "settings-runtime-environment-source",
+          "base": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
+          "sha": "9108eac90e3f579e18d552c8585c3ee9a585fdfb",
+          "tree": "fc01e161761b8bf5b15786771eaa4f862eda66db",
+          "parents": [
+            "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
+            "992c146ccf6232957728eed0e201e790974e19b3"
+          ],
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Build/runtime_environment.py",
+            "docs/documentation.json",
+            "docs/feature-membership.json"
+          ],
+          "new_paths": [
+            "Build/runtime_environment.py"
+          ],
+          "created_utc": "2026-11-03T23:24:59+00:00"
+        },
+        {
+          "label": "settings-runtime-environment-approval",
+          "base": "9108eac90e3f579e18d552c8585c3ee9a585fdfb",
+          "sha": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+          "tree": "69505bd855ced51584de748565adf9c705ad6868",
+          "parents": [
+            "9108eac90e3f579e18d552c8585c3ee9a585fdfb"
+          ],
+          "changed_paths": [
+            "Build/documentation-baseline.json",
+            "docs/documentation.json"
+          ],
+          "new_paths": [],
+          "created_utc": "2026-11-03T23:25:00+00:00"
+        },
+        {
+          "label": "integrated-runtime-environment-source",
+          "base": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
+          "sha": "d99fc9968551a242dc215b3a3c3729857ec67d7d",
+          "tree": "6e57d36be52a73ce9b3010d71524fb6862949748",
+          "parents": [
+            "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
+            "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+            "e002fb55e95c35006683f8c8b182e99cd53b837c",
+            "992c146ccf6232957728eed0e201e790974e19b3",
+            "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+            "5bb13783e30b155ef69a18a897f721258090f2d7",
+            "b05db817684d6b006353d5062fdba756d739faea"
+          ],
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Build/inherited-workflows/traffic-statistics-verify-build.yml",
+            "Build/runtime_environment.py",
+            "Tests/AppIcon/runtime_environment.py",
+            "docs/documentation.json",
+            "docs/feature-membership.json"
+          ],
+          "new_paths": [
+            "Build/runtime_environment.py",
+            "Tests/AppIcon/runtime_environment.py"
+          ],
+          "created_utc": "2026-11-03T23:25:01+00:00"
+        },
+        {
+          "label": "integrated-runtime-environment-approval",
+          "base": "d99fc9968551a242dc215b3a3c3729857ec67d7d",
+          "sha": "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
+          "tree": "6e7d0e257fa2bf7e6dc40a491a7d73c4a52e1036",
+          "parents": [
+            "d99fc9968551a242dc215b3a3c3729857ec67d7d"
+          ],
+          "changed_paths": [
+            "Build/documentation-baseline.json",
+            "docs/documentation.json"
+          ],
+          "new_paths": [],
+          "created_utc": "2026-11-03T23:25:02+00:00"
+        }
       ],
-      "baseline_paths": [
-        "Build/documentation-baseline.json",
-        "docs/documentation.json"
+      "validations": [
+        {
+          "owner": "server",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+            "Build/check_documentation.py"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "016eb4aee194faf85e662067471d7b9fee01d1fb3329e55b78fab2d2bb73044c",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "server",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+            "Build/check.py",
+            "baseline"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "384f350d4ed979e50ba3b70a89d8b60caa55c776b75e2e91812b6722c2452661",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "server",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+            "Build/check_ownership.py"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "6f4361bc33da8a1843709e8f1c5e0c9b7917c26c11b3528ec3b371cede607716",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "statistics",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+            "Build/check_documentation.py"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "01f373387c051184f2231b7dfdbb8a18c1e24439243d816882b40f7bab723173",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "statistics",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+            "Build/check.py",
+            "baseline"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "eb4e72545c306e9cd10bb54a08d50b3a1724489ec1ccb3ea67d484fc379efbd0",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "icon",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+            "Build/check_documentation.py"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "4a998bd8d1ca403faf5a644c53e0960728ef31dfb1833414260d3ae690cb7aa6",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "icon",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+            "Build/check.py",
+            "baseline"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "2b452b6909bd38b2c94e1cc056a0181076ddb07de76542fd3c21f33142a2421b",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "settings",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+            "Build/check_documentation.py"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "91f7f1cd682edf7361ec53ecdd00031e366bf3facf7e2545623863b840f7da7e",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "settings",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+            "Build/check.py",
+            "baseline"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "5f10bfbf2d98af3ef12caa4f551194e70c353856892550b008b67195b5551a95",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "settings",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+            "Build/check_ownership.py"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "7d9197cd18ecd61afb1bf1aa6b9b3557a8072dc7d51e343a497f882f19e60cb8",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "integrated",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+            "Build/check_documentation.py"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "f97649921fdc930dfad4b40a49f7f30be167c3906c351d3edee2130304ba5503",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "integrated",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+            "Build/check.py",
+            "baseline"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "69b9da9817525cb1d7b73a8481992879113650588cbb0b96b9bf22e8b85c0494",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "integrated",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+            "Build/check_ownership.py"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "96506f365c38fcabe7174a317feb3c8942f2770529bce850e2e7896c77e02fa6",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
       ],
-      "app_and_native_patch_changes": [],
-      "purpose": "Record the missing exact fixture recv and host operation boundaries; no runtime fix or gate acceptance claimed",
-      "original_deadlines_assertions_and_test_bodies_preserved": true,
-      "new_remote_mutations": 0,
-      "new_CI_runs": 0,
-      "local_source_commits": 2,
-      "patch_sha256": "8dca2d026add00cb67cc919cd88bce97a973a650ad2c0e808c206351182b6f51"
+      "membership": [
+        {
+          "owner": "server",
+          "sources": 3,
+          "files": 3,
+          "rebound_counts": {},
+          "existing_keys_preserved": true,
+          "exact_added_sources": {},
+          "exact_added_owned_files": {
+            "Build/runtime_environment.py": "14b3af5745b19c892d249944052e240c650d20406df3a8ddf8f78e478bb29099"
+          },
+          "existing_owned_file_hashes_preserved": true
+        },
+        {
+          "owner": "settings",
+          "sources": 32,
+          "files": 4,
+          "rebound_counts": {
+            "server": 30
+          },
+          "existing_keys_preserved": true,
+          "exact_added_sources": {
+            "Build/runtime_environment.py": "server"
+          },
+          "exact_added_owned_files": {},
+          "existing_owned_file_hashes_preserved": true
+        },
+        {
+          "owner": "integrated",
+          "sources": 235,
+          "files": 3,
+          "rebound_counts": {
+            "server": 29,
+            "statistics": 85,
+            "icon": 10,
+            "settings": 28
+          },
+          "existing_keys_preserved": true,
+          "exact_added_sources": {
+            "Build/runtime_environment.py": "server",
+            "Tests/AppIcon/runtime_environment.py": "icon"
+          },
+          "exact_added_owned_files": {},
+          "existing_owned_file_hashes_preserved": true
+        }
+      ],
+      "preservation": [
+        {
+          "owner": "server",
+          "base": "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
+          "final": "992c146ccf6232957728eed0e201e790974e19b3",
+          "protected_files": 81,
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Build/documentation-baseline.json",
+            "Build/runtime_environment.py",
+            "docs/documentation.json",
+            "docs/feature-membership.json"
+          ]
+        },
+        {
+          "owner": "statistics",
+          "base": "545d8690f30e82be990c536b3b2932d6d292c92f",
+          "final": "5bb13783e30b155ef69a18a897f721258090f2d7",
+          "protected_files": 131,
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Build/documentation-baseline.json",
+            "Build/runtime_environment.py",
+            "docs/documentation.json"
+          ]
+        },
+        {
+          "owner": "icon",
+          "base": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
+          "final": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+          "protected_files": 57,
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Build/documentation-baseline.json",
+            "Tests/AppIcon/runtime_environment.py",
+            "docs/documentation.json"
+          ]
+        },
+        {
+          "owner": "settings",
+          "base": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
+          "final": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+          "protected_files": 111,
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Build/documentation-baseline.json",
+            "Build/runtime_environment.py",
+            "docs/documentation.json",
+            "docs/feature-membership.json"
+          ]
+        },
+        {
+          "owner": "integrated",
+          "base": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
+          "final": "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
+          "protected_files": 308,
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Build/documentation-baseline.json",
+            "Build/inherited-workflows/traffic-statistics-verify-build.yml",
+            "Build/runtime_environment.py",
+            "Tests/AppIcon/runtime_environment.py",
+            "docs/documentation.json",
+            "docs/feature-membership.json"
+          ]
+        }
+      ],
+      "all8_current_parents_and_real_ancestry_verified": true,
+      "tags27_preserved": true,
+      "integrated_membership_count": 235,
+      "settings_membership_count": 32,
+      "server_owned_file_count": 3,
+      "new_helper_physical_entries": 6,
+      "new_helper_git_blob": "dc05a64795abade309de3fb1d1a59d332431f6ea",
+      "new_helper_sha256": "14b3af5745b19c892d249944052e240c650d20406df3a8ddf8f78e478bb29099",
+      "native_patch_count": 14,
+      "app_swift_count": 21,
+      "original_repository_refs_and_maps_unchanged": true,
+      "strict_full_fsck": true,
+      "remote_actions": 0,
+      "ci_runs": 0,
+      "new_application_or_native_bytes": false,
+      "actual_runtime_acceptance": false,
+      "decision_sha256": "edc27c4e1c408c46d1746ba6a930d07cd39dfd1851fa7099e07a4f17088fa34b"
     }
   },
+  "source_generation_actual_execution": {
+    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/canonical-runtime-source-generation-execution-v1/execution-receipt.json",
+    "bytes": 1596,
+    "sha256": "f2301d74d1d628569c2f268040815a3ae2bbb1eb5031e548a76851fa6381e102",
+    "actual_exit_code": 0
+  },
+  "reviewed_candidate_caller": {
+    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/completion-current-preparation/canonical-runtime-caller-proposal-v2/caller-preparation.json",
+    "sha256": "804b8d0a6fce4673af29fd1abb26c1dc77ce0bb29499d140959b373f7298ba74",
+    "workflow_sha256": "4d9c39111d62e249af2638296fe08a79f1c946eecb5696e9106c29376935778f"
+  },
   "source_heads_evidence": {
-    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/source-fixture-observation-v1/heads8.json",
-    "sha256": "58db06fc30539d42e1145bbf6875c902e09fb6e0e0a5376ed0fab6c6460459ce"
+    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/canonical-runtime-source-generation-v1/heads8.json",
+    "sha256": "2bffb4009da354c4d1d65c51f5bfb0be9368262c08a1c55134dcd1a4869cbfbb"
   },
   "source_immediate_previous_heads_evidence": {
-    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/source-fixture-observation-v1/heads8-before.json",
-    "sha256": "19d58e4c90472fbf6a8b316b1520efb200af6dd16bb04683c5353dcac9ecb0a0"
+    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/completion-current-preparation/canonical-runtime-generator-proposal-v1/candidate-heads8.json",
+    "sha256": "236a6e84cddc991db1ba68c9dd0fd87c78e71778f08c006201da84f16016504a"
   },
   "seed_roots": [
     "5d5327d4513b587e2a2e948fa20f588a04f1376f",
@@ -171,9 +694,9 @@
     "e50f434be2610ef00713d39363963542db0020e2",
     "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
     "8bec30de328543f8f23b79a736385ed0e80aaa88",
-    "87abc82b5230f893de4c401ff96e826f35d93c74",
+    "4a4e2a3cf725ed7e0b8de5758e6883c12a08e191",
     "f6cd633480b938fbe1e27b4bacaf4e286f4193d2",
-    "1b218ad379d83222a7e5ea4a37c610fa90088ef1",
+    "00934b6da46325949ed21ad0f6f327a06433b818",
     "31ef4a7baa15f76e7c7cdbc1ed11216c1fa2f93e",
     "eccd78c41103e6d31e305eebc4e176864d442d48",
     "99680a3bcdb6a3270767dcc43b1d9133866714b2",
@@ -202,78 +725,55 @@
     "e82e590412e5b5cbcd531827a81f845596ee16f6"
   ],
   "source_absent_from_remote_only_seed_before_import": true,
-  "manifest_sha256": "2868303d39b1b8acda2f96d147365e67764931adea60513819255919954bedc0",
+  "all_five_absent_before_import": [
+    {
+      "owner": "statistics",
+      "source": "5bb13783e30b155ef69a18a897f721258090f2d7",
+      "returncode": 128,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "93051ef5e7bf1424b70ed514d3f012953c936894eec9c3018251c6cfb674dd83"
+    },
+    {
+      "owner": "server",
+      "source": "992c146ccf6232957728eed0e201e790974e19b3",
+      "returncode": 128,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "93051ef5e7bf1424b70ed514d3f012953c936894eec9c3018251c6cfb674dd83"
+    },
+    {
+      "owner": "settings",
+      "source": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+      "returncode": 128,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "93051ef5e7bf1424b70ed514d3f012953c936894eec9c3018251c6cfb674dd83"
+    },
+    {
+      "owner": "icon",
+      "source": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+      "returncode": 128,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "93051ef5e7bf1424b70ed514d3f012953c936894eec9c3018251c6cfb674dd83"
+    },
+    {
+      "owner": "integrated",
+      "source": "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
+      "returncode": 128,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "93051ef5e7bf1424b70ed514d3f012953c936894eec9c3018251c6cfb674dd83"
+    }
+  ],
+  "manifest_sha256": "69ad5bde22a25a6962fe0fdd5b62ef5d209167627a11694a5d48f5da701e2f20",
   "original_importer_sha256": "1e647ab8a266a64097c5cc543f22d6a2c58010bfba8988b10fa4809589a6367e",
   "actual_importer_verified": false,
   "original_importer_main": "PENDING: no clean newly committed helper or actual CI prepare exists yet; no HEAD/env simulation performed.",
   "local_checks": {
-    "bundle_refs_candidate1_support7": true,
+    "bundle_refs_candidate5_support3": true,
     "same_eight_prerequisites": true,
     "verify_in_actual_remote_histories_only_repository": true,
     "unbundle_ref_mutations": false,
     "all_source_heads_and_trees_exact": true,
     "forbidden_ancestry_checks": [
       {
-        "owner": "main",
-        "source": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
-        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
-        "returncode": 1
-      },
-      {
-        "owner": "main",
-        "source": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
-        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
-        "returncode": 1
-      },
-      {
-        "owner": "udp",
-        "source": "b05db817684d6b006353d5062fdba756d739faea",
-        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
-        "returncode": 1
-      },
-      {
-        "owner": "udp",
-        "source": "b05db817684d6b006353d5062fdba756d739faea",
-        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
-        "returncode": 1
-      },
-      {
-        "owner": "statistics",
-        "source": "545d8690f30e82be990c536b3b2932d6d292c92f",
-        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
-        "returncode": 1
-      },
-      {
-        "owner": "statistics",
-        "source": "545d8690f30e82be990c536b3b2932d6d292c92f",
-        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
-        "returncode": 1
-      },
-      {
-        "owner": "server",
-        "source": "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
-        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
-        "returncode": 1
-      },
-      {
-        "owner": "server",
-        "source": "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
-        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
-        "returncode": 1
-      },
-      {
-        "owner": "settings",
-        "source": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
-        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
-        "returncode": 1
-      },
-      {
-        "owner": "settings",
-        "source": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
-        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
-        "returncode": 1
-      },
-      {
         "owner": "background",
         "source": "e002fb55e95c35006683f8c8b182e99cd53b837c",
         "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
@@ -287,37 +787,97 @@
       },
       {
         "owner": "icon",
-        "source": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
+        "source": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
         "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
         "returncode": 1
       },
       {
         "owner": "icon",
-        "source": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
+        "source": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
         "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
         "returncode": 1
       },
       {
         "owner": "integrated",
-        "source": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
+        "source": "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
         "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
         "returncode": 1
       },
       {
         "owner": "integrated",
-        "source": "0bcc1931314661549bdd5f71f6fdb0b6c9c97f08",
+        "source": "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "main",
+        "source": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "main",
+        "source": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "server",
+        "source": "992c146ccf6232957728eed0e201e790974e19b3",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "server",
+        "source": "992c146ccf6232957728eed0e201e790974e19b3",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "settings",
+        "source": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "settings",
+        "source": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "statistics",
+        "source": "5bb13783e30b155ef69a18a897f721258090f2d7",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "statistics",
+        "source": "5bb13783e30b155ef69a18a897f721258090f2d7",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "udp",
+        "source": "b05db817684d6b006353d5062fdba756d739faea",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "udp",
+        "source": "b05db817684d6b006353d5062fdba756d739faea",
         "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
         "returncode": 1
       }
     ]
   },
-  "old_manifest_previous_field": "Preserved historical baseline label; immediate previous Integrated source is separately recorded in previous_candidate_heads.",
+  "old_manifest_previous_field": "Historical optional previous labels remain in unchanged helper4a4. New candidates use original generator name/sha/ref schema; exact immediate prior source8 is separately recorded in previous_candidate_heads.",
   "planned_jobs": {
     "prepare": 1,
-    "build": 2,
-    "runtime": 1,
-    "verify": 2,
-    "total": 6
+    "build": 10,
+    "runtime": 5,
+    "verify": 10,
+    "total": 26
   },
   "future_helper_commit": null,
   "future_run_id": null,
@@ -329,7 +889,7 @@
   "remote_mutations": false,
   "CI_runs": 0,
   "application_gate_credit": 0,
-  "scope": "New Integrated0bcc fixture-boundary observation inputs only. Existing failure receipts remain unchanged; other four candidate Mac failures remain open. No unchanged failed runtime job retry and no application gate credit.",
-  "started_utc": "2026-11-03T19:09:01.825853+00:00",
-  "completed_utc": "2026-11-03T19:09:02.816459+00:00"
+  "scope": "Exact new five-owner common-runtime generation inputs with original ten producer/final rows and five runtime consumers. Existing failures and successful diagnostics remain separate. Local input verification grants no current16, application, D28 or release acceptance.",
+  "started_utc": "2026-11-03T23:32:23.519182+00:00",
+  "completed_utc": "2026-11-03T23:32:24.575077+00:00"
 }
