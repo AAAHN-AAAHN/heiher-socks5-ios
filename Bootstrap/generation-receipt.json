@@ -1,96 +1,265 @@
 {
-  "result": "PASS",
+  "result": "PASS_LOCAL_INPUT_PREPARATION_ONLY",
   "selected": [
     "integrated"
   ],
   "support": [
+    "main",
     "udp",
     "statistics",
-    "background",
     "server",
     "settings",
+    "background",
     "icon"
   ],
   "heads": {
-    "main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
-    "udp": "e50f434be2610ef00713d39363963542db0020e2",
-    "statistics": "a55184fca134ce16b64335ac2f88b31b1161cd81",
-    "background": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
-    "server": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
-    "settings": "953ee8d720cf32311d82dad1bcb1b566333c5d62",
-    "icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
-    "integrated": "efae8be3f8ccb60fdb447a4175abebbecc2767de"
+    "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+    "udp": "b05db817684d6b006353d5062fdba756d739faea",
+    "statistics": "545d8690f30e82be990c536b3b2932d6d292c92f",
+    "server": "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
+    "settings": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
+    "background": "e002fb55e95c35006683f8c8b182e99cd53b837c",
+    "icon": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
+    "integrated": "5fc669f059161075ff815d54389b81c0e66c928a"
   },
-  "macos_only": [
-    "integrated"
-  ],
-  "bundle_sha256": "67e761bd51711701b5163a067125e8d3ae55174c87815ce63702c193f16dab7c",
-  "bundle_bytes": 264293,
-  "prerequisites": [
-    "9baac92fb4508d9e1b96f00744a91ff1cae77003",
-    "7d224414d29e7aa243e9542b3144584fe8f0fdf2",
-    "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
-    "7e40f951441cb226bc5e22a95d9c0658aba76939",
-    "c6935dbfbc6fecb7d7f573db0d5149bb0afc61b9",
-    "c1722e48f99e140b98cc436979b8ffc49ca0fa63",
-    "91a6e736a9b9e007caa49d9aac44f8e4d9697c00",
-    "e9d8e75f96f4cc96cb53604edd30e5077c87032c"
-  ],
-  "verified_remote_exclusions": [
-    {
-      "ref": "refs/heads/feature/app-icon",
-      "sha": "d268d0bb8fb91fce426b9eef377e1456690fba47"
-    },
-    {
-      "ref": "refs/heads/feature/background",
-      "sha": "48b7ae84fa4d2667aa52850271fab089fc6fcc2e"
-    },
-    {
-      "ref": "refs/heads/feature/icmp-relay",
-      "sha": "60fa64b5c98aadaaee349e6e12c50bd2f9b32ac2"
-    },
-    {
-      "ref": "refs/heads/feature/server-control",
-      "sha": "e6663544b9394c0e743108fd4f169c8c7baf7490"
-    },
-    {
-      "ref": "refs/heads/feature/settings-persistence",
-      "sha": "45a592b81fda404edb63710067349276f72a986a"
-    },
-    {
-      "ref": "refs/heads/feature/traffic-statistics",
-      "sha": "fc54f9aebe07c2460b98d3b2bc18a971911ff0d0"
-    },
-    {
-      "ref": "refs/heads/feature/udp-compat",
-      "sha": "4d64d2dbfc37ef04fef326fde6133dbceba90e97"
-    },
-    {
-      "ref": "refs/heads/main",
-      "sha": "19aec84fbc929678bb0f05b89c76d490ada6f8b7"
-    },
-    {
-      "ref": "refs/heads/release/integrated",
-      "sha": "e82e590412e5b5cbcd531827a81f845596ee16f6"
-    },
-    {
-      "ref": "refs/heads/work/udp-echo-main-20261028",
-      "sha": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
-    }
-  ],
-  "remote_snapshot_time": "2026-10-30 before selective Integrated DNS retry preparation",
-  "remote_snapshot_sha256": "6efa421d4340d16fa47f9f8d28c0399c7590d54acfc63bdfd9825907fa898e72",
-  "frozen_heads_sha256": "f48d9edbe59576c03ee9498872df4a62be332912c8dd8fc01418c7636ebae2d3",
+  "previous_candidate_heads": {
+    "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+    "udp": "b05db817684d6b006353d5062fdba756d739faea",
+    "statistics": "545d8690f30e82be990c536b3b2932d6d292c92f",
+    "server": "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
+    "settings": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
+    "background": "e002fb55e95c35006683f8c8b182e99cd53b837c",
+    "icon": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
+    "integrated": "7a8dbf7058b2677c3a4a8b7a4fe496bd97a96af6"
+  },
+  "macos_only": [],
   "matrix": [
     {
       "name": "integrated",
-      "sha": "efae8be3f8ccb60fdb447a4175abebbecc2767de",
+      "sha": "5fc669f059161075ff815d54389b81c0e66c928a",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "integrated",
+      "sha": "5fc669f059161075ff815d54389b81c0e66c928a",
       "os": "xcode-27",
       "runtime": true
     }
   ],
+  "bundle_sha256": "544bf704020b38240b2a30059b437f8574515274c440f8ae68f071ff85f0c416",
+  "bundle_bytes": 97582,
+  "prerequisites": [
+    "8bec30de328543f8f23b79a736385ed0e80aaa88",
+    "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
+    "e50f434be2610ef00713d39363963542db0020e2",
+    "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+    "bf0789c68670078def846d7e3778e7f5cfe9e77f",
+    "5d5327d4513b587e2a2e948fa20f588a04f1376f",
+    "a55184fca134ce16b64335ac2f88b31b1161cd81",
+    "953ee8d720cf32311d82dad1bcb1b566333c5d62"
+  ],
+  "verified_remote_prerequisite_refs": {
+    "refs/heads/main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+    "refs/heads/feature/udp-compat": "e50f434be2610ef00713d39363963542db0020e2",
+    "refs/heads/feature/traffic-statistics": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+    "refs/heads/feature/background": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
+    "refs/heads/feature/server-control": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
+    "refs/heads/feature/settings-persistence": "953ee8d720cf32311d82dad1bcb1b566333c5d62",
+    "refs/heads/feature/app-icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
+    "refs/heads/release/integrated": "8bec30de328543f8f23b79a736385ed0e80aaa88"
+  },
+  "actual_remote_captures": {
+    "heads": {
+      "path": "/workspace/scratch/630ba41d6484/completion-20261103/simulator-fix/kernel-exit-observer-proposal/remote-execution/postupdate-heads.json",
+      "bytes": 11391,
+      "sha256": "10855026467fdbd968e26e500c9063ad13797c1504fb6df8426ccf17291fca0d",
+      "requested_utc": "2026-11-03T03:05:10.317Z",
+      "received_utc": "2026-11-03T03:05:10.812Z",
+      "refs": {
+        "refs/heads/feature/app-icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
+        "refs/heads/feature/background": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
+        "refs/heads/feature/server-control": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
+        "refs/heads/feature/settings-persistence": "953ee8d720cf32311d82dad1bcb1b566333c5d62",
+        "refs/heads/feature/traffic-statistics": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+        "refs/heads/feature/udp-compat": "e50f434be2610ef00713d39363963542db0020e2",
+        "refs/heads/main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+        "refs/heads/release/integrated": "8bec30de328543f8f23b79a736385ed0e80aaa88",
+        "refs/heads/work/udp-echo-build-20261028": "7875c96e11384908c2f8a0260b50de4d52f2c4cb",
+        "refs/heads/work/udp-echo-main-20261028": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+        "refs/heads/work/udp-echo-publish-20261028": "f6cd633480b938fbe1e27b4bacaf4e286f4193d2",
+        "refs/heads/work/udp-echo-udp-20261028": "57ddbada58b3d681addf621420e348e9a5172185"
+      }
+    },
+    "tags": {
+      "path": "/workspace/scratch/630ba41d6484/completion-20261103/simulator-fix/kernel-exit-observer-proposal/remote-execution/postupdate-tags.json",
+      "bytes": 31509,
+      "sha256": "41a3beff716707ab098bbccdd305d7b1b3bd05abeadb817269643980d502f9dd",
+      "requested_utc": "2026-11-03T03:05:10.317Z",
+      "received_utc": "2026-11-03T03:05:10.764Z",
+      "refs": {
+        "refs/tags/archive/2026-09-22/audit/statistics-final-20260921": "31ef4a7baa15f76e7c7cdbc1ed11216c1fa2f93e",
+        "refs/tags/archive/2026-09-22/audit/udp-patches-20260921": "eccd78c41103e6d31e305eebc4e176864d442d48",
+        "refs/tags/archive/2026-09-22/build/hev-2.13.1-ipa-20260921": "99680a3bcdb6a3270767dcc43b1d9133866714b2",
+        "refs/tags/archive/2026-09-22/build/hev-upstream-20260921": "6a9d7930fe2cdf103a1b8ad80c157dc60fcc2bfc",
+        "refs/tags/archive/2026-09-22/diagnostics/hev-udp-20260921": "790167ae72155a138969840885e710a9fb36473f",
+        "refs/tags/archive/2026-09-22/feature/background-keepalive": "b68dbb9ca7d4d028111666915eba951911857b1d",
+        "refs/tags/archive/2026-09-22/main": "99680a3bcdb6a3270767dcc43b1d9133866714b2",
+        "refs/tags/archive/2026-09-22/maintenance/reorganize-20260922": "ed1c7cae63eea6906502540f378ef835dba343a9",
+        "refs/tags/archive/2026-09-22/maintenance/reorganize-20260922-0be4e061443c": "0be4e061443ca7e705f1133dcf4483897bbefb04",
+        "refs/tags/archive/2026-09-22/test/udp-sockaddr-only-20260921": "9e1ed7513f9b1b0c61f7a8930ad4be06556a55d7",
+        "refs/tags/archive/before-latest-baseline-20260922/feature/app-icon-12e3eba0fb0d": "12e3eba0fb0d25ef4af03b435af269e85e581209",
+        "refs/tags/archive/before-latest-baseline-20260922/feature/background-31d09c8edf79": "31d09c8edf796f83882610ce90775a2deafca0aa",
+        "refs/tags/archive/before-latest-baseline-20260922/feature/settings-b3590d388758": "b3590d3887584281002b2d2c033280d127ad7685",
+        "refs/tags/archive/before-latest-baseline-20260922/feature/traffic-statistics-7dae9e89f132": "7dae9e89f13242dad429786f431cbe45ba71975c",
+        "refs/tags/archive/before-latest-baseline-20260922/feature/udp-compat-51eed67071d4": "51eed67071d4be701277e371e7db1a65203a7bb2",
+        "refs/tags/archive/before-latest-baseline-20260922/main-83d350d28d6a": "83d350d28d6a31e7730cfa74b49f58d2af642397",
+        "refs/tags/archive/before-latest-baseline-20260922/maintenance/latest-baseline-20260922-b668c256ecbd": "b668c256ecbd411cdb5efedd10afe7efbffae759",
+        "refs/tags/archive/before-latest-baseline-20260922/release/integrated-563d3d197d3e": "563d3d197d3e64de5bacb07da4f66e0ab9c3ba34",
+        "refs/tags/archive/before-udp-echo-20261028/feature/app-icon-d268d0bb8fb9": "d268d0bb8fb91fce426b9eef377e1456690fba47",
+        "refs/tags/archive/before-udp-echo-20261028/feature/background-48b7ae84fa4d": "48b7ae84fa4d2667aa52850271fab089fc6fcc2e",
+        "refs/tags/archive/before-udp-echo-20261028/feature/icmp-relay-60fa64b5c98a": "60fa64b5c98aadaaee349e6e12c50bd2f9b32ac2",
+        "refs/tags/archive/before-udp-echo-20261028/feature/server-control-e6663544b939": "e6663544b9394c0e743108fd4f169c8c7baf7490",
+        "refs/tags/archive/before-udp-echo-20261028/feature/settings-persistence-45a592b81fda": "45a592b81fda404edb63710067349276f72a986a",
+        "refs/tags/archive/before-udp-echo-20261028/feature/traffic-statistics-fc54f9aebe07": "fc54f9aebe07c2460b98d3b2bc18a971911ff0d0",
+        "refs/tags/archive/before-udp-echo-20261028/feature/udp-compat-4d64d2dbfc37": "4d64d2dbfc37ef04fef326fde6133dbceba90e97",
+        "refs/tags/archive/before-udp-echo-20261028/main-19aec84fbc92": "19aec84fbc929678bb0f05b89c76d490ada6f8b7",
+        "refs/tags/archive/before-udp-echo-20261028/release/integrated-e82e590412e5": "e82e590412e5b5cbcd531827a81f845596ee16f6"
+      }
+    }
+  },
+  "helper_base_commit": "7875c96e11384908c2f8a0260b50de4d52f2c4cb",
+  "source_saved_bundle_sha256": "e8cf9f0700d5736abf9566784d76d65638bd4516b9a3f754f09f203e951ae145",
+  "source_saved_evidence_sha256": "e6d97efa6c731e5b01a6031a1b633fed4e9de6b682be53a293b0afe14bcaafc8",
+  "source_saved_readback_sha256": "119bbee3badbebae25689f294cccda70d58b63c0ed572cf1c50317e3902d5489",
+  "manifest_sha256": "79b11e69879fdb50e9f638cd8182e2d6490e0b183bf7c0ce48f13472b40fd283",
+  "original_importer_sha256": "1e647ab8a266a64097c5cc543f22d6a2c58010bfba8988b10fa4809589a6367e",
+  "actual_importer_verified": false,
+  "original_importer_main": "PENDING: no clean newly committed helper or actual CI prepare exists yet; no HEAD/env simulation performed.",
+  "local_checks": {
+    "bundle_refs_candidate1_support7": true,
+    "same_eight_prerequisites": true,
+    "verify_in_actual_remote_histories_only_repository": true,
+    "unbundle_ref_mutations": false,
+    "all_source_heads_and_trees_exact": true,
+    "forbidden_ancestry_checks": [
+      {
+        "owner": "main",
+        "source": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "main",
+        "source": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "udp",
+        "source": "b05db817684d6b006353d5062fdba756d739faea",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "udp",
+        "source": "b05db817684d6b006353d5062fdba756d739faea",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "statistics",
+        "source": "545d8690f30e82be990c536b3b2932d6d292c92f",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "statistics",
+        "source": "545d8690f30e82be990c536b3b2932d6d292c92f",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "server",
+        "source": "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "server",
+        "source": "59d5a05dfa8d94afd34d574b58e758b0efa681b9",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "settings",
+        "source": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "settings",
+        "source": "e617a949c0fb0a0cbe1a80d47a4842f04feb6dda",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "background",
+        "source": "e002fb55e95c35006683f8c8b182e99cd53b837c",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "background",
+        "source": "e002fb55e95c35006683f8c8b182e99cd53b837c",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "icon",
+        "source": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "icon",
+        "source": "b0a0e01b4414e4a6b3e89410b4bbfa8745e6c45d",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "integrated",
+        "source": "5fc669f059161075ff815d54389b81c0e66c928a",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "integrated",
+        "source": "5fc669f059161075ff815d54389b81c0e66c928a",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      }
+    ]
+  },
+  "old_manifest_previous_field": "Preserved historical baseline label; immediate previous Integrated source is separately recorded in previous_candidate_heads.",
+  "planned_jobs": {
+    "prepare": 1,
+    "build": 2,
+    "runtime": 1,
+    "verify": 2,
+    "total": 6
+  },
+  "future_helper_commit": null,
+  "future_run_id": null,
+  "future_run_attempt": null,
+  "future_job_ids": null,
+  "future_artifact_ids": null,
+  "local_source_commits_created": 0,
+  "local_helper_commits_created": 0,
   "remote_mutations": false,
-  "actual_importer_verified": true,
-  "bundle_upload_path": "/workspace/scratch/bc9656eced06/analysis/resumption/selective-integrated-dns-retry-20261030/prepared/Bootstrap/candidates.bundle",
-  "scope": "Local bundle and read-only preparation verified; CI runtime results are not implied."
+  "CI_runs": 0,
+  "application_gate_credit": 0,
+  "scope": "New Integrated5fc entry-fixture validation inputs only. Other four candidate Mac failures remain open; this is not a retry of their failed runtime jobs.",
+  "started_utc": "2026-11-03T03:11:46.760206+00:00",
+  "completed_utc": "2026-11-03T03:11:47.546098+00:00"
 }
