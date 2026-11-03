@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "scope": "DIAGNOSTIC_ONLY_EXACT_TEMPORARY_TEST_FUNCTION_REPLACEMENT",
+  "source_commit": "7a8dbf7058b2677c3a4a8b7a4fe496bd97a96af6",
+  "source_path": "Tests/Integration/IntegrationUITests.swift",
+  "trace_contract_sha256": "45495c27dc87c7baec272e92ebed0b297e6f2970af90d2a9d3602252f7a2a5fc",
+  "source_sha256": "5654d9f5f107b4e1f65e3da7d8233ac9a002062979009f359e2c2e350e66727e",
+  "proposed_source_sha256": "6894bfe688101d526a753c7da44c3c716fc354a1608a19b768ce9445ad9b1e5b",
+  "before_fragment": "    private static func handshake() -> Bool {\n        let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)\n        guard fd >= 0 else { return false }\n        defer { Darwin.close(fd) }\n        var noSignal: Int32 = 1\n        guard setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout.size(ofValue: noSignal))) == 0 else { return false }\n        var timeout = timeval(tv_sec: 1, tv_usec: 0)\n        guard setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout))) == 0,\n              setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout))) == 0 else { return false }\n        var address = sockaddr_in()\n        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)\n        address.sin_family = sa_family_t(AF_INET)\n        address.sin_port = UInt16(1080).bigEndian\n        guard inet_pton(AF_INET, \"127.0.0.1\", &address.sin_addr) == 1 else { return false }\n        let connected = withUnsafePointer(to: &address) {\n            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {\n                Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))\n            }\n        }\n        guard connected == 0 else { return false }\n        let greeting: [UInt8] = [5, 1, 0]\n        guard greeting.withUnsafeBytes({ Darwin.send(fd, $0.baseAddress, $0.count, 0) }) == greeting.count else { return false }\n        var reply = [UInt8](repeating: 0, count: 2)\n        let received = reply.withUnsafeMutableBytes { Darwin.recv(fd, $0.baseAddress, $0.count, MSG_WAITALL) }\n        return received == 2 && reply == [5, 0]\n    }\n",
+  "after_fragment": "    private static func handshake() -> Bool {\n        let traceStarted = ProcessInfo.processInfo.systemUptime\n        let traceStartedUnix = Date().timeIntervalSince1970\n        var traceEvents: [[String: Any]] = []\n        var traceReply: [UInt8] = []\n        var traceResult = false\n        // One bounded line per original probe. File order identifies attempts;\n        // no shared counter, extra network probe, or altered retry policy.\n        defer {\n            let savedErrno = errno\n            defer { errno = savedErrno }\n            let record: [String: Any] = [\n                \"kind\": \"integrated-original-ipv4-handshake\",\n                \"started_unix\": traceStartedUnix,\n                \"started_uptime\": traceStarted,\n                \"finished_uptime\": ProcessInfo.processInfo.systemUptime,\n                \"events\": traceEvents,\n                \"reply_buffer\": traceReply,\n                \"returned\": traceResult,\n                \"errno_note\": \"errno is captured immediately; it is diagnostic only and may be stale after success\"\n            ]\n            if let data = try? JSONSerialization.data(withJSONObject: record, options: [.sortedKeys]),\n               data.count <= 8_192 {\n                do {\n                    try FileHandle.standardError.write(contentsOf:\n                        Data(\"IG_HANDSHAKE_TRACE \".utf8) + data + Data([10]))\n                } catch { /* Logging must not replace the original probe result. */ }\n            }\n        }\n        func observed<Value: BinaryInteger>(_ stage: String, _ operation: () -> Value) -> Value {\n            let began = ProcessInfo.processInfo.systemUptime\n            let value = operation()\n            let capturedErrno = errno\n            let ended = ProcessInfo.processInfo.systemUptime\n            traceEvents.append([\n                \"stage\": stage, \"returncode\": Int64(value), \"errno\": capturedErrno,\n                \"started_uptime\": began, \"finished_uptime\": ended,\n                \"elapsed_seconds\": ended - began\n            ])\n            errno = capturedErrno\n            return value\n        }\n        let fd = observed(\"socket\", { Darwin.socket(AF_INET, SOCK_STREAM, 0) })\n        guard fd >= 0 else { return false }\n        defer { _ = observed(\"close\", { Darwin.close(fd) }) }\n        var noSignal: Int32 = 1\n        guard observed(\"setsockopt-SO_NOSIGPIPE\", {\n            setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout.size(ofValue: noSignal)))\n        }) == 0 else { return false }\n        var timeout = timeval(tv_sec: 1, tv_usec: 0)\n        guard observed(\"setsockopt-SO_RCVTIMEO\", {\n            setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))\n        }) == 0,\n              observed(\"setsockopt-SO_SNDTIMEO\", {\n            setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))\n        }) == 0 else { return false }\n        var address = sockaddr_in()\n        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)\n        address.sin_family = sa_family_t(AF_INET)\n        address.sin_port = UInt16(1080).bigEndian\n        guard observed(\"inet_pton\", { inet_pton(AF_INET, \"127.0.0.1\", &address.sin_addr) }) == 1 else { return false }\n        let connected = withUnsafePointer(to: &address) {\n            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { pointer in\n                observed(\"connect\", { Darwin.connect(fd, pointer, socklen_t(MemoryLayout<sockaddr_in>.size)) })\n            }\n        }\n        guard connected == 0 else { return false }\n        let greeting: [UInt8] = [5, 1, 0]\n        guard greeting.withUnsafeBytes({ buffer in\n            observed(\"send\", { Darwin.send(fd, buffer.baseAddress, buffer.count, 0) })\n        }) == greeting.count else { return false }\n        var reply = [UInt8](repeating: 0, count: 2)\n        let received = reply.withUnsafeMutableBytes { buffer in\n            observed(\"recv\", { Darwin.recv(fd, buffer.baseAddress, buffer.count, MSG_WAITALL) })\n        }\n        traceReply = reply\n        let result = received == 2 && reply == [5, 0]\n        traceResult = result\n        return result\n    }\n",
+  "before_fragment_sha256": "ba560c3eca2c699ea42059a05ed7762965d7dd3df035fb9a69b09ce46110fe94",
+  "after_fragment_sha256": "005a26f4e22eb62cbf721b11b75c1992d0f9bc2287ba8c34e67e841e8fac4a88",
+  "before_generated_sha256": "7f6bd83418efa42fc5506e39308c0728430b915b65e31433993f856629df2122",
+  "after_generated_sha256": "49e4105a769960ab33c4a47d1f19782df5df3d1b4e0c42b5aa46a754ddd634fe",
+  "replace_count": 1,
+  "unchanged_contract": {
+    "IPv4": "127.0.0.1",
+    "port": 1080,
+    "socket_type": "SOCK_STREAM",
+    "protocol": 0,
+    "SO_NOSIGPIPE": 1,
+    "SO_RCVTIMEO_seconds": 1,
+    "SO_SNDTIMEO_seconds": 1,
+    "greeting": [
+      5,
+      1,
+      0
+    ],
+    "greeting_send_must_equal": 3,
+    "reply_buffer_size": 2,
+    "recv_flags": "MSG_WAITALL",
+    "reply_must_equal": [
+      5,
+      0
+    ],
+    "original_early_false_guards": 6
+  },
+  "original_network_and_close_calls_same_count_order_arguments": [
+    {
+      "name": "Darwin.socket",
+      "normalized_arguments": "AF_INET,SOCK_STREAM,0"
+    },
+    {
+      "name": "Darwin.close",
+      "normalized_arguments": "fd"
+    },
+    {
+      "name": "setsockopt",
+      "normalized_arguments": "fd,SOL_SOCKET,SO_NOSIGPIPE,&noSignal,socklen_t(MemoryLayout.size(ofValue:noSignal))"
+    },
+    {
+      "name": "setsockopt",
+      "normalized_arguments": "fd,SOL_SOCKET,SO_RCVTIMEO,&timeout,socklen_t(MemoryLayout.size(ofValue:timeout))"
+    },
+    {
+      "name": "setsockopt",
+      "normalized_arguments": "fd,SOL_SOCKET,SO_SNDTIMEO,&timeout,socklen_t(MemoryLayout.size(ofValue:timeout))"
+    },
+    {
+      "name": "inet_pton",
+      "normalized_arguments": "AF_INET,\"127.0.0.1\",&address.sin_addr"
+    },
+    {
+      "name": "Darwin.connect",
+      "normalized_arguments": "fd,$0,socklen_t(MemoryLayout<sockaddr_in>.size)"
+    },
+    {
+      "name": "Darwin.send",
+      "normalized_arguments": "fd,$0.baseAddress,$0.count,0"
+    },
+    {
+      "name": "Darwin.recv",
+      "normalized_arguments": "fd,$0.baseAddress,$0.count,MSG_WAITALL"
+    }
+  ],
+  "trace": {
+    "stderr_prefix": "IG_HANDSHAKE_TRACE ",
+    "one_line_per_original_probe": true,
+    "maximum_JSON_bytes": 8192,
+    "bounded_event_count": 9,
+    "no_mutable_static_counter": true,
+    "attempt_identity": "Order of trace lines plus start/end uptime and wall-clock start; index assigned during readback.",
+    "errno": "Immediately captured in the next statement after each syscall return and restored after recording; values following successful syscalls may be stale.",
+    "close": "Original deferred close still occurs exactly once for every valid fd, before final logging; its return code and errno are observed.",
+    "failure_handling": "Serialization/write failures are suppressed and cannot replace the original returned Bool.",
+    "no_extra_network_probes": true,
+    "added_time": "Clock sampling and record/log overhead consume the unchanged outer deadline; no timeout extension."
+  },
+  "original_test_case_count": 4,
+  "original_ui_build_timeout_seconds": 900,
+  "original_ui_test_timeout_seconds": 900,
+  "original_bootstatus_timeout_seconds": 120,
+  "original_cleanup_timeout_seconds": 30,
+  "original_waitUntil_deadline_seconds": 5,
+  "original_waitUntil_sleep_seconds": 0.05
+}

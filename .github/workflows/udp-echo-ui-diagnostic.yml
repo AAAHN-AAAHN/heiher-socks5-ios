@@ -1,40 +1,71 @@
-name: Bounded installed-Xcode 27.0 Simulator diagnostic
+name: Observe the original Integrated handshake and installed toolchain
 on:
   push:
     branches: [work/udp-echo-udp-20261028]
 permissions:
   contents: read
+  actions: read
 jobs:
-  # One alternative supported configuration; the existing 27.1 control ran on another host.
-  # An empty-device result provides no app, candidate, or sole-cause credit.
-  simulator-runtime-comparison:
+  integrated-handshake-diagnostic:
     runs-on: xcode-27
-    timeout-minutes: 15
+    timeout-minutes: 45
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: diagnostic
+      - name: Read the exact original producer helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 7875c96e11384908c2f8a0260b50de4d52f2c4cb
+          fetch-depth: 0
+          persist-credentials: false
+          path: producer
+      - name: Observe one original UI run without changing its assertions or deadlines
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 diagnostic/Bootstrap/run_integrated_handshake_diagnostic.py \
+            --producer-helper "$GITHUB_WORKSPACE/producer" \
+            --source "$RUNNER_TEMP/udp-source" \
+            --output "$RUNNER_TEMP/handshake-diagnostic"
+      - name: Preserve diagnostic observations and original UI results including failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Integrated-handshake-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/handshake-diagnostic/
+            ${{ runner.temp }}/udp-source/artifacts/
+          if-no-files-found: error
+          retention-days: 90
+
+  installed-toolchain-readonly:
+    runs-on: xcode-27
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: One pinned empty-device lifecycle with original deadlines
+      - name: Read installed toolchain and global component identities with a fixed query budget
         shell: bash
-        env:
-          COMPARE_RUNTIME_VERSION: '27.0'
-          COMPARE_RUNTIME_BUILD: '24A434'
-          COMPARE_DEVICE_TYPE: 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
         run: |
           set -euo pipefail
-          python3 Bootstrap/simulator_runtime_compare.py \
-            --runtime-version "$COMPARE_RUNTIME_VERSION" \
-            --runtime-build "$COMPARE_RUNTIME_BUILD" \
-            --device-type "$COMPARE_DEVICE_TYPE" \
-            --output "$RUNNER_TEMP/simulator-runtime-comparison"
-      - name: Preserve all actual diagnostic bytes including failure
+          python3 Bootstrap/toolchain_readonly_preflight.py \
+            --output "$RUNNER_TEMP/toolchain-readonly-preflight"
+      - name: Preserve all actual read-only observations including failure
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Simulator-xcode27.0-pinned-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/simulator-runtime-comparison
+          name: Toolchain-readonly-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/toolchain-readonly-preflight
           if-no-files-found: error
           retention-days: 90
