@@ -67,6 +67,28 @@ jobs:
         id: ui
         run: |
           set -euo pipefail
+          runtime_observer_bind() {
+            "$runtime_common_python" -B - "$runtime_common_source_root" "$runtime_common_source_commit" "$@" <<'HOST_OBSERVER_BINDING'
+          import hashlib, pathlib, stat, subprocess, sys
+          root = pathlib.Path(sys.argv[1])
+          relative = 'Build/observed_command_status.py'
+          path = root / relative
+          if not root.is_absolute() or root.resolve(strict=True) != root or path.is_symlink() or path.parent.is_symlink():
+              raise SystemExit('Status reader must be an unlinked file in the exact source root')
+          info = path.stat()
+          if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o644 or info.st_nlink != 1 or info.st_size != 16069:
+              raise SystemExit('Status reader file type, mode, links or size differs')
+          raw = path.read_bytes()
+          if len(raw) != 16069 or hashlib.sha256(raw).hexdigest() != '1c8345f864b3a84d72ee43b3eef67ef3f307836d47d513dc25daeb1c6ebc1ca5':
+              raise SystemExit('Status reader bytes differ from the frozen reader')
+          blob = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
+          entry = subprocess.run(['git', '-C', str(root), 'ls-tree', sys.argv[2], '--', relative], capture_output=True, timeout=10)
+          if entry.returncode != 0 or entry.stderr != b'' or entry.stdout != ('100644 blob ' + blob + '\t' + relative + '\n').encode():
+              raise SystemExit('Status reader is not tracked exactly by the actual source commit')
+          sys.argv = [str(path), *sys.argv[3:]]
+          exec(compile(raw, str(path), 'exec'), {'__name__': '__main__', '__file__': str(path)})
+          HOST_OBSERVER_BINDING
+          }
           runtime_common_preparation_applied=1
           runtime_common_legacy_record_status=0
           runtime_common_after_status=0
@@ -145,22 +167,109 @@ jobs:
             if [ "$runtime_common_record_status" -ne 0 ]; then exit "$runtime_common_record_status"; fi
             runtime_common_invoke before --consumer statistics-ui
           fi
-          # The single original command remains required even if legacy limitation recording failed.
-          if python3 Tests/Statistics/ui_audit.py; then
-            runtime_common_original_status=0
-          else
-            runtime_common_original_status=$?
-          fi
-          if [ "$runtime_common_preparation_applied" -eq 1 ]; then
-            if runtime_common_invoke after --consumer statistics-ui --actual-status "$runtime_common_original_status"; then
-              runtime_common_after_status=0
+          # An explicit historical checkout may predate the observer, even if it has the common helper.
+          runtime_observer_legacy_input=0
+          if [ "$runtime_common_preparation_applied" -eq 0 ]; then
+            runtime_observer_legacy_input=1
+          elif [ -n "${RUNTIME_COMMON_SOURCE_REF:-}" ]; then
+            runtime_observer_git_entry="$(git ls-tree HEAD -- Build/observe_host_during_command.py)"
+            if [ -z "$runtime_observer_git_entry" ]; then
+              runtime_observer_legacy_input=1
             else
-              runtime_common_after_status=$?
+              runtime_observer_reader_git_entry="$(git ls-tree HEAD -- Build/observed_command_status.py)"
+              if [ -z "$runtime_observer_reader_git_entry" ]; then
+                runtime_observer_legacy_input=1
+              fi
             fi
           fi
-          if [ "$runtime_common_original_status" -ne 0 ]; then exit "$runtime_common_original_status"; fi
-          if [ "$runtime_common_legacy_record_status" -ne 0 ]; then exit "$runtime_common_legacy_record_status"; fi
-          if [ "$runtime_common_after_status" -ne 0 ]; then exit "$runtime_common_after_status"; fi
+          if [ "$runtime_observer_legacy_input" -eq 1 ]; then
+            if python3 - "$runtime_common_preparation_applied" <<'HOST_OBSERVER_LEGACY'
+          import json, os, pathlib, subprocess, sys
+          root = pathlib.Path.cwd().resolve()
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          source = {'commit': git('rev-parse', 'HEAD'), 'tree': git('rev-parse', 'HEAD^{tree}')}
+          common_entry = git('ls-tree', 'HEAD', '--', 'Build/runtime_environment.py')
+          observer_entry = git('ls-tree', 'HEAD', '--', 'Build/observe_host_during_command.py')
+          reader_entry = git('ls-tree', 'HEAD', '--', 'Build/observed_command_status.py')
+          applied = int(sys.argv[1])
+          if not os.environ.get('RUNTIME_COMMON_SOURCE_REF') or applied not in (0, 1):
+              raise SystemExit('Observation limitation requires an explicit earlier checkout')
+          if (applied == 0 and common_entry) or (applied == 1 and (not common_entry or (observer_entry and reader_entry))):
+              raise SystemExit('Historical common/observer availability differs from the exact Git checkout')
+          out = root / 'artifacts/statistics-ui-audit/runtime-preparation'
+          for item in (out / 'host-observation-unavailable.json', out, *out.parents):
+              if item.is_symlink():
+                  raise SystemExit('Linked historical observation output is rejected: ' + str(item))
+              if item == root:
+                  break
+          out.mkdir(parents=True, exist_ok=True)
+          record = {'schema': 'explicit-input-host-observation-unavailable-v1',
+                    'result': 'OBSERVATION_UNAVAILABLE_ORIGINAL_CONSUMER_STILL_REQUIRED',
+                    'actual_input_ref': os.environ['RUNTIME_COMMON_SOURCE_REF'], 'source': source,
+                    'actual_caller_github_sha': os.environ['GITHUB_SHA'],
+                    'repository': os.environ['GITHUB_REPOSITORY'], 'run_id': os.environ['GITHUB_RUN_ID'],
+                    'attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'job': os.environ['GITHUB_JOB'],
+                    'common_helper_git_entry': common_entry or None, 'observer_git_entry': observer_entry or None,
+                    'status_reader_git_entry': reader_entry or None,
+                    'common_preparation_applied': bool(applied), 'observation_applied': False,
+                    'formal_current_source_credit': False, 'hidden_helper_download': False,
+                    'original_command': 'python3 Tests/Statistics/ui_audit.py'}
+          with (out / 'host-observation-unavailable.json').open('x') as stream:
+              json.dump(record, stream, indent=2); stream.write('\n')
+          HOST_OBSERVER_LEGACY
+            then
+              runtime_observer_legacy_record_status=0
+            else
+              runtime_observer_legacy_record_status=$?
+            fi
+            # Limitation recording must never replace or prevent the required original historical command.
+            if python3 Tests/Statistics/ui_audit.py; then
+              runtime_common_original_status=0
+            else
+              runtime_common_original_status=$?
+            fi
+            if [ "$runtime_common_preparation_applied" -eq 1 ]; then
+              if runtime_common_invoke after --consumer statistics-ui --actual-status "$runtime_common_original_status"; then
+                runtime_common_after_status=0
+              else
+                runtime_common_after_status=$?
+              fi
+            fi
+            if [ "$runtime_common_original_status" -ne 0 ]; then exit "$runtime_common_original_status"; fi
+            if [ "$runtime_common_legacy_record_status" -ne 0 ]; then exit "$runtime_common_legacy_record_status"; fi
+            if [ "$runtime_observer_legacy_record_status" -ne 0 ]; then exit "$runtime_observer_legacy_record_status"; fi
+            if [ "$runtime_common_after_status" -ne 0 ]; then exit "$runtime_common_after_status"; fi
+          else
+            runtime_observer_bind before statistics statistics-ui "$runtime_common_source_root" "$runtime_common_source_commit" "$runtime_common_source_tree"
+            runtime_observer_output="$runtime_common_source_root/artifacts/statistics-ui-audit/runtime-preparation/consumers/statistics-ui/host-observation"
+            if "$runtime_common_python" -B "$runtime_common_source_root/Build/observe_host_during_command.py" --output "$runtime_observer_output" -- python3 Tests/Statistics/ui_audit.py; then
+              runtime_observer_actual_status=0
+            else
+              runtime_observer_actual_status=$?
+            fi
+            runtime_common_original_status=
+            if runtime_common_original_status="$(runtime_observer_bind after statistics statistics-ui "$runtime_common_source_root" "$runtime_common_source_commit" "$runtime_common_source_tree" "$runtime_observer_actual_status")"; then
+              runtime_observer_binding_status=0
+            else
+              runtime_observer_binding_status=$?
+            fi
+            if [[ "$runtime_common_original_status" =~ ^(0|[1-9][0-9]{0,2})$ ]] && [ "$runtime_common_original_status" -le 255 ]; then
+              if runtime_common_invoke after --consumer statistics-ui --actual-status "$runtime_common_original_status"; then
+                runtime_common_after_status=0
+              else
+                runtime_common_after_status=$?
+              fi
+            else
+              printf 'No trustworthy original exit status; no original-status after binding is claimed.\n' >&2
+              if [ "$runtime_observer_actual_status" -ne 0 ]; then exit "$runtime_observer_actual_status"; fi
+              exit 1
+            fi
+            if [ "$runtime_common_original_status" -ne 0 ]; then exit "$runtime_common_original_status"; fi
+            if [ "$runtime_observer_actual_status" -ne 0 ]; then exit "$runtime_observer_actual_status"; fi
+            if [ "$runtime_observer_binding_status" -ne 0 ]; then exit "$runtime_observer_binding_status"; fi
+            if [ "$runtime_common_after_status" -ne 0 ]; then exit "$runtime_common_after_status"; fi
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: ${{ always() && steps.build.outputs.artifact_path != '' }}
         with:
