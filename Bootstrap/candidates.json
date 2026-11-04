@@ -1,5 +1,5 @@
 {
-  "sha256": "43660a7b68e2c5f9de2efee4d43d12f5e3faf14c6ea74c144ab12363a51d01c6",
+  "sha256": "88b66c684b1b19bec02cb15b4d12c48835f93af7513fa2913951093ddde7e2c3",
   "candidates": [
     {
       "name": "background",
@@ -8,12 +8,12 @@
     },
     {
       "name": "statistics",
-      "sha": "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c",
+      "sha": "89a8dd5a19d51fa9967bb049c41db3cb58a24d6a",
       "ref": "refs/heads/work/udp-echo-statistics-20261028"
     },
     {
       "name": "integrated",
-      "sha": "e592bd12df88084215667d4e74c62a120504aa96",
+      "sha": "56d32a4a1c42b934b728824b774630bcb8c22afd",
       "ref": "refs/heads/work/udp-echo-integrated-20261028"
     }
   ],
@@ -54,25 +54,25 @@
     },
     {
       "name": "statistics",
-      "sha": "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c",
+      "sha": "89a8dd5a19d51fa9967bb049c41db3cb58a24d6a",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "statistics",
-      "sha": "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c",
+      "sha": "89a8dd5a19d51fa9967bb049c41db3cb58a24d6a",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "integrated",
-      "sha": "e592bd12df88084215667d4e74c62a120504aa96",
+      "sha": "56d32a4a1c42b934b728824b774630bcb8c22afd",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "integrated",
-      "sha": "e592bd12df88084215667d4e74c62a120504aa96",
+      "sha": "56d32a4a1c42b934b728824b774630bcb8c22afd",
       "os": "xcode-27",
       "runtime": true
     }
