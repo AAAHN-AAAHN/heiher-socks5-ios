@@ -1,88 +1,52 @@
-name: Observe one Simulator lifecycle with Xcode 27.1 without candidate credit
+name: Compile current integrated XCUI sources without Simulator execution
 on:
   push:
     branches: [work/udp-echo-udp-20261028]
 permissions:
   contents: read
+  actions: read
 jobs:
-  diagnose_simulator_lifecycle_only:
+  compile_current_xcui_only:
     runs-on: xcode-27
-    timeout-minutes: 10
+    timeout-minutes: 25
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
-      - name: Check out the actual diagnostic control identity
+      - name: Check out the actual diagnostic helper identity
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
           path: control
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
-      - name: Prepare once and observe one original Simulator lifecycle
+      - name: Verify actual v3 producer inputs and compile all four unchanged XCUI cases
         shell: bash
         working-directory: control
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          lifecycle_cache_root="${RUNNER_TOOL_CACHE:?}"
-          lifecycle_cache_dir="$lifecycle_cache_root/Python/3.14.9/arm64"
-          lifecycle_python314="$lifecycle_cache_dir/bin/python3.14"
-          lifecycle_python315="$(command -v python3)"
-          lifecycle_output="$RUNNER_TEMP/simulator-lifecycle-xcode271-diagnostic"
-          if [[ "$lifecycle_cache_root" != /* || ! -f "${lifecycle_cache_dir}.complete" || ! -x "$lifecycle_python314" || "$lifecycle_python315" != /* ]]; then
-            printf '%s\n' 'Required existing interpreter/cache is unavailable.' >&2
-            exit 1
-          fi
-          mkdir "$lifecycle_output"
-          "$lifecycle_python314" -B Bootstrap/simulator_lifecycle_diagnostic_xcode271.py bind-control \
-            --python315 "$lifecycle_python315" --output "$lifecycle_output/control"
-
-          lifecycle_record_status() {
-            local lifecycle_phase="$1" lifecycle_original="$2" lifecycle_record=0
-            if printf '%s\n' "$lifecycle_original" > "$lifecycle_output/$lifecycle_phase.shell-status.txt"; then
-              lifecycle_record=0
-            else lifecycle_record=$?; fi
-            if [[ "$lifecycle_original" -ne 0 ]]; then return "$lifecycle_original"; fi
-            return "$lifecycle_record"
-          }
-          if "$lifecycle_python314" -B Bootstrap/ios_runtime_staged_preflight_xcode271.py --output "$lifecycle_output/preflight"; then
-            lifecycle_status=0
-          else lifecycle_status=$?; fi
-          lifecycle_record_status staged "$lifecycle_status"
-
-          if "$lifecycle_python314" -B Bootstrap/ios_runtime_service_refresh_xcode271.py \
-            --preflight "$lifecycle_output/preflight" --output "$lifecycle_output/service"; then
-            lifecycle_status=0
-          else lifecycle_status=$?; fi
-          lifecycle_record_status service "$lifecycle_status"
-
-          if "$lifecycle_python314" -B "$GITHUB_WORKSPACE/control/Bootstrap/observe_host_during_command.py" \
-            --output "$lifecycle_output/host" -- \
-            "$lifecycle_python315" -B "$GITHUB_WORKSPACE/control/Bootstrap/simulator_lifecycle_diagnostic_xcode271.py" \
-            lifecycle --output "$lifecycle_output"; then
-            lifecycle_status=0
-          else lifecycle_status=$?; fi
-          lifecycle_record_status observer "$lifecycle_status"
-      - name: Preserve preparation, actual lifecycle statuses and host observations
+          python3 -B Bootstrap/ui_compile_diagnostic.py --fetch --compile \
+            --output "$RUNNER_TEMP/current-xcui-compile-diagnostic"
+      - name: Preserve actual compile result and separate producer provenance
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Simulator-lifecycle-Xcode27.1-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          name: Current-XCUI-compile-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/simulator-lifecycle-xcode271-diagnostic
-            control/Bootstrap/simulator_lifecycle_diagnostic_xcode271.py
-            control/Bootstrap/simulator_runtime_xcode271_policy.py
-            control/Bootstrap/ios_runtime_staged_preflight_xcode271.py
-            control/Bootstrap/ios_runtime_service_refresh_xcode271.py
-            control/Bootstrap/ios_runtime_staged_preflight.py
-            control/Bootstrap/ios_runtime_service_refresh.py
-            control/Bootstrap/simulator_lifecycle_diagnostic.py
-            control/Bootstrap/simulator_runtime_compare.py
-            control/Bootstrap/simulator_comparison_diagnostics.py
-            control/Bootstrap/watch_runtime_preflight.py
-            control/Bootstrap/ios_runtime_signature_preflight.py
-            control/Bootstrap/observe_host_during_command.py
-            control/Bootstrap/process_wait_diagnostic.py
+            ${{ runner.temp }}/current-xcui-compile-diagnostic/diagnostic-result.json
+            ${{ runner.temp }}/current-xcui-compile-diagnostic/actual-producer-api-metadata.json
+            ${{ runner.temp }}/current-xcui-compile-diagnostic/native-product-identity.json
+            ${{ runner.temp }}/current-xcui-compile-diagnostic/built-framework.json
+            ${{ runner.temp }}/current-xcui-compile-diagnostic/generated-StatisticsUITests.swift
+            ${{ runner.temp }}/current-xcui-compile-diagnostic/generated-test-project.pbxproj
+            ${{ runner.temp }}/current-xcui-compile-diagnostic/xcode-version.txt
+            ${{ runner.temp }}/current-xcui-compile-diagnostic/simulator-sdk-version.txt
+            ${{ runner.temp }}/current-xcui-compile-diagnostic/build-for-testing.log
+            ${{ runner.temp }}/current-xcui-compile-diagnostic/application/Socks5.xcodeproj/xcshareddata/xcschemes/StatisticsUIAudit.xcscheme
+            ${{ runner.temp }}/current-xcui-compile-diagnostic/DerivedData/Build/Products/*.xctestrun
+            control/Bootstrap/ui_compile_diagnostic.py
             control/.github/workflows/udp-echo-ui-diagnostic.yml
           if-no-files-found: error
           retention-days: 90
