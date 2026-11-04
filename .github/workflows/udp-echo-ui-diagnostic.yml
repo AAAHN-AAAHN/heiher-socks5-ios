@@ -1,4 +1,4 @@
-name: Observe one Simulator lifecycle without candidate credit
+name: Observe one Simulator lifecycle with Xcode 27.1 without candidate credit
 on:
   push:
     branches: [work/udp-echo-udp-20261028]
@@ -9,7 +9,7 @@ jobs:
     runs-on: xcode-27
     timeout-minutes: 10
     env:
-      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
       - name: Check out the actual diagnostic control identity
@@ -28,13 +28,13 @@ jobs:
           lifecycle_cache_dir="$lifecycle_cache_root/Python/3.14.9/arm64"
           lifecycle_python314="$lifecycle_cache_dir/bin/python3.14"
           lifecycle_python315="$(command -v python3)"
-          lifecycle_output="$RUNNER_TEMP/simulator-lifecycle-diagnostic"
+          lifecycle_output="$RUNNER_TEMP/simulator-lifecycle-xcode271-diagnostic"
           if [[ "$lifecycle_cache_root" != /* || ! -f "${lifecycle_cache_dir}.complete" || ! -x "$lifecycle_python314" || "$lifecycle_python315" != /* ]]; then
             printf '%s\n' 'Required existing interpreter/cache is unavailable.' >&2
             exit 1
           fi
           mkdir "$lifecycle_output"
-          "$lifecycle_python314" -B Bootstrap/simulator_lifecycle_diagnostic.py bind-control \
+          "$lifecycle_python314" -B Bootstrap/simulator_lifecycle_diagnostic_xcode271.py bind-control \
             --python315 "$lifecycle_python315" --output "$lifecycle_output/control"
 
           lifecycle_record_status() {
@@ -45,12 +45,12 @@ jobs:
             if [[ "$lifecycle_original" -ne 0 ]]; then return "$lifecycle_original"; fi
             return "$lifecycle_record"
           }
-          if "$lifecycle_python314" -B Bootstrap/ios_runtime_staged_preflight.py --output "$lifecycle_output/preflight"; then
+          if "$lifecycle_python314" -B Bootstrap/ios_runtime_staged_preflight_xcode271.py --output "$lifecycle_output/preflight"; then
             lifecycle_status=0
           else lifecycle_status=$?; fi
           lifecycle_record_status staged "$lifecycle_status"
 
-          if "$lifecycle_python314" -B Bootstrap/ios_runtime_service_refresh.py \
+          if "$lifecycle_python314" -B Bootstrap/ios_runtime_service_refresh_xcode271.py \
             --preflight "$lifecycle_output/preflight" --output "$lifecycle_output/service"; then
             lifecycle_status=0
           else lifecycle_status=$?; fi
@@ -58,7 +58,7 @@ jobs:
 
           if "$lifecycle_python314" -B "$GITHUB_WORKSPACE/control/Bootstrap/observe_host_during_command.py" \
             --output "$lifecycle_output/host" -- \
-            "$lifecycle_python315" -B "$GITHUB_WORKSPACE/control/Bootstrap/simulator_lifecycle_diagnostic.py" \
+            "$lifecycle_python315" -B "$GITHUB_WORKSPACE/control/Bootstrap/simulator_lifecycle_diagnostic_xcode271.py" \
             lifecycle --output "$lifecycle_output"; then
             lifecycle_status=0
           else lifecycle_status=$?; fi
@@ -67,12 +67,20 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Simulator-lifecycle-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          name: Simulator-lifecycle-Xcode27.1-observation-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/simulator-lifecycle-diagnostic
-            control/Bootstrap/simulator_lifecycle_diagnostic.py
+            ${{ runner.temp }}/simulator-lifecycle-xcode271-diagnostic
+            control/Bootstrap/simulator_lifecycle_diagnostic_xcode271.py
+            control/Bootstrap/simulator_runtime_xcode271_policy.py
+            control/Bootstrap/ios_runtime_staged_preflight_xcode271.py
+            control/Bootstrap/ios_runtime_service_refresh_xcode271.py
             control/Bootstrap/ios_runtime_staged_preflight.py
             control/Bootstrap/ios_runtime_service_refresh.py
+            control/Bootstrap/simulator_lifecycle_diagnostic.py
+            control/Bootstrap/simulator_runtime_compare.py
+            control/Bootstrap/simulator_comparison_diagnostics.py
+            control/Bootstrap/watch_runtime_preflight.py
+            control/Bootstrap/ios_runtime_signature_preflight.py
             control/Bootstrap/observe_host_during_command.py
             control/Bootstrap/process_wait_diagnostic.py
             control/.github/workflows/udp-echo-ui-diagnostic.yml
