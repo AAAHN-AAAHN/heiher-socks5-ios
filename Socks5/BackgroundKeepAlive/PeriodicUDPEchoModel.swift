@@ -9,6 +9,7 @@ final class PeriodicUDPEchoModel: @MainActor ObservableObject {
     let objectWillChange = ObservableObjectPublisher()
     private(set) var settings = PeriodicUDPEchoSettings()
     private(set) var state = "Off"
+    private(set) var sentCount: UInt64 = 0
     private(set) var storageError: String?
     private(set) var savePending = false
     private(set) var intentRevision: UInt64 = 0
@@ -28,8 +29,10 @@ final class PeriodicUDPEchoModel: @MainActor ObservableObject {
         self.save = save
         service = PeriodicUDPEchoService(prepareObserver: prepareObserver) { [weak self] value in
             Task { @MainActor [weak self] in
-                guard let self, service.isCurrent(value.generation), state != value.text else { return }
+                guard let self, service.isCurrent(value.generation),
+                      state != value.text || sentCount != value.sentCount else { return }
                 state = value.text
+                sentCount = value.sentCount
                 objectWillChange.send()
             }
         }
@@ -88,6 +91,7 @@ final class PeriodicUDPEchoModel: @MainActor ObservableObject {
 
     private func apply(_ value: PeriodicUDPEchoSettings, persist shouldPersist: Bool) {
         let changed = settings != value
+        if value.enabled && !settings.enabled { sentCount = 0 }
         settings = value
         intentRevision &+= 1
         // Even an explicit Off matching defaults invalidates a pending old load.

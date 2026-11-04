@@ -38,11 +38,20 @@ struct HevSocks5EndpointStats {
     final class Clock { var systemUptime = 100.0 }
 }
 @MainActor enum NativeSnapshot {
+    static var generation: UInt32 = 0
+    static var generationReads = 0
+    static let generationReadsPerSample = 2
     static var rows = [HevSocks5EndpointStats(id: 0, received: 0, sent: 0)]
     static var registerDuringCopy = 0
+    static var restartDuringCopy: [HevSocks5EndpointStats]?
+    static var totals = 0
     static var queries = 0
     static var copies = 0
     static var addressReads = 0
+}
+@MainActor func hev_socks5_server_endpoint_generation() -> UInt32 {
+    NativeSnapshot.generationReads += 1
+    return NativeSnapshot.generation
 }
 @MainActor func withUnsafePointer<T, Result>(to value: inout T,
     _ body: (UnsafePointer<T>) throws -> Result) rethrows -> Result {
@@ -50,6 +59,7 @@ struct HevSocks5EndpointStats {
     return try Swift.withUnsafePointer(to: &value, body)
 }
 @MainActor func hev_socks5_server_endpoint_stats(_ received: inout UInt64, _ sent: inout UInt64) {
+    NativeSnapshot.totals += 1
     received = NativeSnapshot.rows.reduce(0) { $0 &+ $1.received }
     sent = NativeSnapshot.rows.reduce(0) { $0 &+ $1.sent }
 }
@@ -57,6 +67,11 @@ struct HevSocks5EndpointStats {
                                              _ capacity: Int) -> Int {
     guard let rows else { NativeSnapshot.queries += 1; return NativeSnapshot.rows.count }
     NativeSnapshot.copies += 1
+    if let replacement = NativeSnapshot.restartDuringCopy {
+        NativeSnapshot.generation += 1
+        NativeSnapshot.rows = replacement
+        NativeSnapshot.restartDuringCopy = nil
+    }
     for _ in 0..<NativeSnapshot.registerDuringCopy {
         let id = UInt64(NativeSnapshot.rows.count)
         NativeSnapshot.rows.append(HevSocks5EndpointStats(id: id, received: id * 17, sent: id * 31))
@@ -70,6 +85,7 @@ struct HevSocks5EndpointStats {
     @Recorded var statistics = TrafficStatistics()
     @Recorded var clients = EndpointTrafficStatistics()
     @Recorded var clientsIncomplete = false
+    @Recorded var sampledGeneration: UInt32? = nil
     // INSERT_EXACT_SAMPLE_METHOD
     func run() { sample() }
 }
@@ -86,15 +102,24 @@ struct HevSocks5EndpointStats {
             let previousWrites = view.$clients.writes
             let queries = NativeSnapshot.queries
             let copies = NativeSnapshot.copies
-            let entries = view.clients.entries.count
+            let totals = NativeSnapshot.totals
+            let generationReads = NativeSnapshot.generationReads
+            let generation = view.sampledGeneration
+            let entries = Set(view.clients.entries.keys)
             let addressReads = NativeSnapshot.addressReads
             view.run()
             check(view.$clients.writes == previousWrites + 1,
                   "one client-state publication per snapshot; observed \(view.$clients.writes - previousWrites)")
             check(NativeSnapshot.queries == queries + 1 && NativeSnapshot.copies == copies + 1,
                   "one size query and one bounded copy; no retry loop")
+            check(NativeSnapshot.totals == totals + 1 &&
+                  NativeSnapshot.generationReads == generationReads + NativeSnapshot.generationReadsPerSample,
+                  "one aggregate read bracketed by two generation reads")
+            let newAddresses = generation == view.sampledGeneration
+                ? Set(view.clients.entries.keys).subtracting(entries).count
+                : view.clients.entries.count
             addressesReadOnce = addressesReadOnce &&
-                NativeSnapshot.addressReads - addressReads == view.clients.entries.count - entries
+                NativeSnapshot.addressReads - addressReads == newAddresses
         }
         let view = SamplingHarness()
         sample(view)
@@ -160,7 +185,60 @@ struct HevSocks5EndpointStats {
         sample(packed)
         check(packed.clients.entries[7]?.traffic.sendRate == 3, "reordered packed rows keep the same per-IP baseline")
         check(packed.statistics.received == 160 && packed.statistics.sent == 165, "packed Total sums endpoint directions")
+
+        // The first counters in the new run deliberately exceed the old run's
+        // counters. A decrease-only reset heuristic would preserve stale rates.
+        NativeSnapshot.generation += 1
+        NativeSnapshot.rows = [HevSocks5EndpointStats(id: 42, received: 1_000_000, sent: 2_000_000)]
+        ProcessInfo.processInfo.systemUptime += 0.5
+        sample(packed)
+        check(packed.clients.rows.map(\.id) == [42], "new server generation removes old peer rows")
+        check(packed.statistics.received == 1_000_000 && packed.statistics.sent == 2_000_000 &&
+              packed.statistics.sumRate == 0 && packed.clients.entries[42]?.traffic.sumRate == 0,
+              "larger first counters still establish a zero-rate server baseline")
+        NativeSnapshot.rows[0].received += 100
+        NativeSnapshot.rows[0].sent += 25
+        ProcessInfo.processInfo.systemUptime += 0.25
+        sample(packed)
+        check(packed.statistics.receiveRate == 400 && packed.statistics.sendRate == 100 &&
+              packed.clients.entries[42]?.traffic.sumRate == 500,
+              "rates resume using only the new server generation")
+
+        // Aggregate/size reads see the old run, but bounded row copy sees a new
+        // run. The mixed values must never become either a display or a baseline.
+        NativeSnapshot.restartDuringCopy = [
+            HevSocks5EndpointStats(id: 0, received: 0, sent: 0),
+            HevSocks5EndpointStats(id: 777, received: 3_000_000, sent: 4_000_000),
+        ]
+        let generationReads = NativeSnapshot.generationReads
+        let totals = NativeSnapshot.totals
+        let queries = NativeSnapshot.queries
+        let copies = NativeSnapshot.copies
+        let writes = packed.$clients.writes
+        ProcessInfo.processInfo.systemUptime += 0.5
+        packed.run()
+        check(packed.statistics.received == 0 && packed.statistics.sent == 0 &&
+              packed.statistics.sumRate == 0 && packed.clients.entries.isEmpty &&
+              !packed.clientsIncomplete && packed.sampledGeneration == nil,
+              "mid-snapshot restart clears old state and discards mixed totals and rows")
+        check(packed.$clients.writes == writes + 1 && NativeSnapshot.totals == totals + 1 &&
+              NativeSnapshot.queries == queries + 1 && NativeSnapshot.copies == copies + 1 &&
+              NativeSnapshot.generationReads == generationReads + 2,
+              "a crossed generation publishes one empty state without a retry loop")
+        ProcessInfo.processInfo.systemUptime += 0.5
+        sample(packed)
+        check(packed.clients.rows.map(\.id) == [777] && packed.statistics.received == 3_000_000 &&
+              packed.statistics.sent == 4_000_000 && packed.statistics.sumRate == 0 &&
+              packed.clients.entries[777]?.traffic.sumRate == 0,
+              "next scheduled sample starts the new run without the discarded baseline")
+        NativeSnapshot.generation += 1
+        NativeSnapshot.rows = [HevSocks5EndpointStats(id: 0, received: 0, sent: 0)]
+        ProcessInfo.processInfo.systemUptime += 0.5
+        sample(packed)
+        check(packed.clients.rows.isEmpty && packed.statistics.received == 0 &&
+              packed.statistics.sent == 0 && packed.statistics.sumRate == 0,
+              "a new server with no traffic displays zero totals and no old IPs")
         check(addressesReadOnce, "decode only newly observed peer addresses")
-        print("PASS:", checks, "exact sample-body checks; 512 peers/64 intervals, snapshot growth and packed IDs; no SwiftUI render-count claim")
+        print("PASS:", checks, "exact sample-body checks; 512 peers/64 intervals, snapshot growth, packed IDs and server generations; no SwiftUI render-count claim")
     }
 }

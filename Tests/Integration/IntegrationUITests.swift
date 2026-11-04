@@ -131,6 +131,7 @@ final class IntegrationUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         app.launch()
         let state = app.staticTexts["background.udpEcho.state"]
+        let sent = app.staticTexts["background.udpEcho.sentCount"]
         let destination = app.textFields
             .matching(identifier: "background.udpEcho.destinations").firstMatch
         let period = app.textFields["background.udpEcho.period"]
@@ -159,6 +160,10 @@ final class IntegrationUITests: XCTestCase {
             let expectation = XCTNSPredicateExpectation(
                 predicate: NSPredicate(format: "label == %@", text), object: state)
             XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 10), .completed)
+        }
+        @MainActor func sentCount() throws -> UInt64 {
+            reveal(sent)
+            return try XCTUnwrap(UInt64(sent.label), "Sent must expose the numeric datagram count")
         }
         @MainActor func replace(_ field: XCUIElement, with text: String) {
             reveal(field)
@@ -245,6 +250,7 @@ final class IntegrationUITests: XCTestCase {
         toggle().tap()
         XCTAssertEqual(toggle().value as? String, "1")
         expectState("Waiting for SOCKS5 server")
+        XCTAssertEqual(try sentCount(), 0, "A new On starts at zero while no server is running")
         try quiet()
         server(running: true)
         let replying = try packets(atLeast: ["4": 3, "6": 3], replies: true)
@@ -252,6 +258,9 @@ final class IntegrationUITests: XCTestCase {
         XCTAssertEqual(replying.ports["6"]?.count, 1, "Periodic sends must reuse the IPv6 association")
         background()
         expectState("Sending UDP Echo")
+        reveal(sent)
+        XCTAssertTrue(waitUntil { (UInt64(sent.label) ?? 0) > 0 }, "Actual sends must update the Sent row")
+        let replyingCount = try sentCount()
         let capture = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         capture.name = "integrated-udp-echo-running"; capture.lifetime = .keepAlways; add(capture)
 
@@ -261,13 +270,23 @@ final class IntegrationUITests: XCTestCase {
         let continued = try packets(atLeast: silent.counts.mapValues { $0 + 3 }, replies: false)
         XCTAssertEqual(continued.ports["4"]?.count, 1)
         XCTAssertEqual(continued.ports["6"]?.count, 1)
+        XCTAssertTrue(waitUntil { (UInt64(sent.label) ?? 0) > replyingCount },
+                      "Sent must continue increasing without Echo replies")
+        let silentCount = try sentCount()
         server(running: false)
         expectFields(enabled: true)
         expectState("Waiting for SOCKS5 server")
         try quiet()
+        let stoppedCount = try sentCount()
+        XCTAssertGreaterThanOrEqual(stoppedCount, silentCount, "Stopping the server must preserve the same On count")
         let stopped = try Self.echoFixture("snapshot")
         server(running: true)
         _ = try packets(atLeast: stopped.counts.mapValues { $0 + 3 }, replies: false)
+        background()
+        expectState("Sending UDP Echo")
+        reveal(sent)
+        XCTAssertTrue(waitUntil { (UInt64(sent.label) ?? 0) > stoppedCount },
+                      "Server restart must continue the existing On count")
 
         // Relaunch must restore actual sends, the On intent and both raw inputs.
         saved()
@@ -278,12 +297,31 @@ final class IntegrationUITests: XCTestCase {
         expectFields(enabled: true)
         XCTAssertTrue(waitUntil { Self.handshake() })
         _ = try packets(atLeast: terminated.counts.mapValues { $0 + 3 }, replies: false)
+        reveal(sent)
+        XCTAssertTrue(waitUntil { (UInt64(sent.label) ?? 0) > 0 })
+        let relaunchedCount = try sentCount()
         reveal(toggle(), upward: false)
         toggle().tap()
         XCTAssertEqual(toggle().value as? String, "0")
         expectState("Off")
         try quiet()
+        let offCount = try sentCount()
+        XCTAssertGreaterThanOrEqual(offCount, relaunchedCount, "Off retains all accepted sends from the ending On")
         XCTAssertTrue(Self.handshake(), "Echo Off must leave the independently running server intact")
+        // A stopped server makes the next On's zero observable before any new send.
+        server(running: false)
+        background()
+        expectState("Off")
+        XCTAssertEqual(try sentCount(), offCount, "The final Off count must remain visible")
+        reveal(toggle(), upward: false)
+        toggle().tap()
+        expectState("Waiting for SOCKS5 server")
+        XCTAssertEqual(try sentCount(), 0, "The next Off-to-On must reset the displayed count")
+        reveal(toggle(), upward: false)
+        toggle().tap()
+        expectState("Off")
+        XCTAssertEqual(try sentCount(), 0)
+        server(running: true)
         saved()
         app.terminate()
         XCTAssertTrue(waitUntil { !Self.handshake() })

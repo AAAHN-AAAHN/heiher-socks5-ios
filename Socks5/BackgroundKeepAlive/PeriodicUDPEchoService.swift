@@ -13,6 +13,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
     struct State: Sendable, Equatable {
         let generation: UInt64
         let text: String
+        let sentCount: UInt64
     }
 
     struct Plan {
@@ -35,6 +36,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
         let resolver: ServerResolver?
         let runID: UUID?
         let generation: UInt64
+        let episode: UUID
     }
 
     private final class Slot {
@@ -53,6 +55,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
     private let admission = Socks5UDPClient.Admission()
     private let ingress = NSLock()
     private var latest = PeriodicUDPEchoSettings()
+    private var episode = UUID()
     private var resolver: ServerResolver?
     private var runID: UUID?
     private var constantServer: Socks5UDPClient.Configuration?
@@ -70,6 +73,9 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
     private let prepareObserver: (@Sendable () -> IOObserver?)?
     private let onState: @Sendable (State) -> Void
     private var shown: State?
+    private var sentCount: UInt64 = 0
+    private var publishAfter: UInt64 = 0
+    private var countPublicationAt: UInt64?
     private var pumpQueued = false
     private var driving = false
     private var nextSlot = 0
@@ -98,6 +104,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
     /// The admission generation changes synchronously, before any queued parsing.
     func update(_ settings: PeriodicUDPEchoSettings) {
         enqueue {
+            if settings.enabled && !latest.enabled { episode = UUID() }
             latest = settings
             return true
         }
@@ -146,7 +153,8 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
         guard !closed else { ingress.unlock(); return }
         guard change() else { ingress.unlock(); return }
         let generation = admission.begin(enabled: latest.enabled)
-        pending = Request(settings: latest, resolver: resolver, runID: runID, generation: generation)
+        pending = Request(settings: latest, resolver: resolver, runID: runID,
+                          generation: generation, episode: episode)
         let start = !queued
         queued = true
         ingress.unlock()
@@ -161,6 +169,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
         ingress.unlock()
         guard let request, admission.isCurrent(request.generation) else { return }
         let changed = current?.settings != request.settings
+        if current?.episode != request.episode { sentCount = 0 }
         current = request
         closeClients()
         server = nil
@@ -393,6 +402,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
             remaining -= 1
             switch client.send(to: plan.targets[index][cursor], payload: Self.payload) {
             case .sent:
+                if sentCount < .max { sentCount += 1 }
                 slot.sent = true
                 slot.cursor = cursor + 1
                 if cursor == 0 { slot.nextRound = Self.after(DispatchTime.now().uptimeNanoseconds, plan.interval) }
@@ -429,8 +439,17 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
 
     private func show(_ text: String) {
         guard let current, admission.isCurrent(current.generation) else { return }
-        let value = State(generation: current.generation, text: text)
-        guard shown != value else { return }
+        let value = State(generation: current.generation, text: text, sentCount: sentCount)
+        guard shown != value else { countPublicationAt = nil; return }
+        let now = DispatchTime.now().uptimeNanoseconds
+        // Batch count-only UI updates on the existing timer, independently of
+        // send cadence. Intent/state changes publish immediately, including Off.
+        if let shown, shown.generation == value.generation, shown.text == text, now < publishAfter {
+            countPublicationAt = publishAfter
+            return
+        }
+        countPublicationAt = nil
+        publishAfter = Self.after(now, Self.second / 2)
         shown = value
         onState(value)
     }
@@ -444,6 +463,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
         func include(_ value: UInt64?) {
             if let value { deadline = min(deadline ?? value, value) }
         }
+        include(countPublicationAt)
         // A blocked/in-progress round is driven by readiness or one continuation,
         // not by repeatedly waking at the user's period while no new round can run.
         for slot in slots {

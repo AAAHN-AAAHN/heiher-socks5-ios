@@ -85,7 +85,7 @@ main (void)
     wm_add (p, UINT32_MAX, UINT32_MAX);
     wm_add (p, 17, 19);
     uint64_t i, o;
-    counter_read (&p->counter, &i, &o);
+    counter_read (&p->counter, wm_generation (), &i, &o);
     assert (i == (uint64_t)UINT32_MAX + 17 && o == (uint64_t)UINT32_MAX + 19);
     assert (atomic_load (&p->counter.epoch) == 1);
     wm_worker_release (a);

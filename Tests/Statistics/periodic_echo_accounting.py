@@ -60,6 +60,9 @@ def main():
                 (output / 'results.json').write_text(json.dumps(records, indent=2) + '\n')
                 return result
 
+            baseline_wire = 0
+            baseline_rounds = 0
+
             def accounting(rounds):
                 # All replies are consumed before Off; no later round is due for 60s.
                 # Wait only for the native post-syscall counters to be published.
@@ -76,15 +79,16 @@ def main():
                     assert client['tcpSent'] >= rounds * 2 * (3 + 25 + 10)
                     assert client['tcpReceived'] >= rounds * 2 * (2 + 2 + 10)
                     assert len(client['peers']) >= 2
-                    client_wire = client['clientSent'] + client['clientReceived']
-                    expected = client_wire + 2 * rounds
+                    client_wire = client['clientSent'] + client['clientReceived'] - baseline_wire
+                    session_rounds = rounds - baseline_rounds
+                    expected = client_wire + 2 * session_rounds
                     if native_value['received'] == native_value['sent'] == expected:
                         break
                     assert time.monotonic() < deadline, (result, expected)
                     time.sleep(.01)
                 peers = {row['address']: row for row in native_value['rows']}
                 assert set(peers) == {'Unattributed', '127.0.0.1', '::1'}, peers
-                for address, amount in [('Unattributed', 0), ('127.0.0.1', client_wire + rounds), ('::1', rounds)]:
+                for address, amount in [('Unattributed', 0), ('127.0.0.1', client_wire + session_rounds), ('::1', session_rounds)]:
                     assert peers[address]['received'] == peers[address]['sent'] == amount, peers
                 assert result['factoryCalls'] == 1
                 return result
@@ -92,7 +96,9 @@ def main():
             initial = request('snapshot')
             assert initial['factoryCalls'] == 0 and initial['writerAlive']
             assert initial['native']['received'] == initial['native']['sent'] == 0
-            request('start1')
+            started = request('start1')
+            assert started['native']['generation'] == initial['native']['generation'] + 1
+            assert started['native']['received'] == started['native']['sent'] == 0
             for round_number in (1, 2):
                 request('on')
                 stopped = request('off')
@@ -100,7 +106,13 @@ def main():
                 accounting(round_number)
             before_restart = request('stop')
             assert before_restart['writerAlive']
-            request('start4')
+            baseline_wire = sum(before_restart['client'][key] for key in ('clientSent', 'clientReceived'))
+            baseline_rounds = 2
+            restarted = request('start4')
+            assert restarted['writerAlive'] and restarted['factoryCalls'] == 1
+            assert restarted['native']['generation'] == before_restart['native']['generation'] + 1
+            assert restarted['native']['received'] == restarted['native']['sent'] == 0
+            assert restarted['native']['rows'] == [{'address': 'Unattributed', 'received': 0, 'sent': 0}]
             request('on')
             request('off')
             final = accounting(3)
@@ -119,7 +131,7 @@ def main():
             process.stdin.close()
             process.stdout.close()
         echo.finish()
-    print('PASS: same-process real Hev + Swift SOCKS5 service + explicit writer; exact TCP/auth/UDP wire bytes and peer rows; one producer survives Off/native restart and releases after shutdown; cumulative totals retained')
+    print('PASS: same-process real Hev + Swift SOCKS5 service + explicit writer; exact session TCP/auth/UDP wire bytes and peer rows; one producer survives Off/native restart and releases after shutdown; each native run resets totals and old rows')
 
 
 if __name__ == '__main__':

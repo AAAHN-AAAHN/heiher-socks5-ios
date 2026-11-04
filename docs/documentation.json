@@ -3,10 +3,10 @@
   "frozen_source": "3228a0fd44fd2554ef6a4ce438e9f004de65d8cc",
   "parents": {
     "feature/app-icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
-    "feature/background": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
+    "feature/background": "46be6421e93cac43400e99ceeb89ee1290479ce9",
     "feature/server-control": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
     "feature/settings-persistence": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
-    "feature/traffic-statistics": "2e3baaa705e50289f37f60f2d32376e588eefbbb",
+    "feature/traffic-statistics": "e27ddccd2a550af3c9bb70998021634f6a7dea59",
     "feature/udp-compat": "b05db817684d6b006353d5062fdba756d739faea"
   },
   "owned_documents": [

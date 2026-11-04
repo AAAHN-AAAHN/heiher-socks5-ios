@@ -224,7 +224,7 @@ def native_checks(mode):
     env = dict(os.environ, ASAN_OPTIONS='detect_leaks=0', UBSAN_OPTIONS='halt_on_error=1')
     helpers = [('socket_observer', []), ('socket_observer', ['-DFORCE_FALLBACK']),
                ('stream_matrix', ['-DENABLE_IO_SPLICE_SYSCALL'] if splice else []),
-               ('registry', []), ('worker_boundaries', [])]
+               ('registry', []), ('worker_boundaries', []), ('worker_sessions', [])]
     for label, extra in [('asan', sanitize), ('optimized', ['-O3', '-fstrict-aliasing'])]:
         # Fixtures include the actual socket helpers/worker registry; only syscall
         # outcomes and allocation failures are substituted at controlled boundaries.
@@ -236,11 +236,12 @@ def native_checks(mode):
                 mode + '-' + executable.name + '-build.log')
             run([executable], mode + '-' + executable.name + '.log', env=env)
             executable.unlink()
-        executable = OUT / ('socket-meter-pool-failure-' + label)
-        run([*common, *extra, *includes, 'Tests/SocketIO/meter_pool_failure.c',
-             *libs, '-o', executable], mode + '-' + executable.name + '-build.log')
-        run([executable], mode + '-' + executable.name + '.log', env=env)
-        executable.unlink()
+        for name in ('meter_pool_failure', 'session_lifecycle'):
+            executable = OUT / ('socket-' + name.replace('_', '-') + '-' + label)
+            run([*common, *extra, *includes, 'Tests/SocketIO/' + name + '.c',
+                 *libs, '-o', executable], mode + '-' + executable.name + '-build.log')
+            run([executable], mode + '-' + executable.name + '.log', env=env)
+            executable.unlink()
         for source in UDP_COMPOSED_SOURCES:
             executable = OUT / ('composed-' + Path(source).stem + '-' + label)
             flags = [] if source in ('udp_proxy_worker_cascade.c', 'udp_dns_lifecycle.c',
@@ -272,7 +273,7 @@ def native_checks(mode):
         run([executable, '--auth-publication'], mode + '-auth-publication-tsan.log',
             env=dict(os.environ, TSAN_OPTIONS='halt_on_error=1'), timeout=40)
         executable.unlink()
-        for name in ('registry', 'worker_boundaries'):
+        for name in ('registry', 'worker_boundaries', 'worker_sessions'):
             executable = OUT / ('socket-' + name + '-tsan')
             run([*common, '-O1', '-g', '-fsanitize=thread', *includes,
                  'Tests/SocketIO/' + name + '.c', libs[-1], '-o', executable],

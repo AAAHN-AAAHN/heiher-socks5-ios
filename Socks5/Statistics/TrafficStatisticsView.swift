@@ -9,6 +9,7 @@ struct TrafficStatisticsView: View {
     @State private var statistics = TrafficStatistics()
     @State private var clients = EndpointTrafficStatistics()
     @State private var clientsIncomplete = false
+    @State private var sampledGeneration: UInt32? = nil
 
     var body: some View {
         NavigationStack {
@@ -48,7 +49,7 @@ struct TrafficStatisticsView: View {
                     Section {
                         Text("Spd.: average successful socket I/O over the actual sampling interval, in bits per second; not link capacity.")
                             .accessibilityIdentifier("measurement-speed")
-                        Text("Vol.: successful TCP/UDP bytes recorded at this app's server and client sockets since this process started. Server Stop/Start retains totals. Both client and destination peers are included.")
+                        Text("Vol.: successful TCP/UDP bytes recorded at this app's server and client sockets since the latest server start. Starting the server resets totals and peer rows. A new app process starts at zero. Both client and destination peers are included.")
                             .accessibilityIdentifier("measurement-volume")
                         Text("Peer viewpoint: In is bytes the OS accepted toward that IP; Out is bytes this app consumed from that IP. Includes SOCKS negotiation, authentication, framing and consumed rejected input. A write is not proof of remote delivery.")
                         Text("Total sums peer endpoints, not unique relayed content. LAN and Internet peers use the same rules. Only instrumented server and client sockets are observed. IPs are endpoints, not device identities. Unresolved peer IPs appear as Unattributed. Independent live snapshots can briefly differ.")
@@ -65,6 +66,7 @@ struct TrafficStatisticsView: View {
             statistics = TrafficStatistics()
             clients = EndpointTrafficStatistics()
             clientsIncomplete = false
+            sampledGeneration = nil
             sample()
             while !Task.isCancelled {
                 let now = Date().timeIntervalSinceReferenceDate
@@ -138,6 +140,7 @@ struct TrafficStatisticsView: View {
     }
 
     private func sample() {
+        let generation = hev_socks5_server_endpoint_generation()
         var received: UInt64 = 0
         var sent: UInt64 = 0
         hev_socks5_server_endpoint_stats(&received, &sent)
@@ -148,17 +151,30 @@ struct TrafficStatisticsView: View {
         let required = rows.withUnsafeMutableBufferPointer {
             hev_socks5_server_endpoint_rows($0.baseAddress, $0.count)
         }
-        clientsIncomplete = required > capacity
         let time = ProcessInfo.processInfo.systemUptime
-        statistics.sample(received: received, sent: sent, at: time)
+        let sameGeneration = sampledGeneration == generation
+        var sampledStatistics = sameGeneration ? statistics : TrafficStatistics()
+        sampledStatistics.sample(received: received, sent: sent, at: time)
         // Build one value snapshot before publishing; per-row State writes can
         // repeatedly copy the dictionary and invalidate the same view state.
-        var sampledClients = clients
+        var sampledClients = sameGeneration ? clients : EndpointTrafficStatistics()
         for var row in rows.prefix(min(capacity, required)) {
             sampledClients.sample(id: row.id, address: withUnsafePointer(to: &row.address) {
                 $0.withMemoryRebound(to: CChar.self, capacity: 64) { String(cString: $0) }
             }, received: row.received, sent: row.sent, at: time)
         }
+        // A native restart can occur between any two reads. Clear the old run
+        // and discard this mixed snapshot; the next regular tick reads the new run.
+        guard generation == hev_socks5_server_endpoint_generation() else {
+            statistics = TrafficStatistics()
+            clients = EndpointTrafficStatistics()
+            clientsIncomplete = false
+            sampledGeneration = nil
+            return
+        }
+        statistics = sampledStatistics
         clients = sampledClients
+        clientsIncomplete = required > capacity
+        sampledGeneration = generation
     }
 }

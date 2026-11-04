@@ -7,13 +7,13 @@
     "src/hev-socks5-proxy.c": {
       "before": {
         "mode": "100644",
-        "sha256": "ccf2a9a975e9758d273daa459db756712f9ab5cf116d134da4b3ec02f1b4d777",
-        "blob_sha1": "8ef2391a5cf2e3dea884d153e1faa5871cae3834"
+        "sha256": "4987b07c6aa2b88a7228f4e98576bcb7189828550618b31015faadfdc17d54da",
+        "blob_sha1": "a466ea06dc8c50c602708a40ca3f148a60a7a307"
       },
       "after": {
         "mode": "100644",
-        "sha256": "04d97d13e2fdf30afbe68b3f021fb56ac7d6e754d3e28291b1cfe397ce4d9ed7",
-        "blob_sha1": "6d10028dc952a94026a95f9a1131600a348a268d"
+        "sha256": "3ad114a95b700e4a3dde7c9e33c4ef0e12c54c626dde98a6bf628fda31bffe07",
+        "blob_sha1": "ebb8d547df8fb29a0edc5debcd52db082bb0795c"
       }
     }
   },

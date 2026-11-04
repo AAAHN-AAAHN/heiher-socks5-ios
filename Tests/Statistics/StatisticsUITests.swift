@@ -22,6 +22,32 @@ final class StatisticsUITests: XCTestCase {
                 expectedPeers[address, default: PeerBytes()].outgoing += bytes.outgoing
             }
         }
+        func assertFreshStatistics() {
+            app.tabBars.buttons["Statistics"].tap()
+            XCTAssertTrue(app.navigationBars["Statistics"].waitForExistence(timeout: 5))
+            let form = app.collectionViews.firstMatch
+            XCTAssertTrue(form.waitForExistence(timeout: 5))
+            let top = app.staticTexts["total-title"]
+            for _ in 0..<6 {
+                if top.exists && top.isHittable { break }
+                form.swipeDown()
+            }
+            XCTAssertTrue(top.exists && top.isHittable)
+            XCTAssertTrue(waitUntil {
+                app.staticTexts["total-usage-sum"].exists &&
+                app.staticTexts["total-usage-sum"].label == "0.00 KB" &&
+                app.staticTexts["total-speed-sum"].label == "0.00 Kbps"
+            }, "A newly started server or application must have fresh volume and rate baselines")
+            let empty = app.staticTexts["No peer socket I/O recorded yet."]
+            for _ in 0..<6 {
+                if empty.exists { break }
+                form.swipeUp()
+            }
+            XCTAssertTrue(empty.exists, "A fresh run must remove the prior run's IP rows")
+            for address in ["127.0.0.1", "::1"] {
+                XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label == %@", address)).firstMatch.exists)
+            }
+        }
         for orientation in [UIDeviceOrientation.portrait, .landscapeLeft] {
             XCUIDevice.shared.orientation = orientation
             app.tabBars.buttons["Server"].tap()
@@ -42,6 +68,12 @@ final class StatisticsUITests: XCTestCase {
             add(capture)
             start.tap()
             XCTAssertTrue(waitUntil { stop.isEnabled && !start.isEnabled })
+            // Check the new run before opening any measured client socket.
+            // The second orientation restarts the same application process.
+            expectedPeers.removeAll()
+            assertFreshStatistics()
+            app.tabBars.buttons["Server"].tap()
+            XCTAssertTrue(stop.waitForExistence(timeout: 5))
             // Reuse the successful readiness connection for the measured greeting.
             // Closing it without a greeting can itself produce a two-byte rejection.
             var readySocket: Int32?
@@ -175,6 +207,12 @@ final class StatisticsUITests: XCTestCase {
             app.tabBars.buttons["Server"].tap()
             XCTAssertTrue(start.waitForExistence(timeout: 5))
         }
+        // Process restart follows the same fresh-counter policy as server restart.
+        // Keep this in the actual UI test rather than inferring it from the model.
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.tabBars.buttons["Server"].waitForExistence(timeout: 10))
+        assertFreshStatistics()
     }
 
     private func waitUntil(_ condition: () -> Bool) -> Bool {

@@ -18,7 +18,8 @@ history = runpy.run_path(str(HERE / 'historical_checks.py'))['run_historical']
 history('run_checks.py')
 subprocess.run([sys.executable, str(HERE / 'check_loop_audio.py')], check=True)
 
-for entry in ('check_udp_echo.py', 'UDPEchoTransportTests.py', 'UDPEchoSchedulerTests.py'):
+for entry in ('check_udp_echo.py', 'UDPEchoTransportTests.py', 'UDPEchoSchedulerTests.py',
+              'check_udp_echo_counter.py'):
     subprocess.run([sys.executable, str(HERE / entry)], check=True)
 if options.core is not None:
     subprocess.run([sys.executable, str(HERE / 'check_udp_echo_native.py'), '--native', str(options.core)], check=True)

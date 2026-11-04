@@ -79,8 +79,10 @@ extension SamplingHarness {
         cancelled.cancel() // MainActor cannot enter the new body before this cancellation.
         await cancelled.value
         check(view.$statistics.writes == 0 && view.$clients.writes == 0 &&
-              view.$clientsIncomplete.writes == 0, "hidden/inactive/pre-cancelled tasks do not reset display state")
+              view.$clientsIncomplete.writes == 0 && view.$sampledGeneration.writes == 0,
+              "hidden/inactive/pre-cancelled tasks do not reset display state")
         check(NativeSnapshot.queries == 0 && NativeSnapshot.copies == 0 &&
+              NativeSnapshot.totals == 0 && NativeSnapshot.generationReads == 0 &&
               SleepBoundary.requests.isEmpty && Date.reads == 0,
               "hidden/inactive/pre-cancelled tasks perform no sampling, clock reads or sleep")
 
@@ -115,6 +117,8 @@ extension SamplingHarness {
         for (index, test) in cases.enumerated() {
             let queries = NativeSnapshot.queries
             let copies = NativeSnapshot.copies
+            let totals = NativeSnapshot.totals
+            let generationReads = NativeSnapshot.generationReads
             let writes = view.$clients.writes
             let incoming = UInt64(index + 1) * 300
             let outgoing = UInt64(index + 1) * 75
@@ -126,6 +130,7 @@ extension SamplingHarness {
             SleepBoundary.resume()
             await SleepBoundary.waitForSleep()
             check(NativeSnapshot.queries == queries + 1 && NativeSnapshot.copies == copies + 1 &&
+                  NativeSnapshot.totals == totals + 1 && NativeSnapshot.generationReads == generationReads + 2 &&
                   view.$clients.writes == writes + 1, "one sample/publication per resumed sleep")
             let interval = test.elapsed + test.work
             let receiveRate = Double(incoming) / interval
@@ -140,11 +145,13 @@ extension SamplingHarness {
             checkWait(until: test.next, test.reason)
         }
         let queries = NativeSnapshot.queries
+        let generationReads = NativeSnapshot.generationReads
         let clockReads = Date.reads
         visible.cancel()
         SleepBoundary.resume(throwing: true)
         await visible.value
-        check(NativeSnapshot.queries == queries && SleepBoundary.pending == nil && Date.reads == clockReads,
+        check(NativeSnapshot.queries == queries && NativeSnapshot.generationReads == generationReads &&
+              SleepBoundary.pending == nil && Date.reads == clockReads,
               "cancellation thrown from sleep prevents another sample or clock read")
 
         // Traffic accumulates while hidden; no task polls or resets these counters.
@@ -153,7 +160,8 @@ extension SamplingHarness {
         ProcessInfo.processInfo.systemUptime += 20
         let writes = view.$statistics.writes
         await view.runTask(isVisible: false, scenePhase: .active)
-        check(NativeSnapshot.queries == queries && view.$statistics.writes == writes && Date.reads == clockReads,
+        check(NativeSnapshot.queries == queries && NativeSnapshot.generationReads == generationReads &&
+              view.$statistics.writes == writes && Date.reads == clockReads,
               "hidden traffic performs no display sampling")
         Date.now = modern + 0.25
         let resumed = Task { await view.runTask(isVisible: true, scenePhase: .active) }
@@ -163,14 +171,40 @@ extension SamplingHarness {
               view.clients.entries[7]?.traffic.sumRate == 0, "re-entry preserves native volume and resets rate baselines")
         checkWait(until: modern + 0.5, "re-entry chooses the current device-clock boundary")
         let resumedQueries = NativeSnapshot.queries
+        let resumedGenerationReads = NativeSnapshot.generationReads
         let resumedClockReads = Date.reads
         resumed.cancel()
         SleepBoundary.resume() // Model a sleep that completes despite concurrent cancellation.
         await resumed.value
-        check(NativeSnapshot.queries == resumedQueries && SleepBoundary.pending == nil &&
+        check(NativeSnapshot.queries == resumedQueries && NativeSnapshot.generationReads == resumedGenerationReads &&
+              SleepBoundary.pending == nil &&
               Date.reads == resumedClockReads, "post-sleep cancellation guard prevents another sample or clock read")
-        check(SleepBoundary.requests.count == cases.count + 2 && Date.reads == SleepBoundary.requests.count,
+
+        // A server restart while this tab is hidden must not revive the old IP
+        // rows or use their counters/time as the first new run's rate baseline.
+        NativeSnapshot.generation += 1
+        NativeSnapshot.rows = [HevSocks5EndpointStats(id: 42, received: 30_000_000, sent: 40_000_000)]
+        ProcessInfo.processInfo.systemUptime += 30
+        let hiddenWrites = view.$statistics.writes
+        await view.runTask(isVisible: false, scenePhase: .active)
+        await view.runTask(isVisible: true, scenePhase: .inactive)
+        check(NativeSnapshot.queries == resumedQueries && NativeSnapshot.generationReads == resumedGenerationReads &&
+              view.$statistics.writes == hiddenWrites && Date.reads == resumedClockReads,
+              "a hidden or inactive restart does not poll native generation or format state")
+        Date.now = modern + 0.75
+        let restarted = Task { await view.runTask(isVisible: true, scenePhase: .active) }
+        await SleepBoundary.waitForSleep()
+        check(view.statistics.received == 30_000_000 && view.statistics.sent == 40_000_000 &&
+              view.statistics.sumRate == 0 && view.clients.rows.map(\.id) == [42] &&
+              view.clients.entries[42]?.traffic.sumRate == 0 &&
+              view.sampledGeneration == NativeSnapshot.generation,
+              "re-entry after a hidden restart shows only the new run with zero first rates")
+        checkWait(until: modern + 1, "restarted entry keeps the device-clock cadence")
+        restarted.cancel()
+        SleepBoundary.resume(throwing: true)
+        await restarted.value
+        check(SleepBoundary.requests.count == cases.count + 3 && Date.reads == SleepBoundary.requests.count,
               "one clock read and one sleep per active loop; no duplicate or hidden sleeps")
-        print("PASS:", checks, "exact task-body checks; device-clock boundaries, overruns, clock changes, visibility, cancellation and re-entry; no SwiftUI lifecycle claim")
+        print("PASS:", checks, "exact task-body checks; device-clock boundaries, overruns, clock changes, visibility, cancellation and restart re-entry; no SwiftUI lifecycle claim")
     }
 }
