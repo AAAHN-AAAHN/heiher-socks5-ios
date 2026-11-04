@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "scope": "Exact Statistics source and separate real diagnostic control; no restored producer or candidate runtime result is claimed.",
+  "repository": "AAAHN-AAAHN/heiher-socks5-ios",
+  "diagnostic_job": "diagnose_statistics_only",
+  "origin_run_id": 41740668457,
+  "origin_attempt": 1,
+  "origin_runtime_job_id": 126300557115,
+  "origin_runtime_result": "failure",
+  "diagnostic_parent": {
+    "commit": "9863483ffdba902ee0253122159ffa599af8e16e",
+    "tree": "134fe7073158828590ae3347bfb599a3034f51b1"
+  },
+  "source": {
+    "commit": "5bb13783e30b155ef69a18a897f721258090f2d7",
+    "tree": "f9bb2c3549e3e0b94d1f6ca813c50ea8dee99d8b"
+  },
+  "source_input_helper": {
+    "commit": "015543c39a1c5c537aa984f890bc30147dcd5b5a",
+    "tree": "9361a19b7ab51c2c465de6179f6e549dd7569251"
+  },
+  "source_input_files": {
+    "Bootstrap/import_candidates.py": {
+      "bytes": 5295,
+      "sha256": "1e647ab8a266a64097c5cc543f22d6a2c58010bfba8988b10fa4809589a6367e"
+    },
+    "Bootstrap/candidates.json": {
+      "bytes": 2627,
+      "sha256": "69ad5bde22a25a6962fe0fdd5b62ef5d209167627a11694a5d48f5da701e2f20"
+    },
+    "Bootstrap/candidates.bundle": {
+      "bytes": 146765,
+      "sha256": "04aeee1bbc6ba503dbf9f3d3abfe26a956c90b31b6537b0f7af4fb10a5eb1827"
+    },
+    "Bootstrap/generation-receipt.json": {
+      "bytes": 38053,
+      "sha256": "878a93a6f85a7a289aa2f09750d932c9b766476b4392f385bc0100546ed0e5a1"
+    }
+  },
+  "validator_sha256": {
+    "Bootstrap/runtime_handoff.py": "228dbcc1e3e28e682e1d956fd91a9100add223e613bb4aa09d47231e16499580"
+  },
+  "diagnostic_modules": {
+    "Bootstrap/ios_runtime_staged_preflight.py": {
+      "bytes": 32991,
+      "sha256": "50f18d556978a4274949d34a8dcafe8af1098c9c0ffc3b2912d3f10e4bc0568c"
+    },
+    "Bootstrap/ios_runtime_service_refresh.py": {
+      "bytes": 32975,
+      "sha256": "11eb509dcfd933eb0f2dd0a7fbf67883e106feb4ca77400bdf516c4071b16c12"
+    },
+    "Bootstrap/ios_runtime_signature_preflight.py": {
+      "bytes": 16799,
+      "sha256": "cd8024e1c37a2596ab39b53f6cac4f29c4c625d321e445febf36883d6c0ff3ef"
+    },
+    "Bootstrap/simulator_runtime_compare.py": {
+      "bytes": 12133,
+      "sha256": "a855b4e2cf0481f389776a56876345ffbb43f41b744b69d853c15b17bc80de81"
+    },
+    "Bootstrap/simulator_comparison_diagnostics.py": {
+      "bytes": 28218,
+      "sha256": "2674479d846b113204ba0b3c2184f81ba045c5f519c3d1d78c8c04611980e4e0"
+    },
+    "Bootstrap/watch_runtime_preflight.py": {
+      "bytes": 18868,
+      "sha256": "e50a7b7d39b8abf80698b9c5401cbe09b9d48b66059c96ee06e6695b32e88c02"
+    },
+    "Bootstrap/observe_host_during_command.py": {
+      "bytes": 18796,
+      "sha256": "277f667fd17d96e9b3f6fbd733282d9b3622d782e20d2e2a4ab3a35d2b4575f8"
+    },
+    "Bootstrap/runtime_handoff.py": {
+      "bytes": 28467,
+      "sha256": "228dbcc1e3e28e682e1d956fd91a9100add223e613bb4aa09d47231e16499580"
+    }
+  },
+  "original_source_files": {
+    "Tests/Statistics/ui_audit.py": {
+      "bytes": 20321,
+      "sha256": "c94f9b0a87b45140a30252d8e535455fcb383c323c0301456bac9ad8d649a469"
+    },
+    "Tests/Statistics/StatisticsUITests.swift": {
+      "bytes": 19777,
+      "sha256": "e3865c71abf30ca76354cbe585c6ccb15f565bb28d3eb3ff0407da77e3cee574"
+    },
+    "Build/check.py": {
+      "bytes": 12523,
+      "sha256": "f837fac6789bf4a99613b63f06844e00fae8ad18635fac29730525b7ac85b3e8"
+    },
+    "Build/upstream.json": {
+      "bytes": 398,
+      "sha256": "bc35da2894d16e4416f40086f44b6dfc3a74f4fcbd8fc152ba66188269545fc6"
+    },
+    "Build/features.json": {
+      "bytes": 1526,
+      "sha256": "f2f8a5676f0be9d744f90131a824fd3ec708f2052de562264f64398cca9b2c11"
+    },
+    "Build/runtime_environment.py": {
+      "bytes": 132920,
+      "sha256": "14b3af5745b19c892d249944052e240c650d20406df3a8ddf8f78e478bb29099"
+    }
+  },
+  "native_pins": {
+    ".": "318a2ffebfd87a12b72dbac95a65ca27143eb01b",
+    "src/core": "dadbb54bf7509f6dea3c1b30e45198efa400679c",
+    "third-part/hev-task-system": "4039d2fdbb3577af380fa0096b90d0ad99969dfa",
+    "third-part/yaml": "94441ec8777eb319936735a58b376963d09c73d4"
+  },
+  "native_core_path": ".build/statistics-final-audit/core",
+  "original_UI_argv": [
+    "python3",
+    "Tests/Statistics/ui_audit.py"
+  ],
+  "original_deadlines_seconds": {
+    "output": 60,
+    "run_default": 180,
+    "native_make": 600,
+    "bootstatus": 120,
+    "XCTest": 900,
+    "shutdown": 30,
+    "delete": 30
+  },
+  "candidate_credit": false,
+  "full16_credit": false,
+  "future_diagnostic_result": null
+}

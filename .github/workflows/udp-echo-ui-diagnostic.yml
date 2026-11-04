@@ -1,48 +1,310 @@
-name: Inspect exact legacy worker failure and declared causal fixture once
+name: Observe one exact Statistics UI execution without candidate credit
 on:
   push:
     branches: [work/udp-echo-udp-20261028]
 permissions:
   contents: read
 jobs:
-  diagnose_legacy_once:
+  diagnose_statistics_only:
     runs-on: xcode-27
-    timeout-minutes: 15
+    timeout-minutes: 45
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
-      - name: Check out the actual diagnostic control and full historical inputs
+      - name: Check out the actual diagnostic control identity
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
+          path: control
           fetch-depth: 0
           persist-credentials: false
-      - name: Execute the fixed original observed and declared causal matrix once
+      - name: Check out the preserved exact candidate input and its prerequisites
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 015543c39a1c5c537aa984f890bc30147dcd5b5a
+          path: candidate-input
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select the already installed helper interpreter without changing PATH
         shell: bash
+        working-directory: control
         run: |
           set -euo pipefail
-          legacy_cache_root="${RUNNER_TOOL_CACHE:?}"
-          legacy_cache_dir="$legacy_cache_root/Python/3.14.9/arm64"
-          legacy_python="$legacy_cache_dir/bin/python3.14"
-          if [[ "$legacy_cache_root" != /* || ! -f "${legacy_cache_dir}.complete" || ! -x "$legacy_python" ]]; then
-            printf '%s\n' 'FAIL: the existing completed CPython3.14.9 arm64 cache is required.' >&2
+          stats_cache_root="${RUNNER_TOOL_CACHE:-}"
+          if [[ -z "$stats_cache_root" || "$stats_cache_root" != /* ]]; then
+            printf '%s\n' 'FAIL: require the existing absolute tool-cache root.' >&2
             exit 1
           fi
-          "$legacy_python" -B - <<'PY'
-          import platform, sys
-          assert sys.implementation.name == 'cpython' and tuple(sys.version_info) == (3, 14, 9, 'final', 0)
-          assert sys.platform == 'darwin' and platform.machine() == 'arm64' and __debug__
+          stats_cache_dir="$stats_cache_root/Python/3.14.9/arm64"
+          stats_python="$stats_cache_dir/bin/python3.14"
+          if [[ ! -d "$stats_cache_dir" || ! -f "${stats_cache_dir}.complete" || ! -x "$stats_python" ]]; then
+            printf 'FAIL: required completed cache entry is unavailable: %s\n' "$stats_cache_dir" >&2
+            exit 1
+          fi
+          "$stats_python" -B - <<'PY'
+          import platform
+          import sys
+          if sys.implementation.name != 'cpython' or tuple(sys.version_info) != (3, 14, 9, 'final', 0):
+              raise SystemExit('Require the existing CPython3.14.9 final interpreter.')
+          if sys.platform != 'darwin' or platform.machine() != 'arm64' or not __debug__:
+              raise SystemExit('Require Darwin arm64 and enabled assertions.')
           PY
-          "$legacy_python" -B Bootstrap/legacy-worker-diagnostic/diagnose_legacy_worker.py \
-            --repo "$GITHUB_WORKSPACE" --output "$RUNNER_TEMP/legacy-worker-fixed-diagnostic"
-      - name: Preserve every actual outcome including failures and exact inputs
+          printf 'STATISTICS_DIAGNOSTIC_PYTHON=%s\n' "$stats_python" >> "$GITHUB_ENV"
+      - name: Bind real control and exact input and create detached Statistics source
+        shell: bash
+        working-directory: control
+        run: |
+          set -euo pipefail
+          "$STATISTICS_DIAGNOSTIC_PYTHON" -B Bootstrap/statistics-current-diagnostic/prepare_current_source.py \
+            --control "$GITHUB_WORKSPACE/control" \
+            --source-input "$GITHUB_WORKSPACE/candidate-input" \
+            --root "$RUNNER_TEMP/statistics-current-source" \
+            --pins "$GITHUB_WORKSPACE/control/Bootstrap/statistics-current-diagnostic/current-input-pins.json" \
+            --output "$RUNNER_TEMP/statistics-current-input-binding"
+      - name: Prepare the original native checkout and observe the original Statistics UI once
+        shell: bash
+        working-directory: control
+        env:
+          CANDIDATE: statistics
+        run: |
+          set -euo pipefail
+          stats_control="$GITHUB_WORKSPACE/control"
+          stats_source="$RUNNER_TEMP/statistics-current-source"
+          stats_out="$RUNNER_TEMP/statistics-current-observation"
+          stats_python="$STATISTICS_DIAGNOSTIC_PYTHON"
+          mkdir "$stats_out"
+
+          # Each receipt is written only after its actual process has returned.
+          stats_record_exit() {
+            "$stats_python" -B - "$stats_out" "$1" "$2" "${@:3}" <<'PY'
+          from datetime import datetime, timezone
+          import json
+          import os
+          from pathlib import Path
+          import sys
+          out, phase, status = Path(sys.argv[1]), sys.argv[2], int(sys.argv[3])
+          if phase not in ('native', 'staged', 'service', 'observer') or not 0 <= status <= 255:
+              raise SystemExit('Invalid actual shell status receipt.')
+          row = {'schema': 1, 'scope': 'actual_diagnostic_process_exit', 'phase': phase,
+                 'actual_shell_status': status, 'argv': sys.argv[4:], 'cwd': str(Path.cwd().resolve()),
+                 'recorded_utc': datetime.now(timezone.utc).isoformat(),
+                 'context': {key: os.environ.get(key) for key in
+                             ('GITHUB_SHA', 'GITHUB_REPOSITORY', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_JOB')},
+                 'candidate_credit': False}
+          with (out / (phase + '-exit.json')).open('x') as stream:
+              json.dump(row, stream, indent=2)
+              stream.write('\n')
+          PY
+          }
+
+          # Read exact identities and actual receipts; never execute a consumer here.
+          stats_bind_phase() {
+            "$stats_python" -B - "$1" "$2" "$stats_control" "$GITHUB_WORKSPACE/candidate-input" \
+              "$stats_source" "$stats_out" "$RUNNER_TEMP" <<'PY'
+          from datetime import datetime, timezone
+          import hashlib
+          import importlib.util
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import sys
+          phase, actual_status = sys.argv[1], sys.argv[2]
+          control, source_input, root, out, temp = map(Path, sys.argv[3:8])
+          expected_context = {key: os.environ.get(key) for key in
+                              ('GITHUB_SHA', 'GITHUB_REPOSITORY', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_JOB')}
+          report = {'schema': 1, 'scope': 'diagnostic_source_and_observation_binding_only', 'phase': phase,
+                    'started_utc': datetime.now(timezone.utc).isoformat(), 'context': expected_context,
+                    'result': 'BINDING_FAILED', 'candidate_credit': False, 'full16_credit': False,
+                    'original_status': None, 'actual_observer_status': None}
+          def require(value, message):
+              if not value:
+                  raise RuntimeError(message)
+          def record(path):
+              require(path.is_file() and not path.is_symlink(), 'Require an actual regular evidence file: ' + str(path))
+              raw = path.read_bytes()
+              return {'path': str(path), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+          def read(path):
+              info = record(path)
+              report.setdefault('read_evidence', []).append(info)
+              return json.loads(path.read_bytes())
+          failure = None
+          try:
+              require(phase in ('before', 'after'), 'Invalid diagnostic binding phase')
+              pins = read(control / 'Bootstrap/statistics-current-diagnostic/current-input-pins.json')
+              require(expected_context['GITHUB_REPOSITORY'] == pins['repository']
+                      and expected_context['GITHUB_JOB'] == pins['diagnostic_job'], 'Wrong real diagnostic context')
+              require(re.fullmatch(r'[0-9a-f]{40}', expected_context['GITHUB_SHA'] or ''), 'Invalid actual control SHA')
+              for key in ('GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT'):
+                  require(re.fullmatch(r'[1-9][0-9]*', expected_context[key] or ''), 'Invalid actual run/attempt')
+              require(int(expected_context['GITHUB_RUN_ID']) != pins['origin_run_id'], 'Do not impersonate historical runtime')
+              for relative, expected in pins['diagnostic_modules'].items():
+                  info = record(control / relative)
+                  require({k: info[k] for k in ('bytes', 'sha256')} == expected, 'Existing diagnostic module changed: ' + relative)
+              validator = control / 'Bootstrap/runtime_handoff.py'
+              spec = importlib.util.spec_from_file_location('original_statistics_identity_reader', validator)
+              rh = importlib.util.module_from_spec(spec)
+              spec.loader.exec_module(rh)
+              actual_control = rh.identity(control)
+              actual_input = rh.identity(source_input)
+              actual_source = rh.identity(root)
+              require(actual_control['commit'] == expected_context['GITHUB_SHA'], 'Control is not actual workflow source')
+              require(rh.git(control, 'show', '-s', '--format=%P', 'HEAD').decode().strip() == pins['diagnostic_parent']['commit'],
+                      'Diagnostic control is not the declared direct child')
+              require(actual_input == pins['source_input_helper'] and actual_source == pins['source'], 'Input/source identity differs')
+              report['identities'] = {'control': actual_control, 'source_input': actual_input, 'source': actual_source}
+              prepared = read(temp / 'statistics-current-input-binding/current-input-preparation.json')
+              require(prepared['result'] == 'DIAGNOSTIC_SOURCE_INPUT_PREPARED_NOT_CANDIDATE'
+                      and prepared['actual_diagnostic_identity'] == expected_context
+                      and prepared['actual_control'] == actual_control and prepared['source_input'] == actual_input
+                      and prepared['actual_source'] == actual_source, 'Actual source-input adapter receipt differs')
+              for relative, expected in pins['original_source_files'].items():
+                  info = record(root / relative)
+                  require({k: info[k] for k in ('bytes', 'sha256')} == expected, 'Original source changed: ' + relative)
+              for name in ('native', 'staged', 'service'):
+                  exit_row = read(out / (name + '-exit.json'))
+                  require(exit_row['phase'] == name and exit_row['actual_shell_status'] == 0
+                          and exit_row['context'] == expected_context, 'Earlier actual process did not succeed: ' + name)
+              staged = read(temp / 'statistics-current-preflight/preflight-result.json')
+              service = read(temp / 'statistics-current-service-refresh/refresh-result.json')
+              context = {'helper_sha': expected_context['GITHUB_SHA'], 'run_id': expected_context['GITHUB_RUN_ID'],
+                         'attempt': expected_context['GITHUB_RUN_ATTEMPT'], 'checked_out_sha': expected_context['GITHUB_SHA']}
+              for value in (staged, service):
+                  require(all(value.get(k) == v for k, v in context.items())
+                          and value.get('product_pass') is False and value.get('candidate_credit') is False,
+                          'Preparation belongs to a different actual run/control or claims product credit')
+              require(staged['result'] == 'STAGED_RUNTIME_VERIFIED_AND_SELECTED'
+                      and service['result'] == 'OWN_SERVICE_REFRESHED_AND_SAME_RUNTIME_SELECTED'
+                      and staged['original_lifecycle_may_run'] is True and service['original_lifecycle_may_run'] is True,
+                      'Actual standalone preparation was not complete')
+              report['prepared_selection'] = service['logical_selection']
+              require(staged['logical_selection']['expected_later_lifecycle_bundle_path'] ==
+                      service['logical_selection']['expected_later_lifecycle_bundle_path'], 'Prepared bundle changed')
+              if phase == 'after':
+                  report['actual_observer_status'] = int(actual_status)
+                  before = read(out / 'before-binding.json')
+                  require(before['result'] == 'DIAGNOSTIC_BINDING_RECORDED'
+                          and before['identities'] == report['identities'], 'Tracked source/control changed during original UI')
+                  exit_row = read(out / 'observer-exit.json')
+                  require(exit_row['actual_shell_status'] == int(actual_status)
+                          and exit_row['context'] == expected_context, 'Actual observer status receipt differs')
+                  observer = read(temp / 'statistics-host-observation/host-observation-result.json')
+                  require(all(observer['context'].get(k) == v for k, v in expected_context.items()), 'Observer context differs')
+                  require(observer['wrapper_cwd'] == str(root.resolve())
+                          and observer['wrapper_source']['sha256'] == pins['diagnostic_modules']['Bootstrap/observe_host_during_command.py']['sha256'],
+                          'Observer source or original cwd differs')
+                  child = observer['original_command']
+                  require(child['argv'] == ['python3', 'Tests/Statistics/ui_audit.py']
+                          and child['launch_attempts'] == 1 and child['launches'] == 1
+                          and child['timeout_seconds'] is None and child['stdio'] == 'inherited'
+                          and child['environment'] == 'inherited_without_modification', 'Original execution contract differs')
+                  report['original_status'] = child['raw_popen_returncode']
+                  require(type(report['original_status']) is int, 'Original process did not return an actual status')
+                  require(observer['wrapper_exit_code'] == int(actual_status), 'Recorded and actual observer status differ')
+                  if report['original_status'] != 0:
+                      expected_exit = report['original_status'] if report['original_status'] >= 0 else 128 - report['original_status']
+                      require(int(actual_status) == expected_exit, 'Original nonzero status was not preserved')
+                  runtime_path = root / 'artifacts/statistics-ui-audit/runtime.json'
+                  report['original_runtime_receipt_present'] = runtime_path.is_file()
+                  if runtime_path.is_file():
+                      runtime = read(runtime_path)
+                      expected = service['logical_selection']
+                      # Actual use may add/update lastUsage. Preserve that raw observation separately.
+                      project = lambda value: {k: v for k, v in value.items() if k != 'lastUsage'}
+                      require(project(runtime['runtime']) == project(expected['logical_runtime'])
+                              and runtime['deviceType'] == expected['device_type'], 'Original selected runtime/device differs')
+                      require(re.fullmatch(r'[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}', runtime['udid']), 'Malformed actual device UUID')
+                      report['runtime_binding'] = {'matched': True, 'udid': runtime['udid'],
+                          'before_lastUsage': {'present': 'lastUsage' in expected['logical_runtime'], 'value': expected['logical_runtime'].get('lastUsage')},
+                          'after_lastUsage': {'present': 'lastUsage' in runtime['runtime'], 'value': runtime['runtime'].get('lastUsage')}}
+                  else:
+                      require(report['original_status'] != 0, 'Successful original UI lacks its runtime receipt')
+                      report['runtime_binding'] = {'matched': None, 'reason': 'Original command failed before an actual runtime receipt was available'}
+              report['result'] = 'DIAGNOSTIC_BINDING_RECORDED'
+          except BaseException as error:
+              failure = error
+              report['failure'] = {'type': type(error).__name__, 'message': str(error)}
+          finally:
+              report['finished_utc'] = datetime.now(timezone.utc).isoformat()
+              with (out / (phase + '-binding.json')).open('x') as stream:
+                  json.dump(report, stream, indent=2)
+                  stream.write('\n')
+          if failure is not None:
+              raise failure
+          PY
+          }
+
+          # New Bash process keeps the original native block's errexit behavior.
+          cd "$stats_source"
+          if bash -euo pipefail > "$stats_out/native-preparation.log" 2>&1 <<'NATIVE'
+          set -euo pipefail
+          case "$CANDIDATE" in
+            server|settings) core=.build/core ;;
+            statistics) core=.build/statistics-final-audit/core ;;
+            *) core= ;;
+          esac
+          if [ -n "$core" ]; then
+            server_ref=$(python3 -c 'import json; print(json.load(open("Build/upstream.json"))["sources"]["."])')
+            git clone --no-checkout https://github.com/heiher/hev-socks5-server.git "$core"
+            git -C "$core" checkout --detach "$server_ref"
+            git -C "$core" submodule update --init --recursive
+            python3 Build/check.py checkout "$core"
+          fi
+          NATIVE
+          then stats_status=0; else stats_status=$?; fi
+          if stats_record_exit native "$stats_status" bash -euo pipefail; then stats_record_status=0; else stats_record_status=$?; fi
+          if [ "$stats_status" -ne 0 ]; then exit "$stats_status"; fi
+          if [ "$stats_record_status" -ne 0 ]; then exit "$stats_record_status"; fi
+
+          cd "$stats_control"
+          if "$stats_python" -B Bootstrap/ios_runtime_staged_preflight.py --output "$RUNNER_TEMP/statistics-current-preflight"; then
+            stats_status=0
+          else stats_status=$?; fi
+          if stats_record_exit staged "$stats_status" "$stats_python" -B Bootstrap/ios_runtime_staged_preflight.py --output "$RUNNER_TEMP/statistics-current-preflight"; then stats_record_status=0; else stats_record_status=$?; fi
+          if [ "$stats_status" -ne 0 ]; then exit "$stats_status"; fi
+          if [ "$stats_record_status" -ne 0 ]; then exit "$stats_record_status"; fi
+
+          if "$stats_python" -B Bootstrap/ios_runtime_service_refresh.py --preflight "$RUNNER_TEMP/statistics-current-preflight" --output "$RUNNER_TEMP/statistics-current-service-refresh"; then
+            stats_status=0
+          else stats_status=$?; fi
+          if stats_record_exit service "$stats_status" "$stats_python" -B Bootstrap/ios_runtime_service_refresh.py --preflight "$RUNNER_TEMP/statistics-current-preflight" --output "$RUNNER_TEMP/statistics-current-service-refresh"; then stats_record_status=0; else stats_record_status=$?; fi
+          if [ "$stats_status" -ne 0 ]; then exit "$stats_status"; fi
+          if [ "$stats_record_status" -ne 0 ]; then exit "$stats_record_status"; fi
+
+          stats_bind_phase before pending
+          cd "$stats_source"
+          if "$stats_python" -B "$stats_control/Bootstrap/observe_host_during_command.py" \
+            --output "$RUNNER_TEMP/statistics-host-observation" -- python3 Tests/Statistics/ui_audit.py; then
+            stats_observer_status=0
+          else stats_observer_status=$?; fi
+          if stats_record_exit observer "$stats_observer_status" "$stats_python" -B "$stats_control/Bootstrap/observe_host_during_command.py" --output "$RUNNER_TEMP/statistics-host-observation" -- python3 Tests/Statistics/ui_audit.py; then stats_record_status=0; else stats_record_status=$?; fi
+          if stats_bind_phase after "$stats_observer_status"; then stats_binding_status=0; else stats_binding_status=$?; fi
+          # Preserve the actual original/observer failure even if a later record fails.
+          if [ "$stats_observer_status" -ne 0 ]; then exit "$stats_observer_status"; fi
+          if [ "$stats_record_status" -ne 0 ]; then exit "$stats_record_status"; fi
+          exit "$stats_binding_status"
+      - name: Preserve exact inputs, preparation, original UI and live host observations including failure
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Legacy-worker-fixed-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          name: Statistics-original-ui-observation-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/legacy-worker-fixed-diagnostic
-            ${{ github.workspace }}/Bootstrap/legacy-worker-diagnostic
+            ${{ runner.temp }}/statistics-current-input-binding
+            ${{ runner.temp }}/statistics-current-observation
+            ${{ runner.temp }}/statistics-current-preflight
+            ${{ runner.temp }}/statistics-current-service-refresh
+            ${{ runner.temp }}/statistics-host-observation
+            ${{ runner.temp }}/statistics-current-source/artifacts/statistics-ui-audit
+            ${{ github.workspace }}/control/Bootstrap/statistics-current-diagnostic
+            ${{ github.workspace }}/control/Bootstrap/observe_host_during_command.py
+            ${{ github.workspace }}/control/Bootstrap/runtime_handoff.py
+            ${{ github.workspace }}/control/Bootstrap/ios_runtime_staged_preflight.py
+            ${{ github.workspace }}/control/Bootstrap/ios_runtime_service_refresh.py
+            ${{ github.workspace }}/control/Bootstrap/ios_runtime_signature_preflight.py
+            ${{ github.workspace }}/control/Bootstrap/simulator_runtime_compare.py
+            ${{ github.workspace }}/control/Bootstrap/simulator_comparison_diagnostics.py
+            ${{ github.workspace }}/control/Bootstrap/watch_runtime_preflight.py
+            ${{ github.workspace }}/control/.github/workflows/udp-echo-ui-diagnostic.yml
           if-no-files-found: error
           retention-days: 90
