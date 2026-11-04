@@ -21,7 +21,9 @@
   "files": {
     "Patches/hev-server-startup-stop.patch": "e9d9a51850ee252a2c9f26128eecf1d18d98503823d39d2a1f96b28d942b1528",
     "Socks5/Server/ServerController.swift": "b8b1791cfbc741e4b167ebdd2c0cc6f36d5d0a5b1d589c7cf7dc107e44f62332",
-    "Build/runtime_environment.py": "14b3af5745b19c892d249944052e240c650d20406df3a8ddf8f78e478bb29099"
+    "Build/runtime_environment.py": "14b3af5745b19c892d249944052e240c650d20406df3a8ddf8f78e478bb29099",
+    "Build/observe_host_during_command.py": "277f667fd17d96e9b3f6fbd733282d9b3622d782e20d2e2a4ab3a35d2b4575f8",
+    "Build/observed_command_status.py": "1c8345f864b3a84d72ee43b3eef67ef3f307836d47d513dc25daeb1c6ebc1ca5"
   },
   "responsibility": "Server configuration and invocation lifecycle. The canonical shared native lifecycle input is pinned under sources; the authentication/class-initialization remainder and coherent run controller are hash-locked under files. No settings persistence or background traffic."
 }
