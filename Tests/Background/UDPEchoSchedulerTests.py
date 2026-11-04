@@ -51,6 +51,7 @@ def main():
             ("silence", socket.AF_INET, "127.0.0.1"), ("echo", socket.AF_INET, "127.0.0.1"),
             ("silence", socket.AF_INET6, "::1"), ("echo", socket.AF_INET6, "::1"),
             ("burst", socket.AF_INET, "127.0.0.1"), ("invalid-input", socket.AF_INET, "127.0.0.1"),
+            ("counter-cadence", socket.AF_INET, "127.0.0.1"),
             ("statistics-wait", socket.AF_INET, "127.0.0.1")]:
         fixture_mode = "off-before-start" if mode == "statistics-wait" else mode
         fixture = fixture_module.Fixture(fixture_mode, family, target)
@@ -82,7 +83,7 @@ def main():
     assert result.returncode == 0, (result.returncode, result.stdout, result.stderr)
     results.append({"mode": "resolver-wait", **json.loads(result.stdout)})
     (options.output / "results.json").write_text(json.dumps(results, indent=2) + "\n")
-    print("PASS: readiness polling stops after Off; eight scheduler boundaries verified")
+    print("PASS: readiness polling stops after Off; nine scheduler/counter boundaries verified")
 
 
 if __name__ == "__main__":

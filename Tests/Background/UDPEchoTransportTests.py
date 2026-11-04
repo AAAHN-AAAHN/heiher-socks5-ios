@@ -39,7 +39,7 @@ def address(connection, kind):
 
 
 class Fixture:
-    def __init__(self, mode, family, target, *, delay_last_reply=False):
+    def __init__(self, mode, family, target, *, delay_last_reply=False, accept_timeout=0.8):
         self.mode, self.family, self.target = mode, family, target
         self.delay_last_reply = delay_last_reply
         self.delayed_reply = None
@@ -48,7 +48,7 @@ class Fixture:
         self.relay = socket.socket(family, socket.SOCK_DGRAM)
         self.listener.bind((self.host, 0))
         self.listener.listen()
-        self.listener.settimeout(0.8)
+        self.listener.settimeout(accept_timeout)
         self.relay.bind((self.host, 0))
         while self.relay.getsockname()[1] == self.listener.getsockname()[1]:
             self.relay.close()
@@ -197,9 +197,9 @@ class Fixture:
             self.listener.close()
             self.relay.close()
 
-    def finish(self):
+    def finish(self, timeout=3):
         self.stop.set()
-        self.thread.join(3)
+        self.thread.join(timeout)
         assert not self.thread.is_alive(), "fixture leaked its thread"
         assert self.error is None, self.error
 

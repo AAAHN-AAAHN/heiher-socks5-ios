@@ -7,6 +7,7 @@ private final class Observed: @unchecked Sendable {
     private var states = [String]()
     private var prepared = 0
     private var timestamps = [UInt64]()
+    private var counterStates = [(UInt64, UInt64, String)]()
     private let controlPort: UInt16
     init(controlPort: UInt16) { self.controlPort = controlPort }
     func io(_ peer: Socks5UDPClient.Address, _ bytes: Int, _ write: Bool) {
@@ -23,6 +24,7 @@ private final class Observed: @unchecked Sendable {
     func state(_ value: PeriodicUDPEchoService.State) {
         lock.lock()
         states.append(value.text)
+        counterStates.append((DispatchTime.now().uptimeNanoseconds, value.sentCount, value.text))
         lock.unlock()
     }
     func prepare() {
@@ -34,6 +36,11 @@ private final class Observed: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return (writes, readBytes, states, prepared, timestamps)
+    }
+    func counters() -> [(UInt64, UInt64, String)] {
+        lock.lock()
+        defer { lock.unlock() }
+        return counterStates
     }
 }
 
@@ -83,7 +90,7 @@ struct UDPEchoSchedulerProbe {
         }
         let observationTime = DispatchTime.now().uptimeNanoseconds
         let ready = observed.snapshot().4.first.map { $0 <= setupDeadline } ?? false
-        try await Task.sleep(for: .milliseconds(360))
+        try await Task.sleep(for: .milliseconds(mode == "counter-cadence" ? 1100 : 360))
         let activeCount = observed.snapshot().0
         let offTime = DispatchTime.now().uptimeNanoseconds
         if mode == "invalid-input" {
@@ -97,11 +104,16 @@ struct UDPEchoSchedulerProbe {
         let stoppedCount = observed.snapshot().0
         try await Task.sleep(for: .milliseconds(mode.hasSuffix("-wait") ? 1100 : 140))
         let (count, readBytes, states, prepared, timestamps) = observed.snapshot()
+        let counters = observed.counters()
         // Write observations before an optimized precondition trap can end the
         // process without a Swift runtime diagnostic on the target platform.
         let result: [String: Any] = ["writes": count, "activeWrites": activeCount,
                                      "readBytes": readBytes, "states": states, "preparations": prepared,
                                      "stoppedWrites": stoppedCount, "families": families,
+                                     "sentCount": counters.last?.1 ?? 0,
+                                     "countStates": counters.map { value -> [String: Any] in
+                                         ["time": value.0, "count": value.1, "state": value.2]
+                                     },
                                      "timestamps": timestamps, "activationTime": activationTime,
                                      "observationTime": observationTime, "offTime": offTime,
                                      "setupElapsedMS": timestamps.first.map {
@@ -110,18 +122,29 @@ struct UDPEchoSchedulerProbe {
         let data = try JSONSerialization.data(withJSONObject: result, options: .sortedKeys)
         FileHandle.standardOutput.write(data + Data([10]))
         require(count == stoppedCount, "OFF_STABLE")
+        require(counters.last?.1 == UInt64(count), "SUCCESSFUL_DATAGRAM_COUNT")
+        require(zip(counters, counters.dropFirst()).allSatisfy { $0.1 <= $1.1 }, "COUNT_MONOTONIC")
         if mode.hasSuffix("-wait") {
             require(count == 0 && prepared == 1, "WAIT_NO_WORK")
             require(states.contains(mode == "statistics-wait" ?
                 "Waiting for traffic statistics" : "Waiting for SOCKS5 listener"), "WAIT_STATE")
         } else {
             require(ready, "SETUP_READY")
-            require(activeCount >= 5 * families && activeCount <= 20 * families, "ACTIVE_COUNT")
+            let maximum = mode == "counter-cadence" ? 70 : 20
+            require(activeCount >= 5 * families && activeCount <= maximum * families, "ACTIVE_COUNT")
             require(states.contains("Sending UDP Echo"), "SENDING_STATE")
             require(prepared == 1, "PREPARE_ONCE")
             if mode == "silence" { require(readBytes == 0, "SILENCE_READS") }
             let intervals = zip(timestamps, timestamps.dropFirst()).map { Double($1 - $0) / 1_000_000 }
             if families == 1 { require(intervals.allSatisfy { $0 >= 8 && $0 < 200 }, "INTERVAL_RANGE") }
+            if mode == "counter-cadence" {
+                let sending = counters.filter { $0.2 == "Sending UDP Echo" }
+                require((2...3).contains(sending.count), "BOUNDED_COUNT_PUBLICATIONS")
+                require(zip(sending, sending.dropFirst()).allSatisfy {
+                    $1.0 - $0.0 >= 490_000_000
+                }, "COUNT_PUBLICATION_CADENCE")
+                require((sending.last?.1 ?? 0) > (sending.first?.1 ?? 0), "LIVE_COUNT_UPDATES")
+            }
         }
     }
 }
