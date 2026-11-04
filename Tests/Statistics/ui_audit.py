@@ -91,7 +91,7 @@ def add_test_target(app):
 
 
 def verify_presentation():
-    """Keep the frozen table/sample behavior with the approved visibility cadence."""
+    """Keep the frozen table/cadence and the approved server-generation reset."""
     ui_base = 'cfcda5795b833b3ba8768fa4453f6f92606d3be1'
     changed = set(output('git', 'diff', '--name-only', ui_base, 'HEAD', '--',
                          'Socks5', 'Socks5.xcodeproj').splitlines())
@@ -131,7 +131,8 @@ def verify_presentation():
     def without_comments(text):
         return '\n'.join(line for line in text.splitlines() if not line.lstrip().startswith('//'))
 
-    # Preserve the model and sampling behavior while decoding only new labels.
+    # Preserve the formatter/model and table; only the sampling session boundary
+    # changes for the explicitly requested reset at every new server start.
     approved_model = endpoint_names(without_comments(old_model))
     signature = 'address: String, received: UInt64'
     entry = 'Entry(id: id, address: address)'
@@ -152,6 +153,34 @@ def verify_presentation():
     approved_sample = approved_sample.replace(address_start,
         '            sampledClients.sample(id: row.id, address: withUnsafePointer(to: &row.address) {')\
         .replace(address_end, '            }, received: row.received, sent: row.sent, at: time)')
+    first_read = '        var received: UInt64 = 0\n'
+    old_total = ('        clientsIncomplete = required > capacity\n'
+                 '        let time = ProcessInfo.processInfo.systemUptime\n'
+                 '        statistics.sample(received: received, sent: sent, at: time)')
+    old_clients = '        var sampledClients = clients\n'
+    publication = '        clients = sampledClients\n'
+    for part in (first_read, old_total, old_clients, publication):
+        assert approved_sample.count(part) == 1
+    approved_sample = approved_sample.replace(first_read,
+        '        let generation = hev_socks5_server_endpoint_generation()\n' + first_read)\
+        .replace(old_total,
+            '        let time = ProcessInfo.processInfo.systemUptime\n'
+            '        let sameGeneration = sampledGeneration == generation\n'
+            '        var sampledStatistics = sameGeneration ? statistics : TrafficStatistics()\n'
+            '        sampledStatistics.sample(received: received, sent: sent, at: time)')\
+        .replace(old_clients,
+            '        var sampledClients = sameGeneration ? clients : EndpointTrafficStatistics()\n')\
+        .replace(publication,
+            '        guard generation == hev_socks5_server_endpoint_generation() else {\n'
+            '            statistics = TrafficStatistics()\n'
+            '            clients = EndpointTrafficStatistics()\n'
+            '            clientsIncomplete = false\n'
+            '            sampledGeneration = nil\n'
+            '            return\n'
+            '        }\n'
+            '        statistics = sampledStatistics\n' + publication +
+            '        clientsIncomplete = required > capacity\n'
+            '        sampledGeneration = generation\n')
     assert without_comments(view.split(sampler, 1)[1]) == approved_sample
     old_task = endpoint_names(old_view.split('        .task(id:', 1)[1].split(renderer, 1)[0])
     guard = 'guard isVisible && scenePhase == .active else { return }'
@@ -163,6 +192,9 @@ def verify_presentation():
                  '                let now = Date().timeIntervalSinceReferenceDate\n'
                  '                let delay = ((now * 2).rounded(.down) + 1) / 2 - now\n'
                  '                do { try await Task.sleep(for: .seconds(delay)) }')
+    reset = '            clientsIncomplete = false\n'
+    assert approved_task.count(reset) == 1
+    approved_task = approved_task.replace(reset, reset + '            sampledGeneration = nil\n')
     assert view.split('        .task(id:', 1)[1].split(renderer, 1)[0] == approved_task
 
     # Move the unchanged Form inside the visible/active gate. Hidden body
@@ -176,6 +208,9 @@ def verify_presentation():
                    '        NavigationStack {\n')
     assert old_prefix.count(old_opening) == 1
     leading, form = old_prefix.split(old_opening, 1)
+    state = '    @State private var clientsIncomplete = false\n'
+    assert leading.count(state) == 1
+    leading = leading.replace(state, state + '    @State private var sampledGeneration: UInt32? = nil\n')
     approved_prefix = leading + ('    var body: some View {\n        NavigationStack {\n'
         '            if isVisible && scenePhase == .active {\n'
         '                let clientRows = clients.rows\n') + ''.join(
@@ -187,6 +222,7 @@ def verify_presentation():
     assert view.count('summary(statistics, id: "total")') == 1
     assert view.count('summary(client.traffic, id: "client-\\(client.id)")') == 1
     assert view.count('        clients = sampledClients\n') == 1
+    assert view.count('hev_socks5_server_endpoint_generation()') == 2
     assert 'tableCell("In + Out"' in view and 'tableCell("Total"' not in view
     assert '.font(.body.weight(.bold))' in view and '.font(.callout)' in view
     assert 'Grid(alignment:' in view and '.foregroundStyle(.black)' in view
@@ -201,6 +237,10 @@ def verify_presentation():
     assert 'Only instrumented server and client sockets are observed.' in view
     assert 'Total sums peer endpoints' in view
     assert 'over the actual sampling interval, in bits per second' in view
+    assert 'since the latest server start' in view
+    assert 'Starting the server resets totals and peer rows.' in view
+    assert 'A new app process starts at zero.' in view
+    assert 'Server Stop/Start retains totals.' not in view
 
 
 def main():
@@ -300,7 +340,7 @@ def main():
         raise RuntimeError('UI audit cleanup failed: ' + repr(cleanup))
     run(['git', 'diff', '--exit-code', 'HEAD', '--'], 'final-worktree.log')
     run(['git', 'diff', '--cached', '--exit-code', 'HEAD', '--'], 'final-index.log')
-    (OUT / 'SUCCESS.txt').write_text('PASS: actual Simulator scrolling, Start/Stop native handshake and tab navigation in portrait/landscape. No IPA, SideStore or LiveContainer test.\n')
+    (OUT / 'SUCCESS.txt').write_text('PASS: actual Simulator scrolling, Start/Stop native handshake, per-start reset, app relaunch and tab navigation in portrait/landscape. No IPA, SideStore or LiveContainer test.\n')
 
 
 if __name__ == '__main__':

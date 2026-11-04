@@ -34,6 +34,12 @@ main (int argc, char **argv)
             if (pthread_create (&worker, NULL, run_server, argv[1]))
                 return 2;
         }
+        if (!strcmp (command, "generation\n")) {
+            printf ("GENERATION %" PRIu32 "\n",
+                    hev_socks5_server_endpoint_generation ());
+            fflush (stdout);
+            continue;
+        }
         if (!strcmp (command, "clients\n")) {
             size_t capacity = hev_socks5_server_endpoint_rows (NULL, 0) + 32;
             HevSocks5EndpointStats *rows = calloc (capacity, sizeof (*rows));

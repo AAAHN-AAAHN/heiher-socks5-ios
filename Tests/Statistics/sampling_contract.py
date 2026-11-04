@@ -29,10 +29,16 @@ with tempfile.TemporaryDirectory() as directory:
     eager_model = folder / 'EagerModel.swift'
     eager_model.write_text(eager.replace(signature, 'address: String')
                           .replace('address: address()', 'address: address'))
+    current_view = VIEW.read_text()
+    generation_check = 'let sameGeneration = sampledGeneration == generation'
+    assert current_view.count(generation_check) == 1
     for label, text, model_source, expected_failure in [
-        ('current', VIEW.read_text(), model, None),
+        ('current', current_view, model, None),
         ('prior-per-row-negative', previous.decode(), model, 'FAIL: one client-state publication'),
-        ('eager-address-negative', VIEW.read_text(), eager_model, 'FAIL: decode only newly observed peer addresses'),
+        ('eager-address-negative', current_view, eager_model, 'FAIL: decode only newly observed peer addresses'),
+        ('cross-run-retention-negative', current_view.replace(generation_check,
+            'let sameGeneration = sampledGeneration != nil'), model,
+            'FAIL: new server generation removes old peer rows'),
     ]:
         start = text.index('    private func sample()')
         body = text[start:].rsplit('\n}', 1)[0]
@@ -45,6 +51,13 @@ with tempfile.TemporaryDirectory() as directory:
         # Import the exact current formatter/model, not a rewritten formula.
         generated = fixture.replace('    // INSERT_EXACT_SAMPLE_METHOD', body)
         assert generated != fixture
+        if label == 'prior-per-row-negative':
+            # This immutable historical sample predates the generation API.
+            # Keep its original per-row publication failure as the negative
+            # control; it is not evidence for the current restart contract.
+            generation_reads = 'static let generationReadsPerSample = 2'
+            assert generated.count(generation_reads) == 1
+            generated = generated.replace(generation_reads, 'static let generationReadsPerSample = 0')
         source = folder / 'Replay.swift'
         source.write_text(generated)
         for optimized in (False, True):
@@ -62,8 +75,12 @@ with tempfile.TemporaryDirectory() as directory:
                 assert result.returncode == 0 and 'PASS:' in result.stdout, result.stderr
             else:
                 assert result.returncode == 1 and expected_failure in result.stdout, result.stderr
-                print('EXPECTED OLD PUBLICATION-COUNT FAILURE; not incorrect native byte accounting'
-                      if label == 'prior-per-row-negative' else 'EXPECTED EAGER ADDRESS-DECODING FAILURE', flush=True)
+                messages = {
+                    'prior-per-row-negative': 'EXPECTED OLD PUBLICATION-COUNT FAILURE; not incorrect native byte accounting',
+                    'eager-address-negative': 'EXPECTED EAGER ADDRESS-DECODING FAILURE',
+                    'cross-run-retention-negative': 'EXPECTED CROSS-RUN RETENTION FAILURE',
+                }
+                print(messages[label], flush=True)
     current = VIEW.read_text()
     task_start = '        .task(id: isVisible && scenePhase == .active) {\n'
     task_end = '\n        }\n    }\n\n    /// One shared'
@@ -116,4 +133,4 @@ with tempfile.TemporaryDirectory() as directory:
             else:
                 assert result.returncode == 1 and expected_failure in result.stdout, result.stderr
                 print('EXPECTED SCHEDULING/CLOCK CONTRACT FAILURE', flush=True)
-print('PASS: exact sample-body replay, one publication and unchanged snapshot/rate semantics', flush=True)
+print('PASS: exact sample-body replay, one publication, generation reset and sampling/rate contracts', flush=True)

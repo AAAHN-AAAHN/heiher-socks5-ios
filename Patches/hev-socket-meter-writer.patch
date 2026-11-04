@@ -9,12 +9,13 @@ diff --git a/src/hev-main.h b/src/hev-main.h
  
  #ifdef __cplusplus
  extern "C" {
-@@ -70,6 +71,18 @@
+@@ -70,6 +71,19 @@
  size_t hev_socks5_server_endpoint_rows (HevSocks5EndpointStats *rows,
                                          size_t capacity);
  
 +/* A caller-owned single writer, independent of native worker TLS. Serialize
-+ * record and free; join all callbacks before free. Totals survive release.
++ * record and free; join all callbacks before free. Release retains this session
++ * only; a later native run excludes previous records, even from a live writer.
 + * Address is the actual socket peer. Directions retain the peer viewpoint:
 + * accepted_write -> received by the peer; consumed_read -> sent by the peer. */
 +void *hev_socks5_server_io_writer_new (void);

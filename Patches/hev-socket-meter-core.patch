@@ -1,10 +1,10 @@
 diff --git a/src/hev-socks5-meter.c b/src/hev-socks5-meter.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..80bc4a206d31ae4a2b6d8274aef0f753edd93907
+index 0000000000000000000000000000000000000000..20efd87d849fbd3ca672c18711ccdfde38e2d272
 --- /dev/null
 +++ b/src/hev-socks5-meter.c
-@@ -0,0 +1,160 @@
-+/* One process/socket metric. Workers own counter writes; readers only sample. */
+@@ -0,0 +1,176 @@
++/* Server-session/socket metric. Workers own writes; readers only sample. */
 +#include <errno.h>
 +#include <pthread.h>
 +#include "hev-socks5.h"
@@ -23,12 +23,28 @@ index 0000000000000000000000000000000000000000..80bc4a206d31ae4a2b6d8274aef0f753
 +int
 +hev_meter_prepare (void)
 +{
++    /* The single-engine caller can reject exhaustion through its init result.
++     * Preparing, bind failure, and a pre-start Stop must retain the old data. */
++    if (!wm_session_available ())
++        return -1;
 +    if (meter_key_ready)
 +        return 0;
 +    if (pthread_key_create (&meter_key, meter_release))
 +        return -1;
 +    meter_key_ready = 1;
 +    return 0;
++}
++
++int
++hev_meter_begin_session (void)
++{
++    return wm_begin_session ();
++}
++
++uint32_t
++hev_meter_generation (void)
++{
++    return wm_generation ();
 +}
 +
 +int
@@ -166,10 +182,10 @@ index 0000000000000000000000000000000000000000..80bc4a206d31ae4a2b6d8274aef0f753
 +}
 diff --git a/src/hev-socks5-meter.h b/src/hev-socks5-meter.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..8bf8c3302bd56fbdd16914d24be0948ab5276ab7
+index 0000000000000000000000000000000000000000..1266ebf04d1dae3dd64eda145236a6f3bf2d5ac5
 --- /dev/null
 +++ b/src/hev-socks5-meter.h
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,39 @@
 +/* Program/socket boundary accounting; not IP packet or interface counters. */
 +#ifndef HEV_SOCKS5_METER_H
 +#define HEV_SOCKS5_METER_H
@@ -185,6 +201,8 @@ index 0000000000000000000000000000000000000000..8bf8c3302bd56fbdd16914d24be0948a
 +typedef void (*HevMeterRow) (uint64_t id, const char *address, uint64_t in,
 +                             uint64_t out, void *context);
 +int hev_meter_prepare (void);
++int hev_meter_begin_session (void);
++uint32_t hev_meter_generation (void);
 +int hev_meter_worker_enter (void);
 +void hev_meter_worker_leave (void);
 +void *hev_meter_peer (const struct sockaddr *address, socklen_t length);
@@ -514,10 +532,10 @@ index 40ad1cf31d97f237488fc49ee8dd710eb9260e69..b844baa8556462c189186b2f5ab92772
      unsigned int udp_associated : 1;
 diff --git a/src/worker_meter.c b/src/worker_meter.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..207dc2bc4fd0e8efacf442f5d92fd659bcc10502
+index 0000000000000000000000000000000000000000..63d9d2907c6e4fa996e15a1e988ed757f78038f7
 --- /dev/null
 +++ b/src/worker_meter.c
-@@ -0,0 +1,286 @@
+@@ -0,0 +1,346 @@
 +#include "worker_meter.h"
 +#include <stdatomic.h>
 +#include <stdlib.h>
@@ -532,8 +550,8 @@ index 0000000000000000000000000000000000000000..207dc2bc4fd0e8efacf442f5d92fd659
 +typedef struct Identity Identity;
 +typedef struct
 +{
-+    _Atomic unsigned sequence, epoch, in_lo, in_hi, out_lo, out_hi;
-+    unsigned version, epoch_value;
++    _Atomic unsigned sequence, epoch, generation, in_lo, in_hi, out_lo, out_hi;
++    unsigned version, epoch_value, generation_value;
 +    uint64_t in, out; /* Written exclusively by the owning worker. */
 +} Counter;
 +struct WmPeer
@@ -546,6 +564,7 @@ index 0000000000000000000000000000000000000000..207dc2bc4fd0e8efacf442f5d92fd659
 +{
 +    Identity *next;
 +    _Atomic (WmPeer *) parts;
++    _Atomic unsigned generation;
 +    uint64_t id;
 +    uint32_t scope;
 +    int family;
@@ -562,13 +581,37 @@ index 0000000000000000000000000000000000000000..207dc2bc4fd0e8efacf442f5d92fd659
 +static _Atomic (WmWorker *) worker_pool;
 +static _Atomic (Identity *) identities[256];
 +static _Atomic unsigned serial;
++static _Atomic unsigned session_generation;
 +static Identity unknown = { .address = "Unattributed" };
 +
++uint32_t
++wm_generation (void)
++{
++    return atomic_load_explicit (&session_generation, memory_order_acquire);
++}
++int
++wm_session_available (void)
++{
++    return wm_generation () < UINT32_MAX;
++}
++int
++wm_begin_session (void)
++{
++    unsigned previous = wm_generation ();
++    do {
++        if (previous == UINT32_MAX)
++            return -1;
++    } while (!atomic_compare_exchange_weak_explicit (
++        &session_generation, &previous, previous + 1, memory_order_release,
++        memory_order_relaxed));
++    return 0;
++}
 +static void
 +counter_init (Counter *c)
 +{
 +    atomic_init (&c->sequence, 0);
 +    atomic_init (&c->epoch, 0);
++    atomic_init (&c->generation, 0);
 +    atomic_init (&c->in_lo, 0);
 +    atomic_init (&c->in_hi, 0);
 +    atomic_init (&c->out_lo, 0);
@@ -698,6 +741,7 @@ index 0000000000000000000000000000000000000000..207dc2bc4fd0e8efacf442f5d92fd659
 +        else
 +            snprintf (fresh->address, sizeof (fresh->address), "%s", text);
 +        atomic_init (&fresh->parts, NULL);
++        atomic_init (&fresh->generation, 0);
 +        fresh->next = head;
 +        if (atomic_compare_exchange_strong_explicit (
 +                &identities[hash], &head, fresh, memory_order_release,
@@ -721,7 +765,15 @@ index 0000000000000000000000000000000000000000..207dc2bc4fd0e8efacf442f5d92fd659
 +{
 +    if (!peer || (!in && !out))
 +        return;
++    /* The generation load assigns this record to one server session. A writer
++     * already in flight may publish later; readers still exclude its old tag. */
++    unsigned generation = wm_generation ();
 +    Counter *c = &peer->counter;
++    int first = c->generation_value != generation;
++    if (first) {
++        c->in = c->out = 0;
++        c->generation_value = generation;
++    }
 +    c->in += in;
 +    c->out += out;
 +    atomic_store_explicit (&c->sequence, ++c->version, memory_order_relaxed);
@@ -734,17 +786,35 @@ index 0000000000000000000000000000000000000000..207dc2bc4fd0e8efacf442f5d92fd659
 +                           memory_order_relaxed);
 +    atomic_store_explicit (&c->out_hi, (unsigned)(c->out >> 32),
 +                           memory_order_relaxed);
++    atomic_store_explicit (&c->generation, generation, memory_order_relaxed);
 +    if (++c->version == 0)
 +        atomic_store_explicit (&c->epoch, ++c->epoch_value,
 +                               memory_order_release);
 +    atomic_store_explicit (&c->sequence, c->version, memory_order_release);
++    if (first) {
++        /* A late old-session writer must not hide a newer active peer row. */
++        unsigned active = atomic_load_explicit (&peer->identity->generation,
++                                                memory_order_relaxed);
++        while (active < generation &&
++               !atomic_compare_exchange_weak_explicit (
++                   &peer->identity->generation, &active, generation,
++                   memory_order_release, memory_order_relaxed)) {
++        }
++    }
 +}
 +static void
-+counter_read (const Counter *c, uint64_t *in, uint64_t *out)
++counter_read (const Counter *c, unsigned session, uint64_t *in, uint64_t *out)
 +{
++    *in = *out = 0;
 +    for (;;) {
++        /* Neither a new snapshot nor an obsolete one waits for a suspended
++         * writer from a previous server session to finish publication. */
++        if (wm_generation () != session ||
++            atomic_load_explicit (&c->generation, memory_order_acquire) !=
++                session)
++            return;
 +        /* A new epoch must order the following sequence read after wrap. */
-+        unsigned generation =
++        unsigned epoch =
 +            atomic_load_explicit (&c->epoch, memory_order_acquire);
 +        unsigned before =
 +            atomic_load_explicit (&c->sequence, memory_order_acquire);
@@ -754,27 +824,31 @@ index 0000000000000000000000000000000000000000..207dc2bc4fd0e8efacf442f5d92fd659
 +        unsigned ih = atomic_load_explicit (&c->in_hi, memory_order_relaxed);
 +        unsigned ol = atomic_load_explicit (&c->out_lo, memory_order_relaxed);
 +        unsigned oh = atomic_load_explicit (&c->out_hi, memory_order_relaxed);
++        unsigned generation =
++            atomic_load_explicit (&c->generation, memory_order_relaxed);
 +        atomic_thread_fence (memory_order_acquire);
 +        /* Acquire a wrapped sequence before checking its epoch. */
 +        if (before !=
 +                atomic_load_explicit (&c->sequence, memory_order_acquire) ||
-+            generation !=
++            epoch !=
 +                atomic_load_explicit (&c->epoch, memory_order_relaxed))
 +            continue;
++        if (generation != session)
++            return;
 +        *in = ((uint64_t)ih << 32) | il;
 +        *out = ((uint64_t)oh << 32) | ol;
 +        return;
 +    }
 +}
 +static void
-+identity_read (Identity *id, WmVisit visit, void *context, uint64_t *in,
-+               uint64_t *out)
++identity_read (Identity *id, unsigned generation, WmVisit visit, void *context,
++               uint64_t *in, uint64_t *out)
 +{
 +    uint64_t a = 0, b = 0;
 +    for (WmPeer *p = atomic_load_explicit (&id->parts, memory_order_acquire); p;
 +         p = p->identity_next) {
 +        uint64_t x, y;
-+        counter_read (&p->counter, &x, &y);
++        counter_read (&p->counter, generation, &x, &y);
 +        a += x;
 +        b += y;
 +    }
@@ -787,15 +861,19 @@ index 0000000000000000000000000000000000000000..207dc2bc4fd0e8efacf442f5d92fd659
 +wm_snapshot (WmVisit visit, void *context, uint64_t *in, uint64_t *out)
 +{
 +    uint64_t a = 0, b = 0;
++    unsigned generation = wm_generation ();
 +    size_t count = 1;
 +    if (visit || in || out)
-+        identity_read (&unknown, visit, context, &a, &b);
++        identity_read (&unknown, generation, visit, context, &a, &b);
 +    for (unsigned i = 0; i < 256; i++)
 +        for (Identity *id =
 +                 atomic_load_explicit (&identities[i], memory_order_acquire);
 +             id; id = id->next) {
++            if (atomic_load_explicit (&id->generation, memory_order_acquire) !=
++                generation)
++                continue;
 +            if (visit || in || out)
-+                identity_read (id, visit, context, &a, &b);
++                identity_read (id, generation, visit, context, &a, &b);
 +            ++count;
 +        }
 +    if (in)
@@ -806,10 +884,10 @@ index 0000000000000000000000000000000000000000..207dc2bc4fd0e8efacf442f5d92fd659
 +}
 diff --git a/src/worker_meter.h b/src/worker_meter.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..d93c1911ae6478525a5fbcb4183179e680667473
+index 0000000000000000000000000000000000000000..ac52400d85a80eadceb89be95822274d44aa1a01
 --- /dev/null
 +++ b/src/worker_meter.h
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,26 @@
 +#ifndef WORKER_METER_H
 +#define WORKER_METER_H
 +#include <stddef.h>
@@ -822,7 +900,13 @@ index 0000000000000000000000000000000000000000..d93c1911ae6478525a5fbcb4183179e6
 +                         uint64_t out, void *context);
 +/* One writer per worker. Create/register workers before their first socket I/O.
 + * Workers and peer references live for the process lifetime. No callback yields.
-+ * Each worker part is coherent; rows merge parts read at different times. */
++ * Each worker part is coherent; rows merge parts read at different times.
++ * A session begins just before native workers run. No nodes are freed/reset
++ * externally: each writer lazily starts fresh on its first record in a session.
++ * Generation zero covers records before the first server start. */
++uint32_t wm_generation (void);
++int wm_session_available (void);
++int wm_begin_session (void);
 +WmWorker *wm_worker_new (void);
 +void wm_worker_release (WmWorker *);
 +WmPeer *wm_peer (WmWorker *, const struct sockaddr *, socklen_t);

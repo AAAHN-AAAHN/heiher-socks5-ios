@@ -117,7 +117,8 @@ private func nativeSnapshot() -> [String: Any] {
         }
         return ["address": address, "received": row.received, "sent": row.sent]
     }
-    return ["received": received, "sent": sent, "rows": rows]
+    return ["generation": hev_socks5_server_endpoint_generation(),
+            "received": received, "sent": sent, "rows": rows]
 }
 
 @main
@@ -142,6 +143,7 @@ private struct PeriodicEchoMeter {
             switch command {
             case "start1", "start4":
                 precondition(native == nil)
+                let oldGeneration = hev_socks5_server_endpoint_generation()
                 let workers = command == "start1" ? 1 : 4
                 let configuration = """
                 main:
@@ -166,7 +168,10 @@ private struct PeriodicEchoMeter {
                     precondition(hev_socks5_server_main_from_str(configuration, UInt32(configuration.utf8.count)) == 0)
                     returned.leave()
                 }
-                waitFor { Socks5ServerEndpoint.resolve() != nil }
+                waitFor {
+                    hev_socks5_server_endpoint_generation() != oldGeneration &&
+                        Socks5ServerEndpoint.resolve() != nil
+                }
                 let address = Socks5ServerEndpoint.resolve()!
                 ledger.serverPort(address.port)
                 // Keep TCP/UDP peer ports distinct for the independent test ledger.

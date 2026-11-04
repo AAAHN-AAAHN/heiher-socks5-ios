@@ -1,5 +1,7 @@
 import Foundation
 import HevSocks5Server
+let generation: UInt32 = hev_socks5_server_endpoint_generation()
+precondition(generation == 0)
 var incoming: UInt64 = 9
 var outgoing: UInt64 = 9
 hev_socks5_server_endpoint_stats(&incoming, &outgoing)
@@ -16,4 +18,5 @@ let address = withUnsafePointer(to: &rows[0].address) {
     $0.withMemoryRebound(to: CChar.self, capacity: 64) { String(cString: $0) }
 }
 precondition(address == "Unattributed")
-print("PASS: actual new C ABI imported by Swift; bounded rows and directions. Not a SwiftUI/iOS SDK test.")
+precondition(hev_socks5_server_endpoint_generation() == generation)
+print("PASS: actual C ABI imported by Swift; UInt32 session generation, bounded rows and directions. Not a SwiftUI/iOS SDK test.")
