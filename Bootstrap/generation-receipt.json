@@ -1,66 +1,90 @@
 {
   "result": "PASS_LOCAL_INPUT_PREPARATION_ONLY",
   "selected": [
-    "background",
+    "server",
+    "statistics",
+    "settings",
     "integrated"
   ],
   "support": [
     "main",
     "udp",
-    "server",
-    "statistics",
-    "icon",
-    "settings"
+    "background",
+    "icon"
   ],
   "heads": {
-    "background": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
-    "icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
-    "integrated": "13fc917d1569fbd1c383be916f1c35c0c5fd2047",
     "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
-    "server": "992c146ccf6232957728eed0e201e790974e19b3",
-    "settings": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
-    "statistics": "5bb13783e30b155ef69a18a897f721258090f2d7",
-    "udp": "b05db817684d6b006353d5062fdba756d739faea"
+    "udp": "b05db817684d6b006353d5062fdba756d739faea",
+    "background": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
+    "server": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
+    "statistics": "2e3baaa705e50289f37f60f2d32376e588eefbbb",
+    "icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+    "settings": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
+    "integrated": "24f7f9dd989047aec420dd66eda0906d39654bd3"
   },
   "previous_candidate_heads": {
-    "background": "e002fb55e95c35006683f8c8b182e99cd53b837c",
-    "icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
-    "integrated": "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
     "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+    "udp": "b05db817684d6b006353d5062fdba756d739faea",
+    "background": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
     "server": "992c146ccf6232957728eed0e201e790974e19b3",
-    "settings": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
     "statistics": "5bb13783e30b155ef69a18a897f721258090f2d7",
-    "udp": "b05db817684d6b006353d5062fdba756d739faea"
+    "icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+    "settings": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+    "integrated": "13fc917d1569fbd1c383be916f1c35c0c5fd2047"
   },
   "macos_only": [],
   "matrix": [
     {
-      "name": "background",
-      "sha": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
+      "name": "server",
+      "sha": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
-      "name": "background",
-      "sha": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
+      "name": "server",
+      "sha": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
+      "name": "statistics",
+      "sha": "2e3baaa705e50289f37f60f2d32376e588eefbbb",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "statistics",
+      "sha": "2e3baaa705e50289f37f60f2d32376e588eefbbb",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
+      "name": "settings",
+      "sha": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "settings",
+      "sha": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "integrated",
-      "sha": "13fc917d1569fbd1c383be916f1c35c0c5fd2047",
+      "sha": "24f7f9dd989047aec420dd66eda0906d39654bd3",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "integrated",
-      "sha": "13fc917d1569fbd1c383be916f1c35c0c5fd2047",
+      "sha": "24f7f9dd989047aec420dd66eda0906d39654bd3",
       "os": "xcode-27",
       "runtime": true
     }
   ],
-  "bundle_sha256": "2527afb600aa54b2403fc53c2ce29602828a5f3b14decca4bc8c5d182d3ba588",
-  "bundle_bytes": 152737,
+  "bundle_sha256": "cd7a9868802c8517a6c0f41c467ab56fb4336274d03efe2621db400a2e351e05",
+  "bundle_bytes": 173318,
   "prerequisites": [
     "8bec30de328543f8f23b79a736385ed0e80aaa88",
     "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
@@ -83,11 +107,11 @@
   },
   "actual_remote_captures": {
     "heads": {
-      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/legacy-worker-candidate-preparation-v1/observations/fresh-heads-v1.json",
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-observer-candidate-preparation-v1/observations/fresh-heads-v1.json",
       "bytes": 12883,
-      "sha256": "9608b60255e6ea41970af9ad3d65075d2d6befd77e6ff2508820ac3274247aa6",
-      "started_utc": "2026-11-04T00:52:36.574Z",
-      "received_utc": "2026-11-04T00:52:37.057Z",
+      "sha256": "a07db9f57975edc56ce722c56e2a60e5e8f4291324ec591dbb88153137de7243",
+      "started_utc": "2026-11-04T01:49:33.697Z",
+      "received_utc": "2026-11-04T01:49:34.493Z",
       "refs": {
         "refs/heads/feature/app-icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
         "refs/heads/feature/background": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
@@ -97,18 +121,18 @@
         "refs/heads/feature/udp-compat": "e50f434be2610ef00713d39363963542db0020e2",
         "refs/heads/main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
         "refs/heads/release/integrated": "8bec30de328543f8f23b79a736385ed0e80aaa88",
-        "refs/heads/work/udp-echo-build-20261028": "015543c39a1c5c537aa984f890bc30147dcd5b5a",
+        "refs/heads/work/udp-echo-build-20261028": "01ea4f1ee4b2857386c574b1b274a5471b0a8331",
         "refs/heads/work/udp-echo-main-20261028": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
         "refs/heads/work/udp-echo-publish-20261028": "f6cd633480b938fbe1e27b4bacaf4e286f4193d2",
-        "refs/heads/work/udp-echo-udp-20261028": "9863483ffdba902ee0253122159ffa599af8e16e"
+        "refs/heads/work/udp-echo-udp-20261028": "39a3be345e01435d595f1e9d9fb4102e23d26f59"
       }
     },
     "tags": {
-      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/legacy-worker-candidate-preparation-v1/observations/fresh-tags-v1.json",
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-observer-candidate-preparation-v1/observations/fresh-tags-v1.json",
       "bytes": 35797,
-      "sha256": "9e93e5c3ac697d9487ed72091a3b2fd9e031466ef19c5504ed533e3f4e7b8581",
-      "started_utc": "2026-11-04T00:52:36.574Z",
-      "received_utc": "2026-11-04T00:52:37.064Z",
+      "sha256": "0dd6fd0f909fdc97a7dc7d148006c69a36bd72cf93793ab82b103018c023aeef",
+      "started_utc": "2026-11-04T01:49:33.697Z",
+      "received_utc": "2026-11-04T01:49:34.198Z",
       "refs": {
         "refs/tags/archive/2026-09-22/audit/statistics-final-20260921": "31ef4a7baa15f76e7c7cdbc1ed11216c1fa2f93e",
         "refs/tags/archive/2026-09-22/audit/udp-patches-20260921": "eccd78c41103e6d31e305eebc4e176864d442d48",
@@ -140,128 +164,517 @@
       }
     }
   },
-  "helper_base_commit": "015543c39a1c5c537aa984f890bc30147dcd5b5a",
+  "helper_base_commit": "01ea4f1ee4b2857386c574b1b274a5471b0a8331",
+  "capture_is_current_remote_mutation_lease": false,
+  "actual_input_pins": {
+    "source_generation": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/source-generation.json",
+      "bytes": 15636,
+      "sha256": "b8247ca07a73e4d6a11b475c375bb0cab25e1b9dc8819d95de0fbc7bd4025cf1",
+      "mode": 420
+    },
+    "heads8": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/heads8.json",
+      "bytes": 458,
+      "sha256": "4e1612827eec56ac4c1a702255b143fc570f0ff14db4ed911a96182a7be184f1",
+      "mode": 420
+    },
+    "execution": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-execution-v1/execution-receipt.json",
+      "bytes": 1756,
+      "sha256": "317ef569c664fc6c3123a3ef2d7f7d52135bd94cf0cd5341033e16b7a2251d62",
+      "mode": 420
+    },
+    "invocation": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-execution-v1/invocation.json",
+      "bytes": 931,
+      "sha256": "991001086bae4e7910459ffcf3f6464b482b3782ebbbb13eb904d43e9348349c",
+      "mode": 420
+    },
+    "decision": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-root-review-v1/generation-decision.json",
+      "bytes": 8628,
+      "sha256": "8cb695263a148ed654380c5026ea8fc70fc343dbc9734ace7b484b83e70aed47",
+      "mode": 420
+    },
+    "generation_stdout": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-execution-v1/stdout.log",
+      "bytes": 4873,
+      "sha256": "f429e965f060f700451f68f71f74e49a779d903ff4892b5c7cad696b5096c919",
+      "mode": 420
+    },
+    "generation_stderr": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-execution-v1/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 420
+    },
+    "base_heads8": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-proposal-v2/candidate-heads8.json",
+      "bytes": 458,
+      "sha256": "f2709b4ec114475b580dadbb01f9cbaf2cb57d2f16ff5bb41b8795c462a2fe0f",
+      "mode": 420
+    },
+    "caller_preparation": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-proposal-v2/caller-preparation.json",
+      "bytes": 14905,
+      "sha256": "fda01482e04670e46dae8c2055495a0ffd75104a5c587d765ea11320d8249159",
+      "mode": 420
+    },
+    "candidate_workflow": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-proposal-v2/candidate/control/.github/workflows/udp-echo-candidate.yml",
+      "bytes": 32714,
+      "sha256": "38a3ecc120611c61860766c972d80d2dd3e9510005303f77abddce0ae82b073f",
+      "mode": 420
+    },
+    "generator": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-proposal-v2/generate_observed_sources_local.py",
+      "bytes": 25086,
+      "sha256": "839d9a79ffa71be627ae47798ecf4af985d844fd8f564d922d9e2a107d41a66b",
+      "mode": 420
+    },
+    "generator_preparation": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-proposal-v2/generator-preparation.json",
+      "bytes": 7327,
+      "sha256": "b5ec0c14a828af7e15cb48929e82bc8b6884d42ad8516c08396a090e667b83a5",
+      "mode": 420
+    },
+    "source_protection": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-proposal-v2/actual-input-protection-plan.json",
+      "bytes": 168625,
+      "sha256": "71bb5199b8913e9d41098542819d0660d53d1f94beacb75e2a387fa31f090c66",
+      "mode": 420
+    },
+    "proposal_freeze": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-proposal-v2/proposal-freeze.json",
+      "bytes": 175559,
+      "sha256": "593d1d9fed91489ea3d2fac530a3077801cfd2a9104212605256d20e9b8aaf43",
+      "mode": 420
+    },
+    "peer_review": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-peer-v1/peer-review-v2.json",
+      "bytes": 14904,
+      "sha256": "a16e64b9226c00dff0f4fdcd9ea3edde5c5079530960620fe6d96473f3086430",
+      "mode": 420
+    },
+    "validator_server_0_stdout": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/server-validation-0.stdout.log",
+      "bytes": 299,
+      "sha256": "b9dee63e76ff094b60e4dfab558d429ba2d1d2af9e60cc4d2a55061a89ffc533",
+      "mode": 420
+    },
+    "validator_server_0_stderr": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/server-validation-0.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 420
+    },
+    "validator_server_1_stdout": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/server-validation-1.stdout.log",
+      "bytes": 376,
+      "sha256": "9281fa963465b93f8989b8304f46f22fbb372d06d1605cc59d7e51b2a532af6a",
+      "mode": 420
+    },
+    "validator_server_1_stderr": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/server-validation-1.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 420
+    },
+    "validator_server_2_stdout": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/server-validation-2.stdout.log",
+      "bytes": 405,
+      "sha256": "b96f7b29606a59dafa275ce301210cd3316d39c0580e138287fe283aaf37c3f2",
+      "mode": 420
+    },
+    "validator_server_2_stderr": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/server-validation-2.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 420
+    },
+    "validator_statistics_0_stdout": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/statistics-validation-0.stdout.log",
+      "bytes": 306,
+      "sha256": "676b9c8f13c76d5fbf7758648d3cf7e96e231c8d5bb3041a5917adbcde358d83",
+      "mode": 420
+    },
+    "validator_statistics_0_stderr": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/statistics-validation-0.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 420
+    },
+    "validator_statistics_1_stdout": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/statistics-validation-1.stdout.log",
+      "bytes": 383,
+      "sha256": "e6bc733c405c8c409ce8e2b9c7273068d755573f2987849a89ce297e60b8e517",
+      "mode": 420
+    },
+    "validator_statistics_1_stderr": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/statistics-validation-1.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 420
+    },
+    "validator_settings_0_stdout": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/settings-validation-0.stdout.log",
+      "bytes": 307,
+      "sha256": "a27f33373c6c4e97a9ba490ce90499651f8dfa1a9fa979b1dbdbe2aeeda7cbc6",
+      "mode": 420
+    },
+    "validator_settings_0_stderr": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/settings-validation-0.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 420
+    },
+    "validator_settings_1_stdout": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/settings-validation-1.stdout.log",
+      "bytes": 384,
+      "sha256": "0e7ee469fd41650600eb13ebe6f29f507b04d62ca52ec90efb02beeecb85a152",
+      "mode": 420
+    },
+    "validator_settings_1_stderr": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/settings-validation-1.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 420
+    },
+    "validator_settings_2_stdout": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/settings-validation-2.stdout.log",
+      "bytes": 414,
+      "sha256": "729974572eaad8939ca0c03409354fee3d764ed7d558c2c6df85748d2fcd03c9",
+      "mode": 420
+    },
+    "validator_settings_2_stderr": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/settings-validation-2.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 420
+    },
+    "validator_integrated_0_stdout": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/integrated-validation-0.stdout.log",
+      "bytes": 405,
+      "sha256": "87d413a8acc59a5aec7351f6c3456fa4e519c7b05756e50cc506d46080b53173",
+      "mode": 420
+    },
+    "validator_integrated_0_stderr": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/integrated-validation-0.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 420
+    },
+    "validator_integrated_1_stdout": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/integrated-validation-1.stdout.log",
+      "bytes": 482,
+      "sha256": "0f9aac49155996e6c2b50e7de74401f12db36c5128e83ce11ef476dd18650952",
+      "mode": 420
+    },
+    "validator_integrated_1_stderr": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/integrated-validation-1.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 420
+    },
+    "validator_integrated_2_stdout": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/integrated-validation-2.stdout.log",
+      "bytes": 513,
+      "sha256": "c94ae53c3aee34966bd40604ba084e4a3232475d094046e73e97cb7fef3c7833",
+      "mode": 420
+    },
+    "validator_integrated_2_stderr": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/integrated-validation-2.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 420
+    },
+    "protected_server": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/server-protected-bytes.json",
+      "bytes": 21891,
+      "sha256": "004b0f4a8d6c8b5aff8432eeb0262ce197f64bf61ebca19e89f85c9bfd283b32",
+      "mode": 420
+    },
+    "protected_statistics": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/statistics-protected-bytes.json",
+      "bytes": 34277,
+      "sha256": "80cdb35f3730ca1021af693adfa51bfe87555db28326f3a9a845bb154748bf1c",
+      "mode": 420
+    },
+    "protected_settings": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/settings-protected-bytes.json",
+      "bytes": 29656,
+      "sha256": "634f7c20a117ef7b454c4fbb9bd46af52c8a0c3a351b7ada1b45ed4482fcc3c0",
+      "mode": 420
+    },
+    "protected_integrated": {
+      "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/integrated-protected-bytes.json",
+      "bytes": 81026,
+      "sha256": "cff9f2c157ad0ebd25c6456627e43e9976adac11ab34969d3baf93070121238a",
+      "mode": 420
+    }
+  },
   "source_generation_evidence": {
-    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/legacy-worker-source-generation-v1/source-generation.json",
-    "bytes": 7930,
-    "sha256": "123355a31386f8c7e6083e2a8fe7782d827535dae1681c7f5e6c956e1583d806",
+    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/source-generation.json",
+    "bytes": 15636,
+    "sha256": "b8247ca07a73e4d6a11b475c375bb0cab25e1b9dc8819d95de0fbc7bd4025cf1",
     "native_generation": {
       "status": "PASS_LOCAL_SOURCE_GENERATION_ONLY",
       "original_heads8": {
-        "background": "e002fb55e95c35006683f8c8b182e99cd53b837c",
-        "icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
-        "integrated": "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
         "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+        "udp": "b05db817684d6b006353d5062fdba756d739faea",
+        "background": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
         "server": "992c146ccf6232957728eed0e201e790974e19b3",
-        "settings": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
         "statistics": "5bb13783e30b155ef69a18a897f721258090f2d7",
-        "udp": "b05db817684d6b006353d5062fdba756d739faea"
+        "icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+        "settings": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+        "integrated": "13fc917d1569fbd1c383be916f1c35c0c5fd2047"
       },
       "heads8": {
-        "background": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
-        "icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
-        "integrated": "13fc917d1569fbd1c383be916f1c35c0c5fd2047",
         "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
-        "server": "992c146ccf6232957728eed0e201e790974e19b3",
-        "settings": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
-        "statistics": "5bb13783e30b155ef69a18a897f721258090f2d7",
-        "udp": "b05db817684d6b006353d5062fdba756d739faea"
+        "udp": "b05db817684d6b006353d5062fdba756d739faea",
+        "background": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
+        "server": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
+        "statistics": "2e3baaa705e50289f37f60f2d32376e588eefbbb",
+        "icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+        "settings": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
+        "integrated": "24f7f9dd989047aec420dd66eda0906d39654bd3"
       },
       "commits": [
         {
-          "label": "background-legacy-causal-source",
-          "base": "e002fb55e95c35006683f8c8b182e99cd53b837c",
-          "sha": "e50874e6c8923ba3361e300c1fb965ec336c4ee8",
-          "tree": "68132aac5f23622be2c74e88004bd057ecfde7d8",
+          "label": "server-host-observer-source",
+          "base": "992c146ccf6232957728eed0e201e790974e19b3",
+          "sha": "921c1015470d3889c1d5b823702cffd38b314ab1",
+          "tree": "1b48bf21d82d1e93e10855144d6c0e79dcdc347f",
           "parents": [
-            "e002fb55e95c35006683f8c8b182e99cd53b837c",
-            "b05db817684d6b006353d5062fdba756d739faea"
+            "992c146ccf6232957728eed0e201e790974e19b3",
+            "0e030aedbd4127e9215b38bb23dd6e38c5872546"
           ],
           "changed_paths": [
-            "Tests/Background/LegacyWorkerCausalTests.swift",
-            "Tests/Background/check_async_session.py"
+            ".github/workflows/verify-build.yml",
+            "Build/observe_host_during_command.py",
+            "Build/observed_command_status.py",
+            "docs/feature-membership.json"
           ],
           "new_paths": [
-            "Tests/Background/LegacyWorkerCausalTests.swift"
+            "Build/observe_host_during_command.py",
+            "Build/observed_command_status.py"
           ],
-          "created_utc": "2026-11-04T00:51:42+00:00"
+          "created_utc": "2026-11-04T02:14:24+00:00"
         },
         {
-          "label": "background-legacy-causal-approval",
-          "base": "e50874e6c8923ba3361e300c1fb965ec336c4ee8",
-          "sha": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
-          "tree": "4a1c4b57b013675032a26c890eebfc1fb01e7b55",
+          "label": "server-host-observer-approval",
+          "base": "921c1015470d3889c1d5b823702cffd38b314ab1",
+          "sha": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
+          "tree": "d57e573b2470ebaedbd32934b67f605e80fe0cc1",
           "parents": [
-            "e50874e6c8923ba3361e300c1fb965ec336c4ee8"
+            "921c1015470d3889c1d5b823702cffd38b314ab1"
           ],
           "changed_paths": [
             "Build/documentation-baseline.json",
             "docs/documentation.json"
           ],
           "new_paths": [],
-          "created_utc": "2026-11-04T00:51:43+00:00"
+          "created_utc": "2026-11-04T02:14:25+00:00"
         },
         {
-          "label": "integrated-legacy-causal-source",
-          "base": "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
-          "sha": "ab826e5457125e15da33e4c7cfd0bc625b7c07fc",
-          "tree": "013f23fa5f0a92db8bd914e0644b07bbd235152e",
+          "label": "statistics-host-observer-source",
+          "base": "5bb13783e30b155ef69a18a897f721258090f2d7",
+          "sha": "d0554362ed8c476d5ee46193882b2248c53301f7",
+          "tree": "bf2090114889b0da090aaa1e01cc4698804516f1",
           "parents": [
-            "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
-            "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
-            "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
-            "992c146ccf6232957728eed0e201e790974e19b3",
-            "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
             "5bb13783e30b155ef69a18a897f721258090f2d7",
             "b05db817684d6b006353d5062fdba756d739faea"
           ],
           "changed_paths": [
-            "Tests/Background/LegacyWorkerCausalTests.swift",
-            "Tests/Background/check_async_session.py",
-            "docs/documentation.json",
-            "docs/feature-membership.json"
+            ".github/workflows/verify-build.yml",
+            "Build/observe_host_during_command.py",
+            "Build/observed_command_status.py"
           ],
           "new_paths": [
-            "Tests/Background/LegacyWorkerCausalTests.swift"
+            "Build/observe_host_during_command.py",
+            "Build/observed_command_status.py"
           ],
-          "created_utc": "2026-11-04T00:51:44+00:00"
+          "created_utc": "2026-11-04T02:14:26+00:00"
         },
         {
-          "label": "integrated-legacy-causal-approval",
-          "base": "ab826e5457125e15da33e4c7cfd0bc625b7c07fc",
-          "sha": "13fc917d1569fbd1c383be916f1c35c0c5fd2047",
-          "tree": "af207f06f7c40300064be22069d431ba86fdb401",
+          "label": "statistics-host-observer-approval",
+          "base": "d0554362ed8c476d5ee46193882b2248c53301f7",
+          "sha": "2e3baaa705e50289f37f60f2d32376e588eefbbb",
+          "tree": "223f59e5dfddab34f8215159e06e0f12a81d4cc3",
           "parents": [
-            "ab826e5457125e15da33e4c7cfd0bc625b7c07fc"
+            "d0554362ed8c476d5ee46193882b2248c53301f7"
           ],
           "changed_paths": [
             "Build/documentation-baseline.json",
             "docs/documentation.json"
           ],
           "new_paths": [],
-          "created_utc": "2026-11-04T00:51:45+00:00"
+          "created_utc": "2026-11-04T02:14:27+00:00"
+        },
+        {
+          "label": "settings-host-observer-source",
+          "base": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+          "sha": "42a4c5c5fbce5ab5b9c54c3d81b17fdabaa4f890",
+          "tree": "5b6b0a4e50dd0c2ecce69c94f47a8aaa548a4a37",
+          "parents": [
+            "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+            "5d9dc52e5f441e93a6571a2cf59ce78a85062613"
+          ],
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Build/observe_host_during_command.py",
+            "Build/observed_command_status.py",
+            "docs/documentation.json",
+            "docs/feature-membership.json"
+          ],
+          "new_paths": [
+            "Build/observe_host_during_command.py",
+            "Build/observed_command_status.py"
+          ],
+          "created_utc": "2026-11-04T02:14:28+00:00"
+        },
+        {
+          "label": "settings-host-observer-approval",
+          "base": "42a4c5c5fbce5ab5b9c54c3d81b17fdabaa4f890",
+          "sha": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
+          "tree": "d3c3aac5c869e5edddbb73c663556c27fbcb058c",
+          "parents": [
+            "42a4c5c5fbce5ab5b9c54c3d81b17fdabaa4f890"
+          ],
+          "changed_paths": [
+            "Build/documentation-baseline.json",
+            "docs/documentation.json"
+          ],
+          "new_paths": [],
+          "created_utc": "2026-11-04T02:14:29+00:00"
+        },
+        {
+          "label": "integrated-host-observer-source",
+          "base": "13fc917d1569fbd1c383be916f1c35c0c5fd2047",
+          "sha": "3228a0fd44fd2554ef6a4ce438e9f004de65d8cc",
+          "tree": "60c8410ae125a70a675d980b631f7b080183fe9c",
+          "parents": [
+            "13fc917d1569fbd1c383be916f1c35c0c5fd2047",
+            "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+            "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
+            "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
+            "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
+            "2e3baaa705e50289f37f60f2d32376e588eefbbb",
+            "b05db817684d6b006353d5062fdba756d739faea"
+          ],
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Build/inherited-workflows/traffic-statistics-verify-build.yml",
+            "Build/observe_host_during_command.py",
+            "Build/observed_command_status.py",
+            "docs/documentation.json",
+            "docs/feature-membership.json"
+          ],
+          "new_paths": [
+            "Build/observe_host_during_command.py",
+            "Build/observed_command_status.py"
+          ],
+          "created_utc": "2026-11-04T02:14:30+00:00"
+        },
+        {
+          "label": "integrated-host-observer-approval",
+          "base": "3228a0fd44fd2554ef6a4ce438e9f004de65d8cc",
+          "sha": "24f7f9dd989047aec420dd66eda0906d39654bd3",
+          "tree": "09b62924fe2c99b92d3ccf7afb7ff9ca701852e6",
+          "parents": [
+            "3228a0fd44fd2554ef6a4ce438e9f004de65d8cc"
+          ],
+          "changed_paths": [
+            "Build/documentation-baseline.json",
+            "docs/documentation.json"
+          ],
+          "new_paths": [],
+          "created_utc": "2026-11-04T02:14:31+00:00"
         }
       ],
       "validations": [
         {
-          "owner": "background",
+          "owner": "server",
           "command": [
             "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
             "Build/check_documentation.py"
           ],
           "returncode": 0,
-          "stdout_sha256": "bdb3965bfe6866a5c3892ae590014796f22db08bce9f147d81a6e97bb290f883",
+          "stdout_sha256": "b9dee63e76ff094b60e4dfab558d429ba2d1d2af9e60cc4d2a55061a89ffc533",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
         {
-          "owner": "background",
+          "owner": "server",
           "command": [
             "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
             "Build/check.py",
             "baseline"
           ],
           "returncode": 0,
-          "stdout_sha256": "2dfc5a9b2cd4df44d6688ecf825003cb128bd666b4031632c6007ddecda5a0ff",
+          "stdout_sha256": "9281fa963465b93f8989b8304f46f22fbb372d06d1605cc59d7e51b2a532af6a",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "server",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "Build/check_ownership.py"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "b96f7b29606a59dafa275ce301210cd3316d39c0580e138287fe283aaf37c3f2",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "statistics",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "Build/check_documentation.py"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "676b9c8f13c76d5fbf7758648d3cf7e96e231c8d5bb3041a5917adbcde358d83",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "statistics",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "Build/check.py",
+            "baseline"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "e6bc733c405c8c409ce8e2b9c7273068d755573f2987849a89ce297e60b8e517",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "settings",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "Build/check_documentation.py"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "a27f33373c6c4e97a9ba490ce90499651f8dfa1a9fa979b1dbdbe2aeeda7cbc6",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "settings",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "Build/check.py",
+            "baseline"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "0e7ee469fd41650600eb13ebe6f29f507b04d62ca52ec90efb02beeecb85a152",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "owner": "settings",
+          "command": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "Build/check_ownership.py"
+          ],
+          "returncode": 0,
+          "stdout_sha256": "729974572eaad8939ca0c03409354fee3d764ed7d558c2c6df85748d2fcd03c9",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
         {
@@ -271,7 +684,7 @@
             "Build/check_documentation.py"
           ],
           "returncode": 0,
-          "stdout_sha256": "46e4c7784a05468858e5678d9c14aa159de82b370d2ee9cbf1920c115b38aed8",
+          "stdout_sha256": "87d413a8acc59a5aec7351f6c3456fa4e519c7b05756e50cc506d46080b53173",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
         {
@@ -282,7 +695,7 @@
             "baseline"
           ],
           "returncode": 0,
-          "stdout_sha256": "85b1c6321d701574b796b9be253772c20513f6dd31c4044830a7d5a3abf3efe8",
+          "stdout_sha256": "0f9aac49155996e6c2b50e7de74401f12db36c5128e83ce11ef476dd18650952",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
         {
@@ -292,106 +705,173 @@
             "Build/check_ownership.py"
           ],
           "returncode": 0,
-          "stdout_sha256": "cd83177e27a154b2f4b1c44d7c4a55252ec752687424456664922e9f02d996f7",
+          "stdout_sha256": "c94ae53c3aee34966bd40604ba084e4a3232475d094046e73e97cb7fef3c7833",
           "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         }
       ],
       "membership": [
         {
-          "owner": "background",
-          "sources": 36,
+          "owner": "server",
+          "sources": 3,
+          "files": 5,
           "rebound_counts": {},
           "existing_keys_preserved": true,
-          "exact_added_sources": [],
-          "owned_file_hashes_preserved": true
+          "exact_added_sources": {},
+          "exact_added_owned_files": {
+            "Build/observe_host_during_command.py": "277f667fd17d96e9b3f6fbd733282d9b3622d782e20d2e2a4ab3a35d2b4575f8",
+            "Build/observed_command_status.py": "1c8345f864b3a84d72ee43b3eef67ef3f307836d47d513dc25daeb1c6ebc1ca5"
+          },
+          "existing_owned_file_hashes_preserved": true
+        },
+        {
+          "owner": "settings",
+          "sources": 34,
+          "files": 4,
+          "rebound_counts": {
+            "server": 32
+          },
+          "existing_keys_preserved": true,
+          "exact_added_sources": {
+            "Build/observe_host_during_command.py": "server",
+            "Build/observed_command_status.py": "server"
+          },
+          "exact_added_owned_files": {},
+          "existing_owned_file_hashes_preserved": true
         },
         {
           "owner": "integrated",
-          "sources": 236,
+          "sources": 238,
+          "files": 3,
           "rebound_counts": {
-            "background": 81
+            "server": 30,
+            "statistics": 85,
+            "settings": 28
           },
           "existing_keys_preserved": true,
-          "exact_added_sources": [
-            "Tests/Background/LegacyWorkerCausalTests.swift"
-          ],
-          "owned_file_hashes_preserved": true
+          "exact_added_sources": {
+            "Build/observe_host_during_command.py": "server",
+            "Build/observed_command_status.py": "server"
+          },
+          "exact_added_owned_files": {},
+          "existing_owned_file_hashes_preserved": true
         }
       ],
       "preservation": [
         {
-          "owner": "background",
-          "base": "e002fb55e95c35006683f8c8b182e99cd53b837c",
-          "final": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
-          "protected_files": 170,
+          "owner": "server",
+          "base": "992c146ccf6232957728eed0e201e790974e19b3",
+          "final": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
+          "protected_files": 82,
           "changed_paths": [
+            ".github/workflows/verify-build.yml",
             "Build/documentation-baseline.json",
-            "Tests/Background/LegacyWorkerCausalTests.swift",
-            "Tests/Background/check_async_session.py",
+            "Build/observe_host_during_command.py",
+            "Build/observed_command_status.py",
+            "docs/documentation.json",
+            "docs/feature-membership.json"
+          ]
+        },
+        {
+          "owner": "statistics",
+          "base": "5bb13783e30b155ef69a18a897f721258090f2d7",
+          "final": "2e3baaa705e50289f37f60f2d32376e588eefbbb",
+          "protected_files": 132,
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Build/documentation-baseline.json",
+            "Build/observe_host_during_command.py",
+            "Build/observed_command_status.py",
             "docs/documentation.json"
           ]
         },
         {
+          "owner": "settings",
+          "base": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+          "final": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
+          "protected_files": 112,
+          "changed_paths": [
+            ".github/workflows/verify-build.yml",
+            "Build/documentation-baseline.json",
+            "Build/observe_host_during_command.py",
+            "Build/observed_command_status.py",
+            "docs/documentation.json",
+            "docs/feature-membership.json"
+          ]
+        },
+        {
           "owner": "integrated",
-          "base": "fe90f4d786bdea1f3d3815eed1024e0ae116bbc5",
-          "final": "13fc917d1569fbd1c383be916f1c35c0c5fd2047",
+          "base": "13fc917d1569fbd1c383be916f1c35c0c5fd2047",
+          "final": "24f7f9dd989047aec420dd66eda0906d39654bd3",
           "protected_files": 311,
           "changed_paths": [
+            ".github/workflows/verify-build.yml",
             "Build/documentation-baseline.json",
-            "Tests/Background/LegacyWorkerCausalTests.swift",
-            "Tests/Background/check_async_session.py",
+            "Build/inherited-workflows/traffic-statistics-verify-build.yml",
+            "Build/observe_host_during_command.py",
+            "Build/observed_command_status.py",
             "docs/documentation.json",
             "docs/feature-membership.json"
           ]
         }
       ],
-      "changed_owners2": [
-        "background",
-        "integrated"
-      ],
-      "retained_owners6": [
-        "main",
-        "udp",
-        "server",
-        "statistics",
-        "icon",
-        "settings"
-      ],
       "all8_current_parents_and_real_ancestry_verified": true,
       "tags27_preserved": true,
-      "integrated_membership_count": 236,
+      "integrated_membership_count": 238,
+      "settings_membership_count": 34,
+      "server_owned_file_count": 5,
+      "new_observer_physical_entries": 4,
+      "new_observer_git_blob": "9ffb1ddf466adc43166f6a2bb781e7c278d18f08",
+      "new_observer_sha256": "277f667fd17d96e9b3f6fbd733282d9b3622d782e20d2e2a4ab3a35d2b4575f8",
+      "new_status_reader_physical_entries": 4,
+      "new_status_reader_git_blob": "b0466c7cbeddabf990b903e86920940009d4ffcf",
+      "new_status_reader_sha256": "1c8345f864b3a84d72ee43b3eef67ef3f307836d47d513dc25daeb1c6ebc1ca5",
+      "settings_existing_server_entries32_rebound_after_exact_bytes_modes_check": true,
+      "common_helper_physical_entries_preserved": 6,
+      "common_helper_sha256_preserved": "14b3af5745b19c892d249944052e240c650d20406df3a8ddf8f78e478bb29099",
+      "affected_owners": [
+        "server",
+        "statistics",
+        "settings",
+        "integrated"
+      ],
+      "retained_owners": [
+        "main",
+        "udp",
+        "background",
+        "icon"
+      ],
+      "source_git_refs": 39,
+      "observer_causal_fix_claim": false,
+      "diagnostic_formal_credit": false,
       "native_patch_count": 14,
       "app_swift_count": 21,
-      "canonical_helper_entries6_byte_unchanged": true,
-      "existing_workflows_and_original_checkers_byte_unchanged": true,
       "original_repository_refs_and_maps_unchanged": true,
       "strict_full_fsck": true,
       "remote_actions": 0,
       "ci_runs": 0,
       "new_application_or_native_bytes": false,
       "actual_runtime_acceptance": false,
-      "prior_failed_legacy_cause_proven": false,
-      "decision_sha256": "e77aff88b78d3e4c37d043f7d803d10ea10141b2552ed38ea5603d75e77a81ed"
+      "decision_sha256": "8cb695263a148ed654380c5026ea8fc70fc343dbc9734ace7b484b83e70aed47"
     }
   },
   "source_generation_actual_execution": {
-    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/legacy-worker-source-generation-execution-v1/execution-receipt.json",
-    "bytes": 993,
-    "sha256": "fe5e6287ba5ddf5e43223fe4d7076385e14e166bde70c9acfb2dcdb586e0b774",
+    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-execution-v1/execution-receipt.json",
+    "bytes": 1756,
+    "sha256": "317ef569c664fc6c3123a3ef2d7f7d52135bd94cf0cd5341033e16b7a2251d62",
     "actual_returncode": 0
   },
   "reviewed_candidate_caller": {
-    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/completion-current-preparation/canonical-runtime-caller-proposal-v2/caller-preparation.json",
-    "sha256": "804b8d0a6fce4673af29fd1abb26c1dc77ce0bb29499d140959b373f7298ba74",
-    "workflow_sha256": "4d9c39111d62e249af2638296fe08a79f1c946eecb5696e9106c29376935778f"
+    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-proposal-v2/caller-preparation.json",
+    "sha256": "fda01482e04670e46dae8c2055495a0ffd75104a5c587d765ea11320d8249159",
+    "workflow_sha256": "38a3ecc120611c61860766c972d80d2dd3e9510005303f77abddce0ae82b073f"
   },
   "source_heads_evidence": {
-    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/legacy-worker-source-generation-v1/heads8.json",
-    "sha256": "a0c0c5972bc38a50a8b215eacf919c59abb9cbac8828968cce89a7d4d88a6e4c"
+    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-source-generation-v1/heads8.json",
+    "sha256": "4e1612827eec56ac4c1a702255b143fc570f0ff14db4ed911a96182a7be184f1"
   },
   "source_immediate_previous_heads_evidence": {
-    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/canonical-runtime-source-generation-v1/heads8.json",
-    "sha256": "2bffb4009da354c4d1d65c51f5bfb0be9368262c08a1c55134dcd1a4869cbfbb"
+    "path": "/workspace/scratch/630ba41d6484/continuation-20261104/formal-host-observer-proposal-v2/candidate-heads8.json",
+    "sha256": "f2709b4ec114475b580dadbb01f9cbaf2cb57d2f16ff5bb41b8795c462a2fe0f"
   },
   "seed_roots": [
     "5d5327d4513b587e2a2e948fa20f588a04f1376f",
@@ -402,9 +882,9 @@
     "e50f434be2610ef00713d39363963542db0020e2",
     "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
     "8bec30de328543f8f23b79a736385ed0e80aaa88",
-    "015543c39a1c5c537aa984f890bc30147dcd5b5a",
+    "01ea4f1ee4b2857386c574b1b274a5471b0a8331",
     "f6cd633480b938fbe1e27b4bacaf4e286f4193d2",
-    "9863483ffdba902ee0253122159ffa599af8e16e",
+    "39a3be345e01435d595f1e9d9fb4102e23d26f59",
     "31ef4a7baa15f76e7c7cdbc1ed11216c1fa2f93e",
     "eccd78c41103e6d31e305eebc4e176864d442d48",
     "99680a3bcdb6a3270767dcc43b1d9133866714b2",
@@ -433,34 +913,72 @@
     "e82e590412e5b5cbcd531827a81f845596ee16f6"
   ],
   "source_absent_from_remote_only_seed_before_import": true,
-  "both_selected_absent_before_import": [
+  "all_selected_absent_before_import": [
     {
-      "owner": "background",
-      "source": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
+      "owner": "server",
+      "source": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
+      "returncode": 128,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "93051ef5e7bf1424b70ed514d3f012953c936894eec9c3018251c6cfb674dd83"
+    },
+    {
+      "owner": "statistics",
+      "source": "2e3baaa705e50289f37f60f2d32376e588eefbbb",
+      "returncode": 128,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "93051ef5e7bf1424b70ed514d3f012953c936894eec9c3018251c6cfb674dd83"
+    },
+    {
+      "owner": "settings",
+      "source": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
       "returncode": 128,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stderr_sha256": "93051ef5e7bf1424b70ed514d3f012953c936894eec9c3018251c6cfb674dd83"
     },
     {
       "owner": "integrated",
-      "source": "13fc917d1569fbd1c383be916f1c35c0c5fd2047",
+      "source": "24f7f9dd989047aec420dd66eda0906d39654bd3",
       "returncode": 128,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stderr_sha256": "93051ef5e7bf1424b70ed514d3f012953c936894eec9c3018251c6cfb674dd83"
     }
   ],
-  "manifest_sha256": "c071040e6e3669da285a0d5b06ac3bd244fd7ed6252532e05716044ec8f3fb7e",
+  "manifest_sha256": "36cddd18361b01360c8ca0f576ffd6294cda26df5e20a8430b9bafb3e543e5ef",
   "original_importer_sha256": "1e647ab8a266a64097c5cc543f22d6a2c58010bfba8988b10fa4809589a6367e",
   "actual_importer_verified": false,
   "original_importer_main": "PENDING: no clean newly committed helper or actual CI prepare exists yet; no HEAD/env simulation performed.",
   "local_checks": {
-    "bundle_refs_candidate2_support6": true,
+    "bundle_refs_candidate4_support4": true,
     "same_eight_prerequisites": true,
     "verify_in_actual_remote_histories_only_repository": true,
     "unbundle_ref_mutations": false,
     "all_source_heads_and_trees_exact": true,
     "forbidden_ancestry_checks": [
       {
+        "owner": "main",
+        "source": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "main",
+        "source": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "udp",
+        "source": "b05db817684d6b006353d5062fdba756d739faea",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "udp",
+        "source": "b05db817684d6b006353d5062fdba756d739faea",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
         "owner": "background",
         "source": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
         "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
@@ -469,6 +987,30 @@
       {
         "owner": "background",
         "source": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "server",
+        "source": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "server",
+        "source": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
+        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
+        "returncode": 1
+      },
+      {
+        "owner": "statistics",
+        "source": "2e3baaa705e50289f37f60f2d32376e588eefbbb",
+        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
+        "returncode": 1
+      },
+      {
+        "owner": "statistics",
+        "source": "2e3baaa705e50289f37f60f2d32376e588eefbbb",
         "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
         "returncode": 1
       },
@@ -485,86 +1027,38 @@
         "returncode": 1
       },
       {
-        "owner": "integrated",
-        "source": "13fc917d1569fbd1c383be916f1c35c0c5fd2047",
-        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
-        "returncode": 1
-      },
-      {
-        "owner": "integrated",
-        "source": "13fc917d1569fbd1c383be916f1c35c0c5fd2047",
-        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
-        "returncode": 1
-      },
-      {
-        "owner": "main",
-        "source": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
-        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
-        "returncode": 1
-      },
-      {
-        "owner": "main",
-        "source": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
-        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
-        "returncode": 1
-      },
-      {
-        "owner": "server",
-        "source": "992c146ccf6232957728eed0e201e790974e19b3",
-        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
-        "returncode": 1
-      },
-      {
-        "owner": "server",
-        "source": "992c146ccf6232957728eed0e201e790974e19b3",
-        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
-        "returncode": 1
-      },
-      {
         "owner": "settings",
-        "source": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+        "source": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
         "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
         "returncode": 1
       },
       {
         "owner": "settings",
-        "source": "05e8e9a8a4054a53d6a6ef45048443da3d85e159",
+        "source": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
         "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
         "returncode": 1
       },
       {
-        "owner": "statistics",
-        "source": "5bb13783e30b155ef69a18a897f721258090f2d7",
+        "owner": "integrated",
+        "source": "24f7f9dd989047aec420dd66eda0906d39654bd3",
         "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
         "returncode": 1
       },
       {
-        "owner": "statistics",
-        "source": "5bb13783e30b155ef69a18a897f721258090f2d7",
-        "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
-        "returncode": 1
-      },
-      {
-        "owner": "udp",
-        "source": "b05db817684d6b006353d5062fdba756d739faea",
-        "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
-        "returncode": 1
-      },
-      {
-        "owner": "udp",
-        "source": "b05db817684d6b006353d5062fdba756d739faea",
+        "owner": "integrated",
+        "source": "24f7f9dd989047aec420dd66eda0906d39654bd3",
         "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
         "returncode": 1
       }
     ]
   },
-  "old_manifest_previous_field": "Historical helper015 candidate5/support3 inputs remain immutable. New candidates use original generator name/sha/ref schema; exact immediate prior fe90 source8 is recorded in previous_candidate_heads.",
+  "old_manifest_previous_field": "Historical helper01ea candidate2/support6 inputs remain immutable. New candidates use original generator name/sha/ref schema; exact immediate prior13fc source8 is recorded in previous_candidate_heads.",
   "planned_jobs": {
     "prepare": 1,
-    "build": 4,
-    "runtime": 2,
-    "verify": 4,
-    "total": 11
+    "build": 8,
+    "runtime": 4,
+    "verify": 8,
+    "total": 21
   },
   "future_helper_commit": null,
   "future_run_id": null,
@@ -576,7 +1070,7 @@
   "remote_mutations": false,
   "CI_runs": 0,
   "application_gate_credit": 0,
-  "scope": "Exact new Background/Integrated causal-fixture generation inputs with original four producer/final rows and two runtime consumers. Retained Statistics5bb runtime failure remains unresolved; retained source identity is not runtime acceptance. Historical failures and successful diagnostics remain separate. Local input verification grants no current16, application, D28 or release acceptance.",
-  "started_utc": "2026-11-04T01:06:18.798327+00:00",
-  "completed_utc": "2026-11-04T01:06:19.804775+00:00"
+  "scope": "Exact new Server/Statistics/Settings/Integrated observer-source inputs with original eight producer/final rows and four runtime consumers. Original assertions, deadlines, gates and skip behavior remain unchanged. Observer instrumentation is not a proven causal fix, and diagnostic results grant no formal credit. Retained source identity alone grants no runtime acceptance. All historical failures remain preserved. Local input verification grants no current16, application, D28 or release acceptance.",
+  "started_utc": "2026-11-04T02:19:32.482714+00:00",
+  "completed_utc": "2026-11-04T02:19:33.673498+00:00"
 }
