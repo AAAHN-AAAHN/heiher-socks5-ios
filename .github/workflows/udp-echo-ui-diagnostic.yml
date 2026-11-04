@@ -1,4 +1,4 @@
-name: Compile current integrated XCUI sources without Simulator execution
+name: Observe current original UI once on the installed runtime without release credit
 on:
   push:
     branches: [work/udp-echo-udp-20261028]
@@ -6,46 +6,50 @@ permissions:
   contents: read
   actions: read
 jobs:
-  compile_current_xcui_only:
+  observe_original_ui_installed_runtime:
     runs-on: xcode-27
-    timeout-minutes: 25
+    timeout-minutes: 45
     env:
-      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
-      - name: Check out the actual diagnostic helper identity
+      - name: Check out the actual independent diagnostic helper
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
           path: control
           fetch-depth: 1
           persist-credentials: false
-      - name: Verify actual v3 producer inputs and compile all four unchanged XCUI cases
+      - name: Restore original v3 inputs and invoke the unchanged UI consumer exactly once
         shell: bash
         working-directory: control
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          python3 -B Bootstrap/ui_compile_diagnostic.py --fetch --compile \
-            --output "$RUNNER_TEMP/current-xcui-compile-diagnostic"
-      - name: Preserve actual compile result and separate producer provenance
+          python3 -B Bootstrap/ui_default_runtime_diagnostic.py --fetch --run-once \
+            --output "$RUNNER_TEMP/current-ui-installed-runtime-diagnostic"
+      - name: Preserve original UI evidence and the separate diagnostic provenance
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Current-XCUI-compile-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          name: Current-original-UI-installed-runtime-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/current-xcui-compile-diagnostic/diagnostic-result.json
-            ${{ runner.temp }}/current-xcui-compile-diagnostic/actual-producer-api-metadata.json
-            ${{ runner.temp }}/current-xcui-compile-diagnostic/native-product-identity.json
-            ${{ runner.temp }}/current-xcui-compile-diagnostic/built-framework.json
-            ${{ runner.temp }}/current-xcui-compile-diagnostic/generated-StatisticsUITests.swift
-            ${{ runner.temp }}/current-xcui-compile-diagnostic/generated-test-project.pbxproj
-            ${{ runner.temp }}/current-xcui-compile-diagnostic/xcode-version.txt
-            ${{ runner.temp }}/current-xcui-compile-diagnostic/simulator-sdk-version.txt
-            ${{ runner.temp }}/current-xcui-compile-diagnostic/build-for-testing.log
-            ${{ runner.temp }}/current-xcui-compile-diagnostic/application/Socks5.xcodeproj/xcshareddata/xcschemes/StatisticsUIAudit.xcscheme
-            ${{ runner.temp }}/current-xcui-compile-diagnostic/DerivedData/Build/Products/*.xctestrun
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/diagnostic-result.json
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/actual-producer-api-metadata.json
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/diagnostic-input-copy.json
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/original-runtime-export-producer.json
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/original-transfer-manifest.json
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/source-before.json
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/source-after.json
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/isolated-git-restore.log
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/xcode-version.txt
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/original-consumer.stdout.log
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/original-consumer.stderr.log
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/post-cleanup-runtime-images.json
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/post-cleanup-runtime-images.stderr.log
+            ${{ runner.temp }}/current-ui-installed-runtime-diagnostic/checkout/artifacts/integrated/ui
+            control/Bootstrap/ui_default_runtime_diagnostic.py
             control/Bootstrap/ui_compile_diagnostic.py
             control/.github/workflows/udp-echo-ui-diagnostic.yml
           if-no-files-found: error
