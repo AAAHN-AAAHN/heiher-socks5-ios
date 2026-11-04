@@ -1,0 +1,35 @@
+{
+  "schema": "actual-legacy-diagnostic-input-pins-v1",
+  "historical_commit": "618b3d2b413937aaad7373ee2af9e693ec81b84a",
+  "historical_entry_sha256": "3c328e52f33d5c731306a535b6bb923eb1bce27e89eb0367b67c213be761017d",
+  "original_input_sha256": {
+    "Controller.swift": "0595d9f05d35f1f63d5e5b6ab6ce8e7487bf8e96560e10403febce382f34a6ec",
+    "Test.swift": "91d5f6acdcbae6a32269cfa42653acf33aba1048b297a4314f68774f9e10519f",
+    "PlatformMocks.swift": "59f9aed88294a478bd54c1d5a548a213b2d8c38c37bce6b7d800806d1a678648"
+  },
+  "causal_fixture_sha256": "ff5ad46f325167c2b4a8cb0260dcc05ac0ec91b93a0c658f1d15762dc5dac3e0",
+  "actual_failed_run": 41740668457,
+  "actual_failed_attempt": 1,
+  "actual_failed_job": 126281119452,
+  "actual_failure_artifact": {
+    "id": 13284000105,
+    "bytes": 98767458,
+    "sha256": "d7302409720bf4167f935780cea50eceadf902d68371da4edc8297fadf93229e"
+  },
+  "failed_conjunct_is_known": false,
+  "formal_gate_credit": false,
+  "fixed_matrix": {
+    "compiles": 4,
+    "executions": 6,
+    "original_debug": 1,
+    "observed_debug": 1,
+    "causal_positive_debug": 1,
+    "causal_blocking_debug": 1,
+    "causal_positive_optimized": 1,
+    "causal_blocking_optimized": 1
+  },
+  "compile_timeout_seconds": 90,
+  "execution_timeout_seconds": 30,
+  "fixture_deadline_seconds": 2,
+  "retries": 0
+}

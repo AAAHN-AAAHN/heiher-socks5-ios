@@ -1,185 +1,48 @@
-name: Observe one exact current Integrated UI execution without candidate credit
+name: Inspect exact legacy worker failure and declared causal fixture once
 on:
   push:
     branches: [work/udp-echo-udp-20261028]
 permissions:
   contents: read
-  actions: read
 jobs:
-  # One original four-test diagnostic with narrow pre-start host observation.
-  # Prior417271 staged/service passed but its empty lifecycle failed; no candidate gate credit.
-  diagnose_audio_only:
+  diagnose_legacy_once:
     runs-on: xcode-27
-    timeout-minutes: 45
+    timeout-minutes: 15
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
-      - name: Check out the exact real diagnostic control identity
+      - name: Check out the actual diagnostic control and full historical inputs
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
-          path: control
           fetch-depth: 0
           persist-credentials: false
-      - name: Check out the exact preserved candidate-input helper and its full prerequisites
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: 4a4e2a3cf725ed7e0b8de5758e6883c12a08e191
-          path: candidate-input
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Select the already installed exact cached interpreter
+      - name: Execute the fixed original observed and declared causal matrix once
         shell: bash
-        working-directory: control
         run: |
           set -euo pipefail
-          audio_cache_root="${RUNNER_TOOL_CACHE:-}"
-          if [[ -z "$audio_cache_root" || "$audio_cache_root" != /* ]]; then
-            printf '%s\n' 'FAIL: RUNNER_TOOL_CACHE must identify the existing absolute tool-cache root.'
+          legacy_cache_root="${RUNNER_TOOL_CACHE:?}"
+          legacy_cache_dir="$legacy_cache_root/Python/3.14.9/arm64"
+          legacy_python="$legacy_cache_dir/bin/python3.14"
+          if [[ "$legacy_cache_root" != /* || ! -f "${legacy_cache_dir}.complete" || ! -x "$legacy_python" ]]; then
+            printf '%s\n' 'FAIL: the existing completed CPython3.14.9 arm64 cache is required.' >&2
             exit 1
           fi
-          audio_cache_dir="$audio_cache_root/Python/3.14.9/arm64"
-          audio_python="$audio_cache_dir/bin/python3.14"
-          if [[ ! -d "$audio_cache_dir" || ! -f "${audio_cache_dir}.complete" || ! -x "$audio_python" ]]; then
-            printf 'FAIL: required completed cache entry is unavailable: %s\n' "$audio_cache_dir"
-            exit 1
-          fi
-          "$audio_python" -B - <<'PY'
-          import platform
-          import sys
-          if sys.implementation.name != 'cpython' or tuple(sys.version_info) != (3, 14, 9, 'final', 0):
-              raise SystemExit('FAIL: expected the existing CPython3.14.9 final interpreter.')
-          if sys.platform != 'darwin' or platform.machine() != 'arm64' or not __debug__:
-              raise SystemExit('FAIL: require Darwin arm64 and enabled assertions.')
-          print('Existing exact cached interpreter selected; no application or candidate credit.')
+          "$legacy_python" -B - <<'PY'
+          import platform, sys
+          assert sys.implementation.name == 'cpython' and tuple(sys.version_info) == (3, 14, 9, 'final', 0)
+          assert sys.platform == 'darwin' and platform.machine() == 'arm64' and __debug__
           PY
-          printf 'AUDIO_OBSERVATION_PYTHON=%s\n' "$audio_python" >> "$GITHUB_ENV"
-      - name: Bind the real control and preserved input identities and create exact detached current source
-        shell: bash
-        working-directory: control
-        run: |
-          set -euo pipefail
-          "$AUDIO_OBSERVATION_PYTHON" -B Bootstrap/audio-current-diagnostic/prepare_current_source.py \
-            --control "$GITHUB_WORKSPACE/control" \
-            --source-input "$GITHUB_WORKSPACE/candidate-input" \
-            --root "$RUNNER_TEMP/audio-current-source" \
-            --pins "$GITHUB_WORKSPACE/control/Bootstrap/audio-current-diagnostic/current-input-pins.json" \
-            --output "$RUNNER_TEMP/audio-current-input-binding"
-      - name: Restore the separately pinned actual417023 producer bytes for diagnostic use only
-        shell: bash
-        working-directory: control
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          "$AUDIO_OBSERVATION_PYTHON" -B Bootstrap/audio-diagnostic/restore_diagnostic_input.py \
-            --helper "$GITHUB_WORKSPACE/control" \
-            --root "$RUNNER_TEMP/audio-current-source" \
-            --pins "$GITHUB_WORKSPACE/control/Bootstrap/audio-current-diagnostic/current-input-pins.json" \
-            --output "$RUNNER_TEMP/audio-current-restored-input"
-      - name: Stage and verify one exact installed runtime with the reviewed preflight
-        id: audio_staged_once
-        shell: bash
-        working-directory: control
-        run: |
-          set -euo pipefail
-          "$AUDIO_OBSERVATION_PYTHON" -B Bootstrap/ios_runtime_staged_preflight.py \
-            --output "$RUNNER_TEMP/audio-current-preflight"
-      - name: Refresh one exact own-UID service once and preserve the actual process exit
-        id: audio_service_once
-        if: ${{ success() && steps.audio_staged_once.outcome == 'success' }}
-        shell: bash
-        working-directory: control
-        run: |
-          set -euo pipefail
-          "$AUDIO_OBSERVATION_PYTHON" -B Bootstrap/ios_runtime_service_refresh.py \
-            --preflight "$RUNNER_TEMP/audio-current-preflight" \
-            --output "$RUNNER_TEMP/audio-current-service-refresh"
-          audio_service_process_exit=$?
-          "$AUDIO_OBSERVATION_PYTHON" -B - "$audio_service_process_exit" \
-            "$RUNNER_TEMP/audio-current-preflight/preflight-result.json" \
-            "$RUNNER_TEMP/audio-current-service-refresh/refresh-result.json" \
-            "$RUNNER_TEMP/audio-current-service-refresh/workflow-exit-zero.json" <<'PY'
-          from datetime import datetime, timezone
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
-          import sys
-          exit_code = int(sys.argv[1])
-          if exit_code != 0:
-              raise SystemExit(exit_code)
-          def record(path):
-              raw = path.read_bytes()
-              return {'path': str(path.resolve()), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
-          control = Path.cwd().resolve()
-          pins = json.loads((control / 'Bootstrap/audio-current-diagnostic/current-input-pins.json').read_bytes())
-          source_hashes = {name: hashlib.sha256((control / name).read_bytes()).hexdigest()
-                           for name in pins['service_refresh']['source_sha256']}
-          receipt = {'schema': 1, 'scope': 'actual_workflow_post_service_process_exit',
-                     'workflow_step_id': 'audio_service_once', 'service_process_exit_code': exit_code,
-                     'captured_utc': datetime.now(timezone.utc).isoformat(),
-                     'context': {'helper_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
-                                 'attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'repository': os.environ['GITHUB_REPOSITORY'],
-                                 'job': os.environ['GITHUB_JOB']},
-                     'source_sha256': source_hashes, 'preflight_result': record(Path(sys.argv[2])),
-                     'refresh_result': record(Path(sys.argv[3])),
-                     'workflow': record(control / '.github/workflows/udp-echo-ui-diagnostic.yml')}
-          with Path(sys.argv[4]).open('x') as stream:
-              json.dump(receipt, stream, indent=2)
-              stream.write('\n')
-          PY
-      - name: Execute the exact original four-test UI main once with the reviewed temporary AppRoot observation
-        if: ${{ success() && steps.audio_service_once.outcome == 'success' }}
-        shell: bash
-        working-directory: control
-        run: |
-          set -euo pipefail
-          "$AUDIO_OBSERVATION_PYTHON" -B Bootstrap/observe_host_during_command.py \
-            --output "$RUNNER_TEMP/audio-current-host-observation" -- \
-            "$AUDIO_OBSERVATION_PYTHON" -B Bootstrap/audio-current-diagnostic/run_original_ui_once.py \
-            --control "$GITHUB_WORKSPACE/control" \
-            --source-input "$GITHUB_WORKSPACE/candidate-input" \
-            --root "$RUNNER_TEMP/audio-current-source" \
-            --pins "$GITHUB_WORKSPACE/control/Bootstrap/audio-current-diagnostic/current-input-pins.json" \
-            --input-receipt "$RUNNER_TEMP/audio-current-restored-input/diagnostic-input-receipt.json" \
-            --preflight "$RUNNER_TEMP/audio-current-preflight/preflight-result.json" \
-            --service-refresh "$RUNNER_TEMP/audio-current-service-refresh/refresh-result.json" \
-            --service-exit-receipt "$RUNNER_TEMP/audio-current-service-refresh/workflow-exit-zero.json" \
-            --service-step-outcome "${{ steps.audio_service_once.outcome }}" \
-            --output "$RUNNER_TEMP/audio-current-observation"
-      - name: Preserve all actual input, preflight, original UI, trace and failure evidence
+          "$legacy_python" -B Bootstrap/legacy-worker-diagnostic/diagnose_legacy_worker.py \
+            --repo "$GITHUB_WORKSPACE" --output "$RUNNER_TEMP/legacy-worker-fixed-diagnostic"
+      - name: Preserve every actual outcome including failures and exact inputs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Audio-original-four-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          name: Legacy-worker-fixed-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/audio-current-input-binding
-            ${{ runner.temp }}/audio-current-restored-input
-            ${{ runner.temp }}/audio-current-preflight
-            ${{ runner.temp }}/audio-current-observation
-            ${{ runner.temp }}/audio-current-host-observation
-            ${{ runner.temp }}/audio-current-source/artifacts/integrated/ui
-            ${{ github.workspace }}/control/Bootstrap/audio-current-diagnostic
-            ${{ github.workspace }}/control/Bootstrap/observe_host_during_command.py
-            ${{ github.workspace }}/control/Bootstrap/audio-diagnostic/restore_diagnostic_input.py
-            ${{ github.workspace }}/control/Bootstrap/runtime_handoff.py
-            ${{ github.workspace }}/control/Bootstrap/ios_runtime_staged_preflight.py
-          if-no-files-found: error
-          retention-days: 90
-      - name: Preserve exact service, exit binding and unchanged preparation sources including failure
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: Audio-service-refresh-binding-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/audio-current-service-refresh
-            ${{ github.workspace }}/control/Bootstrap/ios_runtime_service_refresh.py
-            ${{ github.workspace }}/control/Bootstrap/ios_runtime_staged_preflight.py
-            ${{ github.workspace }}/control/Bootstrap/ios_runtime_signature_preflight.py
-            ${{ github.workspace }}/control/Bootstrap/simulator_runtime_compare.py
-            ${{ github.workspace }}/control/Bootstrap/simulator_comparison_diagnostics.py
-            ${{ github.workspace }}/control/Bootstrap/watch_runtime_preflight.py
+            ${{ runner.temp }}/legacy-worker-fixed-diagnostic
+            ${{ github.workspace }}/Bootstrap/legacy-worker-diagnostic
           if-no-files-found: error
           retention-days: 90
