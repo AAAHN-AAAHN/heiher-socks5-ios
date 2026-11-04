@@ -1,0 +1,37 @@
+name: DIAGNOSTIC ONLY - current Background Swift counter
+
+on:
+  push:
+    branches: [work/udp-echo-main-20261028]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diagnostic:
+    name: Diagnostic only (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, xcode-27]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      DIAGNOSTIC_PLATFORM: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Execute unchanged targeted counter and scheduler drivers
+        run: python3 -B Diagnostics/run_swift_counter.py --output "$RUNNER_TEMP/swift-counter-diagnostic"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Swift-counter-DIAGNOSTIC-ONLY-${{ matrix.os }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swift-counter-diagnostic/
+          if-no-files-found: error
+          retention-days: 90
