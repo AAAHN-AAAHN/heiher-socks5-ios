@@ -129,7 +129,7 @@ def main():
         },
         "proposed": {
             "Tests/Background/UDPEchoTransportProbe.swift": "55ca38e6e488beb553d52a7d8b66367d6a5bc03859236656bff16496b43e6a82",
-            "Tests/Background/UDPEchoTransportTests.py": "25595e37dc4217724cc49275a5a69403463746074f6ef85619bc685385103450",
+            "Tests/Background/UDPEchoTransportTests.py": "a70b13ced0a114149ed5e3570ad40bf8868022f726982c4c7da5eb311fe87a57",
             "Socks5/BackgroundKeepAlive/Socks5UDPClient.swift": "57da93313e01f5c3938f0be3b112de58afeeaf0aab5013ca9a8c20278d377465",
         },
     }

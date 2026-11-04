@@ -1,28 +1,28 @@
 {
   "result": "PASS_LOCAL_INPUT_PREPARATION_ONLY",
   "repository": "AAAHN-AAAHN/heiher-socks5-ios",
-  "started_utc": "2026-11-04T21:01:34.887851+00:00",
+  "started_utc": "2026-11-04T21:13:13.606228+00:00",
   "generator": {
-    "path": "/workspace/scratch/ecdd1deb3751/implementation-20261105/prepare_counter_reset_candidates_local.py",
-    "bytes": 19206,
-    "sha256": "fd4f2f4c399885b5b40585c8959c632970497e77b6a503230ac624ce07cfe0ac"
+    "path": "/workspace/scratch/ecdd1deb3751/implementation-20261105/prepare_counter_reset_candidates_local_v2.py",
+    "bytes": 20864,
+    "sha256": "ca4987e4a297ce1ff5d80e19f4b3d3339c7243ad3e8195511e5a40a966d53c30"
   },
   "actual_inputs": {
     "heads8": {
-      "path": "/workspace/scratch/ecdd1deb3751/implementation-20261105/heads8-initial-implementation.json",
+      "path": "/workspace/scratch/ecdd1deb3751/implementation-20261105/heads8-formatted.json",
       "bytes": 458,
-      "sha256": "a040fd2ccf852a0c072fdf253a0e58b8d929b13d2f7978e50a350e600f588224"
+      "sha256": "20e6404e753e229bc4c75a5cbce18bf82a4318a1d6bee05acf32a514333039b4"
     },
     "remote_observation": {
-      "path": "/workspace/scratch/ecdd1deb3751/implementation-20261105/remote-heads-before-candidate-generation.json",
-      "bytes": 1210,
-      "sha256": "400395e4b21f70181a3bf90f784ad137bc5e27b8c1203ccd3e6d3e23cf55f1a9"
+      "path": "/workspace/scratch/ecdd1deb3751/implementation-20261105/remote-heads-before-candidate-generation-v2.json",
+      "bytes": 1084,
+      "sha256": "28856410dc2866ba57e1a329aef18507d2c12190e261e7410bec318cc6d21395"
     }
   },
-  "supplied_remote_observation_time": "2026-11-04 20:57:17 UTC",
+  "supplied_remote_observation_time": "2026-11-04 21:12:27 UTC",
   "remote_observation_refreshed_by_this_script": false,
   "capture_is_current_remote_mutation_lease": false,
-  "helper_base_commit": "bce2e2b73fb7b735f1a35781f703a5b0498a9d67",
+  "helper_base_commit": "2bf0f04fcc02f4bc0f1eafe340018dde74137d0b",
   "helper_contract_files": {
     "Bootstrap/import_candidates.py": {
       "path": "/workspace/scratch/ecdd1deb3751/implementation-20261105/build-helper/Bootstrap/import_candidates.py",
@@ -45,30 +45,30 @@
     "udp": "b05db817684d6b006353d5062fdba756d739faea",
     "background": "46be6421e93cac43400e99ceeb89ee1290479ce9",
     "server": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
-    "statistics": "e27ddccd2a550af3c9bb70998021634f6a7dea59",
+    "statistics": "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c",
     "icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
     "settings": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
-    "integrated": "7fcb45cd885fe03788dc76a39bc7afbf2c91f502"
+    "integrated": "e592bd12df88084215667d4e74c62a120504aa96"
   },
   "trees": {
     "main": "e1692ab9f23f50213f5bb88fcace0c2fc45541bf",
     "udp": "e87146dc61af2014d534ceb4f790168a73df0a03",
     "background": "abb68c9efb7996066f3e4c02e67b2be9c2f113c2",
     "server": "d57e573b2470ebaedbd32934b67f605e80fe0cc1",
-    "statistics": "da1037869d746190a4e7c6978686511ac773dcd1",
+    "statistics": "d4fc1ad3546d45017b6c4f6ff4f14c1f60182b74",
     "icon": "4ba6d691703eb350d8aaf3c523956fd28f21ed1e",
     "settings": "d3c3aac5c869e5edddbb73c663556c27fbcb058c",
-    "integrated": "b37d129d229314f650db8f45b1600871b860a1ef"
+    "integrated": "74c568428c258b93462de1361c479cc7bf97e9ec"
   },
   "previous_helper_manifest_heads": {
-    "server": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
-    "statistics": "2e3baaa705e50289f37f60f2d32376e588eefbbb",
-    "settings": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
-    "integrated": "24f7f9dd989047aec420dd66eda0906d39654bd3",
+    "background": "46be6421e93cac43400e99ceeb89ee1290479ce9",
+    "statistics": "e27ddccd2a550af3c9bb70998021634f6a7dea59",
+    "integrated": "7fcb45cd885fe03788dc76a39bc7afbf2c91f502",
     "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
     "udp": "b05db817684d6b006353d5062fdba756d739faea",
-    "background": "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
-    "icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91"
+    "server": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
+    "icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+    "settings": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd"
   },
   "selected": [
     "background",
@@ -97,29 +97,70 @@
     },
     {
       "name": "statistics",
-      "sha": "e27ddccd2a550af3c9bb70998021634f6a7dea59",
+      "sha": "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "statistics",
-      "sha": "e27ddccd2a550af3c9bb70998021634f6a7dea59",
+      "sha": "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "integrated",
-      "sha": "7fcb45cd885fe03788dc76a39bc7afbf2c91f502",
+      "sha": "e592bd12df88084215667d4e74c62a120504aa96",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "integrated",
-      "sha": "7fcb45cd885fe03788dc76a39bc7afbf2c91f502",
+      "sha": "e592bd12df88084215667d4e74c62a120504aa96",
       "os": "xcode-27",
       "runtime": true
     }
   ],
+  "updated_candidates": [
+    "statistics",
+    "integrated"
+  ],
+  "unchanged_reverified_candidates": {
+    "background": "46be6421e93cac43400e99ceeb89ee1290479ce9"
+  },
+  "candidate_comparisons": {
+    "background": {
+      "previous": "46be6421e93cac43400e99ceeb89ee1290479ce9",
+      "current": "46be6421e93cac43400e99ceeb89ee1290479ce9",
+      "intent": "reverify_unchanged",
+      "changed_paths": []
+    },
+    "statistics": {
+      "previous": "e27ddccd2a550af3c9bb70998021634f6a7dea59",
+      "current": "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c",
+      "intent": "verify_updated_descendant",
+      "changed_paths": [
+        "M\tBuild/documentation-baseline.json",
+        "M\tPatches/hev-socket-meter-core.patch",
+        "M\tTests/SocketIO/session_lifecycle.c",
+        "M\tTests/SocketIO/worker-native.json",
+        "M\tdocs/documentation.json"
+      ]
+    },
+    "integrated": {
+      "previous": "7fcb45cd885fe03788dc76a39bc7afbf2c91f502",
+      "current": "e592bd12df88084215667d4e74c62a120504aa96",
+      "intent": "verify_updated_descendant",
+      "changed_paths": [
+        "M\tBuild/documentation-baseline.json",
+        "M\tPatches/hev-socket-meter-core.patch",
+        "M\tTests/SocketIO/session_lifecycle.c",
+        "M\tTests/SocketIO/worker-native.json",
+        "M\tdocs/documentation.json",
+        "M\tdocs/feature-membership.json"
+      ]
+    }
+  },
+  "helper_diagnostic_pin_patch_applied_by_generator": false,
   "excluded_canonical_refs": {
     "refs/heads/main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
     "refs/heads/feature/udp-compat": "e50f434be2610ef00713d39363963542db0020e2",
@@ -142,17 +183,17 @@
   ],
   "advertised_refs": {
     "refs/heads/candidate/background": "46be6421e93cac43400e99ceeb89ee1290479ce9",
-    "refs/heads/candidate/statistics": "e27ddccd2a550af3c9bb70998021634f6a7dea59",
-    "refs/heads/candidate/integrated": "7fcb45cd885fe03788dc76a39bc7afbf2c91f502",
+    "refs/heads/candidate/statistics": "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c",
+    "refs/heads/candidate/integrated": "e592bd12df88084215667d4e74c62a120504aa96",
     "refs/heads/support/main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
     "refs/heads/support/udp": "b05db817684d6b006353d5062fdba756d739faea",
     "refs/heads/support/server": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
     "refs/heads/support/icon": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
     "refs/heads/support/settings": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd"
   },
-  "bundle_bytes": 205381,
-  "bundle_sha256": "f81d7c2cb3bfaae0bce858172e5d5f73762f46db2858fa2dd9a3ac3d5f248957",
-  "manifest_sha256": "6bb73af1aeb3b07f2b3cf27f4447b977a7e2cb355a3568281e740058f9616567",
+  "bundle_bytes": 214601,
+  "bundle_sha256": "43660a7b68e2c5f9de2efee4d43d12f5e3faf14c6ea74c144ab12363a51d01c6",
+  "manifest_sha256": "417a9a87daa6aa281543bbc28fc8974e8c4c4d29a4e25ea9cd74441bdb77bb39",
   "canonical_only_seed_source_presence_before_import": {
     "main": {
       "sha": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
@@ -175,7 +216,7 @@
       "returncode": 128
     },
     "statistics": {
-      "sha": "e27ddccd2a550af3c9bb70998021634f6a7dea59",
+      "sha": "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c",
       "present": false,
       "returncode": 128
     },
@@ -190,15 +231,15 @@
       "returncode": 128
     },
     "integrated": {
-      "sha": "7fcb45cd885fe03788dc76a39bc7afbf2c91f502",
+      "sha": "e592bd12df88084215667d4e74c62a120504aa96",
       "present": false,
       "returncode": 128
     }
   },
   "canonical_only_bundle_verify": {
     "returncode": 0,
-    "stdout": "The bundle contains these 8 refs:\n46be6421e93cac43400e99ceeb89ee1290479ce9 refs/heads/candidate/background\ne27ddccd2a550af3c9bb70998021634f6a7dea59 refs/heads/candidate/statistics\n7fcb45cd885fe03788dc76a39bc7afbf2c91f502 refs/heads/candidate/integrated\n0e030aedbd4127e9215b38bb23dd6e38c5872546 refs/heads/support/main\nb05db817684d6b006353d5062fdba756d739faea refs/heads/support/udp\n5d9dc52e5f441e93a6571a2cf59ce78a85062613 refs/heads/support/server\n3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91 refs/heads/support/icon\n206fbbab4569d4e74de7f0febaa3eee5ed6c86bd refs/heads/support/settings\nThe bundle requires these 8 refs:\n8bec30de328543f8f23b79a736385ed0e80aaa88 \nd1539f429b6a0e993adc9d50f816c3a29c3fac32 \ne50f434be2610ef00713d39363963542db0020e2 \nd3f20d7e3905dcc300f0a5ebf155aa4cc2869774 \nbf0789c68670078def846d7e3778e7f5cfe9e77f \n5d5327d4513b587e2a2e948fa20f588a04f1376f \na55184fca134ce16b64335ac2f88b31b1161cd81 \n953ee8d720cf32311d82dad1bcb1b566333c5d62 \nThe bundle uses this hash algorithm: sha1\n",
-    "stderr": "/tmp/udp-counter-reset-inputs-bhmvs5kq/candidates.bundle is okay\n"
+    "stdout": "The bundle contains these 8 refs:\n46be6421e93cac43400e99ceeb89ee1290479ce9 refs/heads/candidate/background\n35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c refs/heads/candidate/statistics\ne592bd12df88084215667d4e74c62a120504aa96 refs/heads/candidate/integrated\n0e030aedbd4127e9215b38bb23dd6e38c5872546 refs/heads/support/main\nb05db817684d6b006353d5062fdba756d739faea refs/heads/support/udp\n5d9dc52e5f441e93a6571a2cf59ce78a85062613 refs/heads/support/server\n3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91 refs/heads/support/icon\n206fbbab4569d4e74de7f0febaa3eee5ed6c86bd refs/heads/support/settings\nThe bundle requires these 8 refs:\n8bec30de328543f8f23b79a736385ed0e80aaa88 \nd1539f429b6a0e993adc9d50f816c3a29c3fac32 \ne50f434be2610ef00713d39363963542db0020e2 \nd3f20d7e3905dcc300f0a5ebf155aa4cc2869774 \nbf0789c68670078def846d7e3778e7f5cfe9e77f \n5d5327d4513b587e2a2e948fa20f588a04f1376f \na55184fca134ce16b64335ac2f88b31b1161cd81 \n953ee8d720cf32311d82dad1bcb1b566333c5d62 \nThe bundle uses this hash algorithm: sha1\n",
+    "stderr": "/tmp/udp-counter-reset-inputs-yozyb42_/candidates.bundle is okay\n"
   },
   "canonical_only_full_strict_fsck": true,
   "temporary_unbundle_refs_unchanged": true,
@@ -253,13 +294,13 @@
     },
     {
       "owner": "statistics",
-      "sha": "e27ddccd2a550af3c9bb70998021634f6a7dea59",
+      "sha": "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c",
       "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
       "returncode": 1
     },
     {
       "owner": "statistics",
-      "sha": "e27ddccd2a550af3c9bb70998021634f6a7dea59",
+      "sha": "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c",
       "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
       "returncode": 1
     },
@@ -289,20 +330,20 @@
     },
     {
       "owner": "integrated",
-      "sha": "7fcb45cd885fe03788dc76a39bc7afbf2c91f502",
+      "sha": "e592bd12df88084215667d4e74c62a120504aa96",
       "forbidden": "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
       "returncode": 1
     },
     {
       "owner": "integrated",
-      "sha": "7fcb45cd885fe03788dc76a39bc7afbf2c91f502",
+      "sha": "e592bd12df88084215667d4e74c62a120504aa96",
       "forbidden": "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
       "returncode": 1
     }
   ],
   "refs_before": {
     "helper": {
-      "head": "bce2e2b73fb7b735f1a35781f703a5b0498a9d67",
+      "head": "2bf0f04fcc02f4bc0f1eafe340018dde74137d0b",
       "symbolic_head": null,
       "count": 47,
       "sha256": "d1e4a5f434c11cc15757bf8537f17d0bb7bb28358e7a7d46c8cb5ea44c1d869a"
@@ -328,7 +369,7 @@
     "verify": 6,
     "total": 16
   },
-  "scope": "Local packaging and object verification only; clean committed-helper importer and CI remain required.",
+  "scope": "Local packaging and object verification of updated Statistics/Integrated plus unchanged Background reverification; helper diagnostic pin rebinding, clean committed-helper importer and actual CI remain separate, unexecuted steps.",
   "commands": [
     {
       "command": [
@@ -339,11 +380,11 @@
         "rev-parse",
         "HEAD"
       ],
-      "started_utc": "2026-11-04T21:01:34.888191+00:00",
-      "completed_utc": "2026-11-04T21:01:34.891244+00:00",
+      "started_utc": "2026-11-04T21:13:13.606590+00:00",
+      "completed_utc": "2026-11-04T21:13:13.608626+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
-      "stdout_sha256": "3719e1a15cf8c814887aa06ee0b0df8925658c4d62ae25cfaa93ba10982c4aa4",
+      "stdout_sha256": "bb5560fca282fa40f1df5909dbd32693220c16479b61af0f08c07bd4f61d116f",
       "stderr_bytes": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -356,8 +397,8 @@
         "rev-parse",
         "--show-toplevel"
       ],
-      "started_utc": "2026-11-04T21:01:34.891309+00:00",
-      "completed_utc": "2026-11-04T21:01:34.893180+00:00",
+      "started_utc": "2026-11-04T21:13:13.608660+00:00",
+      "completed_utc": "2026-11-04T21:13:13.610280+00:00",
       "returncode": 0,
       "stdout_bytes": 69,
       "stdout_sha256": "94d6bfb50890dbb6312b1ac43ffa5adec73734536be938256b72e2abca72f8d7",
@@ -374,8 +415,8 @@
         "--porcelain=v1",
         "--untracked-files=all"
       ],
-      "started_utc": "2026-11-04T21:01:34.893206+00:00",
-      "completed_utc": "2026-11-04T21:01:34.897688+00:00",
+      "started_utc": "2026-11-04T21:13:13.610299+00:00",
+      "completed_utc": "2026-11-04T21:13:13.613376+00:00",
       "returncode": 0,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -391,8 +432,8 @@
         "rev-parse",
         "--is-bare-repository"
       ],
-      "started_utc": "2026-11-04T21:01:34.897732+00:00",
-      "completed_utc": "2026-11-04T21:01:34.899235+00:00",
+      "started_utc": "2026-11-04T21:13:13.613405+00:00",
+      "completed_utc": "2026-11-04T21:13:13.614850+00:00",
       "returncode": 0,
       "stdout_bytes": 5,
       "stdout_sha256": "a17fcf0a2f50e2d495e4f90ce263410edc183add6c62699a2facbccf60410f74",
@@ -408,8 +449,8 @@
         "rev-parse",
         "--is-shallow-repository"
       ],
-      "started_utc": "2026-11-04T21:01:34.899252+00:00",
-      "completed_utc": "2026-11-04T21:01:34.901774+00:00",
+      "started_utc": "2026-11-04T21:13:13.614866+00:00",
+      "completed_utc": "2026-11-04T21:13:13.616530+00:00",
       "returncode": 0,
       "stdout_bytes": 6,
       "stdout_sha256": "2ed27c1421e6928dbe13dbfdb5c59e1045b30341fe7ebe05700006bc5ac572c0",
@@ -425,8 +466,8 @@
         "rev-parse",
         "--show-object-format"
       ],
-      "started_utc": "2026-11-04T21:01:34.901792+00:00",
-      "completed_utc": "2026-11-04T21:01:34.903631+00:00",
+      "started_utc": "2026-11-04T21:13:13.616562+00:00",
+      "completed_utc": "2026-11-04T21:13:13.618081+00:00",
       "returncode": 0,
       "stdout_bytes": 5,
       "stdout_sha256": "335277ee77cfc8d51d6602e4137232cf6041aac2bc663777e384b90d5ae74d51",
@@ -444,8 +485,8 @@
         "--git-path",
         "objects"
       ],
-      "started_utc": "2026-11-04T21:01:34.903650+00:00",
-      "completed_utc": "2026-11-04T21:01:34.905523+00:00",
+      "started_utc": "2026-11-04T21:13:13.618128+00:00",
+      "completed_utc": "2026-11-04T21:13:13.619606+00:00",
       "returncode": 0,
       "stdout_bytes": 89,
       "stdout_sha256": "377cfe59da2e36e92f60e6c6d55e8af9b95b2a7e83e686877d84827b8734b052",
@@ -462,11 +503,11 @@
         "--verify",
         "HEAD"
       ],
-      "started_utc": "2026-11-04T21:01:34.905649+00:00",
-      "completed_utc": "2026-11-04T21:01:34.907492+00:00",
+      "started_utc": "2026-11-04T21:13:13.619659+00:00",
+      "completed_utc": "2026-11-04T21:13:13.621160+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
-      "stdout_sha256": "3719e1a15cf8c814887aa06ee0b0df8925658c4d62ae25cfaa93ba10982c4aa4",
+      "stdout_sha256": "bb5560fca282fa40f1df5909dbd32693220c16479b61af0f08c07bd4f61d116f",
       "stderr_bytes": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -480,8 +521,8 @@
         "-q",
         "HEAD"
       ],
-      "started_utc": "2026-11-04T21:01:34.907508+00:00",
-      "completed_utc": "2026-11-04T21:01:34.912428+00:00",
+      "started_utc": "2026-11-04T21:13:13.621174+00:00",
+      "completed_utc": "2026-11-04T21:13:13.622745+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -497,8 +538,8 @@
         "for-each-ref",
         "--format=%(refname) %(objectname)"
       ],
-      "started_utc": "2026-11-04T21:01:34.912452+00:00",
-      "completed_utc": "2026-11-04T21:01:34.914651+00:00",
+      "started_utc": "2026-11-04T21:13:13.622762+00:00",
+      "completed_utc": "2026-11-04T21:13:13.624820+00:00",
       "returncode": 0,
       "stdout_bytes": 4595,
       "stdout_sha256": "07d75ff66647699bf44d1c45b012a6c24572679410ed6eea90201a06669fd8e1",
@@ -515,8 +556,8 @@
         "--verify",
         "HEAD"
       ],
-      "started_utc": "2026-11-04T21:01:34.914712+00:00",
-      "completed_utc": "2026-11-04T21:01:34.916200+00:00",
+      "started_utc": "2026-11-04T21:13:13.624846+00:00",
+      "completed_utc": "2026-11-04T21:13:13.626194+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "361f514a610b5530ae736a17a45e5fb3de30fb9e34e061494c09b740db24848d",
@@ -533,8 +574,8 @@
         "-q",
         "HEAD"
       ],
-      "started_utc": "2026-11-04T21:01:34.916219+00:00",
-      "completed_utc": "2026-11-04T21:01:34.918054+00:00",
+      "started_utc": "2026-11-04T21:13:13.626210+00:00",
+      "completed_utc": "2026-11-04T21:13:13.627830+00:00",
       "returncode": 0,
       "stdout_bytes": 26,
       "stdout_sha256": "2c4b7688e9207778c1cb1d11ea9eff5f70c6a6bd3e250e28ba121949332ee421",
@@ -550,8 +591,8 @@
         "for-each-ref",
         "--format=%(refname) %(objectname)"
       ],
-      "started_utc": "2026-11-04T21:01:34.918077+00:00",
-      "completed_utc": "2026-11-04T21:01:34.921197+00:00",
+      "started_utc": "2026-11-04T21:13:13.627845+00:00",
+      "completed_utc": "2026-11-04T21:13:13.630044+00:00",
       "returncode": 0,
       "stdout_bytes": 4595,
       "stdout_sha256": "07d75ff66647699bf44d1c45b012a6c24572679410ed6eea90201a06669fd8e1",
@@ -565,10 +606,10 @@
         "-C",
         "/workspace/scratch/ecdd1deb3751/implementation-20261105/build-helper",
         "show",
-        "bce2e2b73fb7b735f1a35781f703a5b0498a9d67:Bootstrap/import_candidates.py"
+        "2bf0f04fcc02f4bc0f1eafe340018dde74137d0b:Bootstrap/import_candidates.py"
       ],
-      "started_utc": "2026-11-04T21:01:34.921769+00:00",
-      "completed_utc": "2026-11-04T21:01:34.926824+00:00",
+      "started_utc": "2026-11-04T21:13:13.630322+00:00",
+      "completed_utc": "2026-11-04T21:13:13.632693+00:00",
       "returncode": 0,
       "stdout_bytes": 5295,
       "stdout_sha256": "1e647ab8a266a64097c5cc543f22d6a2c58010bfba8988b10fa4809589a6367e",
@@ -582,10 +623,10 @@
         "-C",
         "/workspace/scratch/ecdd1deb3751/implementation-20261105/build-helper",
         "show",
-        "bce2e2b73fb7b735f1a35781f703a5b0498a9d67:Bootstrap/ci_evidence.py"
+        "2bf0f04fcc02f4bc0f1eafe340018dde74137d0b:Bootstrap/ci_evidence.py"
       ],
-      "started_utc": "2026-11-04T21:01:34.926970+00:00",
-      "completed_utc": "2026-11-04T21:01:34.929491+00:00",
+      "started_utc": "2026-11-04T21:13:13.632780+00:00",
+      "completed_utc": "2026-11-04T21:13:13.634892+00:00",
       "returncode": 0,
       "stdout_bytes": 7350,
       "stdout_sha256": "827c8f69d562f60f416bfd9378b210beb9fa7aea28667716c54d4b449f5d3adc",
@@ -599,10 +640,10 @@
         "-C",
         "/workspace/scratch/ecdd1deb3751/implementation-20261105/build-helper",
         "show",
-        "bce2e2b73fb7b735f1a35781f703a5b0498a9d67:.github/workflows/udp-echo-candidate.yml"
+        "2bf0f04fcc02f4bc0f1eafe340018dde74137d0b:.github/workflows/udp-echo-candidate.yml"
       ],
-      "started_utc": "2026-11-04T21:01:34.929645+00:00",
-      "completed_utc": "2026-11-04T21:01:34.932043+00:00",
+      "started_utc": "2026-11-04T21:13:13.634994+00:00",
+      "completed_utc": "2026-11-04T21:13:13.638576+00:00",
       "returncode": 0,
       "stdout_bytes": 32714,
       "stdout_sha256": "38a3ecc120611c61860766c972d80d2dd3e9510005303f77abddce0ae82b073f",
@@ -617,352 +658,10 @@
         "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
         "cat-file",
         "-t",
-        "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd"
-      ],
-      "started_utc": "2026-11-04T21:01:34.932266+00:00",
-      "completed_utc": "2026-11-04T21:01:34.934716+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
-      ],
-      "started_utc": "2026-11-04T21:01:34.934738+00:00",
-      "completed_utc": "2026-11-04T21:01:34.937315+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "5d9dc52e5f441e93a6571a2cf59ce78a85062613"
-      ],
-      "started_utc": "2026-11-04T21:01:34.937338+00:00",
-      "completed_utc": "2026-11-04T21:01:34.939790+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
         "46be6421e93cac43400e99ceeb89ee1290479ce9"
       ],
-      "started_utc": "2026-11-04T21:01:34.939836+00:00",
-      "completed_utc": "2026-11-04T21:01:34.941786+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "e50f434be2610ef00713d39363963542db0020e2"
-      ],
-      "started_utc": "2026-11-04T21:01:34.941810+00:00",
-      "completed_utc": "2026-11-04T21:01:34.943468+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e"
-      ],
-      "started_utc": "2026-11-04T21:01:34.943486+00:00",
-      "completed_utc": "2026-11-04T21:01:34.944982+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "01f87619ce7f8fec9ed57b0a2b067b3441e93749"
-      ],
-      "started_utc": "2026-11-04T21:01:34.944997+00:00",
-      "completed_utc": "2026-11-04T21:01:34.946541+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "953ee8d720cf32311d82dad1bcb1b566333c5d62"
-      ],
-      "started_utc": "2026-11-04T21:01:34.946557+00:00",
-      "completed_utc": "2026-11-04T21:01:34.948211+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "e27ddccd2a550af3c9bb70998021634f6a7dea59"
-      ],
-      "started_utc": "2026-11-04T21:01:34.948227+00:00",
-      "completed_utc": "2026-11-04T21:01:34.951525+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "5d5327d4513b587e2a2e948fa20f588a04f1376f"
-      ],
-      "started_utc": "2026-11-04T21:01:34.951636+00:00",
-      "completed_utc": "2026-11-04T21:01:34.954283+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "d1539f429b6a0e993adc9d50f816c3a29c3fac32"
-      ],
-      "started_utc": "2026-11-04T21:01:34.954305+00:00",
-      "completed_utc": "2026-11-04T21:01:34.956123+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "0a62910f5e444edbf176fe3ccd52363e5b8f869e"
-      ],
-      "started_utc": "2026-11-04T21:01:34.956141+00:00",
-      "completed_utc": "2026-11-04T21:01:34.957908+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91"
-      ],
-      "started_utc": "2026-11-04T21:01:34.957926+00:00",
-      "completed_utc": "2026-11-04T21:01:34.960047+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "bf0789c68670078def846d7e3778e7f5cfe9e77f"
-      ],
-      "started_utc": "2026-11-04T21:01:34.960066+00:00",
-      "completed_utc": "2026-11-04T21:01:34.961639+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "b05db817684d6b006353d5062fdba756d739faea"
-      ],
-      "started_utc": "2026-11-04T21:01:34.961657+00:00",
-      "completed_utc": "2026-11-04T21:01:34.964071+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "2e3baaa705e50289f37f60f2d32376e588eefbbb"
-      ],
-      "started_utc": "2026-11-04T21:01:34.964090+00:00",
-      "completed_utc": "2026-11-04T21:01:34.965801+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "a55184fca134ce16b64335ac2f88b31b1161cd81"
-      ],
-      "started_utc": "2026-11-04T21:01:34.965817+00:00",
-      "completed_utc": "2026-11-04T21:01:34.967755+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "24f7f9dd989047aec420dd66eda0906d39654bd3"
-      ],
-      "started_utc": "2026-11-04T21:01:34.967774+00:00",
-      "completed_utc": "2026-11-04T21:01:34.969980+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "8bec30de328543f8f23b79a736385ed0e80aaa88"
-      ],
-      "started_utc": "2026-11-04T21:01:34.969998+00:00",
-      "completed_utc": "2026-11-04T21:01:34.972019+00:00",
-      "returncode": 0,
-      "stdout_bytes": 7,
-      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
-      "stderr_bytes": 0,
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "command": [
-        "git",
-        "--no-replace-objects",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
-        "cat-file",
-        "-t",
-        "0e030aedbd4127e9215b38bb23dd6e38c5872546"
-      ],
-      "started_utc": "2026-11-04T21:01:34.972038+00:00",
-      "completed_utc": "2026-11-04T21:01:34.973420+00:00",
+      "started_utc": "2026-11-04T21:13:13.638751+00:00",
+      "completed_utc": "2026-11-04T21:13:13.641105+00:00",
       "returncode": 0,
       "stdout_bytes": 7,
       "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
@@ -979,8 +678,332 @@
         "-t",
         "7fcb45cd885fe03788dc76a39bc7afbf2c91f502"
       ],
-      "started_utc": "2026-11-04T21:01:34.973438+00:00",
-      "completed_utc": "2026-11-04T21:01:34.975165+00:00",
+      "started_utc": "2026-11-04T21:13:13.641128+00:00",
+      "completed_utc": "2026-11-04T21:13:13.642972+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "bf0789c68670078def846d7e3778e7f5cfe9e77f"
+      ],
+      "started_utc": "2026-11-04T21:13:13.642990+00:00",
+      "completed_utc": "2026-11-04T21:13:13.644719+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "0e030aedbd4127e9215b38bb23dd6e38c5872546"
+      ],
+      "started_utc": "2026-11-04T21:13:13.644736+00:00",
+      "completed_utc": "2026-11-04T21:13:13.646465+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "a55184fca134ce16b64335ac2f88b31b1161cd81"
+      ],
+      "started_utc": "2026-11-04T21:13:13.646489+00:00",
+      "completed_utc": "2026-11-04T21:13:13.648445+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "953ee8d720cf32311d82dad1bcb1b566333c5d62"
+      ],
+      "started_utc": "2026-11-04T21:13:13.648465+00:00",
+      "completed_utc": "2026-11-04T21:13:13.650009+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c"
+      ],
+      "started_utc": "2026-11-04T21:13:13.650041+00:00",
+      "completed_utc": "2026-11-04T21:13:13.652153+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "b05db817684d6b006353d5062fdba756d739faea"
+      ],
+      "started_utc": "2026-11-04T21:13:13.652170+00:00",
+      "completed_utc": "2026-11-04T21:13:13.654110+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774"
+      ],
+      "started_utc": "2026-11-04T21:13:13.654127+00:00",
+      "completed_utc": "2026-11-04T21:13:13.655808+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "e50f434be2610ef00713d39363963542db0020e2"
+      ],
+      "started_utc": "2026-11-04T21:13:13.655826+00:00",
+      "completed_utc": "2026-11-04T21:13:13.657606+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "5d9dc52e5f441e93a6571a2cf59ce78a85062613"
+      ],
+      "started_utc": "2026-11-04T21:13:13.657623+00:00",
+      "completed_utc": "2026-11-04T21:13:13.659079+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "0a62910f5e444edbf176fe3ccd52363e5b8f869e"
+      ],
+      "started_utc": "2026-11-04T21:13:13.659098+00:00",
+      "completed_utc": "2026-11-04T21:13:13.660560+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "e27ddccd2a550af3c9bb70998021634f6a7dea59"
+      ],
+      "started_utc": "2026-11-04T21:13:13.660578+00:00",
+      "completed_utc": "2026-11-04T21:13:13.662090+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91"
+      ],
+      "started_utc": "2026-11-04T21:13:13.662109+00:00",
+      "completed_utc": "2026-11-04T21:13:13.663484+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "5d5327d4513b587e2a2e948fa20f588a04f1376f"
+      ],
+      "started_utc": "2026-11-04T21:13:13.663500+00:00",
+      "completed_utc": "2026-11-04T21:13:13.664934+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e"
+      ],
+      "started_utc": "2026-11-04T21:13:13.664950+00:00",
+      "completed_utc": "2026-11-04T21:13:13.666365+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd"
+      ],
+      "started_utc": "2026-11-04T21:13:13.666383+00:00",
+      "completed_utc": "2026-11-04T21:13:13.667930+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "e592bd12df88084215667d4e74c62a120504aa96"
+      ],
+      "started_utc": "2026-11-04T21:13:13.667947+00:00",
+      "completed_utc": "2026-11-04T21:13:13.669379+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "d1539f429b6a0e993adc9d50f816c3a29c3fac32"
+      ],
+      "started_utc": "2026-11-04T21:13:13.669395+00:00",
+      "completed_utc": "2026-11-04T21:13:13.670741+00:00",
+      "returncode": 0,
+      "stdout_bytes": 7,
+      "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "cat-file",
+        "-t",
+        "8bec30de328543f8f23b79a736385ed0e80aaa88"
+      ],
+      "started_utc": "2026-11-04T21:13:13.670757+00:00",
+      "completed_utc": "2026-11-04T21:13:13.673144+00:00",
       "returncode": 0,
       "stdout_bytes": 7,
       "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
@@ -996,8 +1019,8 @@
         "rev-parse",
         "0e030aedbd4127e9215b38bb23dd6e38c5872546^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:34.975189+00:00",
-      "completed_utc": "2026-11-04T21:01:34.978466+00:00",
+      "started_utc": "2026-11-04T21:13:13.673163+00:00",
+      "completed_utc": "2026-11-04T21:13:13.674872+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "9c80e971e4a71322d4402475232df4c610f089344efe9ecfc8f765042720a629",
@@ -1015,8 +1038,8 @@
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
         "0e030aedbd4127e9215b38bb23dd6e38c5872546"
       ],
-      "started_utc": "2026-11-04T21:01:34.978492+00:00",
-      "completed_utc": "2026-11-04T21:01:34.984586+00:00",
+      "started_utc": "2026-11-04T21:13:13.674889+00:00",
+      "completed_utc": "2026-11-04T21:13:13.677842+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1034,8 +1057,8 @@
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
         "0e030aedbd4127e9215b38bb23dd6e38c5872546"
       ],
-      "started_utc": "2026-11-04T21:01:34.984627+00:00",
-      "completed_utc": "2026-11-04T21:01:34.989376+00:00",
+      "started_utc": "2026-11-04T21:13:13.677860+00:00",
+      "completed_utc": "2026-11-04T21:13:13.680833+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1051,8 +1074,8 @@
         "rev-parse",
         "b05db817684d6b006353d5062fdba756d739faea^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:34.989420+00:00",
-      "completed_utc": "2026-11-04T21:01:34.991845+00:00",
+      "started_utc": "2026-11-04T21:13:13.680857+00:00",
+      "completed_utc": "2026-11-04T21:13:13.682531+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "0976b0971ccdf83c1b74aff1ca7ee13822e43f0f6f3c8f96f6bbbac37401d330",
@@ -1070,8 +1093,8 @@
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
         "b05db817684d6b006353d5062fdba756d739faea"
       ],
-      "started_utc": "2026-11-04T21:01:34.991881+00:00",
-      "completed_utc": "2026-11-04T21:01:34.997372+00:00",
+      "started_utc": "2026-11-04T21:13:13.682547+00:00",
+      "completed_utc": "2026-11-04T21:13:13.686522+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1089,8 +1112,8 @@
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
         "b05db817684d6b006353d5062fdba756d739faea"
       ],
-      "started_utc": "2026-11-04T21:01:34.997409+00:00",
-      "completed_utc": "2026-11-04T21:01:34.999703+00:00",
+      "started_utc": "2026-11-04T21:13:13.686541+00:00",
+      "completed_utc": "2026-11-04T21:13:13.688716+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1106,8 +1129,8 @@
         "rev-parse",
         "46be6421e93cac43400e99ceeb89ee1290479ce9^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:34.999731+00:00",
-      "completed_utc": "2026-11-04T21:01:35.002341+00:00",
+      "started_utc": "2026-11-04T21:13:13.688734+00:00",
+      "completed_utc": "2026-11-04T21:13:13.690937+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "63af2b18895e171eb45330d7f91e3f80b0e3bec1d2059b273e064a1e2f98dd13",
@@ -1122,11 +1145,31 @@
         "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
         "merge-base",
         "--is-ancestor",
-        "01f87619ce7f8fec9ed57b0a2b067b3441e93749",
+        "46be6421e93cac43400e99ceeb89ee1290479ce9",
         "46be6421e93cac43400e99ceeb89ee1290479ce9"
       ],
-      "started_utc": "2026-11-04T21:01:35.002371+00:00",
-      "completed_utc": "2026-11-04T21:01:35.004966+00:00",
+      "started_utc": "2026-11-04T21:13:13.690956+00:00",
+      "completed_utc": "2026-11-04T21:13:13.692738+00:00",
+      "returncode": 0,
+      "stdout_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "diff",
+        "--name-status",
+        "46be6421e93cac43400e99ceeb89ee1290479ce9",
+        "46be6421e93cac43400e99ceeb89ee1290479ce9",
+        "--"
+      ],
+      "started_utc": "2026-11-04T21:13:13.692754+00:00",
+      "completed_utc": "2026-11-04T21:13:13.694414+00:00",
       "returncode": 0,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1144,8 +1187,8 @@
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
         "46be6421e93cac43400e99ceeb89ee1290479ce9"
       ],
-      "started_utc": "2026-11-04T21:01:35.005010+00:00",
-      "completed_utc": "2026-11-04T21:01:35.011057+00:00",
+      "started_utc": "2026-11-04T21:13:13.694436+00:00",
+      "completed_utc": "2026-11-04T21:13:13.698448+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1163,8 +1206,8 @@
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
         "46be6421e93cac43400e99ceeb89ee1290479ce9"
       ],
-      "started_utc": "2026-11-04T21:01:35.011171+00:00",
-      "completed_utc": "2026-11-04T21:01:35.016747+00:00",
+      "started_utc": "2026-11-04T21:13:13.698466+00:00",
+      "completed_utc": "2026-11-04T21:13:13.702846+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1180,8 +1223,8 @@
         "rev-parse",
         "5d9dc52e5f441e93a6571a2cf59ce78a85062613^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:35.016788+00:00",
-      "completed_utc": "2026-11-04T21:01:35.018625+00:00",
+      "started_utc": "2026-11-04T21:13:13.702868+00:00",
+      "completed_utc": "2026-11-04T21:13:13.705153+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "459d71628459134691f107e9c943d22311fb71fcdae45a2a5ed6dc1671800c50",
@@ -1199,8 +1242,8 @@
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
         "5d9dc52e5f441e93a6571a2cf59ce78a85062613"
       ],
-      "started_utc": "2026-11-04T21:01:35.018648+00:00",
-      "completed_utc": "2026-11-04T21:01:35.022977+00:00",
+      "started_utc": "2026-11-04T21:13:13.705173+00:00",
+      "completed_utc": "2026-11-04T21:13:13.709919+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1218,8 +1261,8 @@
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
         "5d9dc52e5f441e93a6571a2cf59ce78a85062613"
       ],
-      "started_utc": "2026-11-04T21:01:35.023000+00:00",
-      "completed_utc": "2026-11-04T21:01:35.027484+00:00",
+      "started_utc": "2026-11-04T21:13:13.709940+00:00",
+      "completed_utc": "2026-11-04T21:13:13.714053+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1233,13 +1276,13 @@
         "-C",
         "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
         "rev-parse",
-        "e27ddccd2a550af3c9bb70998021634f6a7dea59^{tree}"
+        "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:35.027583+00:00",
-      "completed_utc": "2026-11-04T21:01:35.030186+00:00",
+      "started_utc": "2026-11-04T21:13:13.714076+00:00",
+      "completed_utc": "2026-11-04T21:13:13.716503+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
-      "stdout_sha256": "f3723ce75d6f0884f278ec23c833a16b8a0d2b5f305d2f9d65312eac2c73fd10",
+      "stdout_sha256": "4e292d38150c716bd0a38785899cbae9698b304aaddf8289ac52a4eefe260d50",
       "stderr_bytes": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -1251,11 +1294,11 @@
         "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
         "merge-base",
         "--is-ancestor",
-        "2e3baaa705e50289f37f60f2d32376e588eefbbb",
-        "e27ddccd2a550af3c9bb70998021634f6a7dea59"
+        "e27ddccd2a550af3c9bb70998021634f6a7dea59",
+        "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c"
       ],
-      "started_utc": "2026-11-04T21:01:35.030213+00:00",
-      "completed_utc": "2026-11-04T21:01:35.032265+00:00",
+      "started_utc": "2026-11-04T21:13:13.716541+00:00",
+      "completed_utc": "2026-11-04T21:13:13.718593+00:00",
       "returncode": 0,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1268,13 +1311,33 @@
         "--no-replace-objects",
         "-C",
         "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "diff",
+        "--name-status",
+        "e27ddccd2a550af3c9bb70998021634f6a7dea59",
+        "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c",
+        "--"
+      ],
+      "started_utc": "2026-11-04T21:13:13.718613+00:00",
+      "completed_utc": "2026-11-04T21:13:13.720508+00:00",
+      "returncode": 0,
+      "stdout_bytes": 173,
+      "stdout_sha256": "212d62623e58bcc50fca0d82581b00cbb444cbe2a2ddcc345f7e01902f44fa08",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
         "merge-base",
         "--is-ancestor",
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
-        "e27ddccd2a550af3c9bb70998021634f6a7dea59"
+        "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c"
       ],
-      "started_utc": "2026-11-04T21:01:35.032532+00:00",
-      "completed_utc": "2026-11-04T21:01:35.040107+00:00",
+      "started_utc": "2026-11-04T21:13:13.720530+00:00",
+      "completed_utc": "2026-11-04T21:13:13.726656+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1290,10 +1353,10 @@
         "merge-base",
         "--is-ancestor",
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
-        "e27ddccd2a550af3c9bb70998021634f6a7dea59"
+        "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c"
       ],
-      "started_utc": "2026-11-04T21:01:35.040155+00:00",
-      "completed_utc": "2026-11-04T21:01:35.046065+00:00",
+      "started_utc": "2026-11-04T21:13:13.726675+00:00",
+      "completed_utc": "2026-11-04T21:13:13.730767+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1309,8 +1372,8 @@
         "rev-parse",
         "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:35.046109+00:00",
-      "completed_utc": "2026-11-04T21:01:35.048511+00:00",
+      "started_utc": "2026-11-04T21:13:13.730789+00:00",
+      "completed_utc": "2026-11-04T21:13:13.732489+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "2cd84d8bc813d360b6c689a1449f7cc9418ea497a7187ba765f8eb8282ea7cd7",
@@ -1328,8 +1391,8 @@
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
         "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91"
       ],
-      "started_utc": "2026-11-04T21:01:35.048550+00:00",
-      "completed_utc": "2026-11-04T21:01:35.052393+00:00",
+      "started_utc": "2026-11-04T21:13:13.732514+00:00",
+      "completed_utc": "2026-11-04T21:13:13.737009+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1347,8 +1410,8 @@
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
         "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91"
       ],
-      "started_utc": "2026-11-04T21:01:35.052420+00:00",
-      "completed_utc": "2026-11-04T21:01:35.056385+00:00",
+      "started_utc": "2026-11-04T21:13:13.737030+00:00",
+      "completed_utc": "2026-11-04T21:13:13.741050+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1364,8 +1427,8 @@
         "rev-parse",
         "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:35.056412+00:00",
-      "completed_utc": "2026-11-04T21:01:35.058323+00:00",
+      "started_utc": "2026-11-04T21:13:13.741086+00:00",
+      "completed_utc": "2026-11-04T21:13:13.742769+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "dffe5dab76a9e4757138ebaaa63b044982e42a980f9c3e899dda246959210d59",
@@ -1383,8 +1446,8 @@
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
         "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd"
       ],
-      "started_utc": "2026-11-04T21:01:35.058346+00:00",
-      "completed_utc": "2026-11-04T21:01:35.063867+00:00",
+      "started_utc": "2026-11-04T21:13:13.742787+00:00",
+      "completed_utc": "2026-11-04T21:13:13.747381+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1402,8 +1465,8 @@
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
         "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd"
       ],
-      "started_utc": "2026-11-04T21:01:35.063897+00:00",
-      "completed_utc": "2026-11-04T21:01:35.069053+00:00",
+      "started_utc": "2026-11-04T21:13:13.747401+00:00",
+      "completed_utc": "2026-11-04T21:13:13.751223+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1417,13 +1480,13 @@
         "-C",
         "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
         "rev-parse",
-        "7fcb45cd885fe03788dc76a39bc7afbf2c91f502^{tree}"
+        "e592bd12df88084215667d4e74c62a120504aa96^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:35.069090+00:00",
-      "completed_utc": "2026-11-04T21:01:35.071148+00:00",
+      "started_utc": "2026-11-04T21:13:13.751265+00:00",
+      "completed_utc": "2026-11-04T21:13:13.752832+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
-      "stdout_sha256": "1a3bf892521a3f8ea699e8873e9ba3f11541bb0d15de2533a8eb5fbc5b2b20fc",
+      "stdout_sha256": "0dd78838171c2678205971dad697b8b130bf5c1bc127d3e8afcf3051f11745ca",
       "stderr_bytes": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -1435,11 +1498,11 @@
         "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
         "merge-base",
         "--is-ancestor",
-        "24f7f9dd989047aec420dd66eda0906d39654bd3",
-        "7fcb45cd885fe03788dc76a39bc7afbf2c91f502"
+        "7fcb45cd885fe03788dc76a39bc7afbf2c91f502",
+        "e592bd12df88084215667d4e74c62a120504aa96"
       ],
-      "started_utc": "2026-11-04T21:01:35.071239+00:00",
-      "completed_utc": "2026-11-04T21:01:35.073106+00:00",
+      "started_utc": "2026-11-04T21:13:13.752856+00:00",
+      "completed_utc": "2026-11-04T21:13:13.755083+00:00",
       "returncode": 0,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1452,13 +1515,33 @@
         "--no-replace-objects",
         "-C",
         "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
+        "diff",
+        "--name-status",
+        "7fcb45cd885fe03788dc76a39bc7afbf2c91f502",
+        "e592bd12df88084215667d4e74c62a120504aa96",
+        "--"
+      ],
+      "started_utc": "2026-11-04T21:13:13.755100+00:00",
+      "completed_utc": "2026-11-04T21:13:13.757329+00:00",
+      "returncode": 0,
+      "stdout_bytes": 204,
+      "stdout_sha256": "9c3dd07bf0e5a4a02c75498c180162d1aeea08c1911bf0a4c5f3f6d95e8642ce",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "git",
+        "--no-replace-objects",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/review-20261105/resume/repository-complete47.git",
         "merge-base",
         "--is-ancestor",
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
-        "7fcb45cd885fe03788dc76a39bc7afbf2c91f502"
+        "e592bd12df88084215667d4e74c62a120504aa96"
       ],
-      "started_utc": "2026-11-04T21:01:35.073124+00:00",
-      "completed_utc": "2026-11-04T21:01:35.085321+00:00",
+      "started_utc": "2026-11-04T21:13:13.757352+00:00",
+      "completed_utc": "2026-11-04T21:13:13.766423+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1474,10 +1557,10 @@
         "merge-base",
         "--is-ancestor",
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
-        "7fcb45cd885fe03788dc76a39bc7afbf2c91f502"
+        "e592bd12df88084215667d4e74c62a120504aa96"
       ],
-      "started_utc": "2026-11-04T21:01:35.085376+00:00",
-      "completed_utc": "2026-11-04T21:01:35.097056+00:00",
+      "started_utc": "2026-11-04T21:13:13.766450+00:00",
+      "completed_utc": "2026-11-04T21:13:13.775661+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1489,14 +1572,14 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq",
+        "/tmp/udp-counter-reset-inputs-yozyb42_",
         "init",
         "--bare",
         "--quiet",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/aliases.git"
+        "/tmp/udp-counter-reset-inputs-yozyb42_/aliases.git"
       ],
-      "started_utc": "2026-11-04T21:01:35.097646+00:00",
-      "completed_utc": "2026-11-04T21:01:35.101564+00:00",
+      "started_utc": "2026-11-04T21:13:13.776517+00:00",
+      "completed_utc": "2026-11-04T21:13:13.779641+00:00",
       "returncode": 0,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1508,30 +1591,30 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/aliases.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/aliases.git",
         "update-ref",
         "--stdin"
       ],
-      "started_utc": "2026-11-04T21:01:35.101762+00:00",
-      "completed_utc": "2026-11-04T21:01:35.107825+00:00",
+      "started_utc": "2026-11-04T21:13:13.779960+00:00",
+      "completed_utc": "2026-11-04T21:13:13.782952+00:00",
       "returncode": 0,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stderr_bytes": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdin_bytes": 1244,
-      "stdin_sha256": "24ec5095280a864d0cceefaa9af78d49914a76a5afc1a7d15b243efb7a517174"
+      "stdin_sha256": "b70818effc0beb46cd39a03e19b0ecd9e7b0e63cfa374b6e364981246e661748"
     },
     {
       "command": [
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/aliases.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/aliases.git",
         "bundle",
         "create",
         "--version=2",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/candidates.bundle",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/candidates.bundle",
         "refs/heads/candidate/background",
         "refs/heads/candidate/statistics",
         "refs/heads/candidate/integrated",
@@ -1549,8 +1632,8 @@
         "^953ee8d720cf32311d82dad1bcb1b566333c5d62",
         "^8bec30de328543f8f23b79a736385ed0e80aaa88"
       ],
-      "started_utc": "2026-11-04T21:01:35.107901+00:00",
-      "completed_utc": "2026-11-04T21:01:35.162318+00:00",
+      "started_utc": "2026-11-04T21:13:13.783002+00:00",
+      "completed_utc": "2026-11-04T21:13:13.804300+00:00",
       "returncode": 0,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1562,16 +1645,16 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/aliases.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/aliases.git",
         "bundle",
         "list-heads",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/candidates.bundle"
+        "/tmp/udp-counter-reset-inputs-yozyb42_/candidates.bundle"
       ],
-      "started_utc": "2026-11-04T21:01:35.162386+00:00",
-      "completed_utc": "2026-11-04T21:01:35.164774+00:00",
+      "started_utc": "2026-11-04T21:13:13.804419+00:00",
+      "completed_utc": "2026-11-04T21:13:13.808474+00:00",
       "returncode": 0,
       "stdout_bytes": 549,
-      "stdout_sha256": "dc77f87b294210d551dc821a724a8b89d1dc2778876646384ae59271b16bc9db",
+      "stdout_sha256": "50e6096e312d7fa96570979401d4aaa360aac7401bd6a15e219b7250ca67a2f4",
       "stderr_bytes": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -1580,11 +1663,11 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/aliases.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/aliases.git",
         "bundle",
         "create",
         "--version=2",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-histories.bundle",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-histories.bundle",
         "refs/heads/prerequisite/main",
         "refs/heads/prerequisite/udp",
         "refs/heads/prerequisite/background",
@@ -1594,8 +1677,8 @@
         "refs/heads/prerequisite/settings",
         "refs/heads/prerequisite/integrated"
       ],
-      "started_utc": "2026-11-04T21:01:35.164956+00:00",
-      "completed_utc": "2026-11-04T21:01:35.292386+00:00",
+      "started_utc": "2026-11-04T21:13:13.808644+00:00",
+      "completed_utc": "2026-11-04T21:13:13.897212+00:00",
       "returncode": 0,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1607,14 +1690,14 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq",
+        "/tmp/udp-counter-reset-inputs-yozyb42_",
         "init",
         "--bare",
         "--quiet",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git"
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git"
       ],
-      "started_utc": "2026-11-04T21:01:35.292556+00:00",
-      "completed_utc": "2026-11-04T21:01:35.297042+00:00",
+      "started_utc": "2026-11-04T21:13:13.897390+00:00",
+      "completed_utc": "2026-11-04T21:13:13.902708+00:00",
       "returncode": 0,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1626,13 +1709,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "bundle",
         "unbundle",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-histories.bundle"
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-histories.bundle"
       ],
-      "started_utc": "2026-11-04T21:01:35.297065+00:00",
-      "completed_utc": "2026-11-04T21:01:35.460941+00:00",
+      "started_utc": "2026-11-04T21:13:13.902733+00:00",
+      "completed_utc": "2026-11-04T21:13:14.076788+00:00",
       "returncode": 0,
       "stdout_bytes": 583,
       "stdout_sha256": "01085ee30aadb357dadd0ae7afc28b008483aac63fe6f623e238f4ef7ae70386",
@@ -1644,12 +1727,12 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "update-ref",
         "--stdin"
       ],
-      "started_utc": "2026-11-04T21:01:35.461006+00:00",
-      "completed_utc": "2026-11-04T21:01:35.465825+00:00",
+      "started_utc": "2026-11-04T21:13:14.076852+00:00",
+      "completed_utc": "2026-11-04T21:13:14.079602+00:00",
       "returncode": 0,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1663,12 +1746,12 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "for-each-ref",
         "--format=%(refname) %(objectname)"
       ],
-      "started_utc": "2026-11-04T21:01:35.465881+00:00",
-      "completed_utc": "2026-11-04T21:01:35.467819+00:00",
+      "started_utc": "2026-11-04T21:13:14.079626+00:00",
+      "completed_utc": "2026-11-04T21:13:14.081693+00:00",
       "returncode": 0,
       "stdout_bytes": 583,
       "stdout_sha256": "b04d2fef85bb6ff26a3a556756a047f92c729f67eab5f84671902da4cb753785",
@@ -1680,13 +1763,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-e",
         "0e030aedbd4127e9215b38bb23dd6e38c5872546^{commit}"
       ],
-      "started_utc": "2026-11-04T21:01:35.467844+00:00",
-      "completed_utc": "2026-11-04T21:01:35.469361+00:00",
+      "started_utc": "2026-11-04T21:13:14.081714+00:00",
+      "completed_utc": "2026-11-04T21:13:14.083405+00:00",
       "returncode": 128,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1698,13 +1781,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-e",
         "b05db817684d6b006353d5062fdba756d739faea^{commit}"
       ],
-      "started_utc": "2026-11-04T21:01:35.469387+00:00",
-      "completed_utc": "2026-11-04T21:01:35.471341+00:00",
+      "started_utc": "2026-11-04T21:13:14.083546+00:00",
+      "completed_utc": "2026-11-04T21:13:14.085101+00:00",
       "returncode": 128,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1716,13 +1799,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-e",
         "46be6421e93cac43400e99ceeb89ee1290479ce9^{commit}"
       ],
-      "started_utc": "2026-11-04T21:01:35.471690+00:00",
-      "completed_utc": "2026-11-04T21:01:35.473981+00:00",
+      "started_utc": "2026-11-04T21:13:14.085118+00:00",
+      "completed_utc": "2026-11-04T21:13:14.087082+00:00",
       "returncode": 128,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1734,13 +1817,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-e",
         "5d9dc52e5f441e93a6571a2cf59ce78a85062613^{commit}"
       ],
-      "started_utc": "2026-11-04T21:01:35.473999+00:00",
-      "completed_utc": "2026-11-04T21:01:35.475980+00:00",
+      "started_utc": "2026-11-04T21:13:14.087102+00:00",
+      "completed_utc": "2026-11-04T21:13:14.088642+00:00",
       "returncode": 128,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1752,31 +1835,31 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-e",
-        "e27ddccd2a550af3c9bb70998021634f6a7dea59^{commit}"
+        "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c^{commit}"
       ],
-      "started_utc": "2026-11-04T21:01:35.475999+00:00",
-      "completed_utc": "2026-11-04T21:01:35.478132+00:00",
+      "started_utc": "2026-11-04T21:13:14.088658+00:00",
+      "completed_utc": "2026-11-04T21:13:14.092126+00:00",
       "returncode": 128,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stderr_bytes": 81,
-      "stderr_sha256": "8b2f72e35c031ee9e09e8008f93bc459baa09de6edbf6dc15ee80c94b7ea1020"
+      "stderr_sha256": "d3e3b55916664db7ef8babd096233b8a2a63b416bb2d7c9fd60e718671ab1954"
     },
     {
       "command": [
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-e",
         "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91^{commit}"
       ],
-      "started_utc": "2026-11-04T21:01:35.478150+00:00",
-      "completed_utc": "2026-11-04T21:01:35.479744+00:00",
+      "started_utc": "2026-11-04T21:13:14.092145+00:00",
+      "completed_utc": "2026-11-04T21:13:14.093626+00:00",
       "returncode": 128,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1788,13 +1871,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-e",
         "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd^{commit}"
       ],
-      "started_utc": "2026-11-04T21:01:35.479760+00:00",
-      "completed_utc": "2026-11-04T21:01:35.481165+00:00",
+      "started_utc": "2026-11-04T21:13:14.093642+00:00",
+      "completed_utc": "2026-11-04T21:13:14.095161+00:00",
       "returncode": 128,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -1806,52 +1889,52 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-e",
-        "7fcb45cd885fe03788dc76a39bc7afbf2c91f502^{commit}"
+        "e592bd12df88084215667d4e74c62a120504aa96^{commit}"
       ],
-      "started_utc": "2026-11-04T21:01:35.481183+00:00",
-      "completed_utc": "2026-11-04T21:01:35.482708+00:00",
+      "started_utc": "2026-11-04T21:13:14.095177+00:00",
+      "completed_utc": "2026-11-04T21:13:14.096606+00:00",
       "returncode": 128,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stderr_bytes": 81,
-      "stderr_sha256": "d44ef0102f3da746a9e7155b9827971ff436a3240486c1b9a725e4dfbaeef5e1"
+      "stderr_sha256": "2e51091de3a0b8c727baf03d23787d864dd6a0b34b2fe2980cb64fabcb850933"
     },
     {
       "command": [
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "bundle",
         "verify",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/candidates.bundle"
+        "/tmp/udp-counter-reset-inputs-yozyb42_/candidates.bundle"
       ],
-      "started_utc": "2026-11-04T21:01:35.482728+00:00",
-      "completed_utc": "2026-11-04T21:01:35.487188+00:00",
+      "started_utc": "2026-11-04T21:13:14.096621+00:00",
+      "completed_utc": "2026-11-04T21:13:14.102089+00:00",
       "returncode": 0,
       "stdout_bytes": 995,
-      "stdout_sha256": "e83df29d322b3568ed691a14dcfcd38e2700c29e5142263d218a9f22ba7233ee",
+      "stdout_sha256": "9df21bfbf3298b696ccd13af5db8ba83d6bda956c42777f17ad343267f9b2821",
       "stderr_bytes": 65,
-      "stderr_sha256": "1f8dfe4d66983440faa9bf7913a3a42e884826eaddc3db2e3afcd47e2af717d7"
+      "stderr_sha256": "00fdf3ce8a85accd8df6304ff8b04c2887e7644d848ab707ff6d21c0837a1da6"
     },
     {
       "command": [
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "bundle",
         "unbundle",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/candidates.bundle"
+        "/tmp/udp-counter-reset-inputs-yozyb42_/candidates.bundle"
       ],
-      "started_utc": "2026-11-04T21:01:35.487215+00:00",
-      "completed_utc": "2026-11-04T21:01:35.528476+00:00",
+      "started_utc": "2026-11-04T21:13:14.102106+00:00",
+      "completed_utc": "2026-11-04T21:13:14.142397+00:00",
       "returncode": 0,
       "stdout_bytes": 549,
-      "stdout_sha256": "dc77f87b294210d551dc821a724a8b89d1dc2778876646384ae59271b16bc9db",
+      "stdout_sha256": "50e6096e312d7fa96570979401d4aaa360aac7401bd6a15e219b7250ca67a2f4",
       "stderr_bytes": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -1860,12 +1943,12 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "for-each-ref",
         "--format=%(refname) %(objectname)"
       ],
-      "started_utc": "2026-11-04T21:01:35.528531+00:00",
-      "completed_utc": "2026-11-04T21:01:35.531535+00:00",
+      "started_utc": "2026-11-04T21:13:14.142451+00:00",
+      "completed_utc": "2026-11-04T21:13:14.144650+00:00",
       "returncode": 0,
       "stdout_bytes": 583,
       "stdout_sha256": "b04d2fef85bb6ff26a3a556756a047f92c729f67eab5f84671902da4cb753785",
@@ -1877,13 +1960,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-t",
         "0e030aedbd4127e9215b38bb23dd6e38c5872546"
       ],
-      "started_utc": "2026-11-04T21:01:35.531569+00:00",
-      "completed_utc": "2026-11-04T21:01:35.533625+00:00",
+      "started_utc": "2026-11-04T21:13:14.144687+00:00",
+      "completed_utc": "2026-11-04T21:13:14.146298+00:00",
       "returncode": 0,
       "stdout_bytes": 7,
       "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
@@ -1895,12 +1978,12 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "rev-parse",
         "0e030aedbd4127e9215b38bb23dd6e38c5872546^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:35.533647+00:00",
-      "completed_utc": "2026-11-04T21:01:35.536064+00:00",
+      "started_utc": "2026-11-04T21:13:14.146330+00:00",
+      "completed_utc": "2026-11-04T21:13:14.148189+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "9c80e971e4a71322d4402475232df4c610f089344efe9ecfc8f765042720a629",
@@ -1912,13 +1995,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-t",
         "b05db817684d6b006353d5062fdba756d739faea"
       ],
-      "started_utc": "2026-11-04T21:01:35.536087+00:00",
-      "completed_utc": "2026-11-04T21:01:35.537609+00:00",
+      "started_utc": "2026-11-04T21:13:14.148212+00:00",
+      "completed_utc": "2026-11-04T21:13:14.150388+00:00",
       "returncode": 0,
       "stdout_bytes": 7,
       "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
@@ -1930,12 +2013,12 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "rev-parse",
         "b05db817684d6b006353d5062fdba756d739faea^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:35.537628+00:00",
-      "completed_utc": "2026-11-04T21:01:35.539288+00:00",
+      "started_utc": "2026-11-04T21:13:14.150405+00:00",
+      "completed_utc": "2026-11-04T21:13:14.152353+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "0976b0971ccdf83c1b74aff1ca7ee13822e43f0f6f3c8f96f6bbbac37401d330",
@@ -1947,13 +2030,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-t",
         "46be6421e93cac43400e99ceeb89ee1290479ce9"
       ],
-      "started_utc": "2026-11-04T21:01:35.539310+00:00",
-      "completed_utc": "2026-11-04T21:01:35.540948+00:00",
+      "started_utc": "2026-11-04T21:13:14.152372+00:00",
+      "completed_utc": "2026-11-04T21:13:14.153904+00:00",
       "returncode": 0,
       "stdout_bytes": 7,
       "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
@@ -1965,12 +2048,12 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "rev-parse",
         "46be6421e93cac43400e99ceeb89ee1290479ce9^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:35.540968+00:00",
-      "completed_utc": "2026-11-04T21:01:35.543214+00:00",
+      "started_utc": "2026-11-04T21:13:14.153922+00:00",
+      "completed_utc": "2026-11-04T21:13:14.156220+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "63af2b18895e171eb45330d7f91e3f80b0e3bec1d2059b273e064a1e2f98dd13",
@@ -1982,13 +2065,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-t",
         "5d9dc52e5f441e93a6571a2cf59ce78a85062613"
       ],
-      "started_utc": "2026-11-04T21:01:35.543234+00:00",
-      "completed_utc": "2026-11-04T21:01:35.547312+00:00",
+      "started_utc": "2026-11-04T21:13:14.156318+00:00",
+      "completed_utc": "2026-11-04T21:13:14.158535+00:00",
       "returncode": 0,
       "stdout_bytes": 7,
       "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
@@ -2000,12 +2083,12 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "rev-parse",
         "5d9dc52e5f441e93a6571a2cf59ce78a85062613^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:35.547335+00:00",
-      "completed_utc": "2026-11-04T21:01:35.548874+00:00",
+      "started_utc": "2026-11-04T21:13:14.158570+00:00",
+      "completed_utc": "2026-11-04T21:13:14.161383+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "459d71628459134691f107e9c943d22311fb71fcdae45a2a5ed6dc1671800c50",
@@ -2017,13 +2100,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-t",
-        "e27ddccd2a550af3c9bb70998021634f6a7dea59"
+        "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c"
       ],
-      "started_utc": "2026-11-04T21:01:35.548892+00:00",
-      "completed_utc": "2026-11-04T21:01:35.550783+00:00",
+      "started_utc": "2026-11-04T21:13:14.161403+00:00",
+      "completed_utc": "2026-11-04T21:13:14.163084+00:00",
       "returncode": 0,
       "stdout_bytes": 7,
       "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
@@ -2035,15 +2118,15 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "rev-parse",
-        "e27ddccd2a550af3c9bb70998021634f6a7dea59^{tree}"
+        "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:35.550803+00:00",
-      "completed_utc": "2026-11-04T21:01:35.552334+00:00",
+      "started_utc": "2026-11-04T21:13:14.163114+00:00",
+      "completed_utc": "2026-11-04T21:13:14.164672+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
-      "stdout_sha256": "f3723ce75d6f0884f278ec23c833a16b8a0d2b5f305d2f9d65312eac2c73fd10",
+      "stdout_sha256": "4e292d38150c716bd0a38785899cbae9698b304aaddf8289ac52a4eefe260d50",
       "stderr_bytes": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -2052,13 +2135,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-t",
         "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91"
       ],
-      "started_utc": "2026-11-04T21:01:35.552349+00:00",
-      "completed_utc": "2026-11-04T21:01:35.553887+00:00",
+      "started_utc": "2026-11-04T21:13:14.164700+00:00",
+      "completed_utc": "2026-11-04T21:13:14.166102+00:00",
       "returncode": 0,
       "stdout_bytes": 7,
       "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
@@ -2070,12 +2153,12 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "rev-parse",
         "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:35.553903+00:00",
-      "completed_utc": "2026-11-04T21:01:35.555345+00:00",
+      "started_utc": "2026-11-04T21:13:14.166121+00:00",
+      "completed_utc": "2026-11-04T21:13:14.167667+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "2cd84d8bc813d360b6c689a1449f7cc9418ea497a7187ba765f8eb8282ea7cd7",
@@ -2087,13 +2170,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-t",
         "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd"
       ],
-      "started_utc": "2026-11-04T21:01:35.555361+00:00",
-      "completed_utc": "2026-11-04T21:01:35.556811+00:00",
+      "started_utc": "2026-11-04T21:13:14.167684+00:00",
+      "completed_utc": "2026-11-04T21:13:14.169801+00:00",
       "returncode": 0,
       "stdout_bytes": 7,
       "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
@@ -2105,12 +2188,12 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "rev-parse",
         "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:35.556826+00:00",
-      "completed_utc": "2026-11-04T21:01:35.558611+00:00",
+      "started_utc": "2026-11-04T21:13:14.169819+00:00",
+      "completed_utc": "2026-11-04T21:13:14.171287+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "dffe5dab76a9e4757138ebaaa63b044982e42a980f9c3e899dda246959210d59",
@@ -2122,13 +2205,13 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "cat-file",
         "-t",
-        "7fcb45cd885fe03788dc76a39bc7afbf2c91f502"
+        "e592bd12df88084215667d4e74c62a120504aa96"
       ],
-      "started_utc": "2026-11-04T21:01:35.558630+00:00",
-      "completed_utc": "2026-11-04T21:01:35.560391+00:00",
+      "started_utc": "2026-11-04T21:13:14.171304+00:00",
+      "completed_utc": "2026-11-04T21:13:14.173153+00:00",
       "returncode": 0,
       "stdout_bytes": 7,
       "stdout_sha256": "50836eee574ecff79dea3b4fd40673d7d000f7a5f177d8a6a3000b59c78383b8",
@@ -2140,15 +2223,15 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "rev-parse",
-        "7fcb45cd885fe03788dc76a39bc7afbf2c91f502^{tree}"
+        "e592bd12df88084215667d4e74c62a120504aa96^{tree}"
       ],
-      "started_utc": "2026-11-04T21:01:35.560407+00:00",
-      "completed_utc": "2026-11-04T21:01:35.562254+00:00",
+      "started_utc": "2026-11-04T21:13:14.173170+00:00",
+      "completed_utc": "2026-11-04T21:13:14.174749+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
-      "stdout_sha256": "1a3bf892521a3f8ea699e8873e9ba3f11541bb0d15de2533a8eb5fbc5b2b20fc",
+      "stdout_sha256": "0dd78838171c2678205971dad697b8b130bf5c1bc127d3e8afcf3051f11745ca",
       "stderr_bytes": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -2157,7 +2240,7 @@
         "git",
         "--no-replace-objects",
         "-C",
-        "/tmp/udp-counter-reset-inputs-bhmvs5kq/canonical-only.git",
+        "/tmp/udp-counter-reset-inputs-yozyb42_/canonical-only.git",
         "fsck",
         "--full",
         "--strict",
@@ -2167,13 +2250,13 @@
         "b05db817684d6b006353d5062fdba756d739faea",
         "46be6421e93cac43400e99ceeb89ee1290479ce9",
         "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
-        "e27ddccd2a550af3c9bb70998021634f6a7dea59",
+        "35aa05f9f3701d0ee4f469c1c795ca6e6f35b96c",
         "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
         "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
-        "7fcb45cd885fe03788dc76a39bc7afbf2c91f502"
+        "e592bd12df88084215667d4e74c62a120504aa96"
       ],
-      "started_utc": "2026-11-04T21:01:35.562274+00:00",
-      "completed_utc": "2026-11-04T21:01:35.854092+00:00",
+      "started_utc": "2026-11-04T21:13:14.174767+00:00",
+      "completed_utc": "2026-11-04T21:13:14.438230+00:00",
       "returncode": 0,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -2190,11 +2273,11 @@
         "--verify",
         "HEAD"
       ],
-      "started_utc": "2026-11-04T21:01:35.861938+00:00",
-      "completed_utc": "2026-11-04T21:01:35.863913+00:00",
+      "started_utc": "2026-11-04T21:13:14.445422+00:00",
+      "completed_utc": "2026-11-04T21:13:14.447713+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
-      "stdout_sha256": "3719e1a15cf8c814887aa06ee0b0df8925658c4d62ae25cfaa93ba10982c4aa4",
+      "stdout_sha256": "bb5560fca282fa40f1df5909dbd32693220c16479b61af0f08c07bd4f61d116f",
       "stderr_bytes": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -2208,8 +2291,8 @@
         "-q",
         "HEAD"
       ],
-      "started_utc": "2026-11-04T21:01:35.863933+00:00",
-      "completed_utc": "2026-11-04T21:01:35.865425+00:00",
+      "started_utc": "2026-11-04T21:13:14.447736+00:00",
+      "completed_utc": "2026-11-04T21:13:14.450961+00:00",
       "returncode": 1,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -2225,8 +2308,8 @@
         "for-each-ref",
         "--format=%(refname) %(objectname)"
       ],
-      "started_utc": "2026-11-04T21:01:35.865441+00:00",
-      "completed_utc": "2026-11-04T21:01:35.867911+00:00",
+      "started_utc": "2026-11-04T21:13:14.450984+00:00",
+      "completed_utc": "2026-11-04T21:13:14.453525+00:00",
       "returncode": 0,
       "stdout_bytes": 4595,
       "stdout_sha256": "07d75ff66647699bf44d1c45b012a6c24572679410ed6eea90201a06669fd8e1",
@@ -2243,8 +2326,8 @@
         "--verify",
         "HEAD"
       ],
-      "started_utc": "2026-11-04T21:01:35.867934+00:00",
-      "completed_utc": "2026-11-04T21:01:35.869334+00:00",
+      "started_utc": "2026-11-04T21:13:14.453572+00:00",
+      "completed_utc": "2026-11-04T21:13:14.455601+00:00",
       "returncode": 0,
       "stdout_bytes": 41,
       "stdout_sha256": "361f514a610b5530ae736a17a45e5fb3de30fb9e34e061494c09b740db24848d",
@@ -2261,8 +2344,8 @@
         "-q",
         "HEAD"
       ],
-      "started_utc": "2026-11-04T21:01:35.869349+00:00",
-      "completed_utc": "2026-11-04T21:01:35.870818+00:00",
+      "started_utc": "2026-11-04T21:13:14.455647+00:00",
+      "completed_utc": "2026-11-04T21:13:14.457219+00:00",
       "returncode": 0,
       "stdout_bytes": 26,
       "stdout_sha256": "2c4b7688e9207778c1cb1d11ea9eff5f70c6a6bd3e250e28ba121949332ee421",
@@ -2278,8 +2361,8 @@
         "for-each-ref",
         "--format=%(refname) %(objectname)"
       ],
-      "started_utc": "2026-11-04T21:01:35.870835+00:00",
-      "completed_utc": "2026-11-04T21:01:35.873771+00:00",
+      "started_utc": "2026-11-04T21:13:14.457262+00:00",
+      "completed_utc": "2026-11-04T21:13:14.459424+00:00",
       "returncode": 0,
       "stdout_bytes": 4595,
       "stdout_sha256": "07d75ff66647699bf44d1c45b012a6c24572679410ed6eea90201a06669fd8e1",
@@ -2297,8 +2380,8 @@
         "HEAD",
         "--"
       ],
-      "started_utc": "2026-11-04T21:01:35.873806+00:00",
-      "completed_utc": "2026-11-04T21:01:35.877503+00:00",
+      "started_utc": "2026-11-04T21:13:14.459463+00:00",
+      "completed_utc": "2026-11-04T21:13:14.462665+00:00",
       "returncode": 0,
       "stdout_bytes": 88,
       "stdout_sha256": "f5d8399244cef768ad648fbf433414e99ef6d3607162766253172026c03127e3",
@@ -2317,8 +2400,8 @@
         "HEAD",
         "--"
       ],
-      "started_utc": "2026-11-04T21:01:35.877589+00:00",
-      "completed_utc": "2026-11-04T21:01:35.881782+00:00",
+      "started_utc": "2026-11-04T21:13:14.462830+00:00",
+      "completed_utc": "2026-11-04T21:13:14.464947+00:00",
       "returncode": 0,
       "stdout_bytes": 0,
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -2328,7 +2411,7 @@
   ],
   "refs_after": {
     "helper": {
-      "head": "bce2e2b73fb7b735f1a35781f703a5b0498a9d67",
+      "head": "2bf0f04fcc02f4bc0f1eafe340018dde74137d0b",
       "symbolic_head": null,
       "count": 47,
       "sha256": "d1e4a5f434c11cc15757bf8537f17d0bb7bb28358e7a7d46c8cb5ea44c1d869a"
@@ -2341,5 +2424,5 @@
     }
   },
   "existing_repository_refs_unchanged": true,
-  "completed_utc": "2026-11-04T21:01:35.882067+00:00"
+  "completed_utc": "2026-11-04T21:13:14.465141+00:00"
 }
