@@ -27,8 +27,8 @@ record (const char *text, size_t in, size_t out)
 {
     struct sockaddr_in address = { .sin_family = AF_INET };
     assert (inet_pton (AF_INET, text, &address.sin_addr) == 1);
-    hev_socks5_server_io_writer_record (
-        writer, (struct sockaddr *)&address, sizeof (address), in, out);
+    hev_socks5_server_io_writer_record (writer, (struct sockaddr *)&address,
+                                        sizeof (address), in, out);
 }
 
 static void

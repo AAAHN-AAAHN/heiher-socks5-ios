@@ -532,10 +532,10 @@ index 40ad1cf31d97f237488fc49ee8dd710eb9260e69..b844baa8556462c189186b2f5ab92772
      unsigned int udp_associated : 1;
 diff --git a/src/worker_meter.c b/src/worker_meter.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..63d9d2907c6e4fa996e15a1e988ed757f78038f7
+index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca31661b39774
 --- /dev/null
 +++ b/src/worker_meter.c
-@@ -0,0 +1,346 @@
+@@ -0,0 +1,344 @@
 +#include "worker_meter.h"
 +#include <stdatomic.h>
 +#include <stdlib.h>
@@ -814,8 +814,7 @@ index 0000000000000000000000000000000000000000..63d9d2907c6e4fa996e15a1e988ed757
 +                session)
 +            return;
 +        /* A new epoch must order the following sequence read after wrap. */
-+        unsigned epoch =
-+            atomic_load_explicit (&c->epoch, memory_order_acquire);
++        unsigned epoch = atomic_load_explicit (&c->epoch, memory_order_acquire);
 +        unsigned before =
 +            atomic_load_explicit (&c->sequence, memory_order_acquire);
 +        if (before & 1u)
@@ -830,8 +829,7 @@ index 0000000000000000000000000000000000000000..63d9d2907c6e4fa996e15a1e988ed757
 +        /* Acquire a wrapped sequence before checking its epoch. */
 +        if (before !=
 +                atomic_load_explicit (&c->sequence, memory_order_acquire) ||
-+            epoch !=
-+                atomic_load_explicit (&c->epoch, memory_order_relaxed))
++            epoch != atomic_load_explicit (&c->epoch, memory_order_relaxed))
 +            continue;
 +        if (generation != session)
 +            return;

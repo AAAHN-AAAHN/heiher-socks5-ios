@@ -7,7 +7,7 @@
     "src/core/src/hev-socks5-udp.c": "d9a69449cd507be2f5814bf07a67a994fa4a2e9804b7bafe57d1d7882fbe2cef",
     "src/core/src/hev-socks5.c": "d97deabdfff39ea6b43644ec4bbecb604088bb6641a968f5cec58c0a642fd267",
     "src/core/src/hev-socks5.h": "6f3851a0c193360d7cdcf129da07470c920ff65f86843c6f087b635d8d7d3170",
-    "src/core/src/worker_meter.c": "a4a1a06da68ed1676af2ba1e0fc51f67bb2bbc94802ebc2de4deccb158b1f980",
+    "src/core/src/worker_meter.c": "facd70853f600a6dc30c3fc295b2d21653b2ab2a1f5b4f2b5fccdcfd56fcf0c2",
     "src/core/src/worker_meter.h": "1cc2984d82fd58b65239ce2f779d991313878f6522a03bfc8a3effc339c476d6",
     "third-part/hev-task-system/src/lib/io/basic/hev-task-io.c": "62b0a555f15f268c7b1f4dc6b1b33b1abcd3be33af96536ca559de4fc2df7310",
     "third-part/hev-task-system/src/lib/io/basic/hev-task-io.h": "d93443ca3e9835724236fb2a4974711525ae599711b971c7dde4154413b80212",
