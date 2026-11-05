@@ -13,13 +13,16 @@ import sys
 import time
 import zipfile
 
-DEPENDENCY_SHA = 'f0b7930f8fdebc97012053bbb4b2eccd58913bb72152b0e6fe25a43bb1f6439c'
-HISTORY_SHA = '6d1dd665951bab87c8df9e44d0b9ab07d68f3c5bcbf3547965b1a94f6db454cd'
-TRANSFER_SHA = 'cf46b2fda13531be3fd5219832fe6d90c19ed22018d679c8ece3f600334641c3'
-PRODUCER = {'repository': 'AAAHN-AAAHN/heiher-socks5-ios', 'run_id': '41919837795',
-            'attempt': '1', 'job': 'build', 'runner_os': 'macOS',
-            'helper': {'commit': 'b7216e75ca091b4482bc9a3583a278c8cb4058ea',
-                       'tree': '275f43f25e0f11d3d0b0e3effd570eb6c7cf1968'}}
+DEPENDENCY_SHA = 'a2704a8fe894efc41901bafa906fe7d38bd04624cbb6d899f654ed79a65e5d79'
+HISTORY_SHA = '14a1b7ca0a599939b9c06c280121962ecfcd8359ae6420dbdc7165aa0624ed01'
+TRANSFER_SHA = '1caf9e7266abb13a4db637e1f73638e037593b1562986a12818576069a5099a3'
+PRODUCER = {'repository': 'AAAHN-AAAHN/heiher-socks5-ios',
+ 'run_id': '41940618811',
+ 'attempt': '1',
+ 'job': 'build',
+ 'runner_os': 'macOS',
+ 'helper': {'commit': '8b227e0e5ca5b01f3dff79bd26938310ff429d13',
+            'tree': '8f379eba705bab4d16aa056b9da87b30232a5eea'}}
 SAFE_ENV = ('GITHUB_ACTIONS', 'GITHUB_REPOSITORY', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT',
             'GITHUB_JOB', 'GITHUB_SHA', 'GITHUB_REF', 'RUNNER_OS', 'RUNNER_ARCH',
             'ImageOS', 'ImageVersion', 'DEVELOPER_DIR')

@@ -20,7 +20,7 @@ jobs:
           path: control
           fetch-depth: 1
           persist-credentials: false
-      - name: Restore original v3 inputs and invoke the unchanged UI consumer exactly once
+      - name: Restore original v4 inputs and invoke the unchanged UI consumer exactly once
         shell: bash
         working-directory: control
         env:
