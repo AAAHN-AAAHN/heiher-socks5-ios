@@ -42,6 +42,95 @@ class ObserverContracts(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'birth identity changed'):
                 observer.verify_descendant(child, base)
 
+    def test_native_ancestry_allows_only_known_python_launcher_transition(self):
+        base = {'pid': 100, 'ppid': 90, 'uid': 501, 'ruid': 501, 'svuid': 501,
+                'start_seconds': 1000, 'start_microseconds': 1, 'executable': observer.PYTHON_LAUNCHER}
+        child = dict(base, pid=101, ppid=100, executable=observer.CORE_SIMCTL)
+        for path, accepted in [(observer.PYTHON_APPLICATION, True), ('/unrelated/Python', False)]:
+            identities = {101: child, 100: dict(base, executable=path)}
+            with self.subTest(path=path), patch.object(observer, 'owned', return_value=True), \
+                    patch.object(observer, 'native_identity', side_effect=identities.__getitem__):
+                if accepted:
+                    observer.verify_descendant(child, base)
+                else:
+                    with self.assertRaisesRegex(RuntimeError, 'executable changed'):
+                        observer.verify_descendant(child, base)
+
+    def snapshot_fixture(self, directory):
+        identity = {'pid': 101, 'ppid': 100, 'uid': 501, 'ruid': 501, 'svuid': 501,
+                    'start_seconds': 1000, 'start_microseconds': 1, 'executable': observer.CORE_SIMCTL}
+        report = {'simctl_executable': '/Applications/Xcode_27.app/Contents/Developer/usr/bin/simctl',
+                  'samples': [], 'inner': {'native_identity': dict(identity, pid=100, ppid=90)},
+                  'binding': {'source_root': directory, 'original_service_identity': dict(identity, pid=200, executable=observer.SERVICE)},
+                  'last_original_udid': '03ABB540-4FBE-427B-B47E-D2F8D4D96B44'}
+        return identity, report
+
+    def test_actual_core_simctl_path_reaches_native_and_argument_binding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            identity, report = self.snapshot_fixture(directory)
+            ps = '501 501 101 100 S 0.1 4096 00:05 Thu Nov 5 07:46:42 2026 ' + observer.CORE_SIMCTL + '\n'
+            args = observer.CORE_SIMCTL + ' bootstatus ' + report['last_original_udid'] + ' -b\n'
+            with patch.object(observer.os, 'getuid', return_value=501), \
+                    patch.object(observer, 'read_command', side_effect=[({'returncode': 0}, ps), ({'returncode': 0}, args)]), \
+                    patch.object(observer, 'native_identity', return_value=identity), \
+                    patch.object(observer, 'verify_descendant') as ancestry, \
+                    patch.object(observer, 'current_device', return_value={'udid': report['last_original_udid']}):
+                row = observer.snapshot(100, Path(directory), report, 1, {}, set())
+            ancestry.assert_called_once_with(identity, report['inner']['native_identity'])
+            self.assertEqual(row['processes'][0]['native_identity'], identity)
+            self.assertEqual(report['bound_bootstatus']['identity'], identity)
+            self.assertEqual(report['bound_bootstatus']['verified_args'], args.strip())
+            self.assertEqual(row['observer_errors'], [])
+
+    def test_same_basename_outside_exact_simctl_paths_is_not_queried(self):
+        with tempfile.TemporaryDirectory() as directory:
+            _, report = self.snapshot_fixture(directory)
+            ps = '501 501 101 100 S 0.1 4096 00:05 Thu Nov 5 07:46:42 2026 /unrelated/simctl\n'
+            with patch.object(observer.os, 'getuid', return_value=501), \
+                    patch.object(observer, 'read_command', return_value=({'returncode': 0}, ps)) as query, \
+                    patch.object(observer, 'native_identity') as native, \
+                    patch.object(observer, 'current_device', return_value={}):
+                observer.snapshot(100, Path(directory), report, 1, {}, set())
+            self.assertEqual(query.call_count, 1)
+            native.assert_not_called()
+            self.assertNotIn('bound_bootstatus', report)
+
+    def test_failed_ps_retains_actual_query_and_can_sample_bound_live_child(self):
+        with tempfile.TemporaryDirectory() as directory:
+            identity, report = self.snapshot_fixture(directory)
+            report['bound_bootstatus'] = {'identity': identity, 'verified_args': observer.CORE_SIMCTL + ' bootstatus ' + report['last_original_udid'] + ' -b',
+                                         'udid': report['last_original_udid'], 'first_seen_monotonic': 0.0,
+                                         'last_verified_utc': 'LOCAL_UNIT_FIXTURE'}
+            failed = {'argv': ['/bin/ps'], 'error': {'type': 'TimeoutExpired', 'message': 'LOCAL_UNIT_FIXTURE'},
+                      'started_utc': 'fixture-start', 'finished_utc': 'fixture-end'}
+            with patch.object(observer, 'read_command', return_value=(failed, '')), \
+                    patch.object(observer, 'native_identity', return_value=identity), \
+                    patch.object(observer, 'verify_descendant') as ancestry, \
+                    patch.object(observer, 'sample_once') as sample, \
+                    patch.object(observer.time, 'monotonic', return_value=61.0), \
+                    patch.object(observer, 'current_device', return_value={}):
+                row = observer.snapshot(100, Path(directory), report, 1, {}, set())
+            self.assertEqual(row['ps_query'], failed)
+            self.assertEqual(row['observer_errors'][0]['query'], failed)
+            self.assertEqual(row['processes'], [])
+            ancestry.assert_called_once_with(identity, report['inner']['native_identity'])
+            self.assertEqual([call.args[2] for call in sample.call_args_list], ['late-bootstatus', 'late-coresimulator'])
+
+    def test_bound_child_pid_reuse_blocks_late_sampling_after_ps_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            identity, report = self.snapshot_fixture(directory)
+            report['bound_bootstatus'] = {'identity': identity, 'first_seen_monotonic': 0.0,
+                                         'last_verified_utc': 'LOCAL_UNIT_FIXTURE'}
+            with patch.object(observer, 'read_command', return_value=({'returncode': 1}, '')), \
+                    patch.object(observer, 'native_identity', return_value=dict(identity, start_microseconds=2)), \
+                    patch.object(observer, 'sample_once') as sample, \
+                    patch.object(observer.time, 'monotonic', return_value=61.0), \
+                    patch.object(observer, 'current_device', return_value={}):
+                row = observer.snapshot(100, Path(directory), report, 1, {}, set())
+            sample.assert_not_called()
+            self.assertIn('late_bootstatus_unavailable', row)
+            self.assertEqual(len(row['observer_errors']), 1)
+
     def test_sample_denied_identity_has_no_command_fallback(self):
         identity = {'pid': 100, 'ppid': 90, 'uid': 501, 'ruid': 501, 'svuid': 501,
                     'start_seconds': 1000, 'start_microseconds': 1, 'executable': observer.SERVICE}
@@ -74,7 +163,7 @@ class ObserverContracts(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'Linked read path'):
                 observer.safe_bytes(link)
 
-    def run_fixture(self, exit_code, snapshot_error=False, recording_error=False):
+    def run_fixture(self, exit_code, snapshot_error=False, recording_error=False, periodic_gap=False):
         with tempfile.TemporaryDirectory() as directory:
             root, output = Path(directory), Path(directory) / 'observations'
             child_file = root / 'child.json'
@@ -90,7 +179,12 @@ class ObserverContracts(unittest.TestCase):
                 if recording_error and value['inner']['launches']:
                     raise OSError('fixture recording failure')
                 return original_save(out, value)
-            snapshot = (lambda *args: (_ for _ in ()).throw(RuntimeError('fixture observation failure'))) if snapshot_error else (lambda *args: {'scope': 'LOCAL_UNIT_FIXTURE_NO_CI_CREDIT'})
+            def snapshot(*args):
+                if snapshot_error:
+                    raise RuntimeError('fixture observation failure')
+                return {'scope': 'LOCAL_UNIT_FIXTURE_NO_CI_CREDIT',
+                        'observer_errors': [{'tick': 0, 'message': 'fixture first periodic query failed'}]
+                        if periodic_gap and args[3] == 0 else []}
             with patch.object(observer, 'inputs', return_value=binding), \
                     patch.object(observer, 'native_identity', return_value=fake_identity), \
                     patch.object(observer, 'owned', return_value=True), \
@@ -109,7 +203,10 @@ class ObserverContracts(unittest.TestCase):
                 self.assertEqual(report['inner']['raw_returncode'], exit_code)
                 self.assertEqual(report['inner']['launch_attempts'], 1)
                 self.assertEqual(report['inner']['launches'], 1)
-                if snapshot_error:
+                if periodic_gap:
+                    self.assertGreater(report['ticks'], 1)
+                    self.assertEqual(len(report['observer_errors']), 1)
+                if snapshot_error or periodic_gap:
                     with self.assertRaisesRegex(RuntimeError, 'observation failed'):
                         observer.verify(output, actual)
                 else:
@@ -132,6 +229,12 @@ class ObserverContracts(unittest.TestCase):
 
     def test_recording_failure_waits_for_original_and_preserves_failure(self):
         self.run_fixture(7, recording_error=True)
+
+    def test_periodic_gap_does_not_stop_later_observations_or_mask_original_failure(self):
+        self.run_fixture(7, periodic_gap=True)
+
+    def test_periodic_gap_still_fails_health_after_original_success(self):
+        self.run_fixture(0, periodic_gap=True)
 
     def test_original_launch_has_no_added_behavior(self):
         tree = ast.parse(Path(observer.__file__).read_text())

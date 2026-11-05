@@ -27,6 +27,9 @@ import time
 SOURCE = '206fbbab4569d4e74de7f0febaa3eee5ed6c86bd'
 REPOSITORY = 'AAAHN-AAAHN/heiher-socks5-ios'
 SERVICE = '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/XPCServices/com.apple.CoreSimulator.CoreSimulatorService.xpc/Contents/MacOS/com.apple.CoreSimulator.CoreSimulatorService'
+CORE_SIMCTL = '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/bin/simctl'
+PYTHON_LAUNCHER = '/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14'
+PYTHON_APPLICATION = '/Library/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python'
 FIELDS = 'uid=,ruid=,pid=,ppid=,state=,pcpu=,rss=,etime=,lstart=,comm='
 INTERVAL = 5.0
 MAX_TICKS = 360
@@ -127,7 +130,13 @@ def verify_descendant(identity, root_identity):
         require(owned(current) and current['pid'] not in seen, 'Invalid own-UID ancestry')
         require(native_identity(current['pid']) == current, 'Ancestry changed during observation')
         if current['pid'] == root_identity['pid']:
-            require(current == root_identity, 'Original observer birth identity changed')
+            require({k: v for k, v in current.items() if k != 'executable'} ==
+                    {k: v for k, v in root_identity.items() if k != 'executable'},
+                    'Original observer birth identity changed')
+            executables = {root_identity['executable']}
+            if root_identity['executable'] == PYTHON_LAUNCHER:
+                executables.add(PYTHON_APPLICATION)
+            require(current['executable'] in executables, 'Original observer executable changed')
             return
         seen.add(current['pid'])
         require(current['ppid'] > 1, 'Not an original command descendant')
@@ -208,15 +217,21 @@ def read_command(argv, output, label, timeout=3, persist_stdout=True):
     return row, raw.decode(errors='replace')
 
 
+def simctl_executables(report):
+    # Xcode's selected command and the actually observed CoreSimulator command
+    # are exact paths, never a basename/prefix match or an unrelated process.
+    return (report['simctl_executable'], CORE_SIMCTL)
+
+
 def sample_once(identity, output, label, report):
     row = {'label': label, 'expected_identity': identity, 'started_utc': now(), 'invocations': 0}
     report['samples'].append(row)
     try:
         require(owned(identity), 'Sample target outside own UID')
-        require(identity['executable'] in (SERVICE, report['simctl_executable']), 'Sample executable outside scope')
+        require(identity['executable'] in (SERVICE, *simctl_executables(report)), 'Sample executable outside scope')
         current = native_identity(identity['pid'])
         require(current == identity, 'Sample target identity changed before invocation')
-        if identity['executable'] == report['simctl_executable']:
+        if identity['executable'] in simctl_executables(report):
             verify_descendant(identity, report['inner']['native_identity'])
         row['before_identity'] = current
         row['invocations'] = 1
@@ -326,15 +341,28 @@ def snapshot(original_pid, output, report, tick, first_seen, seen_plists):
     query, text = read_command(['/bin/ps', '-ww', '-x', '-U', str(os.getuid()), '-o', FIELDS], output,
                                f'{tick:03d}-ps', persist_stdout=False)
     row['ps_query'] = query
-    require(query.get('returncode') == 0, 'Read-only ps snapshot failed')
-    rows = selected_rows(parse_ps(text), original_pid)
+    row['observer_errors'] = []
+    rows = []
+    if query.get('returncode') != 0:
+        # Preserve the actual command status/exception/timing, then keep the
+        # ordinary observation cadence. The mandatory health gate still fails.
+        row['observer_errors'].append({'where': 'ps_query', 'tick': tick,
+                                       'type': 'RuntimeError', 'message': 'Read-only ps snapshot failed',
+                                       'query': query})
+    else:
+        try:
+            rows = selected_rows(parse_ps(text), original_pid)
+        except Exception as exc:
+            row['observer_errors'].append({'where': 'ps_parse', 'tick': tick,
+                                           **error_record(exc), 'query': query})
     row['processes'] = rows
     for proc in rows:
-        if not (proc['original_descendant'] and proc['comm'] == report['simctl_executable']):
+        if not (proc['original_descendant'] and proc['comm'] in simctl_executables(report)):
             continue
         try:
             identity = native_identity(proc['pid'])
-            require(owned(identity) and identity['ppid'] == proc['ppid'] and identity['executable'] == report['simctl_executable'], 'CLI identity changed')
+            require(owned(identity) and identity['ppid'] == proc['ppid'] and
+                    identity['executable'] == proc['comm'], 'CLI identity changed')
             verify_descendant(identity, report['inner']['native_identity'])
             query, args = read_command(['/bin/ps', '-ww', '-p', str(proc['pid']), '-o', 'args='], output,
                                        f'{tick:03d}-args-{proc["pid"]}', persist_stdout=False)
@@ -350,13 +378,31 @@ def snapshot(original_pid, output, report, tick, first_seen, seen_plists):
             # preceding value; no process launch or device query discovers it.
             udid = report.get('last_original_udid')
             exact_boot = (udid is not None and re.search(r'(?:^|/)simctl bootstatus ' + re.escape(udid) + r' -b\s*$', args.strip()))
-            if exact_boot and age >= LATE_BOOT_SECONDS and not report['samples']:
-                sample_once(identity, output, 'late-bootstatus', report)
-                # Only the exact service already bound by common preparation is
-                # eligible. A newly observed replacement never becomes a target.
-                sample_once(report['binding']['original_service_identity'], output, 'late-coresimulator', report)
+            if exact_boot:
+                bound = {'identity': identity, 'verified_args': args.strip(), 'udid': udid,
+                         'first_seen_monotonic': first_seen[key], 'last_verified_utc': now()}
+                previous = report.get('bound_bootstatus')
+                require(previous is None or previous['identity'] == identity,
+                        'Original bootstatus identity changed')
+                report['bound_bootstatus'] = bound
         except Exception as exc:
             proc['cli_observation_unavailable'] = error_record(exc)
+    # A failed global ps read must not erase a previously verified exact child.
+    # Native UID/birth/path/ancestry checks remain mandatory before late sampling.
+    bound = report.get('bound_bootstatus')
+    if bound is not None and not report['samples']:
+        age = time.monotonic() - bound['first_seen_monotonic']
+        if age >= LATE_BOOT_SECONDS:
+            try:
+                identity = native_identity(bound['identity']['pid'])
+                require(identity == bound['identity'], 'Bound bootstatus identity changed')
+                verify_descendant(identity, report['inner']['native_identity'])
+                row['late_bootstatus_binding'] = {'identity': identity, 'observed_lifetime_seconds': age,
+                                                  'last_verified_args_utc': bound['last_verified_utc']}
+                sample_once(identity, output, 'late-bootstatus', report)
+                sample_once(report['binding']['original_service_identity'], output, 'late-coresimulator', report)
+            except Exception as exc:
+                row['late_bootstatus_unavailable'] = error_record(exc)
     row['device'] = current_device(Path(report['binding']['source_root']), output, tick, seen_plists)
     if 'udid' in row['device']:
         report['last_original_udid'] = row['device']['udid']
@@ -378,6 +424,7 @@ def run(output, command):
               'launch_attempts': 0, 'launches': 0, 'raw_returncode': None, 'environment': 'inherited',
               'stdio': 'inherited', 'added_timeout': None, 'new_session': False},
               'simctl_executable': str(Path(os.environ['DEVELOPER_DIR']) / 'usr/bin/simctl'),
+              'observed_core_simctl_executable': CORE_SIMCTL,
               'samples': [], 'observer_errors': [], 'ticks': 0, 'recording_complete': False,
               'limits': {'tick_interval_seconds': INTERVAL, 'maximum_ticks': MAX_TICKS,
                          'late_child_observed_seconds': LATE_BOOT_SECONDS, 'maximum_sample_invocations': 2,
@@ -391,6 +438,8 @@ def run(output, command):
                          'sampling_and_observation_can_change_host_timing': True,
                          'sample_target_birth_identity_recheck_has_a_remaining_pid_reuse_race': True,
                          'no_privileged_or_alternative_sampling_fallback': True,
+                         'failed_periodic_ps_queries_are_recorded_and_keep_health_failure': True,
+                         'late_sampling_may_use_previously_verified_argv_with_fresh_native_birth_and_ancestry': True,
                          'run_exit_represents_inner_status_not_observer_health': True}}
     original = None
     previous = {}
@@ -425,6 +474,7 @@ def run(output, command):
                     require(events.tell() + len(raw) <= MAX_EVENTS_BYTES, 'Process observation size limit reached')
                     events.write(raw)
                     events.flush()
+                    report['observer_errors'].extend(row.get('observer_errors', []))
                     report['ticks'] += 1
                     save(output, report)
                 except Exception as exc:
