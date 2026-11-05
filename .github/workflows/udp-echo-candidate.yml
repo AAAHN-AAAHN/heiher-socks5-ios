@@ -268,6 +268,27 @@ jobs:
           set -euo pipefail
           python3 Bootstrap/ci_evidence.py download --candidate "$CANDIDATE" --output "$RUNNER_TEMP/runtime-download"
           python3 Bootstrap/runtime_handoff.py restore --candidate "$CANDIDATE" --root "$RUNNER_TEMP/udp-source" --artifact "$RUNNER_TEMP/runtime-download/runtime-input.zip" --metadata "$RUNNER_TEMP/runtime-download/artifact.json" --producer-job build
+      - name: Record the actual Settings interpreter before dependency provisioning
+        id: runtime_python_before
+        if: ${{ matrix.name == 'settings' }}
+        shell: bash
+        run: python3 -B Bootstrap/record_runtime_python.py before --source-root "$RUNNER_TEMP/udp-source"
+      - name: Provision the exact CPython cache required by the original Settings runtime
+        id: runtime_python_setup
+        if: ${{ matrix.name == 'settings' }}
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.14.9'
+          architecture: arm64
+          check-latest: false
+          update-environment: false
+          allow-prereleases: false
+          freethreaded: false
+      - name: Record and verify the actual completed Settings interpreter cache
+        id: runtime_python_after
+        if: ${{ always() && matrix.name == 'settings' && steps.runtime_python_before.outcome == 'success' }}
+        shell: bash
+        run: python3 -B Bootstrap/record_runtime_python.py after --source-root "$RUNNER_TEMP/udp-source"
       - name: Run original non-Integrated macOS runtime coverage
         id: runtime_original
         if: ${{ matrix.name != 'integrated' }}
@@ -371,6 +392,9 @@ jobs:
           RUNTIME_CONTROL_OUTCOME: ${{ steps.runtime_control.outcome }}
           RUNTIME_CANDIDATE_OUTCOME: ${{ steps.runtime_candidate.outcome }}
           RUNTIME_INPUT_OUTCOME: ${{ steps.runtime_input.outcome }}
+          RUNTIME_PYTHON_BEFORE_OUTCOME: ${{ steps.runtime_python_before.outcome }}
+          RUNTIME_PYTHON_SETUP_OUTCOME: ${{ steps.runtime_python_setup.outcome }}
+          RUNTIME_PYTHON_AFTER_OUTCOME: ${{ steps.runtime_python_after.outcome }}
           RUNTIME_ORIGINAL_OUTCOME: ${{ steps.runtime_original.outcome }}
           INTEGRATED_PREPARE_OUTCOME: ${{ steps.integrated_prepare.outcome }}
           INTEGRATED_PREPARE_CHECKPOINT_OUTCOME: ${{ steps.integrated_prepare_checkpoint.outcome }}
@@ -396,6 +420,11 @@ jobs:
           esac
           for runtime_outcome_key in RUNTIME_CONTROL_OUTCOME RUNTIME_CANDIDATE_OUTCOME RUNTIME_INPUT_OUTCOME RUNTIME_SOURCE_RECORD_OUTCOME RUNTIME_RESULTS_OUTCOME; do
             require_outcome "$runtime_outcome_key" "${!runtime_outcome_key}" success
+          done
+          runtime_python_expected=skipped
+          if [ "$CANDIDATE" = settings ]; then runtime_python_expected=success; fi
+          for runtime_outcome_key in RUNTIME_PYTHON_BEFORE_OUTCOME RUNTIME_PYTHON_SETUP_OUTCOME RUNTIME_PYTHON_AFTER_OUTCOME; do
+            require_outcome "$runtime_outcome_key" "${!runtime_outcome_key}" "$runtime_python_expected"
           done
           require_outcome RUNTIME_ORIGINAL_OUTCOME "$RUNTIME_ORIGINAL_OUTCOME" "$runtime_original_expected"
           for runtime_outcome_key in INTEGRATED_PREPARE_OUTCOME INTEGRATED_PREPARE_CHECKPOINT_OUTCOME INTEGRATED_UI_OUTCOME INTEGRATED_UI_CHECKPOINT_OUTCOME INTEGRATED_SIMULATOR_OUTCOME INTEGRATED_SIMULATOR_CHECKPOINT_OUTCOME; do
