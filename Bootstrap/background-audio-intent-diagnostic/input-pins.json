@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "repository": "AAAHN-AAAHN/heiher-socks5-ios",
+  "source": {
+    "commit": "60e32211b1edf62c668b549043bf0bc4cdd83608",
+    "tree": "1ab318d405a516c42a59f1d9280a62639d1810fd"
+  },
+  "producer": {
+    "repository": "AAAHN-AAAHN/heiher-socks5-ios",
+    "run_id": 41940618811,
+    "run_attempt": 1,
+    "job_id": 126960239513,
+    "job_conclusion": "success",
+    "helper": {
+      "commit": "8b227e0e5ca5b01f3dff79bd26938310ff429d13",
+      "tree": "8f379eba705bab4d16aa056b9da87b30232a5eea"
+    }
+  },
+  "artifacts": {
+    "build": {
+      "id": 13379915995,
+      "name": "UDP-Echo-build-background-macOS-41940618811-1",
+      "size_in_bytes": 117029771,
+      "digest": "sha256:8c5d856886d5503ab190f1e7be2f4ea2fb7b716c08afd3aeaa175e10b63dc04d"
+    },
+    "runtime_input": {
+      "id": 13380315116,
+      "name": "UDP-Echo-runtime-background-41940618811-1",
+      "size_in_bytes": 2359989,
+      "digest": "sha256:153a55bce0567b2d2ccfd0183e9430e8251dd3c9e50c6a81c85641c9025f4865"
+    },
+    "build_archive_members": {
+      "background/history.bundle": {
+        "bytes": 2152985,
+        "sha256": "0943a34ee2907a2c7b1be1f5558fd7d50d7b0fce2221e578df3ba8a60e46c34a"
+      },
+      "background/Socks5-background-source.zip": {
+        "bytes": 1411463,
+        "sha256": "3fb17a4a819b1220cb133594edda3089543e4c0f98fa692f63f1b6d347bf17d2"
+      },
+      "runtime-input/background/producer.json": {
+        "bytes": 992,
+        "sha256": "db027a634056fbbbd2518c7ee6bd56392ace0fd52da8ee8d4e2b5a102567225e"
+      },
+      "runtime-input/background/runtime-input.tar.gz": {
+        "bytes": 2359707,
+        "sha256": "07cb072f40b2c87dbd20e5dcc67310872b1af1b4092fd38691239e8858e9f5ee"
+      }
+    }
+  },
+  "native_pins": {
+    ".": "318a2ffebfd87a12b72dbac95a65ca27143eb01b",
+    "src/core": "dadbb54bf7509f6dea3c1b30e45198efa400679c",
+    "third-part/hev-task-system": "4039d2fdbb3577af380fa0096b90d0ad99969dfa",
+    "third-part/yaml": "94441ec8777eb319936735a58b376963d09c73d4"
+  },
+  "payload_count": 30,
+  "framework_file_count": 16,
+  "source_file_count": 176,
+  "source_test_sha256": "14cfa19dbd0c8a167b3ea0f1d7412456a74449cbdd3843e8a15f46d03c34f260",
+  "original_driver_sha256": "5870ce10232bc22f10da0bb6e6952ae1038cd2742535cedb501e925b5f954b5f",
+  "dependencies": {
+    "Bootstrap/runtime_handoff.py": "228dbcc1e3e28e682e1d956fd91a9100add223e613bb4aa09d47231e16499580",
+    "Bootstrap/ui_compile_diagnostic.py": "a2704a8fe894efc41901bafa906fe7d38bd04624cbb6d899f654ed79a65e5d79"
+  },
+  "diagnostic_files": {
+    "instrument_audio_intent.py": "1278b519f801641b8e268aa345d5dc670e34700915f524b25481051602276771",
+    "check_async_ui_intent_diagnostic.py": "3f6cd92df0684e3cc3e30a66251993d805cc02502b498e3b145c42d0348e66ff"
+  },
+  "original_native_framework_zip": {
+    "path": "native-product/HevSocks5Server.xcframework.zip",
+    "bytes": 965895,
+    "sha256": "da4ec46839d6a43c1ea35af779b7760879978d1c6433da2b26020ffe4237b201"
+  },
+  "instrumented_sources": {
+    "Socks5/AppRoot.swift": "a44220f88b5ab9756cd947b72add58c4ab6c02fb78b22e40b13472e0cf3fac72",
+    "Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift": "7fff8f372653031363bab8e7135dae5b053088531c1badc1e76057af97e060fd"
+  }
+}
