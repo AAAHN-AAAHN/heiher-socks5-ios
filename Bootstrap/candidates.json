@@ -1,10 +1,30 @@
 {
-  "sha256": "831f275e919840e3d2d59e8c6ab5fdd2ca327634f6249682f52603a45df58380",
+  "sha256": "51386e68f4471e4ba8916551fc25accfbf027f88aa2a6cf0e8e90a258f12c6a4",
   "candidates": [
     {
-      "name": "background",
-      "sha": "60e32211b1edf62c668b549043bf0bc4cdd83608",
-      "ref": "refs/heads/work/udp-echo-background-20261028"
+      "name": "server",
+      "sha": "5dad292d1506c0e71c6235d73bb7c7aa8c33a5bf",
+      "ref": "refs/heads/work/udp-echo-server-20261028"
+    },
+    {
+      "name": "statistics",
+      "sha": "edcab068957dcdfcecf0667d2a1f996f72955cab",
+      "ref": "refs/heads/work/udp-echo-statistics-20261028"
+    },
+    {
+      "name": "icon",
+      "sha": "eb732c78d7859f0aebe49ab167e0df662bfd1d71",
+      "ref": "refs/heads/work/udp-echo-icon-20261028"
+    },
+    {
+      "name": "settings",
+      "sha": "51d0bc1342ffc9017d031314b49854aad0d034f4",
+      "ref": "refs/heads/work/udp-echo-settings-20261028"
+    },
+    {
+      "name": "integrated",
+      "sha": "5ee746d5c2a1b4885bf83597a23885a646ef58ff",
+      "ref": "refs/heads/work/udp-echo-integrated-20261028"
     }
   ],
   "support": [
@@ -17,30 +37,68 @@
       "sha": "b05db817684d6b006353d5062fdba756d739faea"
     },
     {
-      "name": "server",
-      "sha": "5d9dc52e5f441e93a6571a2cf59ce78a85062613"
-    },
-    {
-      "name": "statistics",
-      "sha": "89a8dd5a19d51fa9967bb049c41db3cb58a24d6a"
-    },
-    {
-      "name": "icon",
-      "sha": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91"
-    },
-    {
-      "name": "settings",
-      "sha": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd"
-    },
-    {
-      "name": "integrated",
-      "sha": "850e3d1de780ae716973fc8400ac2a8f7985ee15"
+      "name": "background",
+      "sha": "60e32211b1edf62c668b549043bf0bc4cdd83608"
     }
   ],
   "matrix": [
     {
-      "name": "background",
-      "sha": "60e32211b1edf62c668b549043bf0bc4cdd83608",
+      "name": "server",
+      "sha": "5dad292d1506c0e71c6235d73bb7c7aa8c33a5bf",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "server",
+      "sha": "5dad292d1506c0e71c6235d73bb7c7aa8c33a5bf",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
+      "name": "statistics",
+      "sha": "edcab068957dcdfcecf0667d2a1f996f72955cab",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "statistics",
+      "sha": "edcab068957dcdfcecf0667d2a1f996f72955cab",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
+      "name": "icon",
+      "sha": "eb732c78d7859f0aebe49ab167e0df662bfd1d71",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "icon",
+      "sha": "eb732c78d7859f0aebe49ab167e0df662bfd1d71",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
+      "name": "settings",
+      "sha": "51d0bc1342ffc9017d031314b49854aad0d034f4",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "settings",
+      "sha": "51d0bc1342ffc9017d031314b49854aad0d034f4",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
+      "name": "integrated",
+      "sha": "5ee746d5c2a1b4885bf83597a23885a646ef58ff",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "integrated",
+      "sha": "5ee746d5c2a1b4885bf83597a23885a646ef58ff",
       "os": "xcode-27",
       "runtime": true
     }

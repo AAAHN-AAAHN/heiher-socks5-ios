@@ -268,14 +268,14 @@ jobs:
           set -euo pipefail
           python3 Bootstrap/ci_evidence.py download --candidate "$CANDIDATE" --output "$RUNNER_TEMP/runtime-download"
           python3 Bootstrap/runtime_handoff.py restore --candidate "$CANDIDATE" --root "$RUNNER_TEMP/udp-source" --artifact "$RUNNER_TEMP/runtime-download/runtime-input.zip" --metadata "$RUNNER_TEMP/runtime-download/artifact.json" --producer-job build
-      - name: Record the actual Settings interpreter before dependency provisioning
+      - name: Record the actual runtime interpreter before dependency provisioning
         id: runtime_python_before
-        if: ${{ matrix.name == 'settings' }}
+        if: ${{ contains(fromJSON('["server","statistics","icon","settings","integrated"]'), matrix.name) }}
         shell: bash
         run: python3 -B Bootstrap/record_runtime_python.py before --source-root "$RUNNER_TEMP/udp-source"
-      - name: Provision the exact CPython cache required by the original Settings runtime
+      - name: Provision the exact CPython cache required by the original runtime
         id: runtime_python_setup
-        if: ${{ matrix.name == 'settings' }}
+        if: ${{ contains(fromJSON('["server","statistics","icon","settings","integrated"]'), matrix.name) }}
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: '3.14.9'
@@ -284,9 +284,9 @@ jobs:
           update-environment: false
           allow-prereleases: false
           freethreaded: false
-      - name: Record and verify the actual completed Settings interpreter cache
+      - name: Record and verify the actual completed runtime interpreter cache
         id: runtime_python_after
-        if: ${{ always() && matrix.name == 'settings' && steps.runtime_python_before.outcome == 'success' }}
+        if: ${{ always() && contains(fromJSON('["server","statistics","icon","settings","integrated"]'), matrix.name) && steps.runtime_python_before.outcome == 'success' }}
         shell: bash
         run: python3 -B Bootstrap/record_runtime_python.py after --source-root "$RUNNER_TEMP/udp-source"
       - name: Run original non-Integrated macOS runtime coverage
@@ -325,7 +325,11 @@ jobs:
         env:
           CANDIDATE: ${{ matrix.name }}
         shell: bash
-        run: exec bash "$GITHUB_WORKSPACE/Bootstrap/run_candidate_runtime.sh" ui
+        run: |
+          exec python3 -B "$GITHUB_WORKSPACE/Bootstrap/observe_integrated_destination.py" \
+            --source-root "$PWD" --source-commit "${{ matrix.sha }}" \
+            --control-root "$GITHUB_WORKSPACE" \
+            --output "$RUNNER_TEMP/integrated-destination-observation"
       - name: Preserve the Integrated UI checkpoint
         id: integrated_ui_checkpoint
         if: ${{ always() && matrix.name == 'integrated' && (steps.integrated_ui.outcome == 'success' || steps.integrated_ui.outcome == 'failure' || steps.integrated_ui.outcome == 'cancelled') }}
@@ -338,6 +342,7 @@ jobs:
             ${{ runner.temp }}/udp-source/artifacts/integrated/runtime-preparation/
             ${{ runner.temp }}/udp-source/artifacts/integrated/ui/
             ${{ runner.temp }}/udp-source/artifacts/integrated/ui-review.log
+            ${{ runner.temp }}/integrated-destination-observation/
             ${{ runner.temp }}/runtime-download/artifact.json
           if-no-files-found: error
           retention-days: 90
@@ -381,6 +386,7 @@ jobs:
           name: UDP-Echo-runtime-results-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/udp-source/artifacts/
+            ${{ runner.temp }}/integrated-destination-observation/
             ${{ runner.temp }}/runtime-download/artifact.json
           if-no-files-found: error
           retention-days: 90
@@ -422,7 +428,9 @@ jobs:
             require_outcome "$runtime_outcome_key" "${!runtime_outcome_key}" success
           done
           runtime_python_expected=skipped
-          if [ "$CANDIDATE" = settings ]; then runtime_python_expected=success; fi
+          case "$CANDIDATE" in
+            server|statistics|icon|settings|integrated) runtime_python_expected=success ;;
+          esac
           for runtime_outcome_key in RUNTIME_PYTHON_BEFORE_OUTCOME RUNTIME_PYTHON_SETUP_OUTCOME RUNTIME_PYTHON_AFTER_OUTCOME; do
             require_outcome "$runtime_outcome_key" "${!runtime_outcome_key}" "$runtime_python_expected"
           done

@@ -23,10 +23,10 @@ if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o644 or info
     raise SystemExit('Status reader file type, mode, links or size differs')
 raw = path.read_bytes()
 expected_reader_sha256 = {
-    'server': '1c8345f864b3a84d72ee43b3eef67ef3f307836d47d513dc25daeb1c6ebc1ca5',
-    'settings': '1c8345f864b3a84d72ee43b3eef67ef3f307836d47d513dc25daeb1c6ebc1ca5',
+    'server': '746856ae23ac23abcad3339a3f425ffe3f7a34d017de6dcfcde58be288b61c86',
+    'settings': '746856ae23ac23abcad3339a3f425ffe3f7a34d017de6dcfcde58be288b61c86',
     'statistics': '2fee551ef38bcfea0077cc2305aeff67268df6b19e0a0fa762f8afcc413558fa',
-    'integrated': '1c8345f864b3a84d72ee43b3eef67ef3f307836d47d513dc25daeb1c6ebc1ca5',
+    'integrated': '746856ae23ac23abcad3339a3f425ffe3f7a34d017de6dcfcde58be288b61c86',
 }[sys.argv[4]]
 if len(raw) != 16069 or hashlib.sha256(raw).hexdigest() != expected_reader_sha256:
     raise SystemExit('Status reader bytes differ from the frozen reader')
@@ -124,8 +124,7 @@ case "$CANDIDATE" in
     runtime_common_invoke before --consumer settings-ui
     runtime_observer_bind before settings settings-ui "$runtime_common_source_root" "$runtime_common_source_commit" "$runtime_common_source_tree"
     runtime_observer_output="$runtime_common_source_root/artifacts/settings-persistence-ui-audit/runtime-preparation/consumers/settings-ui/host-observation"
-    settings_process_output="$runtime_common_source_root/artifacts/settings-persistence-ui-audit/runtime-preparation/consumers/settings-ui/process-observation"
-    if "$runtime_common_python" -B "$GITHUB_WORKSPACE/Bootstrap/observe_settings_processes.py" run --output "$settings_process_output" -- "$runtime_common_python" -B "$runtime_common_source_root/Build/observe_host_during_command.py" --output "$runtime_observer_output" -- python3 Tests/Settings/ui_audit.py; then
+    if "$runtime_common_python" -B "$runtime_common_source_root/Build/observe_host_during_command.py" --output "$runtime_observer_output" -- python3 Tests/Settings/ui_audit.py; then
       runtime_observer_actual_status=0
     else
       runtime_observer_actual_status=$?
@@ -147,16 +146,10 @@ case "$CANDIDATE" in
       if [ "$runtime_observer_actual_status" -ne 0 ]; then exit "$runtime_observer_actual_status"; fi
       exit 1
     fi
-    if "$runtime_common_python" -B "$GITHUB_WORKSPACE/Bootstrap/observe_settings_processes.py" verify-result --output "$settings_process_output" --actual-inner-status "$runtime_observer_actual_status"; then
-      settings_process_status=0
-    else
-      settings_process_status=$?
-    fi
     if [ "$runtime_common_original_status" -ne 0 ]; then exit "$runtime_common_original_status"; fi
     if [ "$runtime_observer_actual_status" -ne 0 ]; then exit "$runtime_observer_actual_status"; fi
     if [ "$runtime_observer_binding_status" -ne 0 ]; then exit "$runtime_observer_binding_status"; fi
     if [ "$runtime_common_after_status" -ne 0 ]; then exit "$runtime_common_after_status"; fi
-    if [ "$settings_process_status" -ne 0 ]; then exit "$settings_process_status"; fi
     ;;
   icon)
     runtime_common_invoke before --consumer icon-ui
