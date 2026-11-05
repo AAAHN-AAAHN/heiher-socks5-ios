@@ -67,8 +67,11 @@ struct BackgroundKeepAliveView: View {
                         .accessibilityIdentifier("background.udpEcho.state")
                     LabeledContent("Sent") {
                         Text(String(udpEcho.sentCount))
-                            .accessibilityIdentifier("background.udpEcho.sentCount")
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Sent")
+                    .accessibilityValue(String(udpEcho.sentCount))
+                    .accessibilityIdentifier("background.udpEcho.sentCount")
                     if let error = udpEcho.storageError {
                         Text(error).font(.footnote)
                         Button("Retry save") { udpEcho.retrySave() }
