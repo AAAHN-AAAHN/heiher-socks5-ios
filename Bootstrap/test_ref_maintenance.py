@@ -157,6 +157,42 @@ class CandidateProofTests(unittest.TestCase):
                 release.verify_candidate_jobs(plan)
 
 
+    def test_both_publication_scopes_require_full_exact_candidate_closure(self):
+        for current_eight in (False, True):
+            for issue in (None, "missing_row", "unresolved", "pending_closure", "stale_source"):
+                with self.subTest(current_eight=current_eight, issue=issue):
+                    plan, manifest, run, jobs = fixture()
+                    names = release.BRANCHES if current_eight else release.BRANCHES | {release.ICMP}
+                    old = {name: sha(index + 100) for index, name in enumerate(sorted(names))}
+                    tags = (release.current_archive_tags if current_eight else release.archive_tags)(old)
+                    heads = {"refs/heads/" + name: value for name, value in old.items()}
+                    plan.update(operation="publish", old_heads=old, preserved_tags=tags)
+                    if current_eight:
+                        plan["ref_schema"] = release.CURRENT_EIGHT_SCHEMA
+                    if issue == "missing_row":
+                        plan["verified_jobs"].pop()
+                    elif issue == "unresolved":
+                        plan["requirement_closure"]["unresolved"] = ["Owner runtime remains incomplete"]
+                    elif issue == "pending_closure":
+                        plan["requirement_closure"]["result"] = "PENDING"
+                    elif issue == "stale_source":
+                        plan["verified_jobs"][0]["source_sha"] = sha(999)
+                    with patch.object(release, "api", side_effect=evidence_api(manifest, run, jobs)), \
+                         patch.object(release, "refs", side_effect=lambda kind: dict(heads if kind == "heads" else tags)), \
+                         patch.object(release, "verify_sources") as sources, \
+                         patch.object(release, "atomic_push") as push:
+                        result = {"result": "FAIL"}
+                        if issue is None:
+                            release.execute(plan, result, check_only=True)
+                            self.assertEqual(result["result"], "PASS")
+                        else:
+                            with self.assertRaises(RuntimeError):
+                                release.execute(plan, result)
+                            self.assertNotIn("publication_attempted", result)
+                        sources.assert_called_once_with(plan["final_heads"])
+                        push.assert_not_called()
+
+
 class RefMutationTests(unittest.TestCase):
     def setUp(self):
         self.plan, _, _, _ = fixture()
@@ -206,6 +242,13 @@ class RefMutationTests(unittest.TestCase):
     def cleanup_plan(self):
         self.published()
         self.plan.update(operation="cleanup", obsolete_heads={name: value for name, value in self.helpers.items() if name != release.SELF})
+
+    def current_plan(self):
+        self.plan["ref_schema"] = release.CURRENT_EIGHT_SCHEMA
+        self.plan["old_heads"] = {name: value for name, value in self.old.items() if name in release.BRANCHES}
+        self.tags.update(release.current_archive_tags(self.plan["old_heads"]))
+        self.plan["preserved_tags"] = dict(self.tags)
+        self.heads.pop("refs/heads/" + release.ICMP)
 
     def test_atomic_publication_preserves_unrelated_refs_and_requests_eight_runs(self):
         before_tags = dict(self.tags)
@@ -296,6 +339,157 @@ class RefMutationTests(unittest.TestCase):
         self.assertEqual(self.heads, before)
 
 
+    def test_current_publication_updates_eight_and_never_deletes_a_ref(self):
+        self.current_plan()
+        before_heads, before_tags = dict(self.heads), dict(self.tags)
+        release.execute(self.plan, self.result)
+        self.assertEqual(self.pushes, [(self.plan["final_heads"], set(), self.plan["old_heads"])])
+        self.assertEqual(self.heads, {**before_heads, **{"refs/heads/" + name: value
+                                                     for name, value in self.plan["final_heads"].items()}})
+        self.assertEqual(self.tags, before_tags)
+        self.assertEqual(self.result["ref_schema"], release.CURRENT_EIGHT_SCHEMA)
+        self.assertNotIn("deleted_icmp_sha", self.result)
+        self.assertFalse(self.result["canonical_ci_complete"])
+        self.assertEqual(len(self.requests), 8)
+        release.verify_sources.assert_called_once_with(self.plan["final_heads"])
+        release.verify_candidate_jobs.assert_called_once_with(self.plan)
+
+    def test_current_publication_rejects_wrong_scope_icmp_and_changed_lease(self):
+        self.current_plan()
+        original_plan, original_heads = deepcopy(self.plan), dict(self.heads)
+        for issue in ("old_nine", "missing_head", "unrelated_head", "invalid_sha", "icmp", "lease"):
+            with self.subTest(issue=issue):
+                self.plan, self.heads = deepcopy(original_plan), dict(original_heads)
+                if issue == "old_nine":
+                    self.plan["old_heads"][release.ICMP] = self.old[release.ICMP]
+                elif issue == "missing_head":
+                    self.plan["old_heads"].pop("main")
+                elif issue == "unrelated_head":
+                    self.plan["old_heads"]["user/new-work"] = self.plan["old_heads"].pop("main")
+                elif issue == "invalid_sha":
+                    self.plan["old_heads"]["main"] = "not-a-commit"
+                elif issue == "icmp":
+                    self.heads["refs/heads/" + release.ICMP] = self.old[release.ICMP]
+                else:
+                    self.heads["refs/heads/main"] = sha(999)
+                with self.assertRaises(RuntimeError):
+                    release.execute(self.plan, self.result)
+                self.assertEqual(self.pushes, [])
+                self.assertEqual(self.requests, [])
+
+    def test_old_publication_cannot_silently_accept_current_eight(self):
+        self.heads.pop("refs/heads/" + release.ICMP)
+        with self.assertRaisesRegex(RuntimeError, "Concurrent ICMP"):
+            release.execute(self.plan, self.result)
+        self.plan["old_heads"] = {name: value for name, value in self.old.items() if name in release.BRANCHES}
+        with self.assertRaisesRegex(RuntimeError, "Old heads scope"):
+            release.execute(self.plan, self.result)
+        self.assertEqual(self.pushes, [])
+        self.assertEqual(self.requests, [])
+
+    def test_current_publication_requires_existing_archive_even_if_omitted_from_preserved_tags(self):
+        self.current_plan()
+        name = next(iter(release.current_archive_tags(self.plan["old_heads"])))
+        self.tags.pop(name)
+        self.plan["preserved_tags"].pop(name)
+        with self.assertRaisesRegex(RuntimeError, "Historical tag changed"):
+            release.execute(self.plan, self.result)
+        self.assertEqual(self.pushes, [])
+        self.assertEqual(self.requests, [])
+
+    def test_current_publication_refreshes_icmp_absence_leases_and_tags_after_proof(self):
+        self.current_plan()
+        original_heads, original_tags = dict(self.heads), dict(self.tags)
+        for issue in ("icmp", "lease", "tag"):
+            with self.subTest(issue=issue):
+                self.heads, self.tags = dict(original_heads), dict(original_tags)
+                def concurrent_change(plan):
+                    if issue == "icmp":
+                        self.heads["refs/heads/" + release.ICMP] = self.old[release.ICMP]
+                    elif issue == "lease":
+                        self.heads["refs/heads/main"] = sha(999)
+                    else:
+                        self.tags["refs/tags/historical"] = sha(999)
+                release.verify_candidate_jobs.side_effect = concurrent_change
+                with self.assertRaises(RuntimeError):
+                    release.execute(self.plan, self.result)
+                self.assertNotIn("publication_attempted", self.result)
+                self.assertEqual(self.pushes, [])
+                self.assertEqual(self.requests, [])
+
+    def test_current_dispatch_check_only_and_cleanup_reuse_original_boundaries(self):
+        self.current_plan()
+        release.execute(self.plan, self.result, check_only=True)
+        self.assertEqual(self.pushes, [])
+        self.assertEqual(self.requests, [])
+        self.heads.update({"refs/heads/" + name: value for name, value in self.plan["final_heads"].items()})
+        self.plan["operation"] = "dispatch"
+        release.execute(self.plan, self.result)
+        self.assertEqual(self.pushes, [])
+        self.assertEqual(len(self.requests), 8)
+        self.plan.update(operation="cleanup", obsolete_heads={name: value for name, value in self.helpers.items() if name != release.SELF})
+        release.verify_canonical_runs.side_effect = RuntimeError("Canonical runtime incomplete")
+        with self.assertRaisesRegex(RuntimeError, "Canonical runtime incomplete"):
+            release.execute(self.plan, self.result)
+        self.assertEqual(self.pushes, [])
+        release.verify_canonical_runs.side_effect = None
+        release.execute(self.plan, self.result)
+        self.assertEqual(self.pushes, [({}, release.TEMPORARY, self.helpers)])
+        self.assertTrue(self.result["canonical_ci_complete"])
+        self.assertEqual({name: self.heads["refs/heads/" + name] for name in release.BRANCHES}, self.plan["final_heads"])
+        self.assertEqual(self.heads["refs/heads/user/new-work"], sha(890))
+
+    def test_current_cleanup_rejects_wrong_helper_scope_and_stale_lease(self):
+        self.cleanup_plan()
+        self.plan["ref_schema"] = release.CURRENT_EIGHT_SCHEMA
+        original = dict(self.plan["obsolete_heads"])
+        self.plan["obsolete_heads"]["main"] = self.plan["final_heads"]["main"]
+        with self.assertRaisesRegex(RuntimeError, "Cleanup helpers scope"):
+            release.execute(self.plan, self.result)
+        self.plan["obsolete_heads"] = original
+        self.heads["refs/heads/" + release.SELF] = sha(999)
+        with self.assertRaisesRegex(RuntimeError, "Deletion lease changed"):
+            release.execute(self.plan, self.result)
+        self.assertEqual(self.pushes, [])
+        self.assertEqual(self.requests, [])
+
+    def test_current_archive_preserves_old_nine_tags_and_never_moves_heads(self):
+        before_tags = dict(self.tags)
+        self.plan.update(operation="archive", ref_schema=release.CURRENT_EIGHT_SCHEMA,
+                         old_heads={name: value for name, value in self.old.items() if name in release.BRANCHES})
+        self.heads.pop("refs/heads/" + release.ICMP)
+        before_heads = dict(self.heads)
+        archived = release.current_archive_tags(self.plan["old_heads"])
+        release.execute(self.plan, self.result, check_only=True)
+        self.assertEqual(self.tags, before_tags)
+        self.assertEqual(self.requests, [])
+        release.execute(self.plan, self.result)
+        self.assertEqual(self.tags, {**before_tags, **archived})
+        self.assertEqual(self.heads, before_heads)
+        self.assertEqual(self.pushes, [])
+        self.assertEqual(len(self.requests), 8)
+        self.assertEqual({body["ref"] for _, body in self.requests}, set(archived))
+        self.assertFalse(self.result["operating_refs_changed"])
+        release.execute(self.plan, self.result)
+        self.assertEqual(len(self.requests), 8)
+        name = next(iter(archived))
+        self.tags[name] = sha(999)
+        with self.assertRaisesRegex(RuntimeError, "Archive tag differs"):
+            release.execute(self.plan, self.result)
+        self.assertEqual(len(self.requests), 8)
+
+    def test_unknown_schema_or_current_store_cannot_fall_back_to_old_mutations(self):
+        for schema, operation in (("current-eight-v2", "publish"),
+                                  (release.CURRENT_EIGHT_SCHEMA, "store")):
+            with self.subTest(schema=schema, operation=operation):
+                self.plan.update(ref_schema=schema, operation=operation)
+                with self.assertRaises(RuntimeError):
+                    release.execute(self.plan, self.result)
+                self.assertEqual(self.pushes, [])
+                self.assertEqual(self.requests, [])
+        release.refs.assert_not_called()
+
+
 class CommandAndCanonicalTests(unittest.TestCase):
     def test_seven_owner_bundle_requires_exact_remote_main_and_complete_scope(self):
         plan, manifest, _, _ = fixture()
@@ -345,6 +539,21 @@ class CommandAndCanonicalTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "explicit lease"):
                 release.atomic_push(plan["final_heads"], {release.ICMP}, {})
             run.assert_not_called()
+
+    def test_current_atomic_command_has_eight_leases_and_no_deletion(self):
+        plan, _, _, _ = fixture()
+        old = {name: sha(index + 100) for index, name in enumerate(sorted(release.BRANCHES))}
+        with patch.dict(os.environ, {"GH_TOKEN": "fixture-token"}), patch.object(release.subprocess, "run") as run, redirect_stdout(io.StringIO()):
+            release.atomic_push(plan["final_heads"], set(), old)
+        command = run.call_args.args[0]
+        self.assertIn("--atomic", command)
+        self.assertNotIn("--force", command)
+        self.assertEqual({part for part in command if part.startswith("--force-with-lease=")},
+                         {"--force-with-lease=refs/heads/" + name + ":" + value for name, value in old.items()})
+        self.assertEqual({part for part in command if ":refs/heads/" in part},
+                         {value + ":refs/heads/" + name for name, value in plan["final_heads"].items()})
+        self.assertFalse(any(release.ICMP in part or part.startswith(":refs/heads/") for part in command))
+        self.assertNotIn("fixture-token", " ".join(command))
 
     def test_canonical_source_and_required_jobs(self):
         plan, _, _, _ = fixture()

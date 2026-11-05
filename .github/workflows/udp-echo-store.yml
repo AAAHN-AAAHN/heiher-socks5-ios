@@ -24,11 +24,15 @@ jobs:
           python3 - <<'PY'
           import json, os
           from pathlib import Path
-          mode = json.loads(Path('Bootstrap/ref-operations.json').read_bytes())['operation']
+          from Bootstrap.ref_maintenance import current_eight_plan
+          plan = json.loads(Path('Bootstrap/ref-operations.json').read_bytes())
+          mode = plan['operation']
           if mode not in ('archive', 'store', 'publish', 'dispatch', 'cleanup'):
               raise SystemExit('Unknown repository operation')
+          current_eight = current_eight_plan(plan)
           with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
               stream.write('mode=' + mode + '\n')
+              stream.write('current_eight=' + str(current_eight).lower() + '\n')
           PY
       - name: Verify publication and cleanup boundaries without network mutations
         run: python3 -m unittest discover -s Bootstrap -p test_ref_maintenance.py -v
@@ -42,9 +46,15 @@ jobs:
         run: python3 Bootstrap/import_candidates.py
       - name: Apply the exact archive, publication, dispatch or cleanup plan
         if: ${{ steps.operation.outputs.mode != 'store' }}
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 Bootstrap/retry_canonical.py
+        run: |
+          if [[ '${{ steps.operation.outputs.current_eight }}' == 'true' ]]; then
+            python3 Bootstrap/ref_maintenance.py
+          else
+            python3 Bootstrap/retry_canonical.py
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

@@ -35,6 +35,7 @@ PARENTS = {"udp": ("main",), "statistics": ("udp",), "background": ("udp",),
 PLATFORMS = ("ubuntu-24.04", "xcode-27")
 WORKFLOW = "verify-build.yml"
 LEGACY_MAIN_HELPER = "0303b7708027c060e536ea5f0f705d15270fe26e"
+CURRENT_EIGHT_SCHEMA = "current-eight-v1"
 
 
 def require(condition, message):
@@ -86,6 +87,21 @@ def verify_old_heads(old, actual):
     require(actual.get("refs/heads/" + ICMP) == old[ICMP], "Concurrent ICMP branch change")
 
 
+def current_eight_plan(plan):
+    schema = plan.get("ref_schema")
+    require(schema in (None, CURRENT_EIGHT_SCHEMA), "Unknown ref plan schema")
+    if schema is None:
+        return False
+    require(plan["operation"] in ("archive", "publish", "dispatch", "cleanup"),
+            "Current-eight schema only supports archive, publication, dispatch or cleanup")
+    return True
+
+
+def verify_current_heads(expected, actual):
+    verify_heads(expected, actual)
+    require("refs/heads/" + ICMP not in actual, "ICMP must be absent in current-eight topology")
+
+
 def verify_tags(expected, actual):
     require(isinstance(expected, dict), "Missing preserved tags")
     for name, sha in expected.items():
@@ -95,6 +111,11 @@ def verify_tags(expected, actual):
 
 def archive_tags(old):
     return {"refs/tags/archive/before-udp-echo-20261028/" + branch + "-" + sha[:12]: sha
+            for branch, sha in old.items()}
+
+
+def current_archive_tags(old):
+    return {"refs/tags/archive/before-current8-publication/" + branch + "-" + sha[:12]: sha
             for branch, sha in old.items()}
 
 
@@ -335,12 +356,17 @@ def dispatch(final, result):
 
 def execute(plan, result, check_only=False):
     operation = plan["operation"]
+    current_eight = current_eight_plan(plan)
+    if current_eight:
+        result["ref_schema"] = CURRENT_EIGHT_SCHEMA
+    publication_heads = verify_current_heads if current_eight else verify_old_heads
+    preservation_tags = current_archive_tags if current_eight else archive_tags
     heads, tags = refs("heads"), refs("tags")
     verify_tags(plan["preserved_tags"], tags)
     if operation == "archive":
         old = plan["old_heads"]
-        verify_old_heads(old, heads)
-        archived, missing = archive_tags(old), {}
+        publication_heads(old, heads)
+        archived, missing = preservation_tags(old), {}
         for name, sha in sorted(archived.items()):
             existing = tags.get(name)
             require(existing is None or existing == sha, "Archive tag differs: " + name)
@@ -357,8 +383,8 @@ def execute(plan, result, check_only=False):
     elif operation in ("publish", "dispatch"):
         final = plan["final_heads"]
         if operation == "publish":
-            verify_old_heads(plan["old_heads"], heads)
-            verify_tags(archive_tags(plan["old_heads"]), tags)
+            publication_heads(plan["old_heads"], heads)
+            verify_tags(preservation_tags(plan["old_heads"]), tags)
         else:
             verify_heads(final, heads)
             require("refs/heads/" + ICMP not in heads, "ICMP was not removed by atomic publication")
@@ -367,16 +393,18 @@ def execute(plan, result, check_only=False):
         if not check_only:
             if operation == "publish":
                 # Proof checks can take time. Refresh leases just before the atomic mutation.
-                verify_old_heads(plan["old_heads"], refs("heads"))
+                publication_heads(plan["old_heads"], refs("heads"))
                 require(refs("tags") == tags, "Tag inventory changed before publication")
                 result["publication_attempted"] = True
-                atomic_push(final, {ICMP}, plan["old_heads"])
+                atomic_push(final, set() if current_eight else {ICMP}, plan["old_heads"])
                 result["publication_completed"] = True
                 result["published_heads"] = final
-                result["deleted_icmp_sha"] = plan["old_heads"][ICMP]
+                if not current_eight:
+                    result["deleted_icmp_sha"] = plan["old_heads"][ICMP]
                 after = refs("heads")
                 expected = {**heads, **{"refs/heads/" + branch: sha for branch, sha in final.items()}}
-                expected.pop("refs/heads/" + ICMP)
+                if not current_eight:
+                    expected.pop("refs/heads/" + ICMP)
                 require(after == expected, "Publication changed an unexpected head")
                 require(refs("tags") == tags, "Publication changed tags")
             dispatch(final, result)

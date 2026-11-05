@@ -1,3 +1,43 @@
 {
-  "operation": "store"
+  "operation": "archive",
+  "ref_schema": "current-eight-v1",
+  "old_heads": {
+    "feature/app-icon": "5d5327d4513b587e2a2e948fa20f588a04f1376f",
+    "feature/background": "d1539f429b6a0e993adc9d50f816c3a29c3fac32",
+    "feature/server-control": "bf0789c68670078def846d7e3778e7f5cfe9e77f",
+    "feature/settings-persistence": "953ee8d720cf32311d82dad1bcb1b566333c5d62",
+    "feature/traffic-statistics": "a55184fca134ce16b64335ac2f88b31b1161cd81",
+    "feature/udp-compat": "e50f434be2610ef00713d39363963542db0020e2",
+    "main": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+    "release/integrated": "8bec30de328543f8f23b79a736385ed0e80aaa88"
+  },
+  "preserved_tags": {
+    "refs/tags/archive/2026-09-22/audit/statistics-final-20260921": "31ef4a7baa15f76e7c7cdbc1ed11216c1fa2f93e",
+    "refs/tags/archive/2026-09-22/audit/udp-patches-20260921": "eccd78c41103e6d31e305eebc4e176864d442d48",
+    "refs/tags/archive/2026-09-22/build/hev-2.13.1-ipa-20260921": "99680a3bcdb6a3270767dcc43b1d9133866714b2",
+    "refs/tags/archive/2026-09-22/build/hev-upstream-20260921": "6a9d7930fe2cdf103a1b8ad80c157dc60fcc2bfc",
+    "refs/tags/archive/2026-09-22/diagnostics/hev-udp-20260921": "790167ae72155a138969840885e710a9fb36473f",
+    "refs/tags/archive/2026-09-22/feature/background-keepalive": "b68dbb9ca7d4d028111666915eba951911857b1d",
+    "refs/tags/archive/2026-09-22/main": "99680a3bcdb6a3270767dcc43b1d9133866714b2",
+    "refs/tags/archive/2026-09-22/maintenance/reorganize-20260922": "ed1c7cae63eea6906502540f378ef835dba343a9",
+    "refs/tags/archive/2026-09-22/maintenance/reorganize-20260922-0be4e061443c": "0be4e061443ca7e705f1133dcf4483897bbefb04",
+    "refs/tags/archive/2026-09-22/test/udp-sockaddr-only-20260921": "9e1ed7513f9b1b0c61f7a8930ad4be06556a55d7",
+    "refs/tags/archive/before-latest-baseline-20260922/feature/app-icon-12e3eba0fb0d": "12e3eba0fb0d25ef4af03b435af269e85e581209",
+    "refs/tags/archive/before-latest-baseline-20260922/feature/background-31d09c8edf79": "31d09c8edf796f83882610ce90775a2deafca0aa",
+    "refs/tags/archive/before-latest-baseline-20260922/feature/settings-b3590d388758": "b3590d3887584281002b2d2c033280d127ad7685",
+    "refs/tags/archive/before-latest-baseline-20260922/feature/traffic-statistics-7dae9e89f132": "7dae9e89f13242dad429786f431cbe45ba71975c",
+    "refs/tags/archive/before-latest-baseline-20260922/feature/udp-compat-51eed67071d4": "51eed67071d4be701277e371e7db1a65203a7bb2",
+    "refs/tags/archive/before-latest-baseline-20260922/main-83d350d28d6a": "83d350d28d6a31e7730cfa74b49f58d2af642397",
+    "refs/tags/archive/before-latest-baseline-20260922/maintenance/latest-baseline-20260922-b668c256ecbd": "b668c256ecbd411cdb5efedd10afe7efbffae759",
+    "refs/tags/archive/before-latest-baseline-20260922/release/integrated-563d3d197d3e": "563d3d197d3e64de5bacb07da4f66e0ab9c3ba34",
+    "refs/tags/archive/before-udp-echo-20261028/feature/app-icon-d268d0bb8fb9": "d268d0bb8fb91fce426b9eef377e1456690fba47",
+    "refs/tags/archive/before-udp-echo-20261028/feature/background-48b7ae84fa4d": "48b7ae84fa4d2667aa52850271fab089fc6fcc2e",
+    "refs/tags/archive/before-udp-echo-20261028/feature/icmp-relay-60fa64b5c98a": "60fa64b5c98aadaaee349e6e12c50bd2f9b32ac2",
+    "refs/tags/archive/before-udp-echo-20261028/feature/server-control-e6663544b939": "e6663544b9394c0e743108fd4f169c8c7baf7490",
+    "refs/tags/archive/before-udp-echo-20261028/feature/settings-persistence-45a592b81fda": "45a592b81fda404edb63710067349276f72a986a",
+    "refs/tags/archive/before-udp-echo-20261028/feature/traffic-statistics-fc54f9aebe07": "fc54f9aebe07c2460b98d3b2bc18a971911ff0d0",
+    "refs/tags/archive/before-udp-echo-20261028/feature/udp-compat-4d64d2dbfc37": "4d64d2dbfc37ef04fef326fde6133dbceba90e97",
+    "refs/tags/archive/before-udp-echo-20261028/main-19aec84fbc92": "19aec84fbc929678bb0f05b89c76d490ada6f8b7",
+    "refs/tags/archive/before-udp-echo-20261028/release/integrated-e82e590412e5": "e82e590412e5b5cbcd531827a81f845596ee16f6"
+  }
 }
