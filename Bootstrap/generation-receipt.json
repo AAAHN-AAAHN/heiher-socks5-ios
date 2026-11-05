@@ -1,56 +1,66 @@
 {
   "schema": "source8-candidate-role-selection-v1",
   "result": "PASS_LOCAL_INPUT_PREPARATION_ONLY",
-  "scope": "Only Background/Integrated macOS selection. Original source8 objects, importer, readers, gates and deadlines are unchanged. No build/runtime/CI acceptance receipt.",
+  "scope": "Only Settings macOS candidate selection from immutable a38b Git inputs. Source8 objects and historical generator old9 rules are unchanged; this preparation does not edit active helper files. Root observation-wrapper work is outside this input preparation. No build/runtime/CI acceptance receipt.",
   "repository": "AAAHN-AAAHN/heiher-socks5-ios",
-  "started_utc": "2026-11-05T06:49:41.124989+00:00",
-  "completed_utc": "2026-11-05T06:49:42.982516+00:00",
-  "helper_base_commit": "fd14f2c406d856df3bf6135b8fc589fcc3b12865",
+  "started_utc": "2026-11-05T07:23:41.727053+00:00",
+  "completed_utc": "2026-11-05T07:23:43.726064+00:00",
+  "helper_base_commit": "a38b88961e29a19ee3f662273c171108241fcd3f",
+  "helper_base_tree": "9af39341efd5b557cf3e16c656dbc8ae250da851",
+  "live_worktree_not_used_as_input": true,
+  "live_helper_head_before": "a38b88961e29a19ee3f662273c171108241fcd3f",
+  "live_helper_head_after": "a38b88961e29a19ee3f662273c171108241fcd3f",
+  "live_refs_snapshot_unchanged": true,
+  "live_worktree_cleanliness_requirement": null,
+  "adapted_from": {
+    "path": "continuation-20261105/bg-ig-input-review/prepare_inputs.py",
+    "bytes": 14059,
+    "sha256": "1567238554a1a48e62367cca1c2a0aa840698447cb30bbeecc6ddcf58031ae62"
+  },
+  "preparation_script": {
+    "path": "continuation-20261105/settings-observation-input-review/prepare_inputs.py",
+    "bytes": 15878,
+    "sha256": "7c135f8133c97399a9ced914a2c7f3cd0299f7f22d3bf212eadb924994e3d4bd"
+  },
   "prior_generation_receipt": {
-    "path": "continuation-20261105/bg-ig-input-review/original/generation-receipt.json",
-    "bytes": 59656,
-    "sha256": "192f0dac7409e37bbd24e6cc22b504e2b604882a5a7417675157f96059215807"
+    "path": "continuation-20261105/settings-observation-input-review/original/generation-receipt.json",
+    "bytes": 50103,
+    "sha256": "9a3de964c58aa43abf879991084876ff8adc840d5e2566b862478c7e63de49fb"
   },
   "prior_manifest": {
-    "path": "continuation-20261105/bg-ig-input-review/original/candidates.json",
-    "bytes": 1291,
-    "sha256": "490ab4d09b9b8f8aded51243d41ba4226f3c4adc2cf43a28a08acf46df09c1a5"
+    "path": "continuation-20261105/settings-observation-input-review/original/candidates.json",
+    "bytes": 1303,
+    "sha256": "c7f59f1292b58aeff2d0810a0cee93ae1805ba1d26d4ff9f4aacefe4c8fc3444"
   },
   "prior_bundle": {
-    "path": "continuation-20261105/bg-ig-input-review/original/candidates.bundle",
+    "path": "continuation-20261105/settings-observation-input-review/original/candidates.bundle",
     "bytes": 234329,
-    "sha256": "0411b200b633c94df6ba42a2b5878edc8619e3e161fecd3777dbc1e1f87f090f"
+    "sha256": "5f9dc1f12ca44eedd6a07f61fd67be73069671aed222aa143eacd4a16c6bb553"
   },
   "selected": [
-    "background",
-    "integrated"
+    "settings"
   ],
   "support": [
     "main",
     "udp",
+    "background",
     "server",
     "statistics",
     "icon",
-    "settings"
+    "integrated"
   ],
   "matrix": [
     {
-      "name": "background",
-      "sha": "60e32211b1edf62c668b549043bf0bc4cdd83608",
-      "os": "xcode-27",
-      "runtime": true
-    },
-    {
-      "name": "integrated",
-      "sha": "850e3d1de780ae716973fc8400ac2a8f7985ee15",
+      "name": "settings",
+      "sha": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
       "os": "xcode-27",
       "runtime": true
     }
   ],
   "manifest": {
-    "path": "continuation-20261105/bg-ig-input-review/candidates.json",
-    "bytes": 1303,
-    "sha256": "c7f59f1292b58aeff2d0810a0cee93ae1805ba1d26d4ff9f4aacefe4c8fc3444"
+    "path": "continuation-20261105/settings-observation-input-review/candidates.json",
+    "bytes": 1094,
+    "sha256": "a73ed531f0db2c1f2182e65de2b9f3cba89c9503e4b305385c5cffddcacf920d"
   },
   "source_identities": {
     "main": {
@@ -129,9 +139,9 @@
   "bundle": {
     "normal_git_bundle_create": true,
     "new_bundle": {
-      "path": "continuation-20261105/bg-ig-input-review/candidates.bundle",
-      "bytes": 234329,
-      "sha256": "5f9dc1f12ca44eedd6a07f61fd67be73069671aed222aa143eacd4a16c6bb553"
+      "path": "continuation-20261105/settings-observation-input-review/candidates.bundle",
+      "bytes": 234327,
+      "sha256": "73fb04ffde86aec13bc71f65fde8a20616afc49b384a0e21f21c5b0c43057a15"
     },
     "prerequisites_unchanged": true,
     "prerequisites": [
@@ -145,40 +155,6 @@
       "953ee8d720cf32311d82dad1bcb1b566333c5d62"
     ],
     "old_heads": [
-      [
-        "60e32211b1edf62c668b549043bf0bc4cdd83608",
-        "refs/heads/support/background"
-      ],
-      [
-        "89a8dd5a19d51fa9967bb049c41db3cb58a24d6a",
-        "refs/heads/support/statistics"
-      ],
-      [
-        "850e3d1de780ae716973fc8400ac2a8f7985ee15",
-        "refs/heads/support/integrated"
-      ],
-      [
-        "0e030aedbd4127e9215b38bb23dd6e38c5872546",
-        "refs/heads/support/main"
-      ],
-      [
-        "b05db817684d6b006353d5062fdba756d739faea",
-        "refs/heads/support/udp"
-      ],
-      [
-        "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
-        "refs/heads/candidate/server"
-      ],
-      [
-        "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
-        "refs/heads/support/icon"
-      ],
-      [
-        "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
-        "refs/heads/candidate/settings"
-      ]
-    ],
-    "new_heads": [
       [
         "60e32211b1edf62c668b549043bf0bc4cdd83608",
         "refs/heads/candidate/background"
@@ -212,53 +188,113 @@
         "refs/heads/support/settings"
       ]
     ],
+    "new_heads": [
+      [
+        "60e32211b1edf62c668b549043bf0bc4cdd83608",
+        "refs/heads/support/background"
+      ],
+      [
+        "89a8dd5a19d51fa9967bb049c41db3cb58a24d6a",
+        "refs/heads/support/statistics"
+      ],
+      [
+        "850e3d1de780ae716973fc8400ac2a8f7985ee15",
+        "refs/heads/support/integrated"
+      ],
+      [
+        "0e030aedbd4127e9215b38bb23dd6e38c5872546",
+        "refs/heads/support/main"
+      ],
+      [
+        "b05db817684d6b006353d5062fdba756d739faea",
+        "refs/heads/support/udp"
+      ],
+      [
+        "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
+        "refs/heads/support/server"
+      ],
+      [
+        "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91",
+        "refs/heads/support/icon"
+      ],
+      [
+        "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
+        "refs/heads/candidate/settings"
+      ]
+    ],
     "all_source_commit_tree_parent_bytes_unchanged": true,
     "contained_object_set_type_size_unchanged": true,
     "contained_objects": 578,
     "pack_bytes_identical": true,
     "inventory": {
-      "path": "continuation-20261105/bg-ig-input-review/bundle-object-inventory.json",
-      "bytes": 71421,
-      "sha256": "37f04dfda2b18585bf0ef037616e73d8054da3b6c1d1b2958b5daf62dd8404a6"
+      "path": "continuation-20261105/settings-observation-input-review/bundle-object-inventory.json",
+      "bytes": 71451,
+      "sha256": "f94ea1905418db6f3a1f952f9370b9db23bca9c3f3d9b622568ae2b4d16a6301"
     },
     "independent_receiver_seed": {
-      "bytes": 5812390,
-      "sha256": "2e5c674fe11f97a6d48f7d230f2e4d7333cd8395fa2bd5c3ac802a777928a211"
+      "bytes": 5816664,
+      "sha256": "1dbea5f095ad3ea5835aacb7c26f12a7914bf491420d3488a1f1622e0ac0f560"
     },
     "independent_receiver_has_alternates": false,
-    "verify_output": "The bundle contains these 8 refs:\n60e32211b1edf62c668b549043bf0bc4cdd83608 refs/heads/candidate/background\n89a8dd5a19d51fa9967bb049c41db3cb58a24d6a refs/heads/support/statistics\n850e3d1de780ae716973fc8400ac2a8f7985ee15 refs/heads/candidate/integrated\n0e030aedbd4127e9215b38bb23dd6e38c5872546 refs/heads/support/main\nb05db817684d6b006353d5062fdba756d739faea refs/heads/support/udp\n5d9dc52e5f441e93a6571a2cf59ce78a85062613 refs/heads/support/server\n3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91 refs/heads/support/icon\n206fbbab4569d4e74de7f0febaa3eee5ed6c86bd refs/heads/support/settings\nThe bundle requires these 8 refs:\n8bec30de328543f8f23b79a736385ed0e80aaa88 \nd1539f429b6a0e993adc9d50f816c3a29c3fac32 \ne50f434be2610ef00713d39363963542db0020e2 \nd3f20d7e3905dcc300f0a5ebf155aa4cc2869774 \nbf0789c68670078def846d7e3778e7f5cfe9e77f \n5d5327d4513b587e2a2e948fa20f588a04f1376f \na55184fca134ce16b64335ac2f88b31b1161cd81 \n953ee8d720cf32311d82dad1bcb1b566333c5d62 \nThe bundle uses this hash algorithm: sha1\n",
-    "unbundle_output": "60e32211b1edf62c668b549043bf0bc4cdd83608 refs/heads/candidate/background\n89a8dd5a19d51fa9967bb049c41db3cb58a24d6a refs/heads/support/statistics\n850e3d1de780ae716973fc8400ac2a8f7985ee15 refs/heads/candidate/integrated\n0e030aedbd4127e9215b38bb23dd6e38c5872546 refs/heads/support/main\nb05db817684d6b006353d5062fdba756d739faea refs/heads/support/udp\n5d9dc52e5f441e93a6571a2cf59ce78a85062613 refs/heads/support/server\n3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91 refs/heads/support/icon\n206fbbab4569d4e74de7f0febaa3eee5ed6c86bd refs/heads/support/settings\n",
+    "verify_output": "The bundle contains these 8 refs:\n60e32211b1edf62c668b549043bf0bc4cdd83608 refs/heads/support/background\n89a8dd5a19d51fa9967bb049c41db3cb58a24d6a refs/heads/support/statistics\n850e3d1de780ae716973fc8400ac2a8f7985ee15 refs/heads/support/integrated\n0e030aedbd4127e9215b38bb23dd6e38c5872546 refs/heads/support/main\nb05db817684d6b006353d5062fdba756d739faea refs/heads/support/udp\n5d9dc52e5f441e93a6571a2cf59ce78a85062613 refs/heads/support/server\n3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91 refs/heads/support/icon\n206fbbab4569d4e74de7f0febaa3eee5ed6c86bd refs/heads/candidate/settings\nThe bundle requires these 8 refs:\n8bec30de328543f8f23b79a736385ed0e80aaa88 \nd1539f429b6a0e993adc9d50f816c3a29c3fac32 \ne50f434be2610ef00713d39363963542db0020e2 \nd3f20d7e3905dcc300f0a5ebf155aa4cc2869774 \nbf0789c68670078def846d7e3778e7f5cfe9e77f \n5d5327d4513b587e2a2e948fa20f588a04f1376f \na55184fca134ce16b64335ac2f88b31b1161cd81 \n953ee8d720cf32311d82dad1bcb1b566333c5d62 \nThe bundle uses this hash algorithm: sha1\n",
+    "unbundle_output": "60e32211b1edf62c668b549043bf0bc4cdd83608 refs/heads/support/background\n89a8dd5a19d51fa9967bb049c41db3cb58a24d6a refs/heads/support/statistics\n850e3d1de780ae716973fc8400ac2a8f7985ee15 refs/heads/support/integrated\n0e030aedbd4127e9215b38bb23dd6e38c5872546 refs/heads/support/main\nb05db817684d6b006353d5062fdba756d739faea refs/heads/support/udp\n5d9dc52e5f441e93a6571a2cf59ce78a85062613 refs/heads/support/server\n3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91 refs/heads/support/icon\n206fbbab4569d4e74de7f0febaa3eee5ed6c86bd refs/heads/candidate/settings\n",
     "strict_fsck_exit": 0,
-    "strict_fsck_output_sha256": "c3abc77f890e8d8e6fd30c75d7dd986fedcf18f9fab725168d5873ab686fb05f"
+    "strict_fsck_output_sha256": "ae66f0ecc21939d50932398aac85225bac90637ab8ac80f18676b14ed9de2b46"
   },
-  "helper_contract_files_unchanged": [
+  "immutable_base_contract_file_identities": [
     {
-      "path": "continuation-20261105/build-helper/Bootstrap/import_candidates.py",
+      "helper_commit": "a38b88961e29a19ee3f662273c171108241fcd3f",
+      "relative_path": "Bootstrap/generate_candidates.py",
+      "git_mode": "100644",
+      "git_blob": "e847b7917be69d311052715d3f4f3fa1661aea47",
+      "bytes": 9868,
+      "sha256": "f85dddb505510cce050a8600232daf1d419b3dc4ee03191c329a98bf789b0f16"
+    },
+    {
+      "helper_commit": "a38b88961e29a19ee3f662273c171108241fcd3f",
+      "relative_path": "Bootstrap/import_candidates.py",
+      "git_mode": "100644",
+      "git_blob": "dc70cfbab047f2c31995588bebf8dc6c36491d8c",
       "bytes": 5295,
       "sha256": "1e647ab8a266a64097c5cc543f22d6a2c58010bfba8988b10fa4809589a6367e"
     },
     {
-      "path": "continuation-20261105/build-helper/Bootstrap/ci_evidence.py",
+      "helper_commit": "a38b88961e29a19ee3f662273c171108241fcd3f",
+      "relative_path": "Bootstrap/ci_evidence.py",
+      "git_mode": "100644",
+      "git_blob": "95225a71656061646ef126005ff0762f11b286c6",
       "bytes": 7350,
       "sha256": "827c8f69d562f60f416bfd9378b210beb9fa7aea28667716c54d4b449f5d3adc"
     },
     {
-      "path": "continuation-20261105/build-helper/Bootstrap/runtime_handoff.py",
+      "helper_commit": "a38b88961e29a19ee3f662273c171108241fcd3f",
+      "relative_path": "Bootstrap/runtime_handoff.py",
+      "git_mode": "100644",
+      "git_blob": "ef9797501f5add89b2c2e5ac7e3e933b6292261d",
       "bytes": 28467,
       "sha256": "228dbcc1e3e28e682e1d956fd91a9100add223e613bb4aa09d47231e16499580"
     },
     {
-      "path": "continuation-20261105/build-helper/Bootstrap/run_candidate_runtime.sh",
+      "helper_commit": "a38b88961e29a19ee3f662273c171108241fcd3f",
+      "relative_path": "Bootstrap/run_candidate_runtime.sh",
+      "git_mode": "100644",
+      "git_blob": "2405f3542a2392b8ba3af6648db6a9b113423936",
       "bytes": 16047,
       "sha256": "88d4a0dd23261ee142ed772c9cb398f7b81b0530047840c9de3ab98b4ae20473"
     },
     {
-      "path": "continuation-20261105/build-helper/.github/workflows/udp-echo-candidate.yml",
+      "helper_commit": "a38b88961e29a19ee3f662273c171108241fcd3f",
+      "relative_path": ".github/workflows/udp-echo-candidate.yml",
+      "git_mode": "100644",
+      "git_blob": "9b35bf576e9abe8f04af370aa36b77f45d2c6934",
       "bytes": 22238,
       "sha256": "54f54372b60667d18b79ad31cf536ef7dff8d43d72eadc5dc417d5c67ab0edc6"
     }
   ],
-  "existing_repository_refs_unchanged": true,
+  "existing_generation_helper_old9_rules_changed": false,
+  "existing_generation_helper_invoked": false,
+  "active_helper_mutations_by_this_preparation": 0,
+  "existing_repository_refs_mutated_by_this_preparation": false,
   "source8_changed": false,
   "importer_changed": false,
   "ci_evidence_changed": false,
@@ -271,12 +307,12 @@
   "new_execution_producer_rule": "Any official execution must create and verify build/runtime/final in its own actual new helper/run/attempt. Prior diagnostics and prior runtime inputs do not receive new formal credit.",
   "checks": [
     {
-      "name": "actual_helper_base",
+      "name": "immutable_actual_helper_base_exists",
       "pass": true,
       "detail": null
     },
     {
-      "name": "base_helper_is_clean",
+      "name": "immutable_actual_helper_tree",
       "pass": true,
       "detail": null
     },
@@ -287,6 +323,11 @@
     },
     {
       "name": "complete_exact_eight_owner_scope",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "all_heads_equal_current_frozen_source8",
       "pass": true,
       "detail": null
     },
@@ -616,7 +657,7 @@
       "detail": null
     },
     {
-      "name": "only_two_mac_runtime_rows",
+      "name": "only_settings_one_mac_runtime_row",
       "pass": true,
       "detail": null
     },
@@ -626,17 +667,12 @@
       "detail": null
     },
     {
-      "name": "helper_worktree_still_clean",
+      "name": "immutable_base_original_inputs_unchanged",
       "pass": true,
       "detail": null
     },
     {
-      "name": "helper_refs_unchanged",
-      "pass": true,
-      "detail": null
-    },
-    {
-      "name": "helper_original_inputs_unchanged",
+      "name": "active_helper_commands_read_only",
       "pass": true,
       "detail": null
     }
@@ -645,6 +681,30 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "rev-parse",
+        "--verify",
+        "a38b88961e29a19ee3f662273c171108241fcd3f^{commit}"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "rev-parse",
+        "a38b88961e29a19ee3f662273c171108241fcd3f^{tree}"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "rev-parse",
@@ -655,17 +715,7 @@
     {
       "argv": [
         "git",
-        "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
-        "status",
-        "--porcelain=v1",
-        "--untracked-files=all"
-      ],
-      "returncode": 0
-    },
-    {
-      "argv": [
-        "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "for-each-ref",
@@ -676,17 +726,52 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr",
-        "init",
-        "--bare",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git"
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "show",
+        "a38b88961e29a19ee3f662273c171108241fcd3f:Bootstrap/candidates.json"
       ],
       "returncode": 0
     },
     {
       "argv": [
         "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "show",
+        "a38b88961e29a19ee3f662273c171108241fcd3f:Bootstrap/candidates.bundle"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "show",
+        "a38b88961e29a19ee3f662273c171108241fcd3f:Bootstrap/generation-receipt.json"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71",
+        "init",
+        "--bare",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "pack-objects",
@@ -698,8 +783,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "index-pack",
         "--stdin"
       ],
@@ -708,19 +794,21 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "bundle",
         "verify",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/original/candidates.bundle"
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/original/candidates.bundle"
       ],
       "returncode": 0
     },
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "for-each-ref",
         "--format=%(refname) %(objectname)"
       ],
@@ -729,19 +817,21 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "bundle",
         "unbundle",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/original/candidates.bundle"
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/original/candidates.bundle"
       ],
       "returncode": 0
     },
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "for-each-ref",
         "--format=%(refname) %(objectname)"
       ],
@@ -750,8 +840,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "cat-file",
         "commit",
         "0e030aedbd4127e9215b38bb23dd6e38c5872546"
@@ -761,6 +852,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "cat-file",
@@ -772,8 +864,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "rev-parse",
         "0e030aedbd4127e9215b38bb23dd6e38c5872546^{tree}"
       ],
@@ -782,6 +875,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "rev-parse",
@@ -792,8 +886,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "cat-file",
         "commit",
         "b05db817684d6b006353d5062fdba756d739faea"
@@ -803,6 +898,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "cat-file",
@@ -814,8 +910,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "rev-parse",
         "b05db817684d6b006353d5062fdba756d739faea^{tree}"
       ],
@@ -824,6 +921,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "rev-parse",
@@ -834,8 +932,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "cat-file",
         "commit",
         "60e32211b1edf62c668b549043bf0bc4cdd83608"
@@ -845,6 +944,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "cat-file",
@@ -856,8 +956,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "rev-parse",
         "60e32211b1edf62c668b549043bf0bc4cdd83608^{tree}"
       ],
@@ -866,6 +967,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "rev-parse",
@@ -876,8 +978,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "cat-file",
         "commit",
         "5d9dc52e5f441e93a6571a2cf59ce78a85062613"
@@ -887,6 +990,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "cat-file",
@@ -898,8 +1002,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "rev-parse",
         "5d9dc52e5f441e93a6571a2cf59ce78a85062613^{tree}"
       ],
@@ -908,6 +1013,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "rev-parse",
@@ -918,8 +1024,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "cat-file",
         "commit",
         "89a8dd5a19d51fa9967bb049c41db3cb58a24d6a"
@@ -929,6 +1036,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "cat-file",
@@ -940,8 +1048,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "rev-parse",
         "89a8dd5a19d51fa9967bb049c41db3cb58a24d6a^{tree}"
       ],
@@ -950,6 +1059,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "rev-parse",
@@ -960,8 +1070,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "cat-file",
         "commit",
         "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91"
@@ -971,6 +1082,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "cat-file",
@@ -982,8 +1094,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "rev-parse",
         "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91^{tree}"
       ],
@@ -992,6 +1105,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "rev-parse",
@@ -1002,8 +1116,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "cat-file",
         "commit",
         "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd"
@@ -1013,6 +1128,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "cat-file",
@@ -1024,8 +1140,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "rev-parse",
         "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd^{tree}"
       ],
@@ -1034,6 +1151,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "rev-parse",
@@ -1044,8 +1162,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "cat-file",
         "commit",
         "850e3d1de780ae716973fc8400ac2a8f7985ee15"
@@ -1055,6 +1174,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "cat-file",
@@ -1066,8 +1186,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "rev-parse",
         "850e3d1de780ae716973fc8400ac2a8f7985ee15^{tree}"
       ],
@@ -1076,6 +1197,7 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "rev-parse",
@@ -1086,10 +1208,11 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "update-ref",
-        "refs/heads/candidate/background",
+        "refs/heads/support/background",
         "60e32211b1edf62c668b549043bf0bc4cdd83608"
       ],
       "returncode": 0
@@ -1097,8 +1220,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "update-ref",
         "refs/heads/support/statistics",
         "89a8dd5a19d51fa9967bb049c41db3cb58a24d6a"
@@ -1108,10 +1232,11 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "update-ref",
-        "refs/heads/candidate/integrated",
+        "refs/heads/support/integrated",
         "850e3d1de780ae716973fc8400ac2a8f7985ee15"
       ],
       "returncode": 0
@@ -1119,8 +1244,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "update-ref",
         "refs/heads/support/main",
         "0e030aedbd4127e9215b38bb23dd6e38c5872546"
@@ -1130,8 +1256,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "update-ref",
         "refs/heads/support/udp",
         "b05db817684d6b006353d5062fdba756d739faea"
@@ -1141,8 +1268,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "update-ref",
         "refs/heads/support/server",
         "5d9dc52e5f441e93a6571a2cf59ce78a85062613"
@@ -1152,8 +1280,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "update-ref",
         "refs/heads/support/icon",
         "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91"
@@ -1163,10 +1292,11 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "update-ref",
-        "refs/heads/support/settings",
+        "refs/heads/candidate/settings",
         "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd"
       ],
       "returncode": 0
@@ -1174,19 +1304,20 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "bundle",
         "create",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/candidates.bundle",
-        "refs/heads/candidate/background",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/candidates.bundle",
+        "refs/heads/support/background",
         "refs/heads/support/statistics",
-        "refs/heads/candidate/integrated",
+        "refs/heads/support/integrated",
         "refs/heads/support/main",
         "refs/heads/support/udp",
         "refs/heads/support/server",
         "refs/heads/support/icon",
-        "refs/heads/support/settings",
+        "refs/heads/candidate/settings",
         "^8bec30de328543f8f23b79a736385ed0e80aaa88",
         "^d1539f429b6a0e993adc9d50f816c3a29c3fac32",
         "^e50f434be2610ef00713d39363963542db0020e2",
@@ -1201,8 +1332,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "index-pack",
         "--fix-thin",
         "--stdin"
@@ -1212,19 +1344,21 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "verify-pack",
         "-v",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git/objects/pack/pack-de899eb215b8c4b15074f54052d5fe8cb3604dd7.idx"
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git/objects/pack/pack-de899eb215b8c4b15074f54052d5fe8cb3604dd7.idx"
       ],
       "returncode": 0
     },
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "cat-file",
         "--batch-check=%(objectname) %(objecttype) %(objectsize)"
       ],
@@ -1233,8 +1367,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "index-pack",
         "--fix-thin",
         "--stdin"
@@ -1244,19 +1379,21 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "verify-pack",
         "-v",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git/objects/pack/pack-de899eb215b8c4b15074f54052d5fe8cb3604dd7.idx"
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git/objects/pack/pack-de899eb215b8c4b15074f54052d5fe8cb3604dd7.idx"
       ],
       "returncode": 0
     },
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/generator.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/generator.git",
         "cat-file",
         "--batch-check=%(objectname) %(objecttype) %(objectsize)"
       ],
@@ -1265,17 +1402,19 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71",
         "init",
         "--bare",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git"
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git"
       ],
       "returncode": 0
     },
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "pack-objects",
@@ -1287,8 +1426,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "index-pack",
         "--stdin"
       ],
@@ -1297,8 +1437,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "for-each-ref",
         "--format=%(refname) %(objectname)"
       ],
@@ -1307,30 +1448,33 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "bundle",
         "verify",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/candidates.bundle"
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/candidates.bundle"
       ],
       "returncode": 0
     },
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "bundle",
         "unbundle",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/candidates.bundle"
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/candidates.bundle"
       ],
       "returncode": 0
     },
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "for-each-ref",
         "--format=%(refname) %(objectname)"
       ],
@@ -1339,8 +1483,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "-t",
         "0e030aedbd4127e9215b38bb23dd6e38c5872546"
@@ -1350,8 +1495,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "commit",
         "0e030aedbd4127e9215b38bb23dd6e38c5872546"
@@ -1362,7 +1508,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
@@ -1374,7 +1520,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
@@ -1385,8 +1531,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "-t",
         "b05db817684d6b006353d5062fdba756d739faea"
@@ -1396,8 +1543,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "commit",
         "b05db817684d6b006353d5062fdba756d739faea"
@@ -1408,7 +1556,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
@@ -1420,7 +1568,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
@@ -1431,8 +1579,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "-t",
         "60e32211b1edf62c668b549043bf0bc4cdd83608"
@@ -1442,8 +1591,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "commit",
         "60e32211b1edf62c668b549043bf0bc4cdd83608"
@@ -1454,7 +1604,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
@@ -1466,7 +1616,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
@@ -1477,8 +1627,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "-t",
         "5d9dc52e5f441e93a6571a2cf59ce78a85062613"
@@ -1488,8 +1639,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "commit",
         "5d9dc52e5f441e93a6571a2cf59ce78a85062613"
@@ -1500,7 +1652,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
@@ -1512,7 +1664,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
@@ -1523,8 +1675,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "-t",
         "89a8dd5a19d51fa9967bb049c41db3cb58a24d6a"
@@ -1534,8 +1687,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "commit",
         "89a8dd5a19d51fa9967bb049c41db3cb58a24d6a"
@@ -1546,7 +1700,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
@@ -1558,7 +1712,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
@@ -1569,8 +1723,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "-t",
         "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91"
@@ -1580,8 +1735,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "commit",
         "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91"
@@ -1592,7 +1748,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
@@ -1604,7 +1760,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
@@ -1615,8 +1771,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "-t",
         "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd"
@@ -1626,8 +1783,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "commit",
         "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd"
@@ -1638,7 +1796,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
@@ -1650,7 +1808,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
@@ -1661,8 +1819,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "-t",
         "850e3d1de780ae716973fc8400ac2a8f7985ee15"
@@ -1672,8 +1831,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "cat-file",
         "commit",
         "850e3d1de780ae716973fc8400ac2a8f7985ee15"
@@ -1684,7 +1844,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "e5980901a6c0b7a8b12ddc37461e22405f7dbe0e",
@@ -1696,7 +1856,7 @@
       "argv": [
         "git",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "merge-base",
         "--is-ancestor",
         "0a62910f5e444edbf176fe3ccd52363e5b8f869e",
@@ -1707,8 +1867,9 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
-        "/workspace/scratch/ecdd1deb3751/continuation-20261105/bg-ig-input-review/normal-git-preparation-4wbyaewr/receiver.git",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/settings-observation-input-review/normal-git-preparation-01j7_i71/receiver.git",
         "fsck",
         "--full",
         "--strict"
@@ -1718,21 +1879,199 @@
     {
       "argv": [
         "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
-        "status",
-        "--porcelain=v1",
-        "--untracked-files=all"
+        "show",
+        "a38b88961e29a19ee3f662273c171108241fcd3f:Bootstrap/generate_candidates.py"
       ],
       "returncode": 0
     },
     {
       "argv": [
         "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "ls-tree",
+        "a38b88961e29a19ee3f662273c171108241fcd3f",
+        "--",
+        "Bootstrap/generate_candidates.py"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "show",
+        "a38b88961e29a19ee3f662273c171108241fcd3f:Bootstrap/import_candidates.py"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "ls-tree",
+        "a38b88961e29a19ee3f662273c171108241fcd3f",
+        "--",
+        "Bootstrap/import_candidates.py"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "show",
+        "a38b88961e29a19ee3f662273c171108241fcd3f:Bootstrap/ci_evidence.py"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "ls-tree",
+        "a38b88961e29a19ee3f662273c171108241fcd3f",
+        "--",
+        "Bootstrap/ci_evidence.py"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "show",
+        "a38b88961e29a19ee3f662273c171108241fcd3f:Bootstrap/runtime_handoff.py"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "ls-tree",
+        "a38b88961e29a19ee3f662273c171108241fcd3f",
+        "--",
+        "Bootstrap/runtime_handoff.py"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "show",
+        "a38b88961e29a19ee3f662273c171108241fcd3f:Bootstrap/run_candidate_runtime.sh"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "ls-tree",
+        "a38b88961e29a19ee3f662273c171108241fcd3f",
+        "--",
+        "Bootstrap/run_candidate_runtime.sh"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "show",
+        "a38b88961e29a19ee3f662273c171108241fcd3f:.github/workflows/udp-echo-candidate.yml"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "ls-tree",
+        "a38b88961e29a19ee3f662273c171108241fcd3f",
+        "--",
+        ".github/workflows/udp-echo-candidate.yml"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "rev-parse",
+        "HEAD"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
         "-C",
         "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
         "for-each-ref",
         "--format=%(refname) %(objectname)"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "show",
+        "a38b88961e29a19ee3f662273c171108241fcd3f:Bootstrap/candidates.json"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "show",
+        "a38b88961e29a19ee3f662273c171108241fcd3f:Bootstrap/candidates.bundle"
+      ],
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "git",
+        "--no-optional-locks",
+        "-C",
+        "/workspace/scratch/ecdd1deb3751/continuation-20261105/build-helper",
+        "show",
+        "a38b88961e29a19ee3f662273c171108241fcd3f:Bootstrap/generation-receipt.json"
       ],
       "returncode": 0
     }

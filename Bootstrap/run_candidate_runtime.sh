@@ -124,7 +124,8 @@ case "$CANDIDATE" in
     runtime_common_invoke before --consumer settings-ui
     runtime_observer_bind before settings settings-ui "$runtime_common_source_root" "$runtime_common_source_commit" "$runtime_common_source_tree"
     runtime_observer_output="$runtime_common_source_root/artifacts/settings-persistence-ui-audit/runtime-preparation/consumers/settings-ui/host-observation"
-    if "$runtime_common_python" -B "$runtime_common_source_root/Build/observe_host_during_command.py" --output "$runtime_observer_output" -- python3 Tests/Settings/ui_audit.py; then
+    settings_process_output="$runtime_common_source_root/artifacts/settings-persistence-ui-audit/runtime-preparation/consumers/settings-ui/process-observation"
+    if "$runtime_common_python" -B "$GITHUB_WORKSPACE/Bootstrap/observe_settings_processes.py" run --output "$settings_process_output" -- "$runtime_common_python" -B "$runtime_common_source_root/Build/observe_host_during_command.py" --output "$runtime_observer_output" -- python3 Tests/Settings/ui_audit.py; then
       runtime_observer_actual_status=0
     else
       runtime_observer_actual_status=$?
@@ -146,10 +147,16 @@ case "$CANDIDATE" in
       if [ "$runtime_observer_actual_status" -ne 0 ]; then exit "$runtime_observer_actual_status"; fi
       exit 1
     fi
+    if "$runtime_common_python" -B "$GITHUB_WORKSPACE/Bootstrap/observe_settings_processes.py" verify-result --output "$settings_process_output" --actual-inner-status "$runtime_observer_actual_status"; then
+      settings_process_status=0
+    else
+      settings_process_status=$?
+    fi
     if [ "$runtime_common_original_status" -ne 0 ]; then exit "$runtime_common_original_status"; fi
     if [ "$runtime_observer_actual_status" -ne 0 ]; then exit "$runtime_observer_actual_status"; fi
     if [ "$runtime_observer_binding_status" -ne 0 ]; then exit "$runtime_observer_binding_status"; fi
     if [ "$runtime_common_after_status" -ne 0 ]; then exit "$runtime_common_after_status"; fi
+    if [ "$settings_process_status" -ne 0 ]; then exit "$settings_process_status"; fi
     ;;
   icon)
     runtime_common_invoke before --consumer icon-ui
