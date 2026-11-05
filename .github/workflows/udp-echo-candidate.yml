@@ -296,7 +296,13 @@ jobs:
         env:
           CANDIDATE: ${{ matrix.name }}
         shell: bash
-        run: exec bash "$GITHUB_WORKSPACE/Bootstrap/run_candidate_runtime.sh" all
+        run: |
+          if [ "$CANDIDATE" = background ]; then
+            exec python3 -B "$GITHUB_WORKSPACE/Bootstrap/observe_background_host.py" \
+              --output "$RUNNER_TEMP/background-host-observation" -- \
+              bash "$GITHUB_WORKSPACE/Bootstrap/run_candidate_runtime.sh" all
+          fi
+          exec bash "$GITHUB_WORKSPACE/Bootstrap/run_candidate_runtime.sh" all
       - name: Prepare the exact Integrated runtime
         id: integrated_prepare
         if: ${{ matrix.name == 'integrated' }}
@@ -387,6 +393,7 @@ jobs:
           path: |
             ${{ runner.temp }}/udp-source/artifacts/
             ${{ runner.temp }}/integrated-destination-observation/
+            ${{ runner.temp }}/background-host-observation/
             ${{ runner.temp }}/runtime-download/artifact.json
           if-no-files-found: error
           retention-days: 90
