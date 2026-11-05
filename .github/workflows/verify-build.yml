@@ -59,6 +59,15 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0
+      - name: Provision the exact CPython cache required by the runtime checks
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.14.9'
+          architecture: arm64
+          check-latest: false
+          update-environment: false
+          allow-prereleases: false
+          freethreaded: false
       - name: Audit icon source, compile assets and verify Simulator registration (no IPA)
         shell: bash
         run: |
