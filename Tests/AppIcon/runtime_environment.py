@@ -270,7 +270,10 @@ def require_same_filesystem(before, after, keys, fields=PATH_FIELDS):
 def watch_records(data):
     result = {}
     for key, row in data.items():
-        if row.get("runtimeIdentifier") != WATCH and row.get("platformIdentifier") != "com.apple.platform.watchsimulator":
+        # Derivative classification: only the observed watchOS 27.0 asset may
+        # use the special transition rules. Other versions remain protected
+        # by exact record and filesystem equality in the calling scope checks.
+        if row.get("runtimeIdentifier") != WATCH:
             continue
         expected = {"runtimeIdentifier": WATCH, "platformIdentifier": "com.apple.platform.watchsimulator",
                     "version": "27.0", "build": "24R362", "path": WATCH_ASSET, "parentMountPath": WATCH_ASSET,
