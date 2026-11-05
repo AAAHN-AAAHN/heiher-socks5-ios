@@ -46,6 +46,16 @@ jobs:
           DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
         if: runner.os == 'macOS' && github.ref == 'refs/heads/feature/server-control'
         run: python3 Tests/ServerControl/ui_audit.py
+      - name: Provision the exact CPython cache required by the runtime checks
+        if: runner.os == 'macOS' && github.ref == 'refs/heads/feature/settings-persistence'
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.14.9'
+          architecture: arm64
+          check-latest: false
+          update-environment: false
+          allow-prereleases: false
+          freethreaded: false
       - name: Actual persistence, restart and JSON on iOS 27 Simulator
         env:
           DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
