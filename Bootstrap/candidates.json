@@ -1,15 +1,15 @@
 {
-  "sha256": "0411b200b633c94df6ba42a2b5878edc8619e3e161fecd3777dbc1e1f87f090f",
+  "sha256": "5f9dc1f12ca44eedd6a07f61fd67be73069671aed222aa143eacd4a16c6bb553",
   "candidates": [
     {
-      "name": "server",
-      "sha": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
-      "ref": "refs/heads/work/udp-echo-server-20261028"
+      "name": "background",
+      "sha": "60e32211b1edf62c668b549043bf0bc4cdd83608",
+      "ref": "refs/heads/work/udp-echo-background-20261028"
     },
     {
-      "name": "settings",
-      "sha": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
-      "ref": "refs/heads/work/udp-echo-settings-20261028"
+      "name": "integrated",
+      "sha": "850e3d1de780ae716973fc8400ac2a8f7985ee15",
+      "ref": "refs/heads/work/udp-echo-integrated-20261028"
     }
   ],
   "support": [
@@ -22,8 +22,8 @@
       "sha": "b05db817684d6b006353d5062fdba756d739faea"
     },
     {
-      "name": "background",
-      "sha": "60e32211b1edf62c668b549043bf0bc4cdd83608"
+      "name": "server",
+      "sha": "5d9dc52e5f441e93a6571a2cf59ce78a85062613"
     },
     {
       "name": "statistics",
@@ -34,20 +34,20 @@
       "sha": "3139ded3d9fd0ac3aacf58ca7fd6f35f9d2cdf91"
     },
     {
-      "name": "integrated",
-      "sha": "850e3d1de780ae716973fc8400ac2a8f7985ee15"
+      "name": "settings",
+      "sha": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd"
     }
   ],
   "matrix": [
     {
-      "name": "server",
-      "sha": "5d9dc52e5f441e93a6571a2cf59ce78a85062613",
+      "name": "background",
+      "sha": "60e32211b1edf62c668b549043bf0bc4cdd83608",
       "os": "xcode-27",
       "runtime": true
     },
     {
-      "name": "settings",
-      "sha": "206fbbab4569d4e74de7f0febaa3eee5ed6c86bd",
+      "name": "integrated",
+      "sha": "850e3d1de780ae716973fc8400ac2a8f7985ee15",
       "os": "xcode-27",
       "runtime": true
     }
