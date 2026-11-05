@@ -164,6 +164,13 @@ def main():
         (OUT / 'runtime.json').write_text(json.dumps(dict(runtime=runtime, deviceType=device, udid=identifier), indent=2))
         run(['xcrun', 'simctl', 'boot', identifier], 'simulator-boot.log')
         run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'simulator-ready.log', timeout=120)
+        # Compile the generated app and UI target in a separate bounded phase.
+        # The original test invocation and result bundle remain below.
+        run(['xcodebuild', 'build-for-testing', '-project', app / 'Socks5.xcodeproj', '-scheme', 'ServerControlUIAudit',
+             '-destination', 'platform=iOS Simulator,id=' + identifier, '-parallel-testing-enabled', 'NO',
+             '-derivedDataPath', WORK / 'DerivedData',
+             'CODE_SIGNING_ALLOWED=NO', 'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES',
+             'MARKETING_VERSION=3.0.0', 'CURRENT_PROJECT_VERSION=1'], 'ui-build.log', timeout=900)
         run(['xcodebuild', 'test', '-project', app / 'Socks5.xcodeproj', '-scheme', 'ServerControlUIAudit',
              '-destination', 'platform=iOS Simulator,id=' + identifier, '-parallel-testing-enabled', 'NO',
              '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
