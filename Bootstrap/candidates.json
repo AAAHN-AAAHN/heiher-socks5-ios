@@ -1,10 +1,10 @@
 {
-  "sha256": "6fd1536cae9aa0dfd92318100041953215cb15068256fb954187712e4403f686",
+  "sha256": "75effa1a6a58c46647c795bce5d010a0497e8fdc5dce6455914c66cf9feff3ac",
   "candidates": [
     {
-      "name": "background",
-      "sha": "60e32211b1edf62c668b549043bf0bc4cdd83608",
-      "ref": "refs/heads/work/udp-echo-background-20261028"
+      "name": "server",
+      "sha": "5dad292d1506c0e71c6235d73bb7c7aa8c33a5bf",
+      "ref": "refs/heads/work/udp-echo-server-20261028"
     }
   ],
   "support": [
@@ -17,8 +17,8 @@
       "sha": "b05db817684d6b006353d5062fdba756d739faea"
     },
     {
-      "name": "server",
-      "sha": "5dad292d1506c0e71c6235d73bb7c7aa8c33a5bf"
+      "name": "background",
+      "sha": "60e32211b1edf62c668b549043bf0bc4cdd83608"
     },
     {
       "name": "statistics",
@@ -39,8 +39,8 @@
   ],
   "matrix": [
     {
-      "name": "background",
-      "sha": "60e32211b1edf62c668b549043bf0bc4cdd83608",
+      "name": "server",
+      "sha": "5dad292d1506c0e71c6235d73bb7c7aa8c33a5bf",
       "os": "xcode-27",
       "runtime": true
     }
