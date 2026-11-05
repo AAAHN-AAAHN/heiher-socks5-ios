@@ -131,7 +131,9 @@ final class IntegrationUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         app.launch()
         let state = app.staticTexts["background.udpEcho.state"]
-        let sent = app.staticTexts["background.udpEcho.sentCount"]
+        let sentElements = app.descendants(matching: .any)
+            .matching(identifier: "background.udpEcho.sentCount")
+        let sent = sentElements.element
         let destination = app.textFields
             .matching(identifier: "background.udpEcho.destinations").firstMatch
         let period = app.textFields["background.udpEcho.period"]
@@ -161,9 +163,15 @@ final class IntegrationUITests: XCTestCase {
                 predicate: NSPredicate(format: "label == %@", text), object: state)
             XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 10), .completed)
         }
+        @MainActor func sentValue() -> UInt64? {
+            guard sentElements.count == 1, sent.label == "Sent",
+                  let value = sent.value as? String else { return nil }
+            return UInt64(value)
+        }
         @MainActor func sentCount() throws -> UInt64 {
             reveal(sent)
-            return try XCTUnwrap(UInt64(sent.label), "Sent must expose the numeric datagram count")
+            return try XCTUnwrap(sentValue(),
+                                 "Sent must be one element labeled Sent with the numeric datagram count as its value")
         }
         @MainActor func replace(_ field: XCUIElement, with text: String) {
             reveal(field)
@@ -250,6 +258,16 @@ final class IntegrationUITests: XCTestCase {
         toggle().tap()
         XCTAssertEqual(toggle().value as? String, "1")
         expectState("Waiting for SOCKS5 server")
+        reveal(sent)
+        let initialAccessibility = XCTAttachment(string:
+            "matches: \(sentElements.count)\nlabel: \(String(reflecting: sent.label))\nvalue: \(String(reflecting: sent.value))")
+        initialAccessibility.name = "integrated-udp-echo-initial-accessibility"
+        initialAccessibility.lifetime = .keepAlways
+        add(initialAccessibility)
+        let initialCapture = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        initialCapture.name = "integrated-udp-echo-initial-zero"
+        initialCapture.lifetime = .keepAlways
+        add(initialCapture)
         XCTAssertEqual(try sentCount(), 0, "A new On starts at zero while no server is running")
         try quiet()
         server(running: true)
@@ -259,7 +277,7 @@ final class IntegrationUITests: XCTestCase {
         background()
         expectState("Sending UDP Echo")
         reveal(sent)
-        XCTAssertTrue(waitUntil { (UInt64(sent.label) ?? 0) > 0 }, "Actual sends must update the Sent row")
+        XCTAssertTrue(waitUntil { (sentValue() ?? 0) > 0 }, "Actual sends must update the Sent row")
         let replyingCount = try sentCount()
         let capture = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         capture.name = "integrated-udp-echo-running"; capture.lifetime = .keepAlways; add(capture)
@@ -270,7 +288,7 @@ final class IntegrationUITests: XCTestCase {
         let continued = try packets(atLeast: silent.counts.mapValues { $0 + 3 }, replies: false)
         XCTAssertEqual(continued.ports["4"]?.count, 1)
         XCTAssertEqual(continued.ports["6"]?.count, 1)
-        XCTAssertTrue(waitUntil { (UInt64(sent.label) ?? 0) > replyingCount },
+        XCTAssertTrue(waitUntil { (sentValue() ?? 0) > replyingCount },
                       "Sent must continue increasing without Echo replies")
         let silentCount = try sentCount()
         server(running: false)
@@ -285,7 +303,7 @@ final class IntegrationUITests: XCTestCase {
         background()
         expectState("Sending UDP Echo")
         reveal(sent)
-        XCTAssertTrue(waitUntil { (UInt64(sent.label) ?? 0) > stoppedCount },
+        XCTAssertTrue(waitUntil { (sentValue() ?? 0) > stoppedCount },
                       "Server restart must continue the existing On count")
 
         // Relaunch must restore actual sends, the On intent and both raw inputs.
@@ -298,7 +316,7 @@ final class IntegrationUITests: XCTestCase {
         XCTAssertTrue(waitUntil { Self.handshake() })
         _ = try packets(atLeast: terminated.counts.mapValues { $0 + 3 }, replies: false)
         reveal(sent)
-        XCTAssertTrue(waitUntil { (UInt64(sent.label) ?? 0) > 0 })
+        XCTAssertTrue(waitUntil { (sentValue() ?? 0) > 0 })
         let relaunchedCount = try sentCount()
         reveal(toggle(), upward: false)
         toggle().tap()
