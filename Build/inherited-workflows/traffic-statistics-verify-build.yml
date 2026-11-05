@@ -58,6 +58,16 @@ jobs:
       - name: Verify statistics-only sources, native accounting and Swift types
         shell: bash
         run: python3 Tests/Statistics/audit.py
+      - name: Provision the exact CPython cache required by the runtime checks
+        if: runner.os == 'macOS' && hashFiles('Build/runtime_environment.py') != ''
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.14.9'
+          architecture: arm64
+          check-latest: false
+          update-environment: false
+          allow-prereleases: false
+          freethreaded: false
       - name: Exercise actual Server controls and tabs on iOS 27 Simulator
         env:
           DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
