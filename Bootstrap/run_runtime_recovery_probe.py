@@ -150,8 +150,20 @@ def main():
     failure = None
     try:
         save()
-        run("original-preparation", ["bash", control / "Bootstrap/run_candidate_runtime.sh", "prepare"],
-            output / "original-preparation.log")
+        try:
+            run("original-preparation", ["bash", control / "Bootstrap/run_candidate_runtime.sh", "prepare"],
+                output / "original-preparation.log")
+        except Exception:
+            # Observe only after failure. Never replace the original exception,
+            # query simctl again, or change the successful sequence's ordering.
+            try:
+                from observe_runtime_mounts import capture_terminal_mounts
+                report["terminal_mount_observation"] = capture_terminal_mounts(
+                    source, output / "terminal-mount-observation")
+            except Exception as observation_error:
+                report["errors"].append({"stage": "terminal-mount-observation",
+                    "type": type(observation_error).__name__, "message": str(observation_error)})
+            raise
         run("exact-duplicate-retirement", [python, "-B", control / "Bootstrap/retire_duplicate_registrations.py",
             "--source-root", source, "--output", temporary / "runtime-duplicate-retirement"],
             output / "duplicate-retirement.log")
