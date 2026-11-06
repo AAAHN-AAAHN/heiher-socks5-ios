@@ -32,7 +32,7 @@ MODULE_PINS = {
 EXTRA_HELPER_PINS = {
     "Bootstrap/run_candidate_runtime.sh": "8321264041563bcad1c3a650617297bfe749afc82e71765a010b424816ff24fc",
     "Bootstrap/run_runtime_recovery_probe.py": "038a70cc2bb458b06572edcc7e5d2bbd01e67581b94aa1a9e8a190a0789c33fd",
-    "Bootstrap/retire_duplicate_registrations.py": "6e19f54429ed73d1e2b87d1b3d992dd9c2b617f0ab2e77f6e8fae7990f8b1606",
+    "Bootstrap/retire_duplicate_registrations.py": "71ca6a00800ab6a1904d2fc8fa0b9cf87814c961c16770d4224af5e92d5efb6b",
     "Bootstrap/runtime_handoff.py": "228dbcc1e3e28e682e1d956fd91a9100add223e613bb4aa09d47231e16499580",
     "Bootstrap/ci_evidence.py": "827c8f69d562f60f416bfd9378b210beb9fa7aea28667716c54d4b449f5d3adc",
     WORKFLOW: WORKFLOW_SHA256,
