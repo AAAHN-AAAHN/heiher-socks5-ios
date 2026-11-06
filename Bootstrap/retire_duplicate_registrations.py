@@ -6,6 +6,10 @@ Its result is not a formal/common-preparation success receipt. A caller may run
 the unchanged diagnostic consumers only after this process actually exits zero.
 Watch UUIDs are never mutation targets. Their absence is external observation,
 not an operation owned by this process or evidence of a particular cause.
+V3 permits only the two known observation-only Watch registrations to reference
+the sole Ready Watch's exact canonical mount/bundle pair. Those shared paths
+remain protected even after the old UUIDs disappear. This explicitly expands
+V2's input policy; it does not reinterpret any earlier failed execution.
 """
 import argparse
 import hashlib
@@ -37,6 +41,14 @@ SAMPLE_INTERVAL = 2
 MAX_SETTLEMENT_SNAPSHOTS = 61
 UNUSABLE_FIELDS = ('unusableErrorDetail', 'unusableErrorMessage', 'unusableSubstate')
 UUID = re.compile(r'[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}')
+PLAN_SCHEMA = 'exact-3a-old-ios-delete-watch-observation-plan-v3'
+ALIAS_ROLES_SCHEMA = 'exact-watch-shared-protected-alias-roles-v3'
+KNOWN_SHARED_WATCH_IDS = frozenset(('4E2A8325-62E2-427F-A198-FFEE1E5EF15A',
+                                  '61FE15D4-6286-4FC9-B531-8FFEAAD0E8D8'))
+SHARED_WATCH_MOUNT = '/private/var/run/com.apple.security.cryptexd/mnt/watchOS_24R362'
+SHARED_WATCH_BUNDLE = SHARED_WATCH_MOUNT + '/Library/Developer/CoreSimulator/Profiles/Runtimes/watchOS 27.0.simruntime'
+EXACT_UNUSABLE_DETAIL = ('Error Domain=SimDiskImageErrorDomain Code=7 "Cryptex Mount Preferred" '
+                         'UserInfo={NSLocalizedDescription=Cryptex Mount Preferred, unusableErrorDetail=}')
 
 
 def require(condition, message):
@@ -146,6 +158,109 @@ def check_delete_request(plan, attempted, invoked, target, argv, timeout):
             and timeout == DELETE_TIMEOUT, 'Mutation is outside the single old-iOS keep-asset command')
 
 
+def exact_shared_watch_record(common, key, row, *, ready):
+    """A narrower complete record contract applies only to the new shared case."""
+    expected = {'identifier': key, 'runtimeIdentifier': common.WATCH,
+                'platformIdentifier': 'com.apple.platform.watchsimulator',
+                'version': '27.0', 'build': '24R362', 'kind': 'Patchable Cryptex Disk Image',
+                'state': 'Ready' if ready else 'Unusable', 'signatureState': 'Unknown',
+                'deletable': True, 'sizeBytes': 3814435665, 'supportedArchitectures': ['arm64'],
+                'path': common.WATCH_ASSET, 'parentMountPath': common.WATCH_ASSET,
+                'mountPath': SHARED_WATCH_MOUNT, 'runtimeBundlePath': SHARED_WATCH_BUNDLE}
+    if not ready:
+        require(key in KNOWN_SHARED_WATCH_IDS, 'Shared alias belongs to an unknown old Watch UUID')
+        expected.update(unusableErrorMessage='Cryptex Mount Preferred',
+                        unusableSubstate='Cryptex Mount Preferred', unusableErrorDetail=EXACT_UNUSABLE_DETAIL)
+    require(canonical(row) == canonical(expected), 'Shared Watch complete metadata differs: ' + key)
+
+
+def freeze_alias_roles(common, plan, current):
+    """Classify literal paths once; no disappearance can later change a role."""
+    def path_values(value, location=()):
+        if isinstance(value, str) and Path(value).is_absolute():
+            yield location, value
+        elif isinstance(value, dict):
+            for key, child in sorted(value.items()):
+                yield from path_values(child, (*location, key))
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                yield from path_values(child, (*location, index))
+
+    data, ready = plan['baseline_inventory'], plan['ready_watch_uuid']
+    pair = {'mountPath': SHARED_WATCH_MOUNT, 'runtimeBundlePath': SHARED_WATCH_BUNDLE}
+    shared_ids = sorted(key for key in plan['watch_observation_ids']
+                        if all(data[key].get(field) == data[ready].get(field) for field in pair))
+    if shared_ids:
+        exact_shared_watch_record(common, ready, data[ready], ready=True)
+        for key in shared_ids:
+            exact_shared_watch_record(common, key, data[key], ready=False)
+    roles = {}
+    for path, references in plan['fixed_paths'].items():
+        alias = any(ref['field'] in pair for ref in references)
+        role = {'role': 'exclusive_alias' if alias else 'retained_asset',
+                'frozen_references': references}
+        if shared_ids and path in pair.values():
+            field = next(name for name, value in pair.items() if value == path)
+            expected_refs = [{'uuid': key, 'field': field} for key in shared_ids]
+            require(references == expected_refs, 'Shared path has a nonmatching frozen field or mutation target')
+            closure = []
+            for key, record in sorted(data.items()):
+                for location, value in path_values(record):
+                    if overlaps(path, value):
+                        # Only the exact matching pair is admitted. Its own
+                        # mount contains its own bundle; no other nesting is allowed.
+                        require(key in [ready, *shared_ids] and len(location) == 1
+                                and location[0] in pair and value == pair[location[0]],
+                                'Shared Watch path overlaps an unrelated runtime, field or alias')
+                        closure.append({'uuid': key, 'field': location[0], 'value': value})
+            observation = current['fixed_path_observations'][path]
+            captured = observation['filesystem']
+            require(observation['resolved_path'] == path and observation['symlink_components'] == []
+                    and captured.get('capture') == 'observed' and captured.get('value') == path
+                    and captured.get('resolved_path') == path and captured.get('is_directory') is True
+                    and captured == current['filesystem'][ready][field],
+                    'Shared Watch path lacks direct protected filesystem identity')
+            expected_rows = {path: current['mount_table'].get(path, [])} if field == 'mountPath' else {}
+            require(observation['os_path_ismount'] is (field == 'mountPath')
+                    and observation['related_mount_rows'] == expected_rows
+                    and (field != 'mountPath' or len(expected_rows[path]) == 1),
+                    'Shared Watch mount must be unique and its bundle must have no descendant mount')
+            proofs = [row for row in current['mount_proofs'] if row['uuid'] == ready]
+            require(len(proofs) == 1 and proofs[0]['mount'] == pair['mountPath']
+                    and proofs[0]['bundle'] == pair['runtimeBundlePath']
+                    and proofs[0]['os_path_ismount'] is True
+                    and proofs[0]['mount_device'] == proofs[0]['bundle_device'] == captured['device']
+                    and proofs[0]['mount_table'] == current['mount_table'][pair['mountPath']][0],
+                    'Shared Watch protected mount proof differs')
+            role.update(role='shared_protected', protected_reference={'uuid': ready, 'field': field},
+                        reference_closure=closure, initial_observation=observation)
+        roles[path] = role
+    return {'schema': ALIAS_ROLES_SCHEMA, 'paths': roles}
+
+
+def validate_shared_path(plan, current, progress, path, role):
+    """Preserve a fixed protected object even if every old reference is absent."""
+    observation = current['fixed_path_observations'][path]
+    reference = role['protected_reference']
+    require(path not in progress['missing_paths'], 'A shared protected path cannot enter the missing-path ledger')
+    require(observation == role['initial_observation']
+            and observation['filesystem'] == plan['path_baselines'][path]
+            and observation['filesystem'] == current['filesystem'][reference['uuid']][reference['field']],
+            'Shared protected Watch path, physical observation or mount rows changed: ' + path)
+    for ref in role['frozen_references']:
+        if ref['uuid'] in current['inventory']:
+            require(observation['filesystem'] == current['filesystem'][ref['uuid']][ref['field']],
+                    'Two reads of one shared protected path disagree')
+
+
+def replay_plan(common, preflight, service, initial, saved_plan):
+    """Recompute a saved V3 plan from bound original inputs; grant no run credit."""
+    require(saved_plan.get('schema') == PLAN_SCHEMA, 'Saved retirement plan is not explicit V3')
+    replayed = freeze_plan(common, preflight, service, initial)
+    require(canonical(saved_plan) == canonical(replayed), 'Saved V3 plan or alias-role ledger differs from replay')
+    return replayed
+
+
 def freeze_plan(common, preflight, service, current):
     """Pure planning: freeze existing identities, never discover replacement targets."""
     inventory, filesystem = current['inventory'], current['filesystem']
@@ -175,7 +290,7 @@ def freeze_plan(common, preflight, service, current):
         require(unusable_duplicate(inventory[key]), 'Target is not the exact Unusable duplicate class')
     require(all(all(field in inventory[key] for field in UNUSABLE_FIELDS) for key in retired_watches),
             'Watch freeze requires all three actual Unusable fields')
-    plan = {'old_ios_uuid': old, 'new_ios_uuid': new, 'ready_watch_uuid': ready[0],
+    plan = {'schema': PLAN_SCHEMA, 'old_ios_uuid': old, 'new_ios_uuid': new, 'ready_watch_uuid': ready[0],
             'target_ids': targets, 'target_records': {key: inventory[key] for key in targets},
             'mutation_target_ids': [old], 'watch_observation_ids': retired_watches,
             'baseline_inventory': inventory, 'baseline_filesystem': filesystem,
@@ -185,6 +300,7 @@ def freeze_plan(common, preflight, service, current):
             'target_order': 'One old-iOS delete, then only scheduled read-only watch observations; no causal claim.'}
     plan['fixed_paths'] = fixed_paths(plan['target_records'], old, retired_watches)
     require(set(current['fixed_path_observations']) == set(plan['fixed_paths']), 'Initial literal path ledger differs')
+    plan['alias_roles'] = freeze_alias_roles(common, plan, current)
     plan['path_baselines'] = {}
     protected_aliases = [inventory[key][field] for key in plan['protected_ids']
                          for field in ('mountPath', 'runtimeBundlePath')]
@@ -193,6 +309,8 @@ def freeze_plan(common, preflight, service, current):
         require(all(baseline == filesystem[ref['uuid']][ref['field']] for ref in references),
                 'Shared literal-path observations disagree with the original preparation')
         plan['path_baselines'][path] = baseline
+        if plan['alias_roles']['paths'][path]['role'] == 'shared_protected':
+            continue
         if any(ref['field'] in ('mountPath', 'runtimeBundlePath') for ref in references):
             require(not any(overlaps(path, protected) for protected in protected_aliases),
                     'A target alias overlaps a protected runtime mount or bundle')
@@ -200,7 +318,8 @@ def freeze_plan(common, preflight, service, current):
                     or enoent_path(baseline, path), 'Unsupported initial old runtime alias filesystem')
     plan['protected_mount_proofs'] = current['mount_proofs']
     plan['protected_mount_rows'] = runtime_mount_rows(inventory, current['mount_table'], plan['protected_ids'])
-    plan['initial_alias_limit'] = 'Every frozen old alias must already be an actual non-mount; this probe accepts no initially mounted target alias.'
+    plan['initial_alias_limit'] = ('Exclusive aliases retain the V2 non-mount rule. Only the two known observation-only Watch UUIDs '
+                                 'may share the sole exact Ready Watch canonical pair; those paths remain protected and never removable.')
     progress = initial_progress(plan)
     validate_state(common, plan, current, progress, old_deleted=False)
     return plan
@@ -214,6 +333,8 @@ def initial_progress(plan):
 
 def validate_state(common, plan, current, progress, *, old_deleted, final=False):
     """Read-only validation; progress is committed only after every guard passes."""
+    require(plan.get('schema') == PLAN_SCHEMA and plan['alias_roles']['schema'] == ALIAS_ROLES_SCHEMA
+            and set(plan['alias_roles']['paths']) == set(plan['fixed_paths']), 'V3 alias-role plan is incomplete')
     data, baseline = current['inventory'], plan['baseline_inventory']
     require(set(data) <= set(baseline), 'New runtime registration appeared; never select a substitute')
     require(set(baseline) - set(data) <= set(plan['target_ids']), 'A protected runtime disappeared')
@@ -253,6 +374,12 @@ def validate_state(common, plan, current, progress, *, old_deleted, final=False)
                 'OBSERVED_ABSENT_WITHOUT_DELETE_INVOCATION_AND_WITHOUT_OBSERVED_DELETING')
     require(set(current['fixed_path_observations']) == set(plan['fixed_paths']), 'Fixed old path ledger changed')
     for path, references in plan['fixed_paths'].items():
+        role = plan['alias_roles']['paths'][path]
+        require(role['frozen_references'] == references
+                and role['role'] in ('exclusive_alias', 'retained_asset', 'shared_protected'), 'Frozen alias role differs')
+        if role['role'] == 'shared_protected':
+            validate_shared_path(plan, current, progress, path, role)
+            continue
         observation = current['fixed_path_observations'][path]
         require(observation['resolved_path'] == path and observation['symlink_components'] == [],
                 'An old path is an indirect alias: ' + path)
@@ -300,7 +427,7 @@ class Probe:
         self.settlement_deadline = None
         self.progress = None
         self.watch_dmg = None
-        self.report = {'schema': 'exact-3a-old-ios-delete-watch-observation-diagnostic-v2',
+        self.report = {'schema': 'exact-3a-old-ios-delete-watch-shared-alias-observation-diagnostic-v3',
                        'started_unix': time.time(), 'source_commit': SOURCE, 'source_tree': TREE,
                        'formal_acceptance_credit': False, 'common_preparation_success_claimed': False,
                        'source_or_ref_modified': False, 'application_consumer_invocations': 0,
@@ -657,7 +784,7 @@ class Probe:
                            original_consumers_may_run_after_actual_exit_zero=True,
                            ready_watch_same_record_and_filesystem=True,
                            complete_frozen_target_set_absent=True,
-                           limitation='Watch absence is an external observation, not an owned delete or a cause claim. Old aliases were already non-mounts at initial freeze; no target unmount is claimed. Point-in-time evidence does not guarantee future platform stability. Original UI/Simulator outcomes remain required; formal credit is zero.')
+                           limitation='Watch absence is an external observation, not an owned delete or a cause claim. Exclusive aliases were already non-mounts; exact shared Watch aliases remain protected and cannot become missing. No deletion safety, automatic Watch disappearance, atomic observation or future platform stability is guaranteed. Original UI/Simulator outcomes remain required; formal credit is zero.')
 
 
 def main():
