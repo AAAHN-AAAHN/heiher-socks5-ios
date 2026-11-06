@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""One diagnostic retirement of exact, already bound runtime duplicates.
+"""One old-iOS retirement, then bounded read-only watch settlement.
 
 This control helper never edits the source or invokes an application consumer.
 Its result is not a formal/common-preparation success receipt. A caller may run
 the unchanged diagnostic consumers only after this process actually exits zero.
+Watch UUIDs are never mutation targets. Their absence is external observation,
+not an operation owned by this process or evidence of a particular cause.
 """
 import argparse
 import hashlib
@@ -30,6 +32,10 @@ PREPARATION = 'artifacts/integrated/runtime-preparation'
 META_TIMEOUT = 10
 DELETE_TIMEOUT = 120
 MAX_TARGETS = 3
+SETTLEMENT_SECONDS = 120
+SAMPLE_INTERVAL = 2
+MAX_SETTLEMENT_SNAPSHOTS = 61
+UNUSABLE_FIELDS = ('unusableErrorDetail', 'unusableErrorMessage', 'unusableSubstate')
 UUID = re.compile(r'[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}')
 
 
@@ -92,6 +98,54 @@ def unusable_duplicate(row):
                  isinstance(row['unusableErrorDetail'], str) and 'Cryptex Mount Preferred' in row['unusableErrorDetail']))
 
 
+def enoent_path(row, path):
+    """Only the original path_snapshot's concrete FileNotFoundError is missing."""
+    return row == {'value': path, 'capture': 'unavailable',
+                   'error': {'type': 'FileNotFoundError', 'errno': 2,
+                             'message': str(FileNotFoundError(2, os.strerror(2), path))}}
+
+
+def overlaps(left, right):
+    a, b = Path(left), Path(right)
+    return a.is_relative_to(b) or b.is_relative_to(a)
+
+
+def fixed_paths(records, old, watches):
+    """Key the ledger by literal path; both watch UUIDs may share one alias."""
+    paths = {}
+    for key in [old, *watches]:
+        fields = ('mountPath',) if key == old else ('mountPath', 'runtimeBundlePath', 'path', 'parentMountPath')
+        for field in fields:
+            value = records[key][field]
+            require(isinstance(value, str) and Path(value).is_absolute() and Path(value).as_posix() == value
+                    and '..' not in Path(value).parts, 'Malformed frozen path')
+            paths.setdefault(value, []).append({'uuid': key, 'field': field})
+    return paths
+
+
+def runtime_mount_rows(data, mounts, keys):
+    paths = {data[key][field] for key in keys for field in ('mountPath', 'runtimeBundlePath')}
+    return {path: mounts.get(path, []) for path in sorted(paths)}
+
+
+def watch_state(frozen, current):
+    if current is None:
+        return 'Absent'
+    if current == frozen and unusable_duplicate(current):
+        return 'Unusable'
+    deleting = {key: value for key, value in frozen.items() if key not in UNUSABLE_FIELDS}
+    deleting['state'] = 'Deleting'
+    require(current == deleting, 'Watch record changed beyond the exact observed Deleting transition')
+    return 'Deleting'
+
+
+def check_delete_request(plan, attempted, invoked, target, argv, timeout):
+    require(plan is not None and target == plan['old_ios_uuid'] and plan['mutation_target_ids'] == [target]
+            and not attempted and not invoked, 'Only the frozen old iOS may receive one total mutation attempt')
+    require(argv == ['xcrun', 'simctl', 'runtime', 'delete', target, '--keep-asset']
+            and timeout == DELETE_TIMEOUT, 'Mutation is outside the single old-iOS keep-asset command')
+
+
 def freeze_plan(common, preflight, service, current):
     """Pure planning: freeze existing identities, never discover replacement targets."""
     inventory, filesystem = current['inventory'], current['filesystem']
@@ -119,55 +173,123 @@ def freeze_plan(common, preflight, service, current):
             'Invalid bounded target set')
     for key in targets:
         require(unusable_duplicate(inventory[key]), 'Target is not the exact Unusable duplicate class')
-    return {'old_ios_uuid': old, 'new_ios_uuid': new, 'ready_watch_uuid': ready[0],
+    require(all(all(field in inventory[key] for field in UNUSABLE_FIELDS) for key in retired_watches),
+            'Watch freeze requires all three actual Unusable fields')
+    plan = {'old_ios_uuid': old, 'new_ios_uuid': new, 'ready_watch_uuid': ready[0],
             'target_ids': targets, 'target_records': {key: inventory[key] for key in targets},
+            'mutation_target_ids': [old], 'watch_observation_ids': retired_watches,
             'baseline_inventory': inventory, 'baseline_filesystem': filesystem,
             'protected_ids': sorted(set(inventory) - set(targets)),
             'devices': current['devices'], 'asset_files': current['asset_files'],
             'protected_mount_paths': [inventory[new]['mountPath'], inventory[ready[0]]['mountPath']],
-            'target_order': 'Old iOS first, then original Unusable watch UUIDs in lexical order; no causal superiority claimed.'}
+            'target_order': 'One old-iOS delete, then only scheduled read-only watch observations; no causal claim.'}
+    plan['fixed_paths'] = fixed_paths(plan['target_records'], old, retired_watches)
+    require(set(current['fixed_path_observations']) == set(plan['fixed_paths']), 'Initial literal path ledger differs')
+    plan['path_baselines'] = {}
+    protected_aliases = [inventory[key][field] for key in plan['protected_ids']
+                         for field in ('mountPath', 'runtimeBundlePath')]
+    for path, references in plan['fixed_paths'].items():
+        baseline = current['fixed_path_observations'][path]['filesystem']
+        require(all(baseline == filesystem[ref['uuid']][ref['field']] for ref in references),
+                'Shared literal-path observations disagree with the original preparation')
+        plan['path_baselines'][path] = baseline
+        if any(ref['field'] in ('mountPath', 'runtimeBundlePath') for ref in references):
+            require(not any(overlaps(path, protected) for protected in protected_aliases),
+                    'A target alias overlaps a protected runtime mount or bundle')
+            require((baseline.get('capture') == 'observed' and baseline.get('is_directory') is True)
+                    or enoent_path(baseline, path), 'Unsupported initial old runtime alias filesystem')
+    plan['protected_mount_proofs'] = current['mount_proofs']
+    plan['protected_mount_rows'] = runtime_mount_rows(inventory, current['mount_table'], plan['protected_ids'])
+    plan['initial_alias_limit'] = 'Every frozen old alias must already be an actual non-mount; this probe accepts no initially mounted target alias.'
+    progress = initial_progress(plan)
+    validate_state(common, plan, current, progress, old_deleted=False)
+    return plan
 
 
-def validate_state(common, plan, current, *, before_target=None, required_absent=(), final=False):
-    """Only disappearance of frozen target records is permitted after retirement."""
+def initial_progress(plan):
+    return {'watch_states': {key: 'Unusable' for key in plan['watch_observation_ids']},
+            'deleting_observed': [], 'absence_dispositions': {}, 'transitions': [],
+            'missing_paths': sorted(path for path, row in plan['path_baselines'].items() if enoent_path(row, path))}
+
+
+def validate_state(common, plan, current, progress, *, old_deleted, final=False):
+    """Read-only validation; progress is committed only after every guard passes."""
     data, baseline = current['inventory'], plan['baseline_inventory']
     require(set(data) <= set(baseline), 'New runtime registration appeared; never select a substitute')
     require(set(baseline) - set(data) <= set(plan['target_ids']), 'A protected runtime disappeared')
-    require(set(plan['target_ids']) - set(data) == set(required_absent),
-            'Frozen-target absence differs from completed commands; stop immediately on natural disappearance')
+    require(set(current['filesystem']) == set(data), 'Runtime filesystem inventory differs')
+    require(common.require_shutdown_devices(current['raw_devices']) == current['devices'], 'Raw device normalization differs')
     require(current['devices'] == plan['devices'], 'Device identities or Shutdown states changed')
     require(current['asset_files'] == plan['asset_files'], 'A retained asset/DMG identity changed')
     for key in plan['protected_ids']:
         require(key in data and canonical(data[key]) == canonical(baseline[key]), 'Protected runtime record changed: ' + key)
         require(canonical(current['filesystem'][key]) == canonical(plan['baseline_filesystem'][key]),
                 'Protected runtime filesystem changed: ' + key)
-    for key in plan['target_ids']:
-        if key in data:
-            require(canonical(data[key]) == canonical(plan['target_records'][key]) and unusable_duplicate(data[key]),
-                    'A frozen target changed; never retarget or delete its replacement: ' + key)
-            require(canonical(current['filesystem'][key]) == canonical(plan['baseline_filesystem'][key]),
-                    'Frozen target filesystem identity changed: ' + key)
-    if before_target is not None:
-        require(before_target in plan['target_ids'] and before_target in data, 'Exact target is not present immediately before its one invocation')
+    old = plan['old_ios_uuid']
+    if old_deleted:
+        require(old not in data, 'Own successful old-iOS delete must be followed by its exact UUID absence')
+    else:
+        require(old in data and data[old] == plan['target_records'][old] and unusable_duplicate(data[old]),
+                'The one old-iOS mutation target is absent or changed before its invocation')
+        require(current['filesystem'][old] == plan['baseline_filesystem'][old], 'Old iOS filesystem changed before deletion')
+    updated = strict_json(canonical(progress))
+    phases = {}
+    allowed = {'Unusable': {'Unusable', 'Deleting', 'Absent'}, 'Deleting': {'Deleting', 'Absent'}, 'Absent': {'Absent'}}
+    require(set(progress['watch_states']) == set(plan['watch_observation_ids']), 'Watch observation identities differ')
+    for key in plan['watch_observation_ids']:
+        phase = watch_state(plan['target_records'][key], data.get(key))
+        previous = progress['watch_states'][key]
+        require(previous in allowed and phase in allowed[previous], 'Watch state regressed or its frozen UUID reappeared: ' + key)
+        phases[key] = phase
+        if phase == 'Deleting' and key not in updated['deleting_observed']:
+            updated['deleting_observed'].append(key)
+        if phase != previous:
+            updated['transitions'].append({'uuid': key, 'from': previous, 'to': phase, 'snapshot': current['label'],
+                                           'observed_unix': current['finished_unix'], 'watch_delete_invoked': False})
+        updated['watch_states'][key] = phase
+        if phase == 'Absent' and key not in updated['absence_dispositions']:
+            updated['absence_dispositions'][key] = (
+                'OBSERVED_ABSENT_WITHOUT_DELETE_INVOCATION_AFTER_OBSERVED_DELETING' if key in updated['deleting_observed'] else
+                'OBSERVED_ABSENT_WITHOUT_DELETE_INVOCATION_AND_WITHOUT_OBSERVED_DELETING')
+    require(set(current['fixed_path_observations']) == set(plan['fixed_paths']), 'Fixed old path ledger changed')
+    for path, references in plan['fixed_paths'].items():
+        observation = current['fixed_path_observations'][path]
+        require(observation['resolved_path'] == path and observation['symlink_components'] == [],
+                'An old path is an indirect alias: ' + path)
+        # This narrowly supported diagnostic starts with old aliases already
+        # unmounted. No alias is allowed to appear at any later observation.
+        require(observation['os_path_ismount'] is False and observation['related_mount_rows'] == {},
+                'An old path or a child acquired an actual mount: ' + path)
+        captured, original = observation['filesystem'], plan['path_baselines'][path]
+        require(captured.get('value') == path, 'Fixed path observation refers to another path')
+        for ref in references:
+            if ref['uuid'] in data:
+                require(captured == current['filesystem'][ref['uuid']][ref['field']], 'Two reads of one old path disagree')
+        watch_refs = [ref for ref in references if ref['uuid'] in phases]
+        removable = (all(ref['field'] in ('mountPath', 'runtimeBundlePath') for ref in references)
+                     and ((bool(watch_refs) and all(phases[ref['uuid']] in ('Deleting', 'Absent') for ref in watch_refs))
+                          or (not watch_refs and old_deleted)))
+        require(captured == original or (removable and enoent_path(captured, path)),
+                'Old path changed beyond exact identity or permitted ENOENT: ' + path)
+        require(path not in progress['missing_paths'] or enoent_path(captured, path), 'An absent old path reappeared: ' + path)
+        if enoent_path(captured, path) and path not in updated['missing_paths']:
+            updated['missing_paths'].append(path)
     new = data[plan['new_ios_uuid']]
     require(new['state'] == 'Ready' and new['signatureState'] == 'Verified', 'Selected iOS lost Ready/Verified')
     watches = common.watch_records(data)
     ready = [key for key, row in watches.items() if row['state'] == 'Ready']
     require(ready == [plan['ready_watch_uuid']], 'Sole Ready watch identity changed; a new Ready UUID is not accepted')
     require(current['mounted_paths'] == plan['protected_mount_paths'], 'Protected actual mount proof is incomplete')
-    # An absent registration's old alias must not still be mounted unless the
-    # exact protected survivor also intentionally names that same mount path.
-    protected_paths = set(plan['protected_mount_paths'])
-    for key in plan['target_ids']:
-        if key not in data:
-            old_path = plan['target_records'][key].get('mountPath')
-            require(old_path in protected_paths or old_path not in current['mount_paths'],
-                    'Retired registration still has an independently mounted old alias: ' + key)
+    require(current['mount_proofs'] == plan['protected_mount_proofs'], 'Protected actual mount identity, source or options changed')
+    require(runtime_mount_rows(data, current['mount_table'], plan['protected_ids']) == plan['protected_mount_rows'],
+            'Non-target runtime mount membership or rows changed')
     if final:
+        require(old_deleted, 'No successful own old-iOS deletion was bound')
         require(not (set(plan['target_ids']) & set(data)), 'A frozen duplicate remains')
         require(set(watches) == {plan['ready_watch_uuid']}, 'Watch27.0 is not a single unchanged Ready registration')
         ios = [key for key, row in data.items() if row.get('runtimeIdentifier') == common.IOS]
         require(ios == [plan['new_ios_uuid']], 'Selected iOS runtime still has duplicate registrations')
+    return updated
 
 
 class Probe:
@@ -175,15 +297,21 @@ class Probe:
         self.source, self.output = source, output
         self.labels, self.attempted, self.invoked = set(), set(), set()
         self.common = self.preflight = self.service = self.plan = None
+        self.settlement_deadline = None
+        self.progress = None
         self.watch_dmg = None
-        self.report = {'schema': 'exact-3a-runtime-duplicate-retirement-diagnostic-v1',
+        self.report = {'schema': 'exact-3a-old-ios-delete-watch-observation-diagnostic-v2',
                        'started_unix': time.time(), 'source_commit': SOURCE, 'source_tree': TREE,
                        'formal_acceptance_credit': False, 'common_preparation_success_claimed': False,
                        'source_or_ref_modified': False, 'application_consumer_invocations': 0,
                        'candidate_runtime_success_claimed': False, 'caller_actual_exit_required': True,
                        'original_consumers_may_run_after_actual_exit_zero': False,
                        'limits': {'metadata_seconds': META_TIMEOUT, 'delete_seconds': DELETE_TIMEOUT,
-                                  'max_frozen_targets': MAX_TARGETS, 'delete_invocations_per_uuid': 1,
+                                  'max_frozen_targets': MAX_TARGETS, 'total_mutation_attempts': 1,
+                                  'watch_delete_invocations': 0, 'settlement_seconds': SETTLEMENT_SECONDS,
+                                  'sample_interval_seconds': SAMPLE_INTERVAL,
+                                  'max_settlement_snapshots': MAX_SETTLEMENT_SNAPSHOTS,
+                                  'settlement_budget_covers_final_metadata_and_guards': True,
                                   'retries': 0, 'replacement_targets': 0, 'service_signals': 0,
                                   'consumer_deadlines_changed': False},
                        'commands': [], 'snapshots': [], 'target_actions': []}
@@ -193,14 +321,18 @@ class Probe:
         pending.write_text(json.dumps(self.report, indent=2, sort_keys=True, allow_nan=False) + '\n')
         pending.replace(self.output / 'result.json')
 
+    def remaining(self):
+        if self.settlement_deadline is None:
+            return None
+        value = self.settlement_deadline - time.monotonic()
+        require(value > 0, 'The single read-only settlement deadline expired; no consumer may run')
+        return value
+
     def run(self, label, argv, timeout=META_TIMEOUT, target=None):
         require(label not in self.labels, 'Command cannot be retried: ' + label)
         self.labels.add(label)
         if target is not None:
-            require(self.plan is not None and target in self.plan['target_ids'] and target not in self.attempted,
-                    'Mutation target was not frozen once')
-            require(argv == ['xcrun', 'simctl', 'runtime', 'delete', target, '--keep-asset']
-                    and timeout == DELETE_TIMEOUT, 'Mutation is outside the exact single-UUID keep-asset command')
+            check_delete_request(self.plan, self.attempted, self.invoked, target, argv, timeout)
         else:
             git_root = argv[:3] == ['git', '-C', str(self.source)] or (
                 self.report.get('control_root') and argv[:3] == ['git', '-C', self.report['control_root']])
@@ -220,8 +352,15 @@ class Probe:
         self.report['commands'].append(row)
         process, failure, started = None, None, time.monotonic()
         try:
+            self.remaining()
             self.save()
             with (self.output / row['stdout_file']).open('xb') as out, (self.output / row['stderr_file']).open('xb') as err:
+                remaining = self.remaining()
+                effective = min(timeout, remaining) if remaining is not None else timeout
+                row['effective_timeout_seconds'] = effective
+                row['settlement_remaining_at_launch_seconds'] = remaining
+                launched = time.monotonic()
+                command_deadline = min(launched + timeout, self.settlement_deadline) if self.settlement_deadline is not None else launched + timeout
                 if target is not None:
                     self.attempted.add(target)
                     row['mutation_attempted'] = True
@@ -231,9 +370,23 @@ class Probe:
                 if target is not None:
                     self.invoked.add(target)
                     row['mutation_invoked'] = True
-                row['returncode'] = process.wait(timeout=timeout)
+                wait_budget = command_deadline - time.monotonic()
+                if wait_budget <= 0:
+                    raise subprocess.TimeoutExpired(argv, effective)
+                row['returncode'] = process.wait(timeout=wait_budget)
+                completed = time.monotonic()
+                row['command_finished_monotonic'] = completed
                 if row['returncode']:
                     raise subprocess.CalledProcessError(row['returncode'], argv)
+                require(completed <= command_deadline, 'Command completed beyond its bounded deadline')
+                if target is not None:
+                    require(self.settlement_deadline is None, 'The settlement deadline cannot be restarted')
+                    self.settlement_deadline = completed + SETTLEMENT_SECONDS
+                    self.report['settlement_clock'] = {
+                        'starts_after_successful_command': label, 'command_returncode': 0,
+                        'started_monotonic': completed, 'deadline_monotonic': self.settlement_deadline,
+                        'budget_seconds': SETTLEMENT_SECONDS, 'reset_count': 0}
+                self.remaining()
         except Exception as error:
             failure = error
             row['failure'] = {'type': type(error).__name__, 'message': str(error)}
@@ -242,7 +395,8 @@ class Probe:
                 try:
                     process.kill()
                     row['owned_cli_kill_requested'] = True
-                    row['reaped_returncode'] = process.wait(timeout=1)
+                    cleanup_budget = min(1, max(0, self.settlement_deadline - time.monotonic())) if self.settlement_deadline is not None else 1
+                    row['reaped_returncode'] = process.wait(timeout=cleanup_budget)
                 except Exception as cleanup:
                     row['owned_cli_cleanup_error'] = str(cleanup)
                 row['server_side_operation_stopped_claimed'] = False
@@ -264,7 +418,9 @@ class Probe:
                 failure = failure or error
         if failure is not None:
             raise failure
-        return raw_file(self.output / row['stdout_file'], 4 * 1024 * 1024)[0]
+        raw = raw_file(self.output / row['stdout_file'], 4 * 1024 * 1024)[0]
+        self.remaining()
+        return raw
 
     def bind_git(self, root, identity, entries, prefix):
         value = self.run(prefix + '-head', ['git', '-C', str(root), 'rev-parse', 'HEAD', 'HEAD^{tree}']).decode().splitlines()
@@ -376,8 +532,9 @@ class Probe:
         result['watch_dmg'] = {'path': str(self.watch_dmg), 'identity': common.file_identity(info)}
         return result
 
-    def snapshot(self, label, validate_mounts=True):
+    def snapshot(self, label):
         common = self.common
+        self.remaining()
         entry = {'label': label, 'started_unix': time.time()}
         self.report['snapshots'].append(entry)
         data = common.inventory(strict_json(self.run(label + '-runtimes', ['xcrun', 'simctl', 'runtime', 'list', '-j'])))
@@ -389,8 +546,9 @@ class Probe:
         mounts = {}
         for line in mount_text.splitlines():
             match = re.fullmatch(r'(.+) on (/.*) \(([^\n]*)\)', line)
-            if match:
-                mounts.setdefault(match[2], []).append({'source': match[1], 'options': match[3], 'raw_line': line})
+            require(match is not None, 'An actual mount-table row could not be parsed')
+            mounts.setdefault(match[2], []).append({'source': match[1], 'options': match[3], 'raw_line': line})
+        entry['mount_table'] = mounts
         entry['mount_paths'] = sorted(mounts)
         entry['asset_files'] = self.asset_files()
         new = self.preflight['scope_after_verify']['new_uuid']
@@ -398,54 +556,87 @@ class Probe:
         ready = [key for key, row in watches.items() if row['state'] == 'Ready']
         expected_watch = self.plan['ready_watch_uuid'] if self.plan else (ready[0] if len(ready) == 1 else None)
         entry['mounted_paths'], entry['mount_proofs'] = [], []
-        if validate_mounts:
-            require(new in data and expected_watch in data, 'Required protected runtime is absent')
-            for key in (new, expected_watch):
-                row = data[key]
-                mount_path, bundle_path = Path(row['mountPath']), Path(row['runtimeBundlePath'])
-                require(mount_path.is_absolute() and mount_path.resolve() == mount_path
-                        and bundle_path.resolve() == bundle_path and bundle_path.is_relative_to(mount_path),
-                        'Protected mount/bundle is indirect or outside its exact mount')
-                require(len(mounts.get(str(mount_path), [])) == 1 and os.path.ismount(mount_path),
-                        'Directory existence is insufficient: protected path is not an actual unique mount')
-                mount_stat, bundle_stat = mount_path.stat(), bundle_path.stat()
-                require(stat.S_ISDIR(mount_stat.st_mode) and stat.S_ISDIR(bundle_stat.st_mode)
-                        and mount_stat.st_dev == bundle_stat.st_dev, 'Runtime bundle is not on its declared mounted filesystem')
-                entry['mounted_paths'].append(str(mount_path))
-                entry['mount_proofs'].append({'uuid': key, 'mount': str(mount_path), 'bundle': str(bundle_path),
-                                             'mount_table': mounts[str(mount_path)][0], 'os_path_ismount': True,
-                                             'mount_device': mount_stat.st_dev, 'bundle_device': bundle_stat.st_dev})
+        require(new in data and expected_watch in data, 'Required protected runtime is absent')
+        for key in (new, expected_watch):
+            row = data[key]
+            mount_path, bundle_path = Path(row['mountPath']), Path(row['runtimeBundlePath'])
+            require(mount_path.is_absolute() and mount_path.resolve() == mount_path
+                    and bundle_path.resolve() == bundle_path and bundle_path.is_relative_to(mount_path),
+                    'Protected mount/bundle is indirect or outside its exact mount')
+            require(len(mounts.get(str(mount_path), [])) == 1 and os.path.ismount(mount_path),
+                    'Directory existence is insufficient: protected path is not an actual unique mount')
+            mount_stat, bundle_stat = mount_path.stat(), bundle_path.stat()
+            require(stat.S_ISDIR(mount_stat.st_mode) and stat.S_ISDIR(bundle_stat.st_mode)
+                    and mount_stat.st_dev == bundle_stat.st_dev, 'Runtime bundle is not on its declared mounted filesystem')
+            entry['mounted_paths'].append(str(mount_path))
+            entry['mount_proofs'].append({'uuid': key, 'mount': str(mount_path), 'bundle': str(bundle_path),
+                                         'mount_table': mounts[str(mount_path)][0], 'os_path_ismount': True,
+                                         'mount_device': mount_stat.st_dev, 'bundle_device': bundle_stat.st_dev})
+        if self.plan is None:
+            old = self.preflight['selected_original_runtime']['target_uuid']
+            watch_ids = sorted(key for key, row in watches.items() if unusable_duplicate(row))
+            require(old in data, 'Original old iOS is absent before freezing')
+            paths = fixed_paths(data, old, watch_ids)
+        else:
+            paths = self.plan['fixed_paths']
+        entry['fixed_path_observations'] = {}
+        for value in paths:
+            self.remaining()
+            path = Path(value)
+            require(len(path.parts) <= 64, 'Old path depth is outside the bounded ledger')
+            links = []
+            for component in (path, *path.parents):
+                try:
+                    if stat.S_ISLNK(component.lstat().st_mode):
+                        links.append(str(component))
+                except FileNotFoundError:
+                    pass
+            entry['fixed_path_observations'][value] = {
+                'filesystem': common.path_snapshot(value), 'resolved_path': str(path.resolve(strict=False)),
+                'symlink_components': links, 'os_path_ismount': os.path.ismount(path),
+                'related_mount_rows': {key: rows for key, rows in mounts.items() if Path(key).is_relative_to(path)}}
+        self.remaining()
         entry['finished_unix'] = time.time()
         self.save()
+        self.remaining()
         return entry
 
     def execute(self):
         self.bind_inputs()
         current = self.snapshot('initial')
         self.plan = freeze_plan(self.common, self.preflight, self.service, current)
+        self.progress = initial_progress(self.plan)
         self.report['frozen_plan'] = self.plan
         self.save()
-        absent = set()
-        for index, target in enumerate(self.plan['target_ids'], 1):
-            before = self.snapshot('target-' + str(index) + '-before')
-            validate_state(self.common, self.plan, before, before_target=target, required_absent=absent)
-            action = {'uuid': target, 'frozen_record': self.plan['target_records'][target], 'started_unix': time.time()}
-            self.report['target_actions'].append(action)
-            action['disposition'] = 'ONE_EXACT_KEEP_ASSET_DELETE_ATTEMPT'
-            try:
-                self.run('target-' + str(index) + '-delete', ['xcrun', 'simctl', 'runtime', 'delete', target, '--keep-asset'],
-                         DELETE_TIMEOUT, target=target)
-            finally:
-                action['delete_attempts'] = int(target in self.attempted)
-                action['delete_invocations'] = int(target in self.invoked)
-            after = self.snapshot('target-' + str(index) + '-after')
-            absent.add(target)
-            validate_state(self.common, self.plan, after, required_absent=absent)
-            action['disposition'] = 'EXACT_TARGET_ABSENT_ASSETS_AND_PROTECTED_RUNTIMES_PRESERVED'
-            action['finished_unix'] = time.time()
+        before = self.snapshot('old-ios-before')
+        self.progress = validate_state(self.common, self.plan, before, self.progress, old_deleted=False)
+        self.report['watch_observations'] = self.progress
+        target = self.plan['old_ios_uuid']
+        action = {'uuid': target, 'frozen_record': self.plan['target_records'][target],
+                  'started_unix': time.time(), 'disposition': 'ONE_EXACT_OLD_IOS_KEEP_ASSET_DELETE_ATTEMPT'}
+        self.report['target_actions'].append(action)
+        try:
+            self.run('old-ios-delete', ['xcrun', 'simctl', 'runtime', 'delete', target, '--keep-asset'],
+                     DELETE_TIMEOUT, target=target)
+        finally:
+            action['delete_attempts'] = int(target in self.attempted)
+            action['delete_invocations'] = int(target in self.invoked)
+        for sample in range(1, MAX_SETTLEMENT_SNAPSHOTS):
+            after = self.snapshot('settlement-' + str(sample).zfill(3))
+            self.progress = validate_state(self.common, self.plan, after, self.progress, old_deleted=True)
+            self.report['watch_observations'] = self.progress
+            if sample == 1:
+                action.update(disposition='OWN_DELETE_EXIT_ZERO_AND_OLD_IOS_UUID_ABSENT',
+                              absence_snapshot=after['label'], finished_unix=time.time())
+                self.report['own_delete_completed_uuids'] = [target]
             self.save()
-        final = self.snapshot('final')
-        validate_state(self.common, self.plan, final, required_absent=self.plan['target_ids'], final=True)
+            if all(value == 'Absent' for value in self.progress['watch_states'].values()):
+                break
+            require(sample < MAX_SETTLEMENT_SNAPSHOTS - 1, 'Finite read-only snapshot count exhausted')
+            require(self.remaining() > SAMPLE_INTERVAL, 'Insufficient budget for the next fixed read-only interval')
+            time.sleep(SAMPLE_INTERVAL)
+        # These original selection and source bindings share the same remaining
+        # settlement budget. There is no unbounded final sweep after it expires.
         runtimes = strict_json(self.run('final-logical-runtimes', ['xcrun', 'simctl', 'list', 'runtimes', '-j']))
         types = strict_json(self.run('final-device-types', ['xcrun', 'simctl', 'list', 'devicetypes', '-j']))
         selections = {}
@@ -456,11 +647,17 @@ class Probe:
         self.report['actual_original_first_choice'] = selections
         for root, identity, entries, prefix in self.bound_git:
             self.bind_git(root, identity, entries, prefix)
-        self.report.update(result='DUPLICATE_REGISTRATIONS_RETIRED_PENDING_CALLER_EXIT',
+        final = self.snapshot('settlement-final')
+        self.progress = validate_state(self.common, self.plan, final, self.progress, old_deleted=True, final=True)
+        self.remaining()
+        self.report.update(result='OLD_IOS_DELETED_WATCH_ABSENCE_OBSERVED_PENDING_CALLER_EXIT',
+                           watch_observations=self.progress,
+                           externally_observed_watch_absent_uuids=sorted(self.plan['watch_observation_ids']),
+                           watch_delete_attempts=0, watch_delete_invocations=0,
                            original_consumers_may_run_after_actual_exit_zero=True,
                            ready_watch_same_record_and_filesystem=True,
                            complete_frozen_target_set_absent=True,
-                           limitation='Point-in-time official command/state/mount evidence does not guarantee future platform stability or prove the prior sole cause. Exact original UI/Simulator outcomes remain required; this diagnostic grants no formal credit.')
+                           limitation='Watch absence is an external observation, not an owned delete or a cause claim. Old aliases were already non-mounts at initial freeze; no target unmount is claimed. Point-in-time evidence does not guarantee future platform stability. Original UI/Simulator outcomes remain required; formal credit is zero.')
 
 
 def main():
@@ -483,18 +680,19 @@ def main():
         probe.report.update(result='DUPLICATE_RETIREMENT_FAILED_CLOSED',
                             original_consumers_may_run_after_actual_exit_zero=False,
                             failure={'type': type(error).__name__, 'message': str(error)})
-        if probe.invoked and probe.common is not None:
-            try:
-                probe.snapshot('failure-after', validate_mounts=False)
-            except Exception as capture:
-                probe.report['secondary_failure_capture_error'] = {'type': type(capture).__name__, 'message': str(capture)}
+        # Keep all partial raw samples, but issue no post-failure metadata
+        # commands outside the single budget. The caller owns host observation.
     probe.report['finished_unix'] = time.time()
     probe.report['delete_attempted_uuids'] = sorted(probe.attempted)
     probe.report['delete_invoked_uuids'] = sorted(probe.invoked)
     try:
         probe.save()
+        if failure is None:
+            probe.remaining()
         print(json.dumps({'result': probe.report['result'], 'report': str(output / 'result.json'),
                           'delete_invoked_uuids': sorted(probe.invoked), 'formal_acceptance_credit': False}))
+        if failure is None:
+            probe.remaining()
     except Exception as error:
         failure = failure or error
         probe.report.update(result='DUPLICATE_RETIREMENT_FAILED_CLOSED',

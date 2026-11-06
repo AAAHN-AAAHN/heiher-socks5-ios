@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """One diagnostic preparation change; no candidate or publication acceptance.
 
-Run the original preparation, retire only its precisely identified unusable
-duplicates, then invoke the original Integrated consumers once. Their arguments,
-source, assertions and deadlines are unchanged. The historical preparation's
-before/after adapter requires the retired UUID to remain present, so this probe
-does not call that adapter or represent itself as a formal candidate gate.
+Run the original preparation, delete its one frozen old-iOS duplicate, and
+observe the frozen watch UUIDs without deleting them. Invoke the original
+Integrated consumers only after the bounded helper actually exits zero. Their
+arguments, source, assertions and deadlines remain unchanged. The historical
+adapter validates saved preparation and distinct live consumer boundaries; it
+does not establish a binding for this added retirement/settlement phase. This
+diagnostic omits its before/after calls and grants no formal candidate credit.
 """
 
 from datetime import datetime, timezone
@@ -95,11 +97,11 @@ def main():
     python = Path(os.environ["RUNNER_TOOL_CACHE"]) / "Python/3.14.9/arm64/bin/python3.14"
     require(python.is_file() and os.access(python, os.X_OK), "Original preparation interpreter is absent")
     report = {
-        "schema": "single-exact-runtime-retirement-probe-v1", "started_utc": now(),
+        "schema": "single-old-ios-delete-watch-settlement-probe-v2", "started_utc": now(),
         "result": "IN_PROGRESS", "formal_candidate_credit": False, "publication_credit": False,
         "source": {"commit": SOURCE, "tree": TREE}, "original_consumer_sha256": CONSUMERS,
         "context": {key: os.environ.get(key) for key in (*expected, "GITHUB_SHA", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT")},
-        "scope": "One original preparation, one bounded exact-duplicate retirement, and at most one invocation of each original UI/Simulator consumer. No original consumer before/after adapter receipt is asserted after the host mutation.",
+        "scope": "One original preparation; at most one exact old-iOS keep-asset delete; zero watch deletes; one bounded read-only watch settlement; at most one invocation of each original UI/Simulator consumer. Original saved preparation validation is preserved. No formal binding or original consumer before/after adapter receipt is asserted for the added phase.",
         "phases": [], "errors": [],
     }
 
