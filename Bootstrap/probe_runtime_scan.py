@@ -22,6 +22,7 @@ SELF_PATH = "Bootstrap/probe_runtime_scan.py"
 HELP = ("/usr/bin/xcrun", "simctl", "help", "runtime")
 SCAN = ("/usr/bin/xcrun", "simctl", "runtime", "scan-and-mount")
 WATCH = "com.apple.CoreSimulator.SimRuntime.watchOS-27-0"
+TVOS = "com.apple.CoreSimulator.SimRuntime.tvOS-27-0"
 TVOS_OLD = "54D35026-7325-4069-BF3A-FDFEA26D5885"
 WATCH_OLD = {"4E2A8325-62E2-427F-A198-FFEE1E5EF15A", "61FE15D4-6286-4FC9-B531-8FFEAAD0E8D8"}
 VOLUMES = "/Library/Developer/CoreSimulator/Volumes/"
@@ -246,6 +247,19 @@ def classify_baseline(window):
                 issues.append({"kind": "exact_old_tvos_unusable_enoent", "uuid": key,
                                "mount_path": mount["path"], "bundle_path": bundle["path"]})
                 continue
+        if runtime.get("runtimeIdentifier") == TVOS and key != TVOS_OLD and runtime["state"] == "Ready":
+            expected_special(runtime, "tvOS")
+            require(runtime["mountPath"] == CRYPTEX + "tvOS_24J360"
+                    and sum(r.get("runtimeIdentifier") == TVOS and r.get("state") == "Ready"
+                            for r in data.values()) == 1,
+                    "Expected one new Ready tvOS at the exact canonical Cryptex alias")
+            if exact_enoent(bundle):
+                if not exact_enoent(mount):
+                    observed_directory(mount)
+                    require(no_mount(mount), "Missing tvOS bundle is not the known unmounted-directory condition")
+                issues.append({"kind": "exact_ready_tvos_bundle_enoent", "uuid": key,
+                               "mount_path": mount["path"], "bundle_path": bundle["path"]})
+                continue
         if key in special_watch:
             expected_special(runtime, "watchOS")
             if runtime["state"] == "Unusable":
@@ -396,7 +410,7 @@ def main():
         require(len(sys.argv) == 1 and __debug__, "This diagnostic accepts no arguments or optimized execution")
         observer = load_observer()
         budget = observer.Budget(started)
-        report = {"schema": "single-runtime-scan-diagnostic-v1", "result": "IN_PROGRESS_NO_ACCEPTANCE",
+        report = {"schema": "single-runtime-scan-diagnostic-v2", "result": "IN_PROGRESS_NO_ACCEPTANCE",
                   "context": {k: os.environ.get(k) for k in observer.CONTEXT_KEYS},
                   "started_utc": observer.now(), "started_monotonic": started, "pid": os.getpid(),
                   "argv": list(sys.argv), "stage": "context", "control_commands": [], "errors": [],
@@ -404,6 +418,7 @@ def main():
                   "formal_candidate_credit": False, "runtime_acceptance": False, "original_preparation_executions": 0,
                   "retirement_executions": 0, "consumer_executions": 0, "product_builds": 0,
                   "owned_add_delete_verify_boot_or_daemon_signal_commands": 0, "query_or_scan_retries": 0,
+                  "diagnostic_precondition_revision": "observed-ready-tvos-enoent-422694",
                   "maximum_runtime_mutation_commands": 1, "observation_phase_budget_seconds": 150,
                   "help_budget_seconds": 10, "scan_budget_seconds": 120,
                   "actual_exit_requires_separate_outer_wrapper_binding": True,
