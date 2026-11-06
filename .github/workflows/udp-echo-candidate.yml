@@ -1,4 +1,4 @@
-name: Observe daemon startup without runtime mutation
+name: Observe one runtime scan between fixed windows
 on:
   push:
     branches: [work/udp-echo-build-20261028]
@@ -7,7 +7,7 @@ permissions:
   actions: read
 jobs:
   startup_observation:
-    name: DIAGNOSTIC startup observation (integrated, 3a6ba06abcbffc48bb5c7290a5e53709e3809fbc, xcode-27)
+    name: DIAGNOSTIC single runtime scan (integrated, 3a6ba06abcbffc48bb5c7290a5e53709e3809fbc, xcode-27)
     runs-on: xcode-27
     timeout-minutes: 15
     env:
@@ -48,7 +48,7 @@ jobs:
         if: ${{ always() && steps.runtime_python_before.outcome == 'success' }}
         shell: bash
         run: python3 -B Bootstrap/record_runtime_python.py after --source-root "$RUNNER_TEMP/udp-source"
-      - name: Bind the actual diagnostic job and unchanged source before the fixed observation
+      - name: Bind actual source and both diagnostic helpers before fixed observation
         shell: bash
         run: |
           set -euo pipefail
@@ -105,7 +105,7 @@ jobs:
               paths = {
                   'source': ['Build/runtime_environment.py', 'Build/observe_host_during_command.py',
                              'Build/ui_review.py', 'Build/simulator_review.py'],
-                  'helper': ['Bootstrap/observe_runtime_startup.py', 'Bootstrap/observe_runtime_mounts.py',
+                  'helper': ['Bootstrap/probe_runtime_scan.py', 'Bootstrap/observe_runtime_startup.py', 'Bootstrap/observe_runtime_mounts.py',
                              'Bootstrap/import_candidates.py', 'Bootstrap/record_runtime_python.py',
                              'Bootstrap/candidates.json', '.github/workflows/udp-echo-candidate.yml']}
               for role, names in paths.items():
@@ -131,18 +131,18 @@ jobs:
           finally:
               (output / 'context.json').write_text(json.dumps(report, indent=2) + '\n')
           PYCODE
-      - name: Observe nine fixed startup epochs without original preparation or consumers
+      - name: Observe baseline then at most one advertised scan then fixed postscan window
         id: startup_observation
         working-directory: ${{ runner.temp }}/udp-source
         shell: bash
         run: |
           set -euo pipefail
           exec python3 -B Build/observe_host_during_command.py \
-            --output "$RUNNER_TEMP/runtime-startup-host-observation" -- \
+            --output "$RUNNER_TEMP/runtime-scan-host-observation" -- \
             "$RUNNER_TOOL_CACHE/Python/3.14.9/arm64/bin/python3.14" -B \
-            "$GITHUB_WORKSPACE/Bootstrap/observe_runtime_startup.py" \
-            > "$RUNNER_TEMP/runtime-startup-command.stdout.log" \
-            2> "$RUNNER_TEMP/runtime-startup-command.stderr.log"
+            "$GITHUB_WORKSPACE/Bootstrap/probe_runtime_scan.py" \
+            > "$RUNNER_TEMP/runtime-scan-command.stdout.log" \
+            2> "$RUNNER_TEMP/runtime-scan-command.stderr.log"
       - name: Record unchanged source after diagnostic observation
         if: always()
         working-directory: ${{ runner.temp }}/udp-source
@@ -154,16 +154,16 @@ jobs:
           git rev-parse 'HEAD^{tree}' > artifacts/startup-source-after/tree.txt
           git diff --exit-code HEAD -- > artifacts/startup-source-after/worktree.log
           git diff --cached --exit-code HEAD -- > artifacts/startup-source-after/index.log
-      - name: Preserve actual startup observations without build or runtime credit
+      - name: Preserve actual scan diagnostic without build or runtime credit
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: UDP-Echo-startup-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          name: UDP-Echo-runtime-scan-observation-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/udp-source/artifacts/
-            ${{ runner.temp }}/runtime-startup-observation/
-            ${{ runner.temp }}/runtime-startup-host-observation/
-            ${{ runner.temp }}/runtime-startup-command.stdout.log
-            ${{ runner.temp }}/runtime-startup-command.stderr.log
+            ${{ runner.temp }}/runtime-scan-observation/
+            ${{ runner.temp }}/runtime-scan-host-observation/
+            ${{ runner.temp }}/runtime-scan-command.stdout.log
+            ${{ runner.temp }}/runtime-scan-command.stderr.log
           if-no-files-found: error
           retention-days: 90
