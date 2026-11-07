@@ -21,9 +21,10 @@
   "files": {
     "Patches/hev-server-startup-stop.patch": "e9d9a51850ee252a2c9f26128eecf1d18d98503823d39d2a1f96b28d942b1528",
     "Socks5/Server/ServerController.swift": "b8b1791cfbc741e4b167ebdd2c0cc6f36d5d0a5b1d589c7cf7dc107e44f62332",
-    "Build/runtime_environment.py": "32bdd3b00bfcbaebc0239add52fc0094db81f42afb84c342bb8d90a39befcabe",
+    "Build/runtime_environment.py": "e3452180fce27ad1dfe6f2bc55d9920f087727bb3db0cf0885b3f9d5fa518d7c",
     "Build/observe_host_during_command.py": "277f667fd17d96e9b3f6fbd733282d9b3622d782e20d2e2a4ab3a35d2b4575f8",
-    "Build/observed_command_status.py": "8b1bc14a9ea2cc9c4fef28ed02bc69b8df171da201df7f0768047ab3d296ed90"
+    "Build/observed_command_status.py": "39676b99c7c2c5cd6f30e0bcfd28c15d9039df78f40a753d4bc36357b94dc827",
+    "Build/runtime_preconditioning.py": "0a72fe7df8bb29748b695c1ea1b424509d6b6ad3ea455f7d90806a2db128eb8a"
   },
   "responsibility": "Server configuration and invocation lifecycle. The canonical shared native lifecycle input is pinned under sources; the authentication/class-initialization remainder and coherent run controller are hash-locked under files. No settings persistence or background traffic."
 }
