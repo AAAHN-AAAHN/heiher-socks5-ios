@@ -1,25 +1,35 @@
 {
-  "sha256": "d7d05d18666ed5057beb7dd136f69188a851beca6bb7acd291f0504aeeb6362f",
+  "sha256": "1d1aac6ffacbe640157d06318da6c9690f52f301fe087c7a3a1e3b34ac99043e",
   "candidates": [
     {
       "name": "server",
-      "sha": "9e8c195d9446254f53f6fc0eb54ef4eedaf91443",
-      "ref": "refs/heads/work/udp-echo-server-20261028"
+      "sha": "2ff0f995905e1d318335e50a7cc2af562d67bfac",
+      "ref": "refs/heads/work/udp-echo-server-20261028",
+      "previous": "9e8c195d9446254f53f6fc0eb54ef4eedaf91443"
     },
     {
       "name": "statistics",
-      "sha": "3e65814900e65cd08c8887f84705c8844e6671fa",
-      "ref": "refs/heads/work/udp-echo-statistics-20261028"
+      "sha": "a106517487a20d1cb91b3dcc59da4f241b5efe14",
+      "ref": "refs/heads/work/udp-echo-statistics-20261028",
+      "previous": "3e65814900e65cd08c8887f84705c8844e6671fa"
+    },
+    {
+      "name": "icon",
+      "sha": "fc0e80d8766754c1d116503a8dadd7c8793fc17c",
+      "ref": "refs/heads/work/udp-echo-icon-20261028",
+      "previous": "5ff672866977c1527297016baa44241f9c5e281a"
     },
     {
       "name": "settings",
-      "sha": "572d57cf43a6321012b0f7144acffb14adc49e42",
-      "ref": "refs/heads/work/udp-echo-settings-20261028"
+      "sha": "e78cdf4fec994e7579f4f46c13c51f2ef16c4a9c",
+      "ref": "refs/heads/work/udp-echo-settings-20261028",
+      "previous": "572d57cf43a6321012b0f7144acffb14adc49e42"
     },
     {
       "name": "integrated",
-      "sha": "3a6ba06abcbffc48bb5c7290a5e53709e3809fbc",
-      "ref": "refs/heads/work/udp-echo-integrated-20261028"
+      "sha": "c2b45ee11140216852c7b4ac4c26d836da87fdae",
+      "ref": "refs/heads/work/udp-echo-integrated-20261028",
+      "previous": "3a6ba06abcbffc48bb5c7290a5e53709e3809fbc"
     }
   ],
   "support": [
@@ -34,34 +44,66 @@
     {
       "name": "background",
       "sha": "60e32211b1edf62c668b549043bf0bc4cdd83608"
-    },
-    {
-      "name": "icon",
-      "sha": "5ff672866977c1527297016baa44241f9c5e281a"
     }
   ],
   "matrix": [
     {
       "name": "server",
-      "sha": "9e8c195d9446254f53f6fc0eb54ef4eedaf91443",
+      "sha": "2ff0f995905e1d318335e50a7cc2af562d67bfac",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "server",
+      "sha": "2ff0f995905e1d318335e50a7cc2af562d67bfac",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "statistics",
-      "sha": "3e65814900e65cd08c8887f84705c8844e6671fa",
+      "sha": "a106517487a20d1cb91b3dcc59da4f241b5efe14",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "statistics",
+      "sha": "a106517487a20d1cb91b3dcc59da4f241b5efe14",
+      "os": "xcode-27",
+      "runtime": true
+    },
+    {
+      "name": "icon",
+      "sha": "fc0e80d8766754c1d116503a8dadd7c8793fc17c",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "icon",
+      "sha": "fc0e80d8766754c1d116503a8dadd7c8793fc17c",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "settings",
-      "sha": "572d57cf43a6321012b0f7144acffb14adc49e42",
+      "sha": "e78cdf4fec994e7579f4f46c13c51f2ef16c4a9c",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "settings",
+      "sha": "e78cdf4fec994e7579f4f46c13c51f2ef16c4a9c",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "integrated",
-      "sha": "3a6ba06abcbffc48bb5c7290a5e53709e3809fbc",
+      "sha": "c2b45ee11140216852c7b4ac4c26d836da87fdae",
+      "os": "ubuntu-24.04",
+      "runtime": false
+    },
+    {
+      "name": "integrated",
+      "sha": "c2b45ee11140216852c7b4ac4c26d836da87fdae",
       "os": "xcode-27",
       "runtime": true
     }

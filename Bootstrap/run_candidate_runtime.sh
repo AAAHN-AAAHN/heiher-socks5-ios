@@ -23,10 +23,10 @@ if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o644 or info
     raise SystemExit('Status reader file type, mode, links or size differs')
 raw = path.read_bytes()
 expected_reader_sha256 = {
-    'server': '8b1bc14a9ea2cc9c4fef28ed02bc69b8df171da201df7f0768047ab3d296ed90',
-    'settings': '8b1bc14a9ea2cc9c4fef28ed02bc69b8df171da201df7f0768047ab3d296ed90',
-    'statistics': '0c0b30dfa7613b41ab64a9f14c0d6af8423583010a6554d9124858264612801a',
-    'integrated': '8b1bc14a9ea2cc9c4fef28ed02bc69b8df171da201df7f0768047ab3d296ed90',
+    'server': '7f6bdf21b389e93f47ab23246eb769fd2e906847babd4590d0550af9d11896f5',
+    'settings': '7f6bdf21b389e93f47ab23246eb769fd2e906847babd4590d0550af9d11896f5',
+    'statistics': 'd5429c902b7f7254cce241d3fdf0996ed9a1638638bc9ac03fc9610badd54d7a',
+    'integrated': '7f6bdf21b389e93f47ab23246eb769fd2e906847babd4590d0550af9d11896f5',
 }[sys.argv[4]]
 if len(raw) != 16069 or hashlib.sha256(raw).hexdigest() != expected_reader_sha256:
     raise SystemExit('Status reader bytes differ from the frozen reader')
