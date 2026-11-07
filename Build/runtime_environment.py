@@ -1631,83 +1631,1907 @@ def validate_service_evidence(p, value, context, stage_dir, service_dir, root):
     return files
 
 
+# Source-owned reconstructed V6 retirement: frozen shared-Watch and ambient tvOS roles, saved replay and terminal host binding.
+RETIREMENT_DELETE_SECONDS = 120
+RETIREMENT_MAX_TARGETS = 3
+RETIREMENT_SETTLEMENT_SECONDS = 120
+RETIREMENT_SAMPLE_INTERVAL_SECONDS = 2
+RETIREMENT_MAX_SCHEDULED_SNAPSHOTS = 60
+RETIREMENT_UNUSABLE_FIELDS = ('unusableErrorDetail', 'unusableErrorMessage', 'unusableSubstate')
+RETIREMENT_UUID = re.compile(r'[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}')
+
+RETIREMENT_PLAN_SCHEMA = 'common-runtime-retirement-watch-ambient-tvos-observation-plan-v6'
+RETIREMENT_ALIAS_ROLES_SCHEMA = 'common-runtime-watch-and-ambient-tvos-protected-alias-roles-v6'
+RETIREMENT_KNOWN_SHARED_WATCH_IDS = frozenset(('4E2A8325-62E2-427F-A198-FFEE1E5EF15A',
+                                  '61FE15D4-6286-4FC9-B531-8FFEAAD0E8D8'))
+RETIREMENT_SHARED_WATCH_MOUNT = '/private/var/run/com.apple.security.cryptexd/mnt/watchOS_24R362'
+RETIREMENT_SHARED_WATCH_BUNDLE = RETIREMENT_SHARED_WATCH_MOUNT + '/Library/Developer/CoreSimulator/Profiles/Runtimes/watchOS 27.0.simruntime'
+RETIREMENT_EXACT_UNUSABLE_DETAIL = ('Error Domain=SimDiskImageErrorDomain Code=7 "Cryptex Mount Preferred" '
+                         'UserInfo={NSLocalizedDescription=Cryptex Mount Preferred, unusableErrorDetail=}')
+
+
+RETIREMENT_PROGRESS_SCHEMA = 'common-runtime-watch-and-ambient-tvos-observation-ledger-v6'
+RETIREMENT_AMBIENT_POLICY_SCHEMA = 'common-runtime-known-old-tvos-observation-policy-v6'
+RETIREMENT_AMBIENT_PROGRESS_SCHEMA = 'common-runtime-known-old-tvos-monotone-observation-ledger-v6'
+RETIREMENT_MAX_AMBIENT_OBSERVERS = 1
+RETIREMENT_AMBIENT_TVOS_UUID = '54D35026-7325-4069-BF3A-FDFEA26D5885'
+RETIREMENT_AMBIENT_TVOS_RUNTIME = 'com.apple.CoreSimulator.SimRuntime.tvOS-27-0'
+RETIREMENT_AMBIENT_TVOS_ASSET = '/System/Library/AssetsV2/com_apple_MobileAsset_appleTVOSSimulatorRuntime/f6a3a9321156c52c0d245f50953d9867b2b139ab.asset/AssetData'
+RETIREMENT_AMBIENT_TVOS_MOUNT = '/private/var/run/com.apple.security.cryptexd/mnt/tvOS_24J360'
+RETIREMENT_AMBIENT_TVOS_BUNDLE = RETIREMENT_AMBIENT_TVOS_MOUNT + '/Library/Developer/CoreSimulator/Profiles/Runtimes/tvOS 27.0.simruntime'
+RETIREMENT_AMBIENT_TVOS_DMG = RETIREMENT_AMBIENT_TVOS_ASSET + '/Restore/043-16887-522.dmg'
+
+
+def retirement_unusable_duplicate(row):
+    return (row.get('state') == 'Unusable'
+            and row.get('unusableErrorMessage') == 'Cryptex Mount Preferred'
+            and row.get('unusableSubstate') == 'Cryptex Mount Preferred'
+            and ('unusableErrorDetail' not in row or
+                 isinstance(row['unusableErrorDetail'], str) and 'Cryptex Mount Preferred' in row['unusableErrorDetail']))
+
+def retirement_enoent_path(row, path):
+    """Only the original path_snapshot's concrete FileNotFoundError is missing."""
+    return row == {'value': path, 'capture': 'unavailable',
+                   'error': {'type': 'FileNotFoundError', 'errno': 2,
+                             'message': str(FileNotFoundError(2, os.strerror(2), path))}}
+
+def retirement_paths_overlap(left, right):
+    a, b = Path(left), Path(right)
+    return a.is_relative_to(b) or b.is_relative_to(a)
+
+def retirement_fixed_paths(records, old, watches):
+    """Key the ledger by literal path; both watch UUIDs may share one alias."""
+    paths = {}
+    for key in [old, *watches]:
+        fields = ('mountPath',) if key == old else ('mountPath', 'runtimeBundlePath', 'path', 'parentMountPath')
+        for field in fields:
+            value = records[key][field]
+            require_contract(isinstance(value, str) and Path(value).is_absolute() and Path(value).as_posix() == value
+                    and '..' not in Path(value).parts, 'Malformed frozen path')
+            paths.setdefault(value, []).append({'uuid': key, 'field': field})
+    return paths
+
+def retirement_runtime_mount_rows(data, mounts, keys):
+    paths = {data[key][field] for key in keys for field in ('mountPath', 'runtimeBundlePath')}
+    return {path: mounts.get(path, []) for path in sorted(paths)}
+
+def retirement_watch_state(frozen, current):
+    if current is None:
+        return 'Absent'
+    if canonical(current) == canonical(frozen) and retirement_unusable_duplicate(current):
+        return 'Unusable'
+    deleting = {key: value for key, value in frozen.items() if key not in RETIREMENT_UNUSABLE_FIELDS}
+    deleting['state'] = 'Deleting'
+    require_contract(canonical(current) == canonical(deleting), 'Watch record changed beyond the exact observed Deleting transition')
+    return 'Deleting'
+
+def check_retirement_delete_request(plan, attempted, invoked, target, argv, timeout):
+    require_contract(plan is not None and target == plan['old_ios_uuid'] and plan['mutation_target_ids'] == [target]
+            and not attempted and not invoked, 'Only the frozen old iOS may receive one total mutation attempt')
+    require_contract(argv == ['xcrun', 'simctl', 'runtime', 'delete', target, '--keep-asset']
+            and timeout == RETIREMENT_DELETE_SECONDS, 'Mutation is outside the single old-iOS keep-asset command')
+
+def retirement_watch_literal_pair(row):
+    """Freeze one complete Watch pair; absence cannot choose another flavor."""
+    canonical_mount = RETIREMENT_SHARED_WATCH_MOUNT
+    volumes_mount = '/Library/Developer/CoreSimulator/Volumes/watchOS_24R362'
+    mount = row.get('mountPath')
+    require_contract(mount in (canonical_mount, volumes_mount), 'Shared Watch mount is outside its literal pair set')
+    bundle = mount + '/Library/Developer/CoreSimulator/Profiles/Runtimes/watchOS 27.0.simruntime'
+    require_contract(row.get('runtimeBundlePath') == bundle, 'Shared Watch mount/bundle pair is mixed or indirect')
+    return {'schema': 'common-runtime-watch-literal-pair-v6',
+            'flavor': 'canonical' if mount == canonical_mount else 'Volumes',
+            'mountPath': mount, 'runtimeBundlePath': bundle}
+
+
+def retirement_watch_volumes_closure(common, plan, current, preflight, pair, shared_ids):
+    """Only new Volumes sharing adds original-preflight raw equality and both-alias closure."""
+    data, ready = plan['baseline_inventory'], plan['ready_watch_uuid']
+    require_contract(pair['flavor'] == 'Volumes' and 1 <= len(shared_ids) <= 2
+            and set(shared_ids) <= RETIREMENT_KNOWN_SHARED_WATCH_IDS
+            and set(shared_ids) == set(plan['watch_observation_ids'])
+            and set(common.watch_records(data)) == {ready, *shared_ids},
+            'Volumes Watch requires one or two known old registrations and its sole Ready')
+    before = preflight['runtime_snapshots']['before']['inventory']
+    require_contract(all(key in before and canonical(before[key]) == canonical(data[key]) for key in (ready, *shared_ids)),
+            'Volumes Watch was not the exact typed original preflight registration set')
+    roots = (RETIREMENT_SHARED_WATCH_MOUNT, '/Library/Developer/CoreSimulator/Volumes/watchOS_24R362', common.WATCH_ASSET)
+    fields = {'mountPath': pair['mountPath'], 'runtimeBundlePath': pair['runtimeBundlePath'],
+              'path': common.WATCH_ASSET, 'parentMountPath': common.WATCH_ASSET}
+    closure = []
+    for key, record in sorted(data.items()):
+        for location, value in retirement_absolute_path_values(record):
+            require_contract(Path(value).as_posix() == value and '..' not in Path(value).parts and '\0' not in value and '//' not in value,
+                    'Volumes Watch recursive absolute reference is not a direct literal path')
+            if any(retirement_paths_overlap(root, value) for root in roots):
+                require_contract(key in (ready, *shared_ids) and len(location) == 1 and location[0] in fields
+                        and value == fields[location[0]],
+                        'Volumes Watch canonical/Volumes aliases or asset overlap another runtime, nested field or ancestor')
+                closure.append({'uuid': key, 'field': location[0], 'value': value})
+    for path in dict.fromkeys(fields.values()):
+        observation = current['fixed_path_observations'][path]
+        captured = observation['filesystem']
+        require_contract(set(observation) == {'filesystem', 'resolved_path', 'symlink_components',
+                                             'os_path_ismount', 'related_mount_rows'}
+                and observation['resolved_path'] == path and observation['symlink_components'] == [],
+                'Volumes Watch lacks a direct fixed physical observation')
+        require_contract(set(captured) == {'value', 'capture', 'resolved_path', 'device', 'inode', 'mode', 'uid', 'gid',
+                                          'is_directory', 'is_regular'}
+                and captured['value'] == captured['resolved_path'] == path and captured['capture'] == 'observed'
+                and captured['is_directory'] is True and captured['is_regular'] is False
+                and all(type(captured[key]) is int and captured[key] >= 0 for key in ('device', 'inode', 'mode', 'uid', 'gid'))
+                and captured['device'] > 0 and captured['inode'] > 0,
+                'Volumes Watch physical identity is unavailable, indirect or not typed')
+        for key in (ready, *shared_ids):
+            for field, value in fields.items():
+                if value == path:
+                    require_contract(canonical(captured) == canonical(current['filesystem'][key][field]),
+                            'Volumes Watch shared asset/alias reads disagree')
+        is_mount = path == pair['mountPath']
+        rows = {path: current['mount_table'].get(path, [])} if is_mount else {}
+        require_contract(observation['os_path_ismount'] is is_mount
+                and canonical(observation['related_mount_rows']) == canonical(rows)
+                and (not is_mount or len(rows[path]) == 1),
+                'Volumes Watch requires one literal mount and no descendant/bundle/asset mount')
+    return closure
+
+
+def retirement_exact_shared_watch_record(common, key, row, *, ready):
+    """A narrower complete record contract applies only to the new shared case."""
+    pair = retirement_watch_literal_pair(row)
+    expected = {'identifier': key, 'runtimeIdentifier': common.WATCH,
+                'platformIdentifier': 'com.apple.platform.watchsimulator',
+                'version': '27.0', 'build': '24R362', 'kind': 'Patchable Cryptex Disk Image',
+                'state': 'Ready' if ready else 'Unusable', 'signatureState': 'Unknown',
+                'deletable': True, 'sizeBytes': 3814435665, 'supportedArchitectures': ['arm64'],
+                'path': common.WATCH_ASSET, 'parentMountPath': common.WATCH_ASSET,
+                'mountPath': pair['mountPath'], 'runtimeBundlePath': pair['runtimeBundlePath']}
+    if not ready:
+        require_contract(key in RETIREMENT_KNOWN_SHARED_WATCH_IDS, 'Shared alias belongs to an unknown old Watch UUID')
+        expected.update(unusableErrorMessage='Cryptex Mount Preferred',
+                        unusableSubstate='Cryptex Mount Preferred', unusableErrorDetail=RETIREMENT_EXACT_UNUSABLE_DETAIL)
+    require_contract(canonical(row) == canonical(expected), 'Shared Watch complete metadata differs: ' + key)
+
+
+def freeze_retirement_alias_roles(common, plan, current, preflight):
+    """Classify literal paths once; no disappearance can later change a role."""
+    def path_values(value, location=()):
+        if isinstance(value, str) and Path(value).is_absolute():
+            yield location, value
+        elif isinstance(value, dict):
+            for key, child in sorted(value.items()):
+                yield from path_values(child, (*location, key))
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                yield from path_values(child, (*location, index))
+
+    data, ready = plan['baseline_inventory'], plan['ready_watch_uuid']
+    frozen_pair = retirement_watch_literal_pair(data[ready])
+    pair = {field: frozen_pair[field] for field in ('mountPath', 'runtimeBundlePath')}
+    shared_ids = sorted(key for key in plan['watch_observation_ids']
+                        if all(data[key].get(field) == data[ready].get(field) for field in pair))
+    if shared_ids:
+        retirement_exact_shared_watch_record(common, ready, data[ready], ready=True)
+        for key in shared_ids:
+            retirement_exact_shared_watch_record(common, key, data[key], ready=False)
+    volumes_closure = None
+    if shared_ids and frozen_pair['flavor'] == 'Volumes':
+        volumes_closure = retirement_watch_volumes_closure(common, plan, current, preflight, frozen_pair, shared_ids)
+    roles = {}
+    for path, references in plan['fixed_paths'].items():
+        alias = any(ref['field'] in pair for ref in references)
+        role = {'role': 'exclusive_alias' if alias else 'retained_asset',
+                'frozen_references': references}
+        if shared_ids and path in pair.values():
+            field = next(name for name, value in pair.items() if value == path)
+            expected_refs = [{'uuid': key, 'field': field} for key in shared_ids]
+            require_contract(references == expected_refs, 'Shared path has a nonmatching frozen field or mutation target')
+            closure = []
+            for key, record in sorted(data.items()):
+                for location, value in path_values(record):
+                    if retirement_paths_overlap(path, value):
+                        # Only the exact matching pair is admitted. Its own
+                        # mount contains its own bundle; no other nesting is allowed.
+                        require_contract(key in [ready, *shared_ids] and len(location) == 1
+                                and location[0] in pair and value == pair[location[0]],
+                                'Shared Watch path overlaps an unrelated runtime, field or alias')
+                        closure.append({'uuid': key, 'field': location[0], 'value': value})
+            if volumes_closure is not None:
+                closure = volumes_closure
+            observation = current['fixed_path_observations'][path]
+            captured = observation['filesystem']
+            require_contract(observation['resolved_path'] == path and observation['symlink_components'] == []
+                    and captured.get('capture') == 'observed' and captured.get('value') == path
+                    and captured.get('resolved_path') == path and captured.get('is_directory') is True
+                    and canonical(captured) == canonical(current['filesystem'][ready][field]),
+                    'Shared Watch path lacks direct protected filesystem identity')
+            expected_rows = {path: current['mount_table'].get(path, [])} if field == 'mountPath' else {}
+            require_contract(observation['os_path_ismount'] is (field == 'mountPath')
+                    and canonical(observation['related_mount_rows']) == canonical(expected_rows)
+                    and (field != 'mountPath' or len(expected_rows[path]) == 1),
+                    'Shared Watch mount must be unique and its bundle must have no descendant mount')
+            proofs = [row for row in current['mount_proofs'] if row['uuid'] == ready]
+            require_contract(len(proofs) == 1 and proofs[0]['mount'] == pair['mountPath']
+                    and proofs[0]['bundle'] == pair['runtimeBundlePath']
+                    and proofs[0]['os_path_ismount'] is True
+                    and type(proofs[0]['mount_device']) is int and type(proofs[0]['bundle_device']) is int
+                    and proofs[0]['mount_device'] == proofs[0]['bundle_device'] == captured['device']
+                    and canonical(proofs[0]['mount_table']) == canonical(current['mount_table'][pair['mountPath']][0]),
+                    'Shared Watch protected mount proof differs')
+            role.update(role='shared_protected', protected_reference={'uuid': ready, 'field': field},
+                        reference_closure=closure, initial_observation=observation)
+        roles[path] = role
+    return {'schema': RETIREMENT_ALIAS_ROLES_SCHEMA, 'paths': roles,
+            'shared_watch_pair': ({'schema': 'common-runtime-shared-watch-pair-v3',
+                'literal_pair': frozen_pair, 'ready_uuid': ready, 'old_uuids': shared_ids,
+                'new_volumes_reference_closure': volumes_closure} if shared_ids else None)}
+
+
+def validate_retirement_shared_path(plan, current, progress, path, role):
+    """Preserve a fixed protected object even if every old reference is absent."""
+    observation = current['fixed_path_observations'][path]
+    reference = role['protected_reference']
+    require_contract(path not in progress['missing_paths'], 'A shared protected path cannot enter the missing-path ledger')
+    require_contract(canonical(observation) == canonical(role['initial_observation'])
+            and canonical(observation['filesystem']) == canonical(plan['path_baselines'][path])
+            and canonical(observation['filesystem']) == canonical(current['filesystem'][reference['uuid']][reference['field']]),
+            'Shared protected Watch path, physical observation or mount rows changed: ' + path)
+    for ref in role['frozen_references']:
+        if ref['uuid'] in current['inventory']:
+            require_contract(canonical(observation['filesystem']) == canonical(current['filesystem'][ref['uuid']][ref['field']]),
+                    'Two reads of one shared protected path disagree')
+
+
+def retirement_absolute_path_values(value, location=()):
+    if isinstance(value, str) and Path(value).is_absolute():
+        yield location, value
+    elif isinstance(value, dict):
+        for key, child in sorted(value.items()):
+            yield from retirement_absolute_path_values(child, (*location, key))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from retirement_absolute_path_values(child, (*location, index))
+
+
+def retirement_tvos_literal_pair(row):
+    """Freeze one closed tvOS pair before the old UUID can disappear."""
+    canonical_mount = RETIREMENT_AMBIENT_TVOS_MOUNT
+    volumes_mount = '/Library/Developer/CoreSimulator/Volumes/tvOS_24J360'
+    mount = row.get('mountPath')
+    require_contract(mount in (canonical_mount, volumes_mount), 'Ambient tvOS mount is outside its literal pair set')
+    bundle = mount + '/Library/Developer/CoreSimulator/Profiles/Runtimes/tvOS 27.0.simruntime'
+    require_contract(row.get('runtimeBundlePath') == bundle, 'Ambient tvOS mount/bundle pair is mixed or indirect')
+    return {'schema': 'common-runtime-tvos-literal-pair-v5',
+            'flavor': 'canonical' if mount == canonical_mount else 'Volumes',
+            'mountPath': mount, 'runtimeBundlePath': bundle}
+
+
+def retirement_exact_ambient_tvos_record(key, row, *, ready):
+    """Only the observed 27.0/24J360 pair receives the new ambient policy."""
+    require_contract(RETIREMENT_UUID.fullmatch(key) is not None, 'Malformed tvOS UUID')
+    pair = retirement_tvos_literal_pair(row)
+    expected = {'identifier': key, 'runtimeIdentifier': RETIREMENT_AMBIENT_TVOS_RUNTIME,
+                'platformIdentifier': 'com.apple.platform.appletvsimulator',
+                'version': '27.0', 'build': '24J360', 'kind': 'Patchable Cryptex Disk Image',
+                'state': 'Ready' if ready else 'Unusable', 'signatureState': 'Unknown',
+                'deletable': True, 'sizeBytes': 3697822545, 'supportedArchitectures': ['arm64'],
+                'path': RETIREMENT_AMBIENT_TVOS_ASSET, 'parentMountPath': RETIREMENT_AMBIENT_TVOS_ASSET,
+                'mountPath': pair['mountPath'], 'runtimeBundlePath': pair['runtimeBundlePath']}
+    if not ready:
+        require_contract(key == RETIREMENT_AMBIENT_TVOS_UUID, 'Unknown old tvOS cannot become ambient')
+        expected.update(unusableErrorMessage='Cryptex Mount Preferred',
+                        unusableSubstate='Cryptex Mount Preferred', unusableErrorDetail=RETIREMENT_EXACT_UNUSABLE_DETAIL)
+    require_contract(canonical(row) == canonical(expected), 'Ambient tvOS complete typed metadata differs: ' + key)
+
+
+def retirement_ambient_tvos_identity(preflight, data):
+    """Freeze zero or one known observer; it is never an absence or delete target."""
+    tvos = {key: row for key, row in data.items()
+            if row.get('platformIdentifier') == 'com.apple.platform.appletvsimulator'
+            or str(row.get('runtimeIdentifier', '')).startswith('com.apple.CoreSimulator.SimRuntime.tvOS-')}
+    require_contract(all(row.get('state') == 'Ready' or key == RETIREMENT_AMBIENT_TVOS_UUID for key, row in tvos.items()),
+            'Unknown non-Ready tvOS registration is outside the ambient policy')
+    if RETIREMENT_AMBIENT_TVOS_UUID not in data or data[RETIREMENT_AMBIENT_TVOS_UUID].get('state') == 'Ready':
+        return None
+    retirement_exact_ambient_tvos_record(RETIREMENT_AMBIENT_TVOS_UUID, data[RETIREMENT_AMBIENT_TVOS_UUID], ready=False)
+    before = preflight['runtime_snapshots']['before']['inventory']
+    require_contract(RETIREMENT_AMBIENT_TVOS_UUID in before
+            and canonical(before[RETIREMENT_AMBIENT_TVOS_UUID]) == canonical(data[RETIREMENT_AMBIENT_TVOS_UUID]),
+            'Ambient old tvOS was not the exact original preflight registration')
+    same_runtime = [key for key, row in data.items() if row.get('runtimeIdentifier') == RETIREMENT_AMBIENT_TVOS_RUNTIME]
+    ready = [key for key in same_runtime if data[key].get('state') == 'Ready']
+    require_contract(len(ready) == 1 and set(same_runtime) == {RETIREMENT_AMBIENT_TVOS_UUID, ready[0]},
+            'Ambient tvOS requires its sole exact Ready counterpart')
+    retirement_exact_ambient_tvos_record(ready[0], data[ready[0]], ready=True)
+    pair = retirement_tvos_literal_pair(data[RETIREMENT_AMBIENT_TVOS_UUID])
+    require_contract(canonical(pair) == canonical(retirement_tvos_literal_pair(data[ready[0]])),
+            'Ambient tvOS old and sole Ready do not share one complete literal pair')
+    return {'schema': RETIREMENT_AMBIENT_POLICY_SCHEMA, 'uuid': RETIREMENT_AMBIENT_TVOS_UUID,
+            'ready_uuid': ready[0], 'dmg_path': RETIREMENT_AMBIENT_TVOS_DMG, 'literal_pair': pair,
+            'absence_required': False, 'delete_invocations_allowed': 0}
+
+
+def extend_retirement_ambient_paths(paths, ambient, data):
+    if ambient is None:
+        return paths
+    original = tuple(paths)
+    for field in ('mountPath', 'runtimeBundlePath', 'path', 'parentMountPath'):
+        value = data[ambient['uuid']][field]
+        require_contract(isinstance(value, str) and Path(value).is_absolute() and Path(value).as_posix() == value
+                and '..' not in Path(value).parts and not any(retirement_paths_overlap(value, other) for other in original),
+                'Ambient tvOS path overlaps an old iOS/Watch role or is indirect')
+        paths.setdefault(value, []).append({'uuid': ambient['uuid'], 'field': field})
+    return paths
+
+
+def freeze_retirement_ambient_roles(plan, current):
+    """Bind the full recursive reference closure and direct physical evidence."""
+    ambient = plan['ambient_tvos']
+    if ambient is None:
+        require_contract('tvos_dmg' not in current['asset_files'], 'Unexpected ambient DMG evidence')
+        return
+    old, ready = ambient['uuid'], ambient['ready_uuid']
+    data = plan['baseline_inventory']
+    frozen_pair = ambient['literal_pair']
+    pair = {field: frozen_pair[field] for field in ('mountPath', 'runtimeBundlePath')}
+    require_contract(canonical(frozen_pair) == canonical(retirement_tvos_literal_pair(data[old]))
+            == canonical(retirement_tvos_literal_pair(data[ready])), 'Ambient frozen literal pair differs')
+    closure_roots = [*pair.values(), RETIREMENT_AMBIENT_TVOS_ASSET]
+    if frozen_pair['flavor'] == 'Volumes':
+        closure_roots.extend((RETIREMENT_AMBIENT_TVOS_MOUNT, RETIREMENT_AMBIENT_TVOS_BUNDLE))
+    fields = dict(pair, path=RETIREMENT_AMBIENT_TVOS_ASSET, parentMountPath=RETIREMENT_AMBIENT_TVOS_ASSET)
+    for path in dict.fromkeys(fields.values()):
+        same_fields = [field for field, value in fields.items() if value == path]
+        references = [{'uuid': old, 'field': field} for field in same_fields]
+        require_contract(plan['fixed_paths'][path] == references, 'Ambient path has mixed frozen roles')
+        closure = []
+        for key, record in sorted(data.items()):
+            for location, value in retirement_absolute_path_values(record):
+                if frozen_pair['flavor'] == 'Volumes':
+                    require_contract(Path(value).as_posix() == value and '..' not in Path(value).parts and '\0' not in value and '//' not in value,
+                            'Ambient Volumes tvOS recursive absolute reference is not a direct literal path')
+                if (any(retirement_paths_overlap(root, value) for root in closure_roots)
+                        if frozen_pair['flavor'] == 'Volumes' else retirement_paths_overlap(path, value)):
+                    require_contract(key in (old, ready) and len(location) == 1 and location[0] in fields
+                            and value == fields[location[0]],
+                            'Ambient tvOS path overlaps an unrelated runtime, nested field or alias')
+                    closure.append({'uuid': key, 'field': location[0], 'value': value})
+        observation = current['fixed_path_observations'][path]
+        captured = observation['filesystem']
+        require_contract(set(observation) == {'filesystem', 'resolved_path', 'symlink_components',
+                                     'os_path_ismount', 'related_mount_rows'}
+                and observation['resolved_path'] == path and observation['symlink_components'] == [],
+                'Ambient tvOS path lacks a direct fixed physical observation')
+        require_contract(set(captured) == {'value', 'capture', 'resolved_path', 'device', 'inode', 'mode', 'uid', 'gid',
+                                  'is_directory', 'is_regular'}
+                and captured['value'] == captured['resolved_path'] == path and captured['capture'] == 'observed'
+                and captured['is_directory'] is True and captured['is_regular'] is False
+                and all(type(captured[key]) is int and captured[key] >= 0 for key in ('device', 'inode', 'mode', 'uid', 'gid'))
+                and captured['device'] > 0 and captured['inode'] > 0,
+                'Ambient tvOS fixed filesystem metadata is unavailable, indirect or malformed')
+        for key in (old, ready):
+            for field in same_fields:
+                require_contract(canonical(captured) == canonical(current['filesystem'][key][field]),
+                        'Ambient tvOS shared filesystem reads disagree')
+        is_mount = path == pair['mountPath']
+        expected_rows = {path: current['mount_table'].get(path, [])} if is_mount else {}
+        require_contract(observation['os_path_ismount'] is is_mount
+                and canonical(observation['related_mount_rows']) == canonical(expected_rows)
+                and (not is_mount or len(expected_rows[path]) == 1),
+                'Ambient tvOS mount must be unique; bundle/asset cannot contain another mount')
+        plan['alias_roles']['paths'][path] = {
+            'role': 'ambient_shared_protected' if path in pair.values() else 'ambient_retained_asset',
+            'frozen_references': references, 'protected_uuid': ready,
+            'protected_fields': same_fields, 'reference_closure': closure,
+            'initial_observation': observation}
+    proofs = [row for row in current['mount_proofs'] if row['uuid'] == ready]
+    require_contract(len(proofs) == 1, 'Ambient Ready tvOS lacks one actual mount proof')
+    proof = proofs[0]
+    fs = current['filesystem'][ready]
+    require_contract(set(proof) == {'uuid', 'mount', 'bundle', 'mount_table', 'os_path_ismount', 'mount_device', 'bundle_device'}
+            and proof['mount'] == pair['mountPath'] and proof['bundle'] == pair['runtimeBundlePath']
+            and proof['os_path_ismount'] is True
+            and type(proof['mount_device']) is int and type(proof['bundle_device']) is int
+            and proof['mount_device'] == proof['bundle_device'] == fs['mountPath']['device'] == fs['runtimeBundlePath']['device']
+            and canonical(proof['mount_table']) == canonical(current['mount_table'][pair['mountPath']][0]),
+            'Ambient Ready tvOS actual mount identity or membership differs')
+    dmg = current['asset_files'].get('tvos_dmg')
+    require_contract(isinstance(dmg, dict) and set(dmg) == {'path', 'resolved_path', 'identity', 'is_regular',
+                                                 'is_symlink', 'symlink_components', 'nlink'}
+            and dmg['path'] == dmg['resolved_path'] == RETIREMENT_AMBIENT_TVOS_DMG
+            and dmg['is_regular'] is True and dmg['is_symlink'] is False and dmg['symlink_components'] == []
+            and type(dmg['nlink']) is int and dmg['nlink'] > 0,
+            'Ambient tvOS requires a new direct DMG stat observation')
+    identity = dmg['identity']
+    require_contract(set(identity) == {'device', 'inode', 'mode', 'uid', 'gid', 'size', 'mtime_ns', 'ctime_ns'}
+            and all(type(value) is int and value >= 0 for value in identity.values())
+            and identity['device'] == fs['path']['device'] and identity['inode'] > 0
+            and identity['size'] == data[old]['sizeBytes'],
+            'Ambient tvOS DMG stat identity or declared size differs')
+
+
+def retirement_ambient_tvos_state(frozen, current):
+    if current is None:
+        return 'Absent'
+    if canonical(current) == canonical(frozen):
+        return 'Unusable'
+    deleting = {key: value for key, value in frozen.items() if key not in RETIREMENT_UNUSABLE_FIELDS}
+    deleting['state'] = 'Deleting'
+    require_contract(canonical(current) == canonical(deleting), 'Ambient tvOS changed beyond its exact typed Deleting transition')
+    return 'Deleting'
+
+
+def validate_retirement_ambient_tvos(plan, current, progress, missing_paths):
+    """Continue the frozen guard after ambient absence; do not rediscover a role."""
+    require_contract(progress.get('schema') == RETIREMENT_AMBIENT_PROGRESS_SCHEMA
+            and set(progress['states']) == set(plan['ambient_observation_ids']), 'Ambient observation ledger differs')
+    updated = strict_json(canonical(progress))
+    ambient = plan['ambient_tvos']
+    if ambient is None:
+        require_contract(plan['ambient_observation_ids'] == [], 'Unexpected ambient observation identity')
+        return updated
+    old, ready = ambient['uuid'], ambient['ready_uuid']
+    require_contract(plan['ambient_observation_ids'] == [RETIREMENT_AMBIENT_TVOS_UUID] and old == RETIREMENT_AMBIENT_TVOS_UUID
+            and old not in plan['target_ids'] and ready in plan['protected_ids'], 'Ambient role became a target or lost its Ready guard')
+    data = current['inventory']
+    phase = retirement_ambient_tvos_state(plan['baseline_inventory'][old], data.get(old))
+    previous = progress['states'][old]
+    allowed = {'Unusable': {'Unusable', 'Deleting', 'Absent'}, 'Deleting': {'Deleting', 'Absent'}, 'Absent': {'Absent'}}
+    require_contract(previous in allowed and phase in allowed[previous], 'Ambient tvOS regressed or its UUID reappeared')
+    if old in data:
+        require_contract(canonical(current['filesystem'][old]) == canonical(plan['baseline_filesystem'][old]),
+                'Ambient tvOS surviving filesystem changed')
+    if phase == 'Deleting' and old not in updated['deleting_observed']:
+        updated['deleting_observed'].append(old)
+    if phase != previous:
+        updated['transitions'].append({'uuid': old, 'from': previous, 'to': phase, 'snapshot': current['label'],
+                                       'observed_unix': current['finished_unix'], 'tvos_delete_invoked': False})
+    updated['states'][old] = phase
+    if phase == 'Absent' and old not in updated['absence_dispositions']:
+        updated['absence_dispositions'][old] = (
+            'OBSERVED_ABSENT_WITHOUT_DELETE_INVOCATION_AFTER_OBSERVED_DELETING' if old in updated['deleting_observed'] else
+            'OBSERVED_ABSENT_WITHOUT_DELETE_INVOCATION_AND_WITHOUT_OBSERVED_DELETING')
+    pair = ambient['literal_pair']
+    require_contract(pair['schema'] == 'common-runtime-tvos-literal-pair-v5', 'Frozen tvOS pair schema differs')
+    for path in (pair['mountPath'], pair['runtimeBundlePath'], RETIREMENT_AMBIENT_TVOS_ASSET):
+        role = plan['alias_roles']['paths'][path]
+        expected_role = 'ambient_retained_asset' if path == RETIREMENT_AMBIENT_TVOS_ASSET else 'ambient_shared_protected'
+        require_contract(role['role'] == expected_role and role['protected_uuid'] == ready,
+                'Frozen ambient physical role differs')
+        observation = current['fixed_path_observations'][path]
+        require_contract(path not in missing_paths
+                and canonical(observation) == canonical(role['initial_observation'])
+                and canonical(observation['filesystem']) == canonical(plan['path_baselines'][path]),
+                'Ambient protected fixed path or physical identity changed: ' + path)
+        for field in role['protected_fields']:
+            require_contract(canonical(observation['filesystem']) == canonical(current['filesystem'][ready][field]),
+                    'Ambient protected Ready filesystem reads disagree')
+        for ref in role['frozen_references']:
+            if ref['uuid'] in data:
+                require_contract(canonical(observation['filesystem']) == canonical(current['filesystem'][ref['uuid']][ref['field']]),
+                        'Ambient fixed path and surviving old registration disagree')
+    return updated
+
+
+def replay_retirement_plan(common, preflight, service, initial, saved_plan):
+    """Recompute a saved V6 plan from bound original inputs; grant no run credit."""
+    require_contract(saved_plan.get('schema') == RETIREMENT_PLAN_SCHEMA, 'Saved retirement plan is not explicit V6')
+    replayed = freeze_retirement_plan(common, preflight, service, initial)
+    require_contract(canonical(saved_plan) == canonical(replayed), 'Saved V6 plan or alias-role ledger differs from replay')
+    return replayed
+
+
+def freeze_retirement_plan(common, preflight, service, current):
+    """Pure planning: freeze existing identities, never discover replacement targets."""
+    inventory, filesystem = current['inventory'], current['filesystem']
+    expected = service['runtime_snapshots']['after']
+    require_contract(canonical(inventory) == canonical(expected['inventory']),
+            'Runtime registrations changed since completed original preparation')
+    require_contract(canonical(filesystem) == canonical(expected['filesystem']),
+            'Runtime filesystem identities changed since completed original preparation')
+    common.validate_runtime(preflight, inventory, filesystem)
+    old = preflight['selected_original_runtime']['target_uuid']
+    new = preflight['scope_after_verify']['new_uuid']
+    require_contract(old != new and retirement_unusable_duplicate(inventory[old]), 'Exactly the original old iOS duplicate must be Unusable')
+    require_contract(inventory[new]['state'] == 'Ready' and inventory[new]['signatureState'] == 'Verified',
+            'New staged iOS image is not Ready/Verified')
+    watches = common.watch_records(inventory)
+    ready = [key for key, row in watches.items() if row['state'] == 'Ready']
+    retired_watches = sorted(key for key, row in watches.items() if retirement_unusable_duplicate(row))
+    require_contract(len(ready) == 1 and len(retired_watches) <= 2 and set(watches) == set(ready + retired_watches),
+            'Require one exact Ready watch27.0 and at most two exact Unusable duplicates; no Copying/Deleting')
+    original_watch_ids = set(common.watch_records(preflight['runtime_snapshots']['before']['inventory']))
+    require_contract(set(retired_watches) <= original_watch_ids, 'A new or unrelated watch UUID cannot become a target')
+    targets = [old, *retired_watches]
+    require_contract(1 <= len(targets) <= RETIREMENT_MAX_TARGETS and len(set(targets)) == len(targets)
+            and all(RETIREMENT_UUID.fullmatch(key) for key in targets) and new not in targets and ready[0] not in targets,
+            'Invalid bounded target set')
+    for key in targets:
+        require_contract(retirement_unusable_duplicate(inventory[key]), 'Target is not the exact Unusable duplicate class')
+    require_contract(all(all(field in inventory[key] for field in RETIREMENT_UNUSABLE_FIELDS) for key in retired_watches),
+            'Watch freeze requires all three actual Unusable fields')
+    ambient = retirement_ambient_tvos_identity(preflight, inventory)
+    ambient_ids = [ambient['uuid']] if ambient else []
+    require_contract(len(ambient_ids) <= RETIREMENT_MAX_AMBIENT_OBSERVERS and not set(ambient_ids) & set(targets),
+            'Ambient identity cannot enlarge the frozen target set')
+    plan = {'schema': RETIREMENT_PLAN_SCHEMA, 'old_ios_uuid': old, 'new_ios_uuid': new, 'ready_watch_uuid': ready[0],
+            'target_ids': targets, 'target_records': {key: inventory[key] for key in targets},
+            'mutation_target_ids': [old], 'watch_observation_ids': retired_watches,
+            'ambient_observation_ids': ambient_ids, 'ambient_tvos': ambient,
+            'baseline_inventory': inventory, 'baseline_filesystem': filesystem,
+            'protected_ids': sorted(set(inventory) - set(targets) - set(ambient_ids)),
+            'devices': current['devices'], 'asset_files': current['asset_files'],
+            'protected_mount_paths': [inventory[new]['mountPath'], inventory[ready[0]]['mountPath']],
+            'target_order': 'One old-iOS delete, then only scheduled read-only watch observations; no causal claim.'}
+    if ambient:
+        plan['protected_mount_paths'].append(inventory[ambient['ready_uuid']]['mountPath'])
+    plan['fixed_paths'] = extend_retirement_ambient_paths(retirement_fixed_paths(plan['target_records'], old, retired_watches),
+                                               ambient, inventory)
+    require_contract(set(current['fixed_path_observations']) == set(plan['fixed_paths']), 'Initial literal path ledger differs')
+    plan['alias_roles'] = freeze_retirement_alias_roles(common, plan, current, preflight)
+    freeze_retirement_ambient_roles(plan, current)
+    plan['path_baselines'] = {}
+    protected_aliases = [inventory[key][field] for key in plan['protected_ids']
+                         for field in ('mountPath', 'runtimeBundlePath')]
+    for path, references in plan['fixed_paths'].items():
+        baseline = current['fixed_path_observations'][path]['filesystem']
+        require_contract(all(baseline == filesystem[ref['uuid']][ref['field']] for ref in references),
+                'Shared literal-path observations disagree with the original preparation')
+        plan['path_baselines'][path] = baseline
+        if plan['alias_roles']['paths'][path]['role'] in ('shared_protected', 'ambient_shared_protected', 'ambient_retained_asset'):
+            continue
+        if any(ref['field'] in ('mountPath', 'runtimeBundlePath') for ref in references):
+            require_contract(not any(retirement_paths_overlap(path, protected) for protected in protected_aliases),
+                    'A target alias overlaps a protected runtime mount or bundle')
+            require_contract((baseline.get('capture') == 'observed' and baseline.get('is_directory') is True)
+                    or retirement_enoent_path(baseline, path), 'Unsupported initial old runtime alias filesystem')
+    expected_proof_ids = [new, ready[0], *([ambient['ready_uuid']] if ambient else [])]
+    require_contract([row['uuid'] for row in current['mount_proofs']] == expected_proof_ids,
+            'Protected actual mount proof identities or order differ')
+    plan['protected_mount_proofs'] = current['mount_proofs']
+    plan['protected_mount_rows'] = retirement_runtime_mount_rows(inventory, current['mount_table'], plan['protected_ids'])
+    plan['initial_alias_limit'] = ('Exclusive aliases retain the V2 non-mount rule. Only the two known observation-only Watch UUIDs '
+                                 'may share the sole exact Ready Watch closed canonical/Volumes pair; those paths remain protected and never removable. '
+                                 'The separate exact known old tvOS observer is not a target; its Ready counterpart, shared physical '
+                                 'paths and direct retained DMG stat stay protected even if its UUID is absent.')
+    progress = initial_retirement_progress(plan)
+    validate_retirement_snapshot_and_progress(common, plan, current, progress, old_deleted=False)
+    return plan
+
+def initial_retirement_progress(plan):
+    return {'schema': RETIREMENT_PROGRESS_SCHEMA,
+            'ambient_tvos': {'schema': RETIREMENT_AMBIENT_PROGRESS_SCHEMA,
+                             'states': {key: 'Unusable' for key in plan['ambient_observation_ids']},
+                             'deleting_observed': [], 'absence_dispositions': {}, 'transitions': []},
+            'watch_states': {key: 'Unusable' for key in plan['watch_observation_ids']},
+            'deleting_observed': [], 'absence_dispositions': {}, 'transitions': [],
+            'missing_paths': sorted(path for path, row in plan['path_baselines'].items() if retirement_enoent_path(row, path))}
+
+def validate_retirement_snapshot_and_progress(common, plan, current, progress, *, old_deleted, final=False):
+    """Read-only validation; progress is committed only after every guard passes."""
+    require_contract(plan.get('schema') == RETIREMENT_PLAN_SCHEMA and plan['alias_roles']['schema'] == RETIREMENT_ALIAS_ROLES_SCHEMA
+            and set(plan['alias_roles']['paths']) == set(plan['fixed_paths'])
+            and progress.get('schema') == RETIREMENT_PROGRESS_SCHEMA, 'V6 alias-role plan or observation ledger is incomplete')
+    data, baseline = current['inventory'], plan['baseline_inventory']
+    require_contract(set(data) <= set(baseline), 'New runtime registration appeared; never select a substitute')
+    require_contract(set(baseline) - set(data) <= set(plan['target_ids']) | set(plan['ambient_observation_ids']), 'A protected runtime disappeared')
+    require_contract(set(current['filesystem']) == set(data), 'Runtime filesystem inventory differs')
+    require_contract(common.require_shutdown_devices(current['raw_devices']) == current['devices'], 'Raw device normalization differs')
+    require_contract(current['devices'] == plan['devices'], 'Device identities or Shutdown states changed')
+    require_contract(canonical(current['asset_files']) == canonical(plan['asset_files']), 'A retained asset/DMG identity changed')
+    for key in plan['protected_ids']:
+        require_contract(key in data and canonical(data[key]) == canonical(baseline[key]), 'Protected runtime record changed: ' + key)
+        require_contract(canonical(current['filesystem'][key]) == canonical(plan['baseline_filesystem'][key]),
+                'Protected runtime filesystem changed: ' + key)
+    old = plan['old_ios_uuid']
+    if old_deleted:
+        require_contract(old not in data, 'Own successful old-iOS delete must be followed by its exact UUID absence')
+    else:
+        require_contract(old in data and data[old] == plan['target_records'][old] and retirement_unusable_duplicate(data[old]),
+                'The one old-iOS mutation target is absent or changed before its invocation')
+        require_contract(current['filesystem'][old] == plan['baseline_filesystem'][old], 'Old iOS filesystem changed before deletion')
+    updated = strict_json(canonical(progress))
+    updated['ambient_tvos'] = validate_retirement_ambient_tvos(plan, current, progress['ambient_tvos'], progress['missing_paths'])
+    phases = {}
+    allowed = {'Unusable': {'Unusable', 'Deleting', 'Absent'}, 'Deleting': {'Deleting', 'Absent'}, 'Absent': {'Absent'}}
+    require_contract(set(progress['watch_states']) == set(plan['watch_observation_ids']), 'Watch observation identities differ')
+    for key in plan['watch_observation_ids']:
+        phase = retirement_watch_state(plan['target_records'][key], data.get(key))
+        previous = progress['watch_states'][key]
+        require_contract(previous in allowed and phase in allowed[previous], 'Watch state regressed or its frozen UUID reappeared: ' + key)
+        phases[key] = phase
+        if phase == 'Deleting' and key not in updated['deleting_observed']:
+            updated['deleting_observed'].append(key)
+        if phase != previous:
+            updated['transitions'].append({'uuid': key, 'from': previous, 'to': phase, 'snapshot': current['label'],
+                                           'observed_unix': current['finished_unix'], 'watch_delete_invoked': False})
+        updated['watch_states'][key] = phase
+        if phase == 'Absent' and key not in updated['absence_dispositions']:
+            updated['absence_dispositions'][key] = (
+                'OBSERVED_ABSENT_WITHOUT_DELETE_INVOCATION_AFTER_OBSERVED_DELETING' if key in updated['deleting_observed'] else
+                'OBSERVED_ABSENT_WITHOUT_DELETE_INVOCATION_AND_WITHOUT_OBSERVED_DELETING')
+    require_contract(set(current['fixed_path_observations']) == set(plan['fixed_paths']), 'Fixed old path ledger changed')
+    for path, references in plan['fixed_paths'].items():
+        role = plan['alias_roles']['paths'][path]
+        require_contract(role['frozen_references'] == references
+                and role['role'] in ('exclusive_alias', 'retained_asset', 'shared_protected',
+                                     'ambient_shared_protected', 'ambient_retained_asset'), 'Frozen alias role differs')
+        if role['role'] in ('ambient_shared_protected', 'ambient_retained_asset'):
+            continue
+        if role['role'] == 'shared_protected':
+            validate_retirement_shared_path(plan, current, progress, path, role)
+            continue
+        observation = current['fixed_path_observations'][path]
+        require_contract(observation['resolved_path'] == path and observation['symlink_components'] == [],
+                'An old path is an indirect alias: ' + path)
+        # This narrowly supported diagnostic starts with old aliases already
+        # unmounted. No alias is allowed to appear at any later observation.
+        require_contract(observation['os_path_ismount'] is False and observation['related_mount_rows'] == {},
+                'An old path or a child acquired an actual mount: ' + path)
+        captured, original = observation['filesystem'], plan['path_baselines'][path]
+        require_contract(captured.get('value') == path, 'Fixed path observation refers to another path')
+        for ref in references:
+            if ref['uuid'] in data:
+                require_contract(canonical(captured) == canonical(current['filesystem'][ref['uuid']][ref['field']]), 'Two reads of one old path disagree')
+        watch_refs = [ref for ref in references if ref['uuid'] in phases]
+        removable = (all(ref['field'] in ('mountPath', 'runtimeBundlePath') for ref in references)
+                     and ((bool(watch_refs) and all(phases[ref['uuid']] in ('Deleting', 'Absent') for ref in watch_refs))
+                          or (not watch_refs and old_deleted)))
+        require_contract(canonical(captured) == canonical(original) or (removable and retirement_enoent_path(captured, path)),
+                'Old path changed beyond exact identity or permitted ENOENT: ' + path)
+        require_contract(path not in progress['missing_paths'] or retirement_enoent_path(captured, path), 'An absent old path reappeared: ' + path)
+        if retirement_enoent_path(captured, path) and path not in updated['missing_paths']:
+            updated['missing_paths'].append(path)
+    new = data[plan['new_ios_uuid']]
+    require_contract(new['state'] == 'Ready' and new['signatureState'] == 'Verified', 'Selected iOS lost Ready/Verified')
+    watches = common.watch_records(data)
+    ready = [key for key, row in watches.items() if row['state'] == 'Ready']
+    require_contract(ready == [plan['ready_watch_uuid']], 'Sole Ready watch identity changed; a new Ready UUID is not accepted')
+    require_contract(current['mounted_paths'] == plan['protected_mount_paths'], 'Protected actual mount proof is incomplete')
+    require_contract(canonical(current['mount_proofs']) == canonical(plan['protected_mount_proofs']), 'Protected actual mount identity, source or options changed')
+    require_contract(retirement_runtime_mount_rows(data, current['mount_table'], plan['protected_ids']) == plan['protected_mount_rows'],
+            'Non-target runtime mount membership or rows changed')
+    if final:
+        require_contract(old_deleted, 'No successful own old-iOS deletion was bound')
+        require_contract(not (set(plan['target_ids']) & set(data)), 'A frozen duplicate remains')
+        require_contract(set(watches) == {plan['ready_watch_uuid']}, 'Watch27.0 is not a single unchanged Ready registration')
+        ios = [key for key, row in data.items() if row.get('runtimeIdentifier') == common.IOS]
+        require_contract(ios == [plan['new_ios_uuid']], 'Selected iOS runtime still has duplicate registrations')
+    return updated
+
+def retirement_common_primitives():
+    from types import SimpleNamespace
+    return SimpleNamespace(validate_runtime=validate_runtime, watch_records=watch_records,
+                           require_shutdown_devices=require_shutdown_devices, IOS=IOS, WATCH=WATCH, WATCH_ASSET=WATCH_ASSET)
+
+
+def retirement_mount_table(raw):
+    rows = {}
+    for line in raw.decode().splitlines():
+        match = re.fullmatch(r'(.+) on (/.*) \(([^\n]*)\)', line)
+        require_contract(match is not None, 'Unparseable actual mount-table row')
+        rows.setdefault(match[2], []).append({'source': match[1], 'options': match[3], 'raw_line': line})
+    return rows
+
+
+def retirement_context_groups(context):
+    source_entries = {**context['helper_git_entries'], **context['original_consumer_files'],
+                      'Build/features.json': context['features_file']}
+    groups = [('final-source', context['source_root'], context['source'], source_entries)]
+    if context['mode'] == 'candidate':
+        binding = context['original_restorer_binding']
+        control_entries = {binding[key]['relative_path']: binding[key] for key in ('matrix', 'restorer')}
+        groups.append(('final-control', context['control_root'], context['control'], control_entries))
+    return groups
+
+
+def retirement_context_commands(context):
+    rows = []
+    for prefix, root, identity, entries in retirement_context_groups(context):
+        names = sorted(entries)
+        rows.extend([(prefix + '-root', ['git', '-C', root, 'rev-parse', '--show-toplevel']),
+                     (prefix + '-head', ['git', '-C', root, 'rev-parse', 'HEAD', 'HEAD^{tree}']),
+                     (prefix + '-entries', ['git', '-C', root, 'ls-tree', '-r', '-z', 'HEAD', '--', *names]),
+                     (prefix + '-index', ['git', '-C', root, 'ls-files', '--stage', '-z', '--', *names]),
+                     (prefix + '-cached-diff', ['git', '-C', root, 'diff', '--cached', '--no-ext-diff',
+                                               '--no-textconv', '--exit-code', identity['commit'], '--'])])
+    if context['mode'] == 'workflow-input':
+        reference = context['workflow_input_binding']['resolved_local_reference']
+        rows.append(('final-input-ref', ['git', '-C', context['source_root'], 'rev-parse', '--verify',
+                                        '--quiet', '--end-of-options', reference + '^{commit}']))
+    return rows
+
+
+def retirement_current_environment(context):
+    if context['mode'] != 'workflow-input':
+        return validate_current_environment(context['source'], context['control'], context['mode'])
+    require_contract(os.environ.get('RUNTIME_COMMON_SOURCE_REF') == context['workflow_input_binding']['raw_input_ref'],
+                     'Actual workflow input ref changed during preparation')
+    caller = {'github_sha': full_sha(os.environ['GITHUB_SHA']),
+              'repository': os.environ['GITHUB_REPOSITORY'],
+              'run_id': positive_decimal(os.environ['GITHUB_RUN_ID']),
+              'attempt': positive_decimal(os.environ['GITHUB_RUN_ATTEMPT']),
+              'job': os.environ['GITHUB_JOB'], 'runner_os': 'macOS',
+              'github_workflow_ref': os.environ.get('GITHUB_WORKFLOW_REF'),
+              'github_workflow_sha': os.environ.get('GITHUB_WORKFLOW_SHA'),
+              'binding_kind': context['consumer']['binding_kind']}
+    if caller['github_workflow_sha'] is not None:
+        full_sha(caller['github_workflow_sha'])
+    return caller
+
+
+def retirement_asset_files(preflight, watch_dmg, ambient, remaining):
+    result = {name: bound_file_stat(preflight[name]) for name in ('source_dmg_after', 'staged_dmg_after')}
+    require_contract(all(row['matches_verified_receipt'] for row in result.values()), 'Verified iOS DMG identity changed')
+    result['ios_asset'], result['watch_asset'] = path_snapshot(str(IOS_ASSET)), path_snapshot(WATCH_ASSET)
+    require_contract(all(result[key].get('capture') == 'observed' and result[key].get('is_directory') is True
+                         for key in ('ios_asset', 'watch_asset')), 'Retained asset directory is unavailable')
+    info = watch_dmg.lstat()
+    require_contract(stat.S_ISREG(info.st_mode) and not watch_dmg.is_symlink() and info.st_size > 0
+                     and watch_dmg.resolve() == watch_dmg, 'Retained watch DMG is unavailable or indirect')
+    result['watch_dmg'] = {'path': str(watch_dmg), 'resolved_path': str(watch_dmg.resolve()),
+                           'is_regular': True, 'is_symlink': False, 'identity': file_identity(info)}
+    if ambient is not None:
+        remaining()
+        path = Path(RETIREMENT_AMBIENT_TVOS_DMG)
+        links = [str(item) for item in (path, *path.parents) if item.is_symlink()]
+        info = path.lstat()
+        require_contract(stat.S_ISREG(info.st_mode) and not links and path.resolve() == path
+                         and file_identity(info) == file_identity(path.stat()),
+                         'Retained ambient tvOS DMG is unavailable or indirect')
+        result['tvos_dmg'] = {'path': str(path), 'resolved_path': str(path.resolve()),
+                              'identity': file_identity(info), 'is_regular': True,
+                              'is_symlink': False, 'symlink_components': links, 'nlink': info.st_nlink}
+        remaining()
+    return result
+
+
+def retirement_filesystem_observation(data, mounts, preflight, plan, watch_dmg, remaining):
+    """Live stat-only portion; no device enumeration and no host mutation."""
+    remaining()
+    ambient = plan['ambient_tvos'] if plan else retirement_ambient_tvos_identity(preflight, data)
+    entry = {'inventory': data, 'filesystem': filesystem_snapshot(data),
+             'mount_table': mounts, 'mount_paths': sorted(mounts),
+             'asset_files': retirement_asset_files(preflight, watch_dmg, ambient, remaining),
+             'mounted_paths': [], 'mount_proofs': []}
+    new = preflight['scope_after_verify']['new_uuid']
+    watches = watch_records(data)
+    ready = [key for key, row in watches.items() if row['state'] == 'Ready']
+    ready_watch = plan['ready_watch_uuid'] if plan else (ready[0] if len(ready) == 1 else None)
+    require_contract(new in data and ready_watch in data, 'A required protected runtime is absent')
+    expected_tvos = [ambient['ready_uuid']] if ambient else []
+    for key in (new, ready_watch, *expected_tvos):
+        remaining()
+        row = data[key]
+        mount, bundle = Path(row['mountPath']), Path(row['runtimeBundlePath'])
+        require_contract(mount.is_absolute() and mount.resolve() == mount and bundle.resolve() == bundle
+                         and bundle.is_relative_to(mount), 'Protected mount/bundle is indirect or misplaced')
+        require_contract(len(mounts.get(str(mount), [])) == 1 and os.path.ismount(mount),
+                         'Protected runtime does not have one actual mount')
+        mi, bi = mount.stat(), bundle.stat()
+        require_contract(stat.S_ISDIR(mi.st_mode) and stat.S_ISDIR(bi.st_mode) and mi.st_dev == bi.st_dev,
+                         'Protected bundle is not on the declared mounted filesystem')
+        entry['mounted_paths'].append(str(mount))
+        entry['mount_proofs'].append({'uuid': key, 'mount': str(mount), 'bundle': str(bundle),
+                                     'mount_table': mounts[str(mount)][0], 'os_path_ismount': True,
+                                     'mount_device': mi.st_dev, 'bundle_device': bi.st_dev})
+    if plan is None:
+        old = preflight['selected_original_runtime']['target_uuid']
+        require_contract(old in data, 'The old iOS UUID is absent before the frozen plan')
+        paths = retirement_fixed_paths(data, old, sorted(key for key, row in watches.items()
+                                                        if retirement_unusable_duplicate(row)))
+        paths = extend_retirement_ambient_paths(paths, ambient, data)
+    else:
+        paths = plan['fixed_paths']
+    entry['fixed_path_observations'] = {}
+    for value in paths:
+        remaining()
+        path = Path(value)
+        require_contract(len(path.parts) <= 64, 'Fixed old path exceeds the bounded depth')
+        links = []
+        for component in (path, *path.parents):
+            try:
+                if stat.S_ISLNK(component.lstat().st_mode):
+                    links.append(str(component))
+            except FileNotFoundError:
+                pass
+        entry['fixed_path_observations'][value] = {
+            'filesystem': path_snapshot(value), 'resolved_path': str(path.resolve(strict=False)),
+            'symlink_components': links, 'os_path_ismount': os.path.ismount(path),
+            'related_mount_rows': {key: rows for key, rows in mounts.items() if Path(key).is_relative_to(path)}}
+    remaining()
+    return entry
+
+
+def validate_retired_host_invariants(plan, final_ledger, observation):
+    """Pure terminal host guard. No device, historical clock or current-host reads."""
+    require_contract(plan.get('schema') == RETIREMENT_PLAN_SCHEMA
+                     and plan['alias_roles']['schema'] == RETIREMENT_ALIAS_ROLES_SCHEMA
+                     and set(plan['alias_roles']['paths']) == set(plan['fixed_paths'])
+                     and final_ledger.get('schema') == RETIREMENT_PROGRESS_SCHEMA,
+                     'Terminal host requires a fully replayed V6 alias-role plan and ledger')
+    data, baseline = observation['inventory'], plan['baseline_inventory']
+    require_contract(set(data) - set(plan['ambient_observation_ids']) == set(plan['protected_ids']), 'A frozen duplicate reappeared or protected/new UUID changed')
+    require_contract(set(observation['filesystem']) == set(data), 'Terminal filesystem membership differs')
+    require_contract(canonical(observation['asset_files']) == canonical(plan['asset_files']), 'A retained asset/DMG identity changed')
+    for key in plan['protected_ids']:
+        require_contract(canonical(data[key]) == canonical(baseline[key]), 'Protected runtime record changed: ' + key)
+        require_contract(canonical(observation['filesystem'][key]) == canonical(plan['baseline_filesystem'][key]),
+                         'Protected runtime filesystem changed: ' + key)
+    require_contract(set(final_ledger['watch_states']) == set(plan['watch_observation_ids'])
+                     and all(v == 'Absent' for v in final_ledger['watch_states'].values()),
+                     'The bound preparation did not retire every frozen duplicate')
+    require_contract(set(observation['fixed_path_observations']) == set(plan['fixed_paths']), 'Terminal fixed path set differs')
+    ambient_progress = validate_retirement_ambient_tvos(plan, observation, final_ledger['ambient_tvos'],
+                                                         final_ledger['missing_paths'])
+    for path, references in plan['fixed_paths'].items():
+        role = plan['alias_roles']['paths'][path]
+        require_contract(role['frozen_references'] == references
+                         and role['role'] in ('exclusive_alias', 'retained_asset', 'shared_protected',
+                                             'ambient_shared_protected', 'ambient_retained_asset'),
+                         'Terminal frozen alias role differs')
+        if role['role'] in ('ambient_shared_protected', 'ambient_retained_asset'):
+            continue
+        if role['role'] == 'shared_protected':
+            # Exact protected raw membership above preserves the frozen recursive
+            # reference closure after all old Watch UUIDs are absent. Never
+            # reclassify the shared object as an exclusive/removable old alias.
+            validate_retirement_shared_path(plan, observation, final_ledger, path, role)
+            continue
+        value = observation['fixed_path_observations'][path]
+        require_contract(value['resolved_path'] == path and value['symlink_components'] == []
+                         and value['os_path_ismount'] is False and value['related_mount_rows'] == {},
+                         'A terminal old alias became linked, indirect or mounted: ' + path)
+        current = value['filesystem']
+        removable = all(ref['field'] in ('mountPath', 'runtimeBundlePath') for ref in references)
+        require_contract(canonical(current) == canonical(plan['path_baselines'][path])
+                         or removable and retirement_enoent_path(current, path), 'Terminal old path identity changed: ' + path)
+        require_contract(path not in final_ledger['missing_paths'] or retirement_enoent_path(current, path),
+                         'An absent old path reappeared after preparation: ' + path)
+    new = data[plan['new_ios_uuid']]
+    require_contract(new['state'] == 'Ready' and new['signatureState'] == 'Verified', 'Selected iOS lost Ready/Verified')
+    require_contract(list(watch_records(data)) == [plan['ready_watch_uuid']], 'Ready watch identity changed')
+    require_contract([key for key, row in data.items() if row.get('runtimeIdentifier') == IOS] == [plan['new_ios_uuid']],
+                     'Selected iOS acquired another registration')
+    require_contract(observation['mounted_paths'] == plan['protected_mount_paths']
+                     and canonical(observation['mount_proofs']) == canonical(plan['protected_mount_proofs']), 'Protected mount identity/source/options changed')
+    require_contract(retirement_runtime_mount_rows(data, observation['mount_table'], plan['protected_ids'])
+                     == plan['protected_mount_rows'], 'Protected mount membership changed')
+    updated = strict_json(canonical(final_ledger))
+    updated['ambient_tvos'] = ambient_progress
+    updated['missing_paths'] = sorted(set(final_ledger['missing_paths']) | {
+        path for path,value in observation['fixed_path_observations'].items()
+        if retirement_enoent_path(value['filesystem'],path)})
+    return updated
+
+
+class RetirementPhase:
+    """One source-owned phase; no hardcoded owner, source SHA or caller mode."""
+    def __init__(self, request, context, preflight, service, output, descriptors):
+        self.request, self.context, self.preflight, self.service = request, context, preflight, service
+        self.root, self.output = Path(context['source_root']), output
+        self.plan, self.progress, self.deadline = None, None, None
+        self.labels, self.attempted, self.invoked = set(), set(), set()
+        self.watch_dmg = None
+        self.report = {'schema': 'common-runtime-retirement-watch-shared-alias-ambient-tvos-settlement-v6',
+            'identity': context, 'original_preflight': descriptors['staged'], 'original_service': descriptors['service'],
+            'started_unix': time.time(), 'commands': [], 'snapshots': [], 'intervals': [],
+            'application_consumer_invocations': 0, 'candidate_credit': False, 'product_pass': False,
+            'watch_delete_attempts': 0, 'watch_delete_invocations': 0, 'replacement_targets': 0,
+            'tvos_delete_attempts': 0, 'tvos_delete_invocations': 0, 'ambient_absence_required': False,
+            'source_or_ref_modified': False, 'service_signals': 0, 'retries': 0,
+            'limits': {'metadata_seconds': METADATA_TIMEOUT, 'delete_seconds': RETIREMENT_DELETE_SECONDS,
+                       'settlement_seconds': RETIREMENT_SETTLEMENT_SECONDS,
+                       'max_frozen_targets': RETIREMENT_MAX_TARGETS,
+                       'max_ambient_observers': RETIREMENT_MAX_AMBIENT_OBSERVERS,
+                       'max_scheduled_snapshots': RETIREMENT_MAX_SCHEDULED_SNAPSHOTS,
+                       'sample_interval_seconds': RETIREMENT_SAMPLE_INTERVAL_SECONDS}}
+
+    def remaining(self):
+        if self.deadline is None:
+            return None
+        value = self.deadline - time.monotonic()
+        require_contract(value > 0, 'The single retirement settlement deadline expired')
+        return value
+
+    def save(self):
+        pending = unlinked_path(self.output / 'result.pending.json', self.root)
+        raw = (json.dumps(self.report, sort_keys=True, indent=2, allow_nan=False) + '\n').encode()
+        with pending.open('xb') as stream:
+            stream.write(raw)
+        pending.replace(self.output / 'result.json')
+
+    def allowed_read(self, label, argv):
+        common = {'simctl-path': ['xcrun', '--find', 'simctl'],
+                  'final-logical-runtimes': ['xcrun', 'simctl', 'list', 'runtimes', '-j'],
+                  'final-device-types': ['xcrun', 'simctl', 'list', 'devicetypes', '-j']}
+        common.update(dict(retirement_context_commands(self.context)))
+        if label in common:
+            return argv == common[label]
+        match = re.fullmatch(r'(initial|old-ios-before|settlement-[0-9]{3}|settlement-final)-(runtimes|devices|mounts)', label)
+        if match is None:
+            return False
+        return argv == {'runtimes': ['xcrun', 'simctl', 'runtime', 'list', '-j'],
+                        'devices': ['xcrun', 'simctl', 'list', 'devices', '-j'], 'mounts': ['/sbin/mount']}[match[2]]
+
+    def run(self, label, argv, timeout=METADATA_TIMEOUT, target=None):
+        require_contract(label not in self.labels, 'Retirement command cannot be retried: ' + label)
+        self.labels.add(label)
+        if target is None:
+            require_contract(timeout == METADATA_TIMEOUT and self.allowed_read(label, argv), 'Retirement read allowlist differs')
+        else:
+            check_retirement_delete_request(self.plan, self.attempted, self.invoked, target, argv, timeout)
+            require_contract(label == 'old-ios-delete', 'The sole mutation has one exact label')
+        row = {'label': label, 'argv': argv, 'requested_timeout_seconds': timeout,
+               'started_unix': time.time(), 'returncode': None, 'timed_out': False,
+               'stdout_file': label + '.stdout.log', 'stderr_file': label + '.stderr.log'}
+        self.report['commands'].append(row)
+        process, failure = None, None
+        try:
+            self.remaining()
+            self.save()
+            with (self.output / row['stdout_file']).open('xb') as out, (self.output / row['stderr_file']).open('xb') as err:
+                launched = time.monotonic()
+                deadline = min(launched + timeout, self.deadline) if self.deadline is not None else launched + timeout
+                row.update(launched_monotonic=launched, command_deadline_monotonic=deadline,
+                           effective_timeout_seconds=deadline-launched,
+                           settlement_remaining_at_launch_seconds=None if self.deadline is None else self.deadline-launched)
+                require_contract(deadline > launched, 'No remaining launch budget')
+                if target is not None:
+                    self.attempted.add(target)
+                    row['mutation_attempted'] = True
+                process = subprocess.Popen(argv, cwd=self.root, stdout=out, stderr=err,
+                                           env=dict(os.environ, LC_ALL='C', TZ='UTC'))
+                row['pid'] = process.pid
+                if target is not None:
+                    self.invoked.add(target)
+                    row['mutation_invoked'] = True
+                wait = deadline - time.monotonic()
+                if wait <= 0:
+                    raise subprocess.TimeoutExpired(argv, row['effective_timeout_seconds'])
+                row['returncode'] = process.wait(timeout=wait)
+                completed = time.monotonic()
+                row['command_finished_monotonic'] = completed
+                if row['returncode']:
+                    raise subprocess.CalledProcessError(row['returncode'], argv)
+                require_contract(completed <= deadline, 'Command completed outside its bounded deadline')
+                if target is not None:
+                    require_contract(self.deadline is None, 'The settlement clock cannot be restarted')
+                    self.deadline = completed + RETIREMENT_SETTLEMENT_SECONDS
+                    self.report['settlement_clock'] = {'starts_after_successful_command': label, 'command_returncode': 0,
+                        'started_monotonic': completed, 'deadline_monotonic': self.deadline,
+                        'budget_seconds': RETIREMENT_SETTLEMENT_SECONDS, 'reset_count': 0}
+                self.remaining()
+        except Exception as error:
+            failure = error
+            row['failure'] = {'type': type(error).__name__, 'message': str(error)}
+            row['timed_out'] = isinstance(error, subprocess.TimeoutExpired)
+            if process is not None and process.returncode is None:
+                try:
+                    process.kill()
+                    row['owned_cli_kill_requested'] = True
+                    budget = min(1, max(0, self.deadline-time.monotonic())) if self.deadline is not None else 1
+                    row['reaped_returncode'] = process.wait(timeout=budget)
+                except Exception as cleanup:
+                    row['owned_cli_cleanup_error'] = str(cleanup)
+                row['server_side_operation_stopped_claimed'] = False
+        finally:
+            row['finished_unix'] = time.time()
+            for channel in ('stdout', 'stderr'):
+                try:
+                    _, row[channel] = regular_bytes(self.output / row[channel+'_file'], self.root, maximum=64*1024*1024)
+                except Exception as error:
+                    row.setdefault('recording_errors', []).append(str(error))
+                    failure = failure or error
+            try:
+                self.save()
+            except Exception as error:
+                failure = failure or error
+        if failure is not None:
+            raise failure
+        raw = regular_bytes(self.output / row['stdout_file'], self.root, maximum=4*1024*1024)[0]
+        self.remaining()
+        return raw
+
+    def snapshot(self, label):
+        self.remaining()
+        entry = {'label': label, 'started_unix': time.time(), 'started_monotonic': time.monotonic()}
+        self.report['snapshots'].append(entry)
+        data = inventory(strict_json(self.run(label+'-runtimes', ['xcrun','simctl','runtime','list','-j'])))
+        raw_devices = strict_json(self.run(label+'-devices', ['xcrun','simctl','list','devices','-j']))
+        mounts = retirement_mount_table(self.run(label+'-mounts', ['/sbin/mount']))
+        entry.update(retirement_filesystem_observation(data, mounts, self.preflight, self.plan, self.watch_dmg, self.remaining))
+        entry['raw_devices'], entry['devices'] = raw_devices, require_shutdown_devices(raw_devices)
+        self.remaining()
+        entry.update(finished_unix=time.time(), finished_monotonic=time.monotonic())
+        self.save()
+        self.remaining()
+        return entry
+
+    def bind_final_context(self):
+        self.remaining()
+        validate_host()
+        require_contract(Path.cwd()==self.root,'The actual source working directory changed')
+        self.remaining()
+        actual_environment = retirement_current_environment(self.context)
+        require_contract(actual_environment == self.context['consumer'], 'Caller identity changed during preparation')
+        by_label = {}
+        for label, argv in retirement_context_commands(self.context):
+            by_label[label] = self.run(label, argv)
+        validate_retirement_context_records(self.context, by_label)
+        for _, root, _, entries in retirement_context_groups(self.context):
+            for name, expected in entries.items():
+                self.remaining()
+                raw, info = regular_bytes(Path(root)/name, Path(root))
+                blob = hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+                require_contract(info['bytes']==expected['bytes'] and info['sha256']==expected['sha256']
+                                 and blob==expected['git_blob']
+                                 and bool(info['mode'] & 0o100)==(expected['git_mode']=='100755'),
+                                 'Source/control byte or mode changed during retirement: '+name)
+        input_receipt=None
+        if self.context['mode']=='candidate':
+            expected=self.context['original_restorer_binding']['receipt']
+            self.remaining()
+            _,input_receipt=regular_bytes(Path(expected['path']),self.root,maximum=64*1024*1024)
+            require_contract(input_receipt==expected,'Actual candidate input/restorer receipt changed during preparation')
+            self.remaining()
+        self.report['final_context_binding'] = {'identity': self.context, 'actual_environment': actual_environment,
+            'workflow_input_binding': self.context.get('workflow_input_binding'),
+            'candidate_restorer_receipt':input_receipt,
+            'validated_monotonic': time.monotonic()}
+        self.remaining()
+
+    def execute(self):
+        help_raw, help_info = regular_bytes(preparation_root(self.context)/'staged/runtime-help.stderr.log', self.root)
+        require_contract(b'delete (<identifier>|' in help_raw and b'--keep-asset' in help_raw
+                         and b'Keep the associated mobile asset' in help_raw, 'Actual official runtime help lacks keep-asset')
+        self.report['official_runtime_help'] = help_info
+        actual = self.run('simctl-path', ['xcrun','--find','simctl']).decode().strip()
+        resolved = str(Path(actual).resolve())
+        require_contract(resolved == self.preflight['toolchain']['resolved_tools']['simctl'], 'Actual simctl changed')
+        self.report['simctl_binding'] = {'actual_path':actual,'resolved_path':resolved}
+        for profile in OWNER_PROFILES[self.context['owner']]['consumers'].values():
+            require_contract(not (self.root/profile['receipt']).exists(), 'An original consumer already began')
+        require_contract(not (preparation_root(self.context)/'consumers').exists(), 'Prior consumer binding exists')
+        restore = Path(WATCH_ASSET)/'Restore'
+        require_contract(restore.is_dir() and restore.resolve()==restore
+                         and not any(p.is_symlink() for p in (restore,*restore.parents)), 'Watch Restore directory is indirect')
+        children=list(restore.iterdir())
+        dmgs=[p for p in children if p.suffix=='.dmg']
+        require_contract(len(children)<=64 and len(dmgs)==1, 'Require one direct watch asset DMG')
+        self.watch_dmg=dmgs[0]
+        current=self.snapshot('initial')
+        self.plan=freeze_retirement_plan(retirement_common_primitives(),self.preflight,self.service,current)
+        self.progress=initial_retirement_progress(self.plan)
+        self.report['frozen_plan']=self.plan
+        before=self.snapshot('old-ios-before')
+        self.progress=validate_retirement_snapshot_and_progress(retirement_common_primitives(),self.plan,before,self.progress,old_deleted=False)
+        old=self.plan['old_ios_uuid']
+        self.run('old-ios-delete',['xcrun','simctl','runtime','delete',old,'--keep-asset'],RETIREMENT_DELETE_SECONDS,target=old)
+        for number in range(1,RETIREMENT_MAX_SCHEDULED_SNAPSHOTS+1):
+            after=self.snapshot('settlement-'+str(number).zfill(3))
+            self.progress=validate_retirement_snapshot_and_progress(retirement_common_primitives(),self.plan,after,self.progress,old_deleted=True)
+            if number==1:
+                self.report['own_delete_completed_uuids']=[old]
+            if all(v=='Absent' for v in self.progress['watch_states'].values()):
+                break
+            require_contract(number<RETIREMENT_MAX_SCHEDULED_SNAPSHOTS,'Scheduled settlement samples exhausted')
+            require_contract(self.remaining()>RETIREMENT_SAMPLE_INTERVAL_SECONDS,'Insufficient interval budget')
+            started=time.monotonic()
+            time.sleep(RETIREMENT_SAMPLE_INTERVAL_SECONDS)
+            self.report['intervals'].append({'after_snapshot':after['label'],'started_monotonic':started,
+                'finished_monotonic':time.monotonic(),'requested_seconds':RETIREMENT_SAMPLE_INTERVAL_SECONDS})
+            self.remaining()
+        runtimes=strict_json(self.run('final-logical-runtimes',['xcrun','simctl','list','runtimes','-j']))
+        types=strict_json(self.run('final-device-types',['xcrun','simctl','list','devicetypes','-j']))
+        selections,pairs={},{}
+        for consumer in OWNER_PROFILES[self.context['owner']]['consumers']:
+            selection=original_selection(consumer,runtimes['runtimes'],types['devicetypes'])
+            check_selection(selection,self.service['logical_selection'],consumer)
+            selections[consumer]=selection
+            pairs[consumer]={'selected':str(Path(selection['runtime']['bundlePath']).resolve()),
+                'prepared':str(Path(self.service['logical_selection']['expected_later_lifecycle_bundle_path']).resolve())}
+            self.remaining()
+        self.report['actual_original_first_choice']=selections
+        self.report['resolved_selection_paths']=pairs
+        self.bind_final_context()
+        final=self.snapshot('settlement-final')
+        self.progress=validate_retirement_snapshot_and_progress(retirement_common_primitives(),self.plan,final,self.progress,old_deleted=True,final=True)
+        self.remaining()
+        self.report.update(result='RETIREMENT_VALIDATED_PENDING_PREPARATION_PROCESS_EXIT',
+            delete_attempted_uuids=sorted(self.attempted),delete_invoked_uuids=sorted(self.invoked),
+            watch_observations=self.progress,externally_observed_watch_absent_uuids=sorted(self.plan['watch_observation_ids']),
+            ambient_tvos_final_states=self.progress['ambient_tvos']['states'],
+            live_guard_checkpoint_monotonic=time.monotonic(),
+            limitation='Frozen watch absence is external observation, not owned deletion or a cause claim. The exact ambient tvOS may finish Unusable, Deleting or Absent; its Ready counterpart, shared paths and DMG stat remain protected. No tvOS deletion, content hash, causal attribution, continuous stability, physical-device or application result is inferred.')
+
+
+def validate_retirement_context_records(context, raw):
+    for prefix, root, identity, entries in retirement_context_groups(context):
+        require_contract(raw[prefix+'-root'].decode().strip()==root and raw[prefix+'-cached-diff']==b'',
+                         'Final exact worktree root or complete cached index changed')
+        require_contract(raw[prefix+'-head'].decode().splitlines()==[identity['commit'],identity['tree']],
+                         'Final source/control HEAD/tree differs')
+        tree,index=[],[]
+        for name in sorted(entries):
+            item=entries[name]
+            safe_relative(name)
+            full_sha(item['git_blob'])
+            require_contract(item['git_mode'] in ('100644','100755'),'Invalid bound source Git mode')
+            tree.append((item['git_mode']+' blob '+item['git_blob']+'\t'+name+'\0').encode())
+            index.append((item['git_mode']+' '+item['git_blob']+' 0\t'+name+'\0').encode())
+        require_contract(raw[prefix+'-entries']==b''.join(tree) and raw[prefix+'-index']==b''.join(index),
+                         'Final source/control tree or index proof differs')
+    if context['mode']=='workflow-input':
+        require_contract(raw['final-input-ref'].decode().strip()==context['source']['commit'],
+                         'Final actual workflow input ref resolves to another commit')
+
+
+def retirement_finite_number(value):
+    require_contract(type(value) in (int, float) and value == value and abs(value) < float('inf'),
+                     'Saved clock value must be a finite real number')
+    return value
+
+
+def retirement_raw_commands(directory, commands, root):
+    """Byte-bound saved files only; no process or current runtime inspection."""
+    files, raw, labels = [], {}, []
+    for row in commands:
+        label = row['label']
+        require_contract(type(label) is str and re.fullmatch(r'[a-z0-9-]+', label)
+                         and label not in labels, 'Missing/duplicate/unsafe saved command label')
+        labels.append(label)
+        require_contract(type(row.get('returncode')) is int and row['returncode'] == 0
+                         and row.get('timed_out') is False and type(row.get('pid')) is int and row['pid'] > 0,
+                         'A required command did not actually complete successfully')
+        require_contract(not any(key in row for key in ('failure','error','recording_errors',
+                         'owned_cli_kill_requested','owned_cli_cleanup_error','reaped_returncode',
+                         'owned_process_kill_requested')), 'Success command includes failure/cleanup evidence')
+        for channel in ('stdout','stderr'):
+            name = label + '.' + channel + '.log'
+            require_contract(row[channel+'_file'] == name and Path(name).name == name,
+                             'Raw command filename is not its exact direct filename')
+            content, info = regular_bytes(directory/name, root, maximum=64*1024*1024)
+            require_contract(info == row[channel], 'Saved raw command descriptor differs')
+            files.append(info)
+            if channel == 'stdout':
+                raw[label] = content
+    expected = {r['label']+'.'+channel+'.log' for r in commands for channel in ('stdout','stderr')}
+    require_contract({p.name for p in directory.iterdir()} == expected | {'result.json'},
+                     'Unexpected/missing command or result file in the owned evidence directory')
+    return files, raw
+
+
+def validate_retirement_physical_evidence(sample, preflight, plan):
+    """Independently connect saved stat attestations to raw mounts and stage identity."""
+    data, filesystem, mounts = sample['inventory'], sample['filesystem'], sample['mount_table']
+    require_contract(set(filesystem)==set(data), 'Saved physical filesystem membership differs')
+    for key,row in data.items():
+        require_contract(set(filesystem[key])==set(PATH_FIELDS), 'Runtime filesystem fields differ')
+        for field in PATH_FIELDS:
+            require_contract(filesystem[key][field].get('value')==row.get(field), 'Saved filesystem field names another path')
+    ambient=plan['ambient_tvos']
+    protected=[plan['new_ios_uuid'],plan['ready_watch_uuid'], *([ambient['ready_uuid']] if ambient else [])]
+    require_contract(len(sample['mount_proofs'])==len(protected) and [r['uuid'] for r in sample['mount_proofs']]==protected,
+                     'All frozen independently bound actual protected mounts are required')
+    require_contract(sample['mounted_paths']==[data[key]['mountPath'] for key in protected], 'Protected mounted path list differs')
+    for proof,key in zip(sample['mount_proofs'],protected):
+        row=data[key]
+        mount,bundle=row['mountPath'],row['runtimeBundlePath']
+        mi,bi=filesystem[key]['mountPath'],filesystem[key]['runtimeBundlePath']
+        require_contract(Path(mount).is_absolute() and Path(bundle).is_relative_to(Path(mount))
+                         and '..' not in Path(mount).parts and '..' not in Path(bundle).parts
+                         and len(mounts.get(mount,[]))==1, 'Protected mount/bundle structure differs')
+        require_contract(mi.get('capture')==bi.get('capture')=='observed'
+                         and mi.get('is_directory') is True and bi.get('is_directory') is True
+                         and mi.get('resolved_path')==mount and bi.get('resolved_path')==bundle
+                         and type(mi.get('device')) is int and mi['device']==bi.get('device'),
+                         'Protected recorded filesystem device/resolution differs')
+        require_contract(canonical(proof)==canonical({'uuid':key,'mount':mount,'bundle':bundle,'mount_table':mounts[mount][0],
+            'os_path_ismount':True,'mount_device':mi['device'],'bundle_device':bi['device']}),
+            'Protected actual mount attestation differs from raw mount row or filesystem device')
+    assets=sample['asset_files']
+    expected_assets={'source_dmg_after','staged_dmg_after','ios_asset','watch_asset','watch_dmg'} | ({'tvos_dmg'} if ambient else set())
+    require_contract(set(assets)==expected_assets,
+                     'Retained asset evidence set differs')
+    for key in ('source_dmg_after','staged_dmg_after'):
+        expected=preflight[key]
+        require_contract(assets[key]=={'path':expected['path'],'capture':'observed',
+            'bound_preflight_sha256':expected['sha256'],'additional_content_hash_performed':False,
+            'resolved_path':expected['resolved_path'],'identity':expected['identity'],
+            'is_regular':True,'is_symlink':False,'matches_verified_receipt':True},
+            'Saved retained iOS DMG does not match the exact verified preflight identity')
+    if ambient:
+        require_contract(canonical(assets['tvos_dmg'])==canonical(plan['asset_files']['tvos_dmg']),
+                         'Saved ambient tvOS DMG differs from its replayed initial physical identity')
+    old=plan['old_ios_uuid']
+    original_ios=plan['baseline_filesystem'][old]['parentMountPath']
+    original_watch=plan['baseline_filesystem'][plan['ready_watch_uuid']]['path']
+    for key,path,expected in [('ios_asset',str(IOS_ASSET),original_ios),('watch_asset',WATCH_ASSET,original_watch)]:
+        require_contract(assets[key]==expected and assets[key].get('value')==path
+                         and assets[key].get('resolved_path')==path and assets[key].get('capture')=='observed'
+                         and assets[key].get('is_directory') is True, 'Saved retained asset directory is not the bound filesystem object')
+    watch=assets['watch_dmg']
+    path=Path(watch['path'])
+    identity=watch['identity']
+    require_contract(path.is_absolute() and path.parent==Path(WATCH_ASSET)/'Restore' and path.suffix=='.dmg'
+                     and path.as_posix()==watch['path'] and '..' not in path.parts
+                     and watch.get('resolved_path')==watch['path'] and watch.get('is_regular') is True
+                     and watch.get('is_symlink') is False
+                     and set(identity)=={'device','inode','mode','uid','gid','size','mtime_ns','ctime_ns'}
+                     and all(type(v) is int and v>=0 for v in identity.values()) and identity['size']>0
+                     and identity['device']==assets['watch_asset']['device'], 'Saved watch DMG stat attestation is malformed or misplaced')
+    for path,value in sample['fixed_path_observations'].items():
+        expected={key:rows for key,rows in mounts.items() if Path(key).is_relative_to(Path(path))}
+        require_contract(value['related_mount_rows']==expected,'Saved old-alias mount membership differs from raw mount stdout')
+    return True
+
+
+def validate_retirement_evidence(preflight, service, receipt, context, retirement_dir, root, *, require_terminal=True):
+    """Pure replay of saved phase records; current clock/runtime FS are not used.
+
+    Reading the exact bound evidence files is intentional. No runtime-path
+    resolve/stat, live devices, sleeping, Git or simctl command occurs here.
+    The unsealed option is private to the live phase's first raw readback.
+    """
+    require_contract(retirement_dir == preparation_root(context)/'retirement', 'Wrong phase evidence directory')
+    require_contract(receipt.get('schema') == 'common-runtime-retirement-watch-shared-alias-ambient-tvos-settlement-v6'
+                     and receipt.get('identity') == context
+                     and receipt.get('result') == 'RETIREMENT_VALIDATED_PENDING_PREPARATION_PROCESS_EXIT',
+                     'Phase receipt is not the source-owned successful shared-Watch/ambient-tvos V6 schema/context')
+    require_contract(not any(key in receipt for key in ('failure','final_recording_error','recording_errors')),
+                     'Successful phase contains an error')
+    for key in ('application_consumer_invocations','watch_delete_attempts','watch_delete_invocations',
+                'replacement_targets','service_signals','retries','tvos_delete_attempts','tvos_delete_invocations'):
+        require_contract(type(receipt.get(key)) is int and receipt[key] == 0, 'Forbidden phase action/credit: '+key)
+    require_contract(receipt.get('candidate_credit') is False and receipt.get('product_pass') is False
+                     and receipt.get('source_or_ref_modified') is False and receipt.get('ambient_absence_required') is False, 'Phase claims application credit or source mutation')
+    require_contract(receipt['limits'] == {'metadata_seconds':METADATA_TIMEOUT,
+        'delete_seconds':RETIREMENT_DELETE_SECONDS,'settlement_seconds':RETIREMENT_SETTLEMENT_SECONDS,
+        'max_frozen_targets':RETIREMENT_MAX_TARGETS,'max_ambient_observers':RETIREMENT_MAX_AMBIENT_OBSERVERS,
+        'max_scheduled_snapshots':RETIREMENT_MAX_SCHEDULED_SNAPSHOTS,
+        'sample_interval_seconds':RETIREMENT_SAMPLE_INTERVAL_SECONDS}, 'Phase limits changed')
+    prep=preparation_root(context)
+    p,_=read_bound_json(prep/'staged/preflight-result.json',root,receipt['original_preflight'])
+    s,_=read_bound_json(prep/'service/refresh-result.json',root,receipt['original_service'])
+    require_contract(p==preflight and s==service,'Phase bound different original preparation evidence')
+    help_raw,help_info=regular_bytes(prep/'staged/runtime-help.stderr.log',root)
+    require_contract(help_info==receipt['official_runtime_help'] and b'delete (<identifier>|' in help_raw
+                     and b'--keep-asset' in help_raw and b'Keep the associated mobile asset' in help_raw,
+                     'Official same-run keep-asset operation is not bound')
+    files,raw=retirement_raw_commands(retirement_dir,receipt['commands'],root)
+    snapshots=receipt['snapshots']
+    require_contract(type(snapshots) is list and 4<=len(snapshots)<=RETIREMENT_MAX_SCHEDULED_SNAPSHOTS+3,
+                     'Phase snapshot count differs')
+    count=len(snapshots)-3
+    labels=['initial','old-ios-before',*['settlement-'+str(n).zfill(3) for n in range(1,count+1)],'settlement-final']
+    require_contract([r['label'] for r in snapshots]==labels,'Snapshot order/sequence differs')
+    expected=[('simctl-path',['xcrun','--find','simctl'])]
+    def add_snapshot(label):
+        expected.extend([(label+'-runtimes',['xcrun','simctl','runtime','list','-j']),
+                         (label+'-devices',['xcrun','simctl','list','devices','-j']),
+                         (label+'-mounts',['/sbin/mount'])])
+    add_snapshot('initial'); add_snapshot('old-ios-before')
+    old=preflight['selected_original_runtime']['target_uuid']
+    expected.append(('old-ios-delete',['xcrun','simctl','runtime','delete',old,'--keep-asset']))
+    for label in labels[2:-1]:
+        add_snapshot(label)
+    expected.extend([('final-logical-runtimes',['xcrun','simctl','list','runtimes','-j']),
+                     ('final-device-types',['xcrun','simctl','list','devicetypes','-j'])])
+    expected.extend(retirement_context_commands(context))
+    add_snapshot('settlement-final')
+    require_contract([(r['label'],r['argv']) for r in receipt['commands']]==expected,
+                     'Raw command allowlist/order is incomplete, additional or changed')
+    rows={r['label']:r for r in receipt['commands']}
+    clock=receipt['settlement_clock']
+    started=retirement_finite_number(clock['started_monotonic'])
+    deadline=retirement_finite_number(clock['deadline_monotonic'])
+    require_contract(clock=={'starts_after_successful_command':'old-ios-delete','command_returncode':0,
+        'started_monotonic':started,'deadline_monotonic':started+RETIREMENT_SETTLEMENT_SECONDS,
+        'budget_seconds':RETIREMENT_SETTLEMENT_SECONDS,'reset_count':0}
+        and started==rows['old-ios-delete']['command_finished_monotonic'], 'Single settlement clock is not tied to successful delete completion')
+    last=None
+    deletion_index=[r['label'] for r in receipt['commands']].index('old-ios-delete')
+    for index,row in enumerate(receipt['commands']):
+        launch=retirement_finite_number(row['launched_monotonic'])
+        finish=retirement_finite_number(row['command_finished_monotonic'])
+        command_deadline=retirement_finite_number(row['command_deadline_monotonic'])
+        requested=RETIREMENT_DELETE_SECONDS if row['label']=='old-ios-delete' else METADATA_TIMEOUT
+        expected_deadline=min(launch+requested,deadline) if index>deletion_index else launch+requested
+        require_contract(row['requested_timeout_seconds']==requested and command_deadline==expected_deadline
+            and row['effective_timeout_seconds']==command_deadline-launch and command_deadline>launch
+            and launch<=finish<=command_deadline and (last is None or launch>=last),
+            'Saved command crossed its original/effective shared deadline or time order')
+        remaining=deadline-launch if index>deletion_index else None
+        require_contract(row['settlement_remaining_at_launch_seconds']==remaining,'Shared remaining budget changed')
+        if row['label']=='old-ios-delete':
+            check_retirement_delete_request(receipt['frozen_plan'],set(),set(),old,row['argv'],requested)
+            require_contract(row.get('mutation_attempted') is True and row.get('mutation_invoked') is True,
+                             'Actual old-iOS mutation attempt/invocation is missing')
+        else:
+            require_contract('mutation_attempted' not in row and 'mutation_invoked' not in row,
+                             'Metadata row carries a mutation')
+        last=finish
+    require_contract(receipt['delete_attempted_uuids']==receipt['delete_invoked_uuids']
+                     ==receipt['own_delete_completed_uuids']==[old], 'Exactly one old-iOS deletion must complete')
+    simctl=receipt['simctl_binding']
+    require_contract(raw['simctl-path'].decode().strip()==simctl['actual_path']
+                     and simctl['resolved_path']==preflight['toolchain']['resolved_tools']['simctl'],
+                     'Recorded live simctl resolution differs from original toolchain')
+    for sample in snapshots:
+        label=sample['label']
+        require_contract(canonical(inventory(strict_json(raw[label+'-runtimes'])))==canonical(sample['inventory'])
+                         and strict_json(raw[label+'-devices'])==sample['raw_devices']
+                         and retirement_mount_table(raw[label+'-mounts'])==sample['mount_table']
+                         and sorted(sample['mount_table'])==sample['mount_paths'], 'Snapshot does not match exact raw streams')
+        require_contract(retirement_finite_number(sample['started_monotonic'])<=rows[label+'-runtimes']['launched_monotonic']
+            and retirement_finite_number(sample['finished_monotonic'])>=rows[label+'-mounts']['command_finished_monotonic'],
+            'Snapshot clock does not enclose its raw metadata')
+        require_contract(sample['started_monotonic']<=sample['finished_monotonic'], 'Snapshot time order regressed')
+        if label.startswith('settlement-'):
+            require_contract(started<=sample['started_monotonic']<=sample['finished_monotonic']<deadline,
+                             'Settlement snapshot crossed its single shared clock')
+    for left,right in zip(snapshots,snapshots[1:]):
+        require_contract(left['finished_monotonic']<=right['started_monotonic'], 'Snapshot event order overlapped or regressed')
+    require_contract(rows['simctl-path']['command_finished_monotonic']<=snapshots[0]['started_monotonic']
+                     and snapshots[1]['finished_monotonic']<=rows['old-ios-delete']['launched_monotonic']
+                     and snapshots[-2]['finished_monotonic']<=rows['final-logical-runtimes']['launched_monotonic'],
+                     'Snapshot filesystem/guard work crossed the following phase boundary')
+    common=retirement_common_primitives()
+    plan=replay_retirement_plan(common,preflight,service,snapshots[0],receipt['frozen_plan'])
+    for sample in snapshots:
+        validate_retirement_physical_evidence(sample,preflight,plan)
+    progress=initial_retirement_progress(plan)
+    progress=validate_retirement_snapshot_and_progress(common,plan,snapshots[1],progress,old_deleted=False)
+    for index,sample in enumerate(snapshots[2:-1]):
+        if index:
+            require_contract(not all(v=='Absent' for v in progress['watch_states'].values()),
+                             'Settlement continued after completion instead of its first terminal observation')
+        progress=validate_retirement_snapshot_and_progress(common,plan,sample,progress,old_deleted=True)
+    require_contract(all(value=='Absent' for value in progress['watch_states'].values()),
+                     'Scheduled settlement did not reach its actual terminal break condition before final selection')
+    require_contract(len(receipt['intervals'])==count-1,'Fixed read-only interval count differs')
+    for index,interval in enumerate(receipt['intervals']):
+        left,right=snapshots[index+2:index+4]
+        a,b=retirement_finite_number(interval['started_monotonic']),retirement_finite_number(interval['finished_monotonic'])
+        require_contract(interval['after_snapshot']==left['label']
+                         and interval['requested_seconds']==RETIREMENT_SAMPLE_INTERVAL_SECONDS
+                         and left['finished_monotonic']<=a and b-a>=RETIREMENT_SAMPLE_INTERVAL_SECONDS
+                         and b<=right['started_monotonic'] and b<deadline, 'Scheduled interval changed, reset or overran')
+    final=snapshots[-1]
+    progress=validate_retirement_snapshot_and_progress(common,plan,final,progress,old_deleted=True,final=True)
+    require_contract(canonical(progress)==canonical(receipt['watch_observations'])
+                     and canonical(receipt['ambient_tvos_final_states'])==canonical(progress['ambient_tvos']['states'])
+                     and receipt['externally_observed_watch_absent_uuids']==sorted(plan['watch_observation_ids']),
+                     'Final external-watch disposition or path ledger differs from replay')
+    validate_retired_host_invariants(plan,progress,final)
+    runtimes=strict_json(raw['final-logical-runtimes'])['runtimes']
+    types=strict_json(raw['final-device-types'])['devicetypes']
+    consumers=OWNER_PROFILES[context['owner']]['consumers']
+    require_contract(set(receipt['actual_original_first_choice'])==set(receipt['resolved_selection_paths'])==set(consumers),
+                     'Final selection omitted or substituted an owner consumer')
+    resolved=final['filesystem'][plan['new_ios_uuid']]['runtimeBundlePath']['resolved_path']
+    for consumer in consumers:
+        selection=original_selection(consumer,runtimes,types)
+        require_contract(selection==receipt['actual_original_first_choice'][consumer], 'Saved first choice differs from raw original order')
+        same_logical_runtime(selection['runtime'],service['logical_selection']['logical_runtime'])
+        expected_device=service['logical_selection']['device_type']
+        if consumer in ('icon-ui','integrated-simulator'):
+            expected_device=expected_device['identifier']
+        require_contract(selection['device']==expected_device,'Saved original device form differs')
+        # Pure saved replay: the live check_selection call recorded both resolved
+        # paths. Do not call it here; its Path.resolve inspects the current host.
+        require_contract(receipt['resolved_selection_paths'][consumer]=={'selected':resolved,'prepared':resolved},
+                         'Recorded live resolved paths are not the final selected filesystem object')
+    validate_retirement_context_records(context,raw)
+    binding=receipt['final_context_binding']
+    require_contract(binding['identity']==context and binding['actual_environment']==context['consumer']
+                     and binding['workflow_input_binding']==context.get('workflow_input_binding'),
+                     'Final source/control/caller binding changed')
+    expected_input=context['original_restorer_binding']['receipt'] if context['mode']=='candidate' else None
+    require_contract(binding['candidate_restorer_receipt']==expected_input,'Final candidate restorer input binding is missing')
+    if expected_input is not None:
+        require_contract(regular_bytes(Path(expected_input['path']),root,maximum=64*1024*1024)[1]==expected_input,
+                         'The exact candidate restorer evidence receipt changed')
+    context_last=retirement_context_commands(context)[-1][0]
+    require_contract(rows[context_last]['command_finished_monotonic']<=retirement_finite_number(binding['validated_monotonic'])
+                     <=final['started_monotonic'],'Final context check is outside its declared event order')
+    guard=retirement_finite_number(receipt['live_guard_checkpoint_monotonic'])
+    require_contract(final['finished_monotonic']<=guard<deadline,'Terminal live guard crossed the one deadline')
+    if require_terminal:
+        terminal=retirement_finite_number(receipt['raw_readback_validated_monotonic'])
+        require_contract(guard<=terminal<deadline,'Complete raw readback was not validated within the shared budget')
+    return files
+
+
+def retire_old_ios_and_observe_watch(request, context, preflight, service, output, descriptors):
+    root=Path(context['source_root'])
+    require_contract(output==preparation_root(context)/'retirement' and not output.exists(),
+                     'Retirement must use one fresh source-owned phase directory')
+    unlinked_path(output,root).mkdir(mode=0o700)
+    phase=RetirementPhase(request,context,preflight,service,output,descriptors)
+    failure=None
+    try:
+        phase.execute()
+        phase.report['finished_unix']=time.time()
+        phase.save()
+        saved,_=read_bound_json(output/'result.json',root)
+        validate_retirement_evidence(preflight,service,saved,context,output,root,require_terminal=False)
+        phase.remaining()
+        phase.report['raw_readback_validated_monotonic']=time.monotonic()
+        phase.remaining()
+        phase.save()
+        saved,info=read_bound_json(output/'result.json',root)
+        files=validate_retirement_evidence(preflight,service,saved,context,output,root)
+        phase.remaining()
+        return saved,info,files
+    except Exception as error:
+        failure=error
+        phase.report.update(result='RETIREMENT_FAILED_CLOSED',failure={'type':type(error).__name__,'message':str(error)},
+                            delete_attempted_uuids=sorted(phase.attempted),delete_invoked_uuids=sorted(phase.invoked),
+                            finished_unix=time.time())
+        try:
+            phase.save()
+        except Exception as recording:
+            failure=recording_failure(failure,recording,'retirement-failure-save',phase.report)
+        raise failure
+
+
+def post_retirement_physical_command(output, label, argv, root):
+    allowed={'runtime-images':['xcrun','simctl','runtime','list','-j'],'mounts':['/sbin/mount']}
+    require_contract(allowed.get(label)==argv,'Post-retirement physical reader has only its two read operations')
+    row={'label':label,'argv':argv,'requested_timeout_seconds':METADATA_TIMEOUT,
+         'started_unix':time.time(),'stdout_file':label+'.stdout.log','stderr_file':label+'.stderr.log',
+         'timed_out':False,'returncode':None}
+    process,failure=None,None
+    try:
+        with (output/row['stdout_file']).open('xb') as out,(output/row['stderr_file']).open('xb') as err:
+            launch=time.monotonic()
+            row.update(launched_monotonic=launch,command_deadline_monotonic=launch+METADATA_TIMEOUT)
+            process=subprocess.Popen(argv,cwd=root,stdout=out,stderr=err,env=dict(os.environ,LC_ALL='C',TZ='UTC'))
+            row['pid']=process.pid
+            remaining=row['command_deadline_monotonic']-time.monotonic()
+            if remaining<=0:
+                raise subprocess.TimeoutExpired(argv,METADATA_TIMEOUT)
+            row['returncode']=process.wait(timeout=remaining)
+            row['command_finished_monotonic']=time.monotonic()
+            if row['returncode']:
+                raise subprocess.CalledProcessError(row['returncode'],argv)
+            require_contract(row['command_finished_monotonic']<=row['command_deadline_monotonic'],'Physical read exceeded metadata cap')
+    except Exception as error:
+        failure=error
+        row['failure']={'type':type(error).__name__,'message':str(error)}
+        row['timed_out']=isinstance(error,subprocess.TimeoutExpired)
+        if process is not None and process.returncode is None:
+            try:
+                process.kill()
+                row['owned_cli_kill_requested']=True
+                row['reaped_returncode']=process.wait(timeout=1)
+            except Exception as cleanup:
+                row['owned_cli_cleanup_error']=str(cleanup)
+    finally:
+        row['finished_unix']=time.time()
+        for channel in ('stdout','stderr'):
+            try:
+                _,row[channel]=regular_bytes(output/row[channel+'_file'],root,maximum=64*1024*1024)
+            except Exception as error:
+                row.setdefault('recording_errors',[]).append(str(error))
+                failure=failure or error
+    return row,failure
+
+
+def selected_runtime_usage_state(record):
+    """The sole consumer-usage field has an exact UTC-second spelling."""
+    if 'lastUsedAt' not in record:
+        return {'present': False, 'value': None, 'utc_second': None}
+    value = record['lastUsedAt']
+    require_contract(type(value) is str
+                     and re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z', value),
+                     'Selected iOS lastUsedAt must be an exact UTC-second string')
+    parsed = datetime.strptime(value, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+    second = int(parsed.timestamp())
+    require_contract(parsed.isoformat(timespec='seconds') == value[:-1] + '+00:00',
+                     'Selected iOS lastUsedAt is not a canonical valid UTC timestamp')
+    return {'present': True, 'value': value, 'utc_second': second}
+
+
+def selected_runtime_usage_event(previous, observed, consumer, phase, label, finished, preceding):
+    """Replay one boundary using recorded times; never consult a live clock."""
+    for state in (previous, observed):
+        require_contract(type(state) is dict and set(state) == {'present', 'value', 'utc_second'},
+                         'Selected iOS usage state shape differs')
+        expected = selected_runtime_usage_state({'lastUsedAt': state['value']} if state['present'] is True else {})
+        require_contract(canonical(state) == canonical(expected), 'Selected iOS usage state is not typed canonical data')
+    finish = retirement_finite_number(finished)
+    require_contract(phase in ('before', 'after'), 'Selected iOS usage boundary is unknown')
+    require_contract(observed['present'] is False or observed['utc_second'] <= int(finish // 1),
+                     'Selected iOS usage is in the future of its actual observation')
+    if preceding is not None:
+        require_contract(retirement_finite_number(preceding['observed_finished_unix']) <= finish,
+                         'Selected iOS usage observation clock regressed')
+    changed = canonical(previous) != canonical(observed)
+    window = None
+    if phase == 'before':
+        require_contract(not changed, 'Selected iOS usage changed before the original consumer')
+    else:
+        require_contract(preceding is not None and preceding['consumer'] == consumer
+                         and preceding['phase'] == 'before',
+                         'Selected iOS AFTER requires the same consumer actual BEFORE')
+        start = retirement_finite_number(preceding['observed_finished_unix'])
+        window = {'before_finished_unix': start, 'after_finished_unix': finish,
+                  'earliest_utc_second': int(start // 1), 'latest_utc_second': int(finish // 1),
+                  'precision': 'UTC whole-second bucket; floor both actual observation endpoints; no extra tolerance'}
+        if changed:
+            require_contract(observed['present'] is True, 'Selected iOS usage may not disappear')
+            require_contract(previous['present'] is False or observed['utc_second'] > previous['utc_second'],
+                             'Selected iOS usage regressed or changed without increasing')
+            require_contract(window['earliest_utc_second'] <= observed['utc_second'] <= window['latest_utc_second'],
+                             'Selected iOS usage lies outside the actual consumer observation interval')
+    return {'consumer': consumer, 'phase': phase, 'label': label, 'observed_finished_unix': finish,
+            'previous_usage': previous, 'observed_usage': observed, 'changed': changed,
+            'changed_value_interval': window}
+
+
+def validate_consumer_retired_host_invariants(plan, final_ledger, observation, context, relative_output):
+    """Only selected staged iOS usage can advance at a bound consumer AFTER."""
+    profile = OWNER_PROFILES[context['owner']]
+    consumers = list(profile['consumers'])
+    require_contract(consumers == ['integrated-ui', 'integrated-simulator'] if context['owner'] == 'integrated'
+                     else len(consumers) == 1, 'Original owner consumer order differs')
+    boundaries = [(consumer, phase) for consumer in consumers for phase in ('before', 'after')]
+    labels = [str(Path(profile['preparation_root']) / 'consumers' / consumer / (phase + '-host'))
+              for consumer, phase in boundaries]
+    require_contract(type(relative_output) is str and relative_output in labels
+                     and observation.get('label') == relative_output,
+                     'Selected iOS usage must be tied to an exact owner consumer boundary')
+    boundary_index = labels.index(relative_output)
+    consumer, phase = boundaries[boundary_index]
+    key = plan['new_ios_uuid']
+    frozen, current = plan['baseline_inventory'][key], observation['inventory'][key]
+    require_contract(key in plan['protected_ids'] and key not in plan['target_ids']
+                     and frozen.get('identifier') == key and frozen.get('runtimeIdentifier') == IOS
+                     and frozen.get('kind') == 'Disk Image' and frozen.get('state') == 'Ready'
+                     and frozen.get('signatureState') == 'Verified',
+                     'Consumer usage exception requires the frozen selected verified staged iOS')
+    require_contract(canonical({k: v for k, v in current.items() if k != 'lastUsedAt'})
+                     == canonical({k: v for k, v in frozen.items() if k != 'lastUsedAt'}),
+                     'Selected iOS changed outside its single usage field')
+    baseline_usage = selected_runtime_usage_state(frozen)
+    current_usage = selected_runtime_usage_state(current)
+    path_ledger = strict_json(canonical(final_ledger))
+    usage = path_ledger.pop('selected_runtime_usage', None)
+    history = []
+    previous = baseline_usage
+    if boundary_index == 0:
+        require_contract(usage is None and 'selected_runtime_usage' not in final_ledger
+                         and canonical(current) == canonical(frozen),
+                         'First consumer BEFORE must retain the whole frozen selected runtime record')
+    else:
+        require_contract(type(usage) is dict
+                         and set(usage) == {'schema', 'owner', 'selected_uuid', 'baseline_usage', 'events'}
+                         and usage['schema'] == 'common-selected-ios-consumer-usage-ledger-v1'
+                         and usage['owner'] == context['owner'] and usage['selected_uuid'] == key
+                         and canonical(usage['baseline_usage']) == canonical(baseline_usage)
+                         and type(usage['events']) is list and len(usage['events']) == boundary_index,
+                         'Selected iOS usage lacks its exact preceding consumer ledger')
+        for index, saved in enumerate(usage['events']):
+            require_contract(type(saved) is dict and set(saved) == {
+                'consumer', 'phase', 'label', 'observed_finished_unix', 'previous_usage',
+                'observed_usage', 'changed', 'changed_value_interval'}, 'Saved usage event shape differs')
+            event = selected_runtime_usage_event(previous, saved['observed_usage'], *boundaries[index],
+                labels[index], saved['observed_finished_unix'], None if not history else history[-1])
+            require_contract(canonical(saved) == canonical(event), 'Saved selected iOS usage transition differs from replay')
+            history.append(event)
+            previous = event['observed_usage']
+    event = selected_runtime_usage_event(previous, current_usage, consumer, phase, relative_output,
+                                        observation['finished_unix'], None if not history else history[-1])
+    # This local expectation copy changes no actual frozen plan/raw receipt.
+    # The full selected-row comparison above permits only the checked usage field;
+    # the original strict guard below retains every other raw/physical invariant.
+    expected_plan = strict_json(canonical(plan))
+    expected_plan['baseline_inventory'][key] = strict_json(canonical(current))
+    updated = validate_retired_host_invariants(expected_plan, path_ledger, observation)
+    updated['selected_runtime_usage'] = {'schema': 'common-selected-ios-consumer-usage-ledger-v1',
+        'owner': context['owner'], 'selected_uuid': key, 'baseline_usage': baseline_usage,
+        'events': [*history, event]}
+    return updated
+
+
+def validate_post_retirement_observation(receipt, retirement, context, binding, output, root, prior_ledger=None):
+    require_contract(receipt.get('schema')=='common-runtime-retired-host-selected-ios-usage-observation-v1'
+                     and receipt.get('identity')==context and receipt.get('preparation_binding')==binding
+                     and receipt.get('result')=='RETIRED_HOST_INVARIANTS_OBSERVED'
+                     and not any(key in receipt for key in ('failure','recording_errors','final_recording_error')),
+                     'Terminal host observation is missing/failed or bound to another preparation')
+    require_contract(receipt.get('device_inventory_read') is False and receipt.get('mutation_attempts')==0,
+                     'Before/after may not apply preparation device guards or perform mutations')
+    require_contract(receipt.get('candidate_credit') is False and receipt.get('product_pass') is False,
+                     'Terminal observation carries false application credit')
+    commands=receipt['commands']
+    require_contract([(r['label'],r['argv']) for r in commands]==[
+        ('runtime-images',['xcrun','simctl','runtime','list','-j']),('mounts',['/sbin/mount'])],
+        'Terminal physical observation command scope changed')
+    files,raw=retirement_raw_commands(output,commands,root)
+    for row in commands:
+        launch=retirement_finite_number(row['launched_monotonic'])
+        finish=retirement_finite_number(row['command_finished_monotonic'])
+        require_contract(row['requested_timeout_seconds']==METADATA_TIMEOUT
+                         and row['command_deadline_monotonic']==launch+METADATA_TIMEOUT
+                         and launch<=finish<=row['command_deadline_monotonic'], 'Physical read deadline changed')
+        require_contract(retirement_finite_number(receipt['started_unix'])<=retirement_finite_number(row['started_unix'])
+                         <=retirement_finite_number(row['finished_unix'])<=retirement_finite_number(receipt['finished_unix']),
+                         'Physical command lies outside its terminal receipt time interval')
+    require_contract(commands[0]['command_finished_monotonic']<=commands[1]['launched_monotonic'],
+                     'Terminal physical commands overlap or are out of order')
+    observed=receipt['observation']
+    require_contract('devices' not in observed and 'raw_devices' not in observed
+                     and canonical(inventory(strict_json(raw['runtime-images'])))==canonical(observed['inventory'])
+                     and retirement_mount_table(raw['mounts'])==observed['mount_table']
+                     and observed['mount_paths']==sorted(observed['mount_table']),
+                     'Terminal observation differs from raw runtime/mount evidence')
+    require_contract(observed.get('label')==str(output.relative_to(root))
+                     and retirement_finite_number(commands[-1]['finished_unix'])
+                     <=retirement_finite_number(observed['finished_unix'])
+                     <=retirement_finite_number(receipt['finished_unix']),
+                     'Terminal ambient ledger lacks its actual boundary label or observation time')
+    prior=retirement['watch_observations'] if prior_ledger is None else prior_ledger
+    require_contract(canonical(receipt['prior_terminal_path_ledger'])==canonical(prior),'Terminal observation changed its preceding path ledger')
+    require_contract(canonical(validate_consumer_retired_host_invariants(retirement['frozen_plan'],prior,observed,context,str(output.relative_to(root))))
+                     ==canonical(receipt['terminal_path_ledger']),'Terminal missing-path accumulation differs')
+    # The terminal observation shares the independently checked phase assets,
+    # devices and raw mount relationships; preparation device guards are absent.
+    for proof in observed['mount_proofs']:
+        key=proof['uuid']
+        require_contract(proof['os_path_ismount'] is True
+                         and observed['mount_table'].get(proof['mount'])==[proof['mount_table']]
+                         and proof['mount_device']==proof['bundle_device']==observed['filesystem'][key]['mountPath']['device']
+                         ==observed['filesystem'][key]['runtimeBundlePath']['device'],
+                         'Terminal actual mount attestation differs from raw mount/FS evidence')
+    for path,value in observed['fixed_path_observations'].items():
+        require_contract(value['related_mount_rows']=={key:rows for key,rows in observed['mount_table'].items()
+                                                      if Path(key).is_relative_to(Path(path))},
+                         'Terminal alias mount membership differs from raw evidence')
+    return files
+
+
+def capture_post_retirement_observation(context, preflight, retirement, binding, output, prior_ledger=None):
+    root=Path(context['source_root'])
+    require_contract(not output.exists(),'Terminal host observation is once per consumer boundary')
+    unlinked_path(output,root).mkdir()
+    prior=retirement['watch_observations'] if prior_ledger is None else prior_ledger
+    report={'schema':'common-runtime-retired-host-selected-ios-usage-observation-v1','identity':context,
+            'preparation_binding':binding,'started_unix':time.time(),'commands':[],
+            'prior_terminal_path_ledger':prior,
+            'device_inventory_read':False,'mutation_attempts':0,'product_pass':False,'candidate_credit':False}
+    failure=None
+    try:
+        for label,argv in [('runtime-images',['xcrun','simctl','runtime','list','-j']),('mounts',['/sbin/mount'])]:
+            row,error=post_retirement_physical_command(output,label,argv,root)
+            report['commands'].append(row)
+            if error is not None:
+                raise error
+        data=inventory(raw_command_json(output,'runtime-images',root))
+        mounts=retirement_mount_table(regular_bytes(output/'mounts.stdout.log',root)[0])
+        watch_dmg=Path(retirement['frozen_plan']['asset_files']['watch_dmg']['path'])
+        report['observation']=retirement_filesystem_observation(data,mounts,preflight,retirement['frozen_plan'],watch_dmg,lambda:None)
+        report['observation'].update(label=str(output.relative_to(root)), finished_unix=time.time())
+        report['terminal_path_ledger']=validate_consumer_retired_host_invariants(retirement['frozen_plan'],prior,report['observation'],context,str(output.relative_to(root)))
+        report['result']='RETIRED_HOST_INVARIANTS_OBSERVED'
+    except Exception as error:
+        failure=error
+        report['result']='RETIRED_HOST_OBSERVATION_FAILED'
+        report['failure']={'type':type(error).__name__,'message':str(error)}
+    report['finished_unix']=time.time()
+    try:
+        info=write_new_json(output/'result.json',report,root)
+        if failure is None:
+            saved,_=read_bound_json(output/'result.json',root,info)
+            validate_post_retirement_observation(saved,retirement,context,binding,output,root,prior)
+    except Exception as error:
+        failure=recording_failure(failure,error,'terminal-host-readback',report)
+    if failure is not None:
+        raise failure
+    return info
+
+
+def retirement_preceding_consumer_ledger(context,retirement,binding,consumer):
+    """Bind the UI before→after ledger before Integrated Simulator may begin."""
+    if consumer!='integrated-simulator':
+        return retirement['watch_observations'],None
+    root,prep=Path(context['source_root']),preparation_root(context)
+    output=prep/'consumers/integrated-ui'
+    after,info=read_bound_json(output/'after.json',root)
+    require_contract(after.get('schema')=='common-runtime-consumer-after-v2'
+                     and after['identity']==context and after['consumer']=='integrated-ui'
+                     and type(after['original_status']) is int and after['original_status']==0
+                     and type(after['effective_status']) is int and after['effective_status']==0
+                     and after['result']=='ORIGINAL_RECEIPT_MATCHED'
+                     and not any(key in after for key in ('failure','recording_errors','final_recording_error'))
+                     and after['preparation_binding']==binding and after['retirement_binding']==binding['retirement'],
+                     'Second Integrated consumer requires successful first consumer and identical V2 binding')
+    before,_=read_bound_json(output/'before.json',root,after['before_binding'])
+    require_contract(before['schema']=='common-runtime-consumer-before-v2' and before['identity']==context
+                     and before['consumer']=='integrated-ui' and before['result']=='BOUND_BEFORE_ORIGINAL_CONSUMER'
+                     and not any(key in before for key in ('failure','recording_errors','final_recording_error'))
+                     and before['preparation_binding']==binding and before['retirement_binding']==binding['retirement'],
+                     'Preceding UI before binding differs')
+    initial,_=read_bound_json(output/'before-host/result.json',root,before['terminal_host_observation'])
+    validate_post_retirement_observation(initial,retirement,context,binding,output/'before-host',root)
+    terminal,_=read_bound_json(output/'after-host/result.json',root,after['terminal_host_observation'])
+    validate_post_retirement_observation(terminal,retirement,context,binding,output/'after-host',root,initial['terminal_path_ledger'])
+    return terminal['terminal_path_ledger'],info
+
+
+PRECONDITIONING_MODULE_BASENAME = "runtime_preconditioning.py"
+PRECONDITIONING_MODULE_SHA256 = "0a72fe7df8bb29748b695c1ea1b424509d6b6ad3ea455f7d90806a2db128eb8a"
+
+
+def load_preconditioning_module(context):
+    import types
+    root = Path(context['source_root'])
+    for directory in {root, *([Path(context['control_root'])] if context['control_root'] is not None else [])}:
+        git_read(directory, 'diff', '--no-ext-diff', '--no-textconv', '--exit-code', 'HEAD', '--')
+        git_read(directory, 'diff', '--cached', '--no-ext-diff', '--no-textconv', '--exit-code', 'HEAD', '--')
+    paths = [str(Path(relative).with_name(PRECONDITIONING_MODULE_BASENAME))
+             for relative in OWNER_PROFILES[context['owner']]['helper_paths']]
+    active = str(Path(context['own_helper_relative_path']).with_name(PRECONDITIONING_MODULE_BASENAME))
+    require_contract(active == paths[0] and len(set(paths)) == len(paths), 'Wrong active owner module path')
+    copies, sources = {}, {}
+    for relative in paths:
+        raw, info = tracked_regular_file(root, context['source']['commit'], relative, PRECONDITIONING_MODULE_SHA256)
+        require_contract(info['mode'] == 0o644 and (root / relative).lstat().st_nlink == 1,
+                         'Every source preconditioning module copy must be exact unlinked0644')
+        copies[relative], sources[relative] = info, raw
+    require_contract(len({(info['sha256'], info['git_blob'], info['git_mode']) for info in copies.values()}) == 1,
+                     'Owned/inherited preconditioning module copies differ in exact blob/mode')
+    binding = {'schema': 'source-runtime-preconditioning-module-set-v1', 'active_relative_path': active,
+               'sha256': PRECONDITIONING_MODULE_SHA256, 'copies': copies}
+    common_raw, common_info = tracked_regular_file(root, context['source']['commit'], context['own_helper_relative_path'],
+                                                   context['own_helper_sha256'])
+    require_contract(common_info == context['helper_git_entries'][context['own_helper_relative_path']],
+                     'Actual common descriptor changed before source module import')
+    module = types.ModuleType('_source_owned_runtime_preconditioning')
+    module.__file__ = str(root / active)
+    exec(compile(sources[active], module.__file__, 'exec'), vars(module))
+    module.validate_context_axes(context, os.environ)
+    return module, binding, common_raw
+
+
+def validate_preconditioning_receipt(report, context):
+    root, output = Path(context['source_root']), preparation_root(context)
+    module, module_info, common_raw = load_preconditioning_module(context)
+    require_contract(report['preconditioning_module'] == module_info,
+                     'Preparation references another source preconditioning module')
+    value, info = read_bound_json(output / 'preconditioning/precondition.json', root, report['preconditioning_result'])
+    raw_files = module.validate_evidence(value, context, module_info, common_raw, root, output / 'preconditioning')
+    require_contract(raw_files == report['preconditioning_raw_files'],
+                     'Complete preparation observation/scan raw replay inventory changed')
+    return info
+
+
+def validate_preparation_success_shape(report, context):
+    phases = report.get('phase_function_return_codes')
+    require_contract(report.get('schema') == 'common-runtime-preparation-v3' and report.get('identity') == context
+        and report.get('result') == 'PREPARATION_FUNCTIONS_COMPLETED_PENDING_ACTUAL_PROCESS_EXIT'
+        and type(phases) is dict and set(phases) == {'preconditioning', 'staged', 'service', 'retirement'}
+        and all(type(code) is int and code == 0 for code in phases.values())
+        and type(report.get('preconditioning_result')) is dict and type(report.get('preconditioning_module')) is dict
+        and type(report.get('preconditioning_raw_files')) is list and report['preconditioning_raw_files']
+        and report.get('candidate_credit') is False and report.get('product_pass') is False
+        and type(report.get('lifecycle_executions')) is int and report['lifecycle_executions'] == 0
+        and report.get('actual_helper_process_exit_requires_separate_caller_binding') is True
+        and not any(key in report for key in ('failure', 'recording_errors', 'final_recording_error')),
+        'V3 preparation is incomplete, failed or carries false application credit')
+
+
 def prepare_environment(request, context):
-    root = Path(context["source_root"])
+    root = Path(context['source_root'])
     output = preparation_root(context)
-    require_contract(not output.exists(), "Preparation is once per source/control/run/attempt/job; no reuse or retry")
+    require_contract(not output.exists(), 'Preparation is once per source/control/run/attempt/job; no reuse or retry')
     output.mkdir(parents=True)
-    report = {"schema": "common-runtime-preparation-v1", "identity": context, "request": request,
-              "started_unix": time.time(), "phase_function_return_codes": {}, "product_pass": False,
-              "candidate_credit": False, "lifecycle_executions": 0,
-              "actual_helper_process_exit_requires_separate_caller_binding": True}
+    report = {'schema': 'common-runtime-preparation-v3', 'identity': context, 'request': request,
+              'started_unix': time.time(), 'phase_function_return_codes': {}, 'product_pass': False,
+              'candidate_credit': False, 'lifecycle_executions': 0,
+              'actual_helper_process_exit_requires_separate_caller_binding': True}
     failure = None
     try:
-        stage_installed_runtime(context, output / "staged")
-        report["phase_function_return_codes"]["staged"] = 0
+        started = time.monotonic()
+        module, module_info, common_raw = load_preconditioning_module(context)
+        report['preconditioning_module'] = module_info
+        precondition, observed_info, raw_files = module.run_source_preconditioning(context, module_info, common_raw,
+                                                                                   output / 'preconditioning', started)
+        raw, info = regular_bytes(output / 'preconditioning/precondition.json', root, maximum=64 * 1024 * 1024)
+        require_contract({key: info[key] for key in ('path', 'bytes', 'sha256')} == observed_info
+                         and strict_json(raw) == precondition
+                         and time.monotonic() < precondition['final_active_phase_budget']['deadline_monotonic'],
+                         'Common receipt binding changed or exceeded the precondition active phase')
+        report['preconditioning_result'], report['preconditioning_raw_files'] = info, raw_files
+        report['phase_function_return_codes']['preconditioning'] = 0
         recheck_context(request, context)
-        refresh_owned_service(context, output / "staged", output / "service")
-        report["phase_function_return_codes"]["service"] = 0
+        stage_installed_runtime(context, output / 'staged')
+        report['phase_function_return_codes']['staged'] = 0
         recheck_context(request, context)
-        p, pinfo = read_bound_json(output / "staged/preflight-result.json", root)
-        s, sinfo = read_bound_json(output / "service/refresh-result.json", root)
+        refresh_owned_service(context, output / 'staged', output / 'service')
+        report['phase_function_return_codes']['service'] = 0
+        recheck_context(request, context)
+        p, pinfo = read_bound_json(output / 'staged/preflight-result.json', root)
+        s, sinfo = read_bound_json(output / 'service/refresh-result.json', root)
         validate_preflight(p, phase_context(context))
-        report["staged_raw_command_files"] = command_files(output / "staged", p, root)
-        report["service_raw_command_files"] = validate_service_evidence(p, s, context, output / "staged", output / "service", root)
-        report["staged_result"], report["service_result"] = pinfo, sinfo
-        report["logical_selection"] = s["logical_selection"]
-        report["result"] = "PREPARATION_FUNCTIONS_COMPLETED_PENDING_ACTUAL_PROCESS_EXIT"
+        report['staged_raw_command_files'] = command_files(output / 'staged', p, root)
+        report['service_raw_command_files'] = validate_service_evidence(p, s, context, output / 'staged', output / 'service', root)
+        report['staged_result'], report['service_result'] = pinfo, sinfo
+        report['logical_selection'] = s['logical_selection']
+        retirement, rinfo, raw = retire_old_ios_and_observe_watch(request, context, p, s, output / 'retirement',
+                                                                 {'staged': pinfo, 'service': sinfo})
+        report['retirement_result'], report['retirement_raw_command_files'] = rinfo, raw
+        report['phase_function_return_codes']['retirement'] = 0
+        report['result'] = 'PREPARATION_FUNCTIONS_COMPLETED_PENDING_ACTUAL_PROCESS_EXIT'
     except Exception as error:
         failure = error
-        report["result"] = "PREPARATION_FAILED"
-        report["failure"] = {"type": type(error).__name__, "message": str(error)}
+        report['result'] = 'PREPARATION_FAILED'
+        report['failure'] = {'type': type(error).__name__, 'message': str(error)}
     finally:
-        report["finished_unix"] = time.time()
+        report['finished_unix'] = time.time()
         try:
-            write_new_json(output / "prepare-result.json", report, root)
+            write_new_json(output / 'prepare-result.json', report, root)
         except Exception as error:
-            failure = recording_failure(failure, error, "prepare-result-save", report)
+            failure = recording_failure(failure, error, 'prepare-result-save', report)
     if failure is not None:
         raise failure
     return report
 
 
 def record_preparation_exit(context, actual_status):
-    require_contract(type(actual_status) is int and 0 <= actual_status <= 255, "Invalid actual shell exit status")
-    root, output = Path(context["source_root"]), preparation_root(context)
-    report = {"schema": "common-runtime-actual-caller-exit-v1", "identity": context,
-              "actual_shell_status_argument": actual_status,
-              "status_provenance": "Reviewed caller passes the immediately captured actual $?; no success constant is permitted.",
-              "candidate_credit": False, "product_pass": False}
-    if (output / "prepare-result.json").exists():
-        value, info = read_bound_json(output / "prepare-result.json", root)
-        require_contract(value["identity"] == context, "Preparation receipt belongs to another context")
-        report["prepare_result"] = info
+    require_contract(type(actual_status) is int and 0 <= actual_status <= 255, 'Invalid actual shell exit status')
+    root, output = Path(context['source_root']), preparation_root(context)
+    report = {'schema': 'common-runtime-actual-caller-exit-v3', 'identity': context,
+              'actual_shell_status_argument': actual_status,
+              'status_provenance': 'Reviewed caller passes the immediately captured actual $?; no success constant is permitted.',
+              'candidate_credit': False, 'product_pass': False}
+    if (output / 'prepare-result.json').exists():
+        value, info = read_bound_json(output / 'prepare-result.json', root)
+        require_contract(value['identity'] == context and value['schema'] == 'common-runtime-preparation-v3',
+                         'Preparation receipt belongs to another context/schema')
+        if actual_status == 0:
+            validate_preparation_success_shape(value, context)
+            validate_preconditioning_receipt(value, context)
+            p, _ = read_bound_json(output / 'staged/preflight-result.json', root, value['staged_result'])
+            s, _ = read_bound_json(output / 'service/refresh-result.json', root, value['service_result'])
+            r, _ = read_bound_json(output / 'retirement/result.json', root, value['retirement_result'])
+            require_contract(validate_retirement_evidence(p, s, r, context, output / 'retirement', root)
+                             == value['retirement_raw_command_files'], 'Caller proof lacks exact retirement evidence')
+        report['prepare_result'] = info
     else:
-        require_contract(actual_status != 0, "Successful process must have its complete preparation receipt")
+        require_contract(actual_status != 0, 'Successful process must have its complete preparation receipt')
         output.mkdir(parents=True, exist_ok=True)
-        report["prepare_result"] = None
-    return write_new_json(output / "prepare-exit.json", report, root)
+        report['prepare_result'] = None
+    return write_new_json(output / 'prepare-exit.json', report, root)
 
 
 def load_preparation(context):
-    root, output = Path(context["source_root"]), preparation_root(context)
-    actual_exit, exit_info = read_bound_json(output / "prepare-exit.json", root)
-    require_contract(actual_exit["identity"] == context and type(actual_exit["actual_shell_status_argument"]) is int
-                     and actual_exit["actual_shell_status_argument"] == 0,
-                     "Same actual helper process must have completed with exit zero")
-    report, info = read_bound_json(output / "prepare-result.json", root, actual_exit["prepare_result"])
-    require_contract(report["identity"] == context and report["result"] == "PREPARATION_FUNCTIONS_COMPLETED_PENDING_ACTUAL_PROCESS_EXIT"
-                     and report["phase_function_return_codes"] == {"staged": 0, "service": 0}
-                     and report["product_pass"] is False and report["candidate_credit"] is False
-                     and report["lifecycle_executions"] == 0, "Preparation result is incomplete or carries false application credit")
-    p, _ = read_bound_json(output / "staged/preflight-result.json", root, report["staged_result"])
-    s, _ = read_bound_json(output / "service/refresh-result.json", root, report["service_result"])
+    root, output = Path(context['source_root']), preparation_root(context)
+    actual_exit, exit_info = read_bound_json(output / 'prepare-exit.json', root)
+    require_contract(actual_exit.get('schema') == 'common-runtime-actual-caller-exit-v3'
+                     and actual_exit['identity'] == context and type(actual_exit['actual_shell_status_argument']) is int
+                     and actual_exit['actual_shell_status_argument'] == 0
+                     and actual_exit.get('candidate_credit') is False and actual_exit.get('product_pass') is False
+                     and not any(key in actual_exit for key in ('failure', 'recording_errors', 'final_recording_error')),
+                     'Same actual V3 preparation process must have completed with exit zero')
+    report, info = read_bound_json(output / 'prepare-result.json', root, actual_exit['prepare_result'])
+    validate_preparation_success_shape(report, context)
+    preconditioning_info = validate_preconditioning_receipt(report, context)
+    p, _ = read_bound_json(output / 'staged/preflight-result.json', root, report['staged_result'])
+    s, _ = read_bound_json(output / 'service/refresh-result.json', root, report['service_result'])
     validate_preflight(p, phase_context(context))
-    require_contract(command_files(output / "staged", p, root) == report["staged_raw_command_files"],
-                     "Staged raw command inventory changed")
-    require_contract(validate_service_evidence(p, s, context, output / "staged", output / "service", root)
-                     == report["service_raw_command_files"], "Service raw command inventory changed")
-    return report, {"preparation": info, "actual_exit": exit_info}, p, s
+    require_contract(command_files(output / 'staged', p, root) == report['staged_raw_command_files'],
+                     'Staged raw command inventory changed')
+    require_contract(validate_service_evidence(p, s, context, output / 'staged', output / 'service', root)
+                     == report['service_raw_command_files'], 'Service raw command inventory changed')
+    r, rinfo = read_bound_json(output / 'retirement/result.json', root, report['retirement_result'])
+    require_contract(validate_retirement_evidence(p, s, r, context, output / 'retirement', root)
+                     == report['retirement_raw_command_files'], 'Retirement raw command inventory changed')
+    return report, {'preparation': info, 'actual_exit': exit_info, 'retirement': rinfo,
+                    'preconditioning': preconditioning_info}, p, s
 
 
 def original_selection(consumer, runtimes, types):
@@ -1804,54 +3628,53 @@ def consumer_profile(context, name):
 
 
 def before_consumer(request, context, consumer):
-    profile = consumer_profile(context, consumer)
-    root, prep = Path(context["source_root"]), preparation_root(context)
-    prepared, binding, p, service = load_preparation(context)
-    original_receipt = unlinked_path(root / profile["receipt"], root)
-    require_contract(not original_receipt.exists(), "Refusing a stale original consumer receipt; it is never deleted by the adapter")
-    if consumer == "integrated-simulator":
-        prior, _ = read_bound_json(prep / "consumers/integrated-ui/after.json", root)
-        require_contract(prior["identity"] == context and prior["consumer"] == "integrated-ui"
-                         and prior["original_status"] == 0 and prior["effective_status"] == 0
-                         and prior["result"] == "ORIGINAL_RECEIPT_MATCHED",
-                         "Second Integrated consumer requires its original first consumer and exact binding to have completed")
-    output = unlinked_path(prep / "consumers" / consumer, root)
-    require_contract(not output.exists(), "Each original consumer has one fresh before binding")
+    profile = consumer_profile(context,consumer)
+    root,prep = Path(context['source_root']),preparation_root(context)
+    prepared,binding,p,service = load_preparation(context)
+    retirement,_ = read_bound_json(prep/'retirement/result.json',root,binding['retirement'])
+    original_receipt = unlinked_path(root/profile['receipt'],root)
+    require_contract(not original_receipt.exists(),'Refusing a stale original consumer receipt; it is never deleted by the adapter')
+    prior_ledger,prior_binding = retirement_preceding_consumer_ledger(context,retirement,binding,consumer)
+    output = unlinked_path(prep/'consumers'/consumer,root)
+    require_contract(not output.exists(),'Each original consumer has one fresh before binding')
     output.mkdir(parents=True)
-    report = {"schema": "common-runtime-consumer-before-v1", "identity": context, "consumer": consumer,
-              "preparation_binding": binding, "started_unix": time.time(), "commands": [],
-              "original_receipt_must_be_new": str(original_receipt), "product_pass": False, "candidate_credit": False}
+    report = {'schema':'common-runtime-consumer-before-v2','identity':context,'consumer':consumer,
+              'preparation_binding':binding,'retirement_binding':binding['retirement'],
+              'preceding_consumer_after_binding':prior_binding,
+              'started_unix':time.time(),'commands':[],'original_receipt_must_be_new':str(original_receipt),
+              'product_pass':False,'candidate_credit':False}
     failure = None
     try:
-        runtimes, row = binding_command(output, "logical-runtimes", ["xcrun", "simctl", "list", "runtimes", "-j"], root)
-        report["commands"].append(row)
-        types, row = binding_command(output, "device-types", ["xcrun", "simctl", "list", "devicetypes", "-j"], root)
-        report["commands"].append(row)
-        selection = original_selection(consumer, runtimes["runtimes"], types["devicetypes"])
-        check_selection(selection, prepared["logical_selection"], consumer)
-        report["selection"] = selection
-        report["dmg_stat_binding"] = {name: bound_file_stat(p[name]) for name in ("source_dmg_after", "staged_dmg_after")}
-        require_contract(all(value["matches_verified_receipt"] is True for value in report["dmg_stat_binding"].values()),
-                         "Prepared DMG stat identity changed before original consumer")
-        new = p["scope_after_verify"]["new_uuid"]
-        current_bundle = path_snapshot(p["scope_after_verify"]["new_record"]["runtimeBundlePath"])
-        require_contract(current_bundle.get("resolved_path") == str(Path(selection["runtime"]["bundlePath"]).resolve()),
-                         "Logical and staged runtime bundle filesystem paths differ")
-        require_contract(current_bundle == service["runtime_snapshots"]["after"]["filesystem"][new]["runtimeBundlePath"],
-                         "Selected bundle filesystem identity changed before original consumer")
-        report["bundle_filesystem"] = current_bundle
-        recheck_context(request, context)
-        report["result"] = "BOUND_BEFORE_ORIGINAL_CONSUMER"
+        runtimes,row = binding_command(output,'logical-runtimes',['xcrun','simctl','list','runtimes','-j'],root)
+        report['commands'].append(row)
+        types,row = binding_command(output,'device-types',['xcrun','simctl','list','devicetypes','-j'],root)
+        report['commands'].append(row)
+        selection = original_selection(consumer,runtimes['runtimes'],types['devicetypes'])
+        check_selection(selection,prepared['logical_selection'],consumer)
+        report['selection'] = selection
+        report['dmg_stat_binding'] = {name:bound_file_stat(p[name]) for name in ('source_dmg_after','staged_dmg_after')}
+        require_contract(all(value['matches_verified_receipt'] is True for value in report['dmg_stat_binding'].values()),
+                         'Prepared DMG stat identity changed before original consumer')
+        new = p['scope_after_verify']['new_uuid']
+        current_bundle = path_snapshot(p['scope_after_verify']['new_record']['runtimeBundlePath'])
+        require_contract(current_bundle.get('resolved_path')==str(Path(selection['runtime']['bundlePath']).resolve()),
+                         'Logical and staged runtime bundle filesystem paths differ')
+        require_contract(current_bundle==service['runtime_snapshots']['after']['filesystem'][new]['runtimeBundlePath'],
+                         'Selected bundle filesystem identity changed before original consumer')
+        report['bundle_filesystem'] = current_bundle
+        report['terminal_host_observation'] = capture_post_retirement_observation(context,p,retirement,binding,output/'before-host',prior_ledger)
+        recheck_context(request,context)
+        report['result'] = 'BOUND_BEFORE_ORIGINAL_CONSUMER'
     except Exception as error:
         failure = error
-        report["result"] = "BEFORE_BINDING_FAILED"
-        report["failure"] = {"type": type(error).__name__, "message": str(error)}
+        report['result'] = 'BEFORE_BINDING_FAILED'
+        report['failure'] = {'type':type(error).__name__,'message':str(error)}
     finally:
-        report["finished_unix"] = time.time()
+        report['finished_unix'] = time.time()
         try:
-            write_new_json(output / "before.json", report, root)
+            write_new_json(output/'before.json',report,root)
         except Exception as error:
-            failure = recording_failure(failure, error, "before-result-save", report)
+            failure = recording_failure(failure,error,'before-result-save',report)
     if failure is not None:
         raise failure
     return report
@@ -1877,42 +3700,51 @@ def validate_original_receipt(value, before, profile, consumer):
 
 
 def after_consumer(request, context, consumer, original_status):
-    require_contract(type(original_status) is int and 0 <= original_status <= 255, "Invalid original shell exit status")
-    root, prep = Path(context["source_root"]), preparation_root(context)
-    output = unlinked_path(prep / "consumers" / consumer, root)
-    report = {"schema": "common-runtime-consumer-after-v1", "identity": context, "consumer": consumer,
-              "original_status": original_status, "started_unix": time.time(), "product_pass": False, "candidate_credit": False}
+    require_contract(type(original_status) is int and 0<=original_status<=255,'Invalid original shell exit status')
+    root,prep = Path(context['source_root']),preparation_root(context)
+    output = unlinked_path(prep/'consumers'/consumer,root)
+    report = {'schema':'common-runtime-consumer-after-v2','identity':context,'consumer':consumer,
+              'original_status':original_status,'started_unix':time.time(),'product_pass':False,'candidate_credit':False}
     failure = None
     try:
-        profile = consumer_profile(context, consumer)
-        prepared, binding, _, _ = load_preparation(context)
-        before, before_info = read_bound_json(output / "before.json", root)
-        require_contract(before["identity"] == context and before["consumer"] == consumer
-                         and before["result"] == "BOUND_BEFORE_ORIGINAL_CONSUMER" and before["preparation_binding"] == binding,
-                         "Before binding is missing, failed or belongs to another preparation")
-        check_selection(before["selection"], prepared["logical_selection"], consumer)
-        value, info = read_bound_json(root / profile["receipt"], root)
-        report["original_receipt"] = info
-        report["before_binding"] = before_info
-        report["selection"] = validate_original_receipt(value, before, profile, consumer)
-        recheck_context(request, context)
-        report["result"] = "ORIGINAL_RECEIPT_MATCHED"
+        profile = consumer_profile(context,consumer)
+        prepared,binding,p,_ = load_preparation(context)
+        retirement,_ = read_bound_json(prep/'retirement/result.json',root,binding['retirement'])
+        before,before_info = read_bound_json(output/'before.json',root)
+        require_contract(before.get('schema')=='common-runtime-consumer-before-v2'
+                         and before['identity']==context and before['consumer']==consumer
+                         and before['result']=='BOUND_BEFORE_ORIGINAL_CONSUMER'
+                         and not any(key in before for key in ('failure','recording_errors','final_recording_error'))
+                         and before['preparation_binding']==binding and before['retirement_binding']==binding['retirement'],
+                         'Before binding is missing, failed or belongs to another V2 preparation')
+        prior_ledger,prior_binding = retirement_preceding_consumer_ledger(context,retirement,binding,consumer)
+        require_contract(before['preceding_consumer_after_binding']==prior_binding,'Preceding consumer after receipt changed')
+        before_observation,_ = read_bound_json(output/'before-host/result.json',root,before['terminal_host_observation'])
+        validate_post_retirement_observation(before_observation,retirement,context,binding,output/'before-host',root,prior_ledger)
+        check_selection(before['selection'],prepared['logical_selection'],consumer)
+        value,info = read_bound_json(root/profile['receipt'],root)
+        report['original_receipt'],report['before_binding'] = info,before_info
+        report['preparation_binding'],report['retirement_binding'] = binding,binding['retirement']
+        report['selection'] = validate_original_receipt(value,before,profile,consumer)
+        report['terminal_host_observation'] = capture_post_retirement_observation(context,p,retirement,binding,output/'after-host',before_observation['terminal_path_ledger'])
+        recheck_context(request,context)
+        report['result'] = 'ORIGINAL_RECEIPT_MATCHED'
     except Exception as error:
         failure = error
-        report["result"] = "AFTER_BINDING_FAILED"
-        report["failure"] = {"type": type(error).__name__, "message": str(error)}
-    report["effective_status"] = original_status if original_status else (1 if failure else 0)
-    report["finished_unix"] = time.time()
+        report['result'] = 'AFTER_BINDING_FAILED'
+        report['failure'] = {'type':type(error).__name__,'message':str(error)}
+    report['effective_status'] = original_status if original_status else (1 if failure else 0)
+    report['finished_unix'] = time.time()
     try:
-        write_new_json(output / "after.json", report, root)
+        write_new_json(output/'after.json',report,root)
     except Exception as error:
-        failure = recording_failure(failure, error, "after-result-save", report)
-        report["effective_status"] = original_status or 1
+        failure = recording_failure(failure,error,'after-result-save',report)
+        report['effective_status'] = original_status or 1
         try:
-            print("Original status preserved; after-binding evidence write failed:", str(error), file=sys.stderr)
+            print('Original status preserved; after-binding evidence write failed:',str(error),file=sys.stderr)
         except Exception:
             pass
-    return report["effective_status"]
+    return report['effective_status']
 
 
 def main():
