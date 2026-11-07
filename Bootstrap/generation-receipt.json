@@ -3,115 +3,115 @@
   "result": "PASS_LOCAL_INPUT_GENERATION_ONLY",
   "repository": "AAAHN-AAAHN/heiher-socks5-ios",
   "generator": {
-    "path": "/workspace/scratch/5cf069d9b2cb/analysis/resume-20261107/source-adoption-ambient-tvos-v4-preparation/draft-tools/prepare_formal_inputs.py",
-    "bytes": 21808,
-    "sha256": "b08f5156705bb4607ed951b5928116202f803479f6f5cd83b6d721cef342391c"
+    "path": "/workspace/scratch/5cf069d9b2cb/analysis/resume-20261107/formal-ambient-tvos-v4-eof-forward-preparation/draft-tools/prepare_formal_inputs.py",
+    "bytes": 24989,
+    "sha256": "2b32328dc84797c6f5cafc18656efe9f8e6ac84e574f5d53d37b69735741664f"
   },
   "generator_support": {
-    "path": "/workspace/scratch/5cf069d9b2cb/analysis/resume-20261107/source-adoption-ambient-tvos-v4-preparation/draft-tools/adoption_tools.py",
+    "path": "/workspace/scratch/5cf069d9b2cb/analysis/resume-20261107/formal-ambient-tvos-v4-eof-forward-preparation/draft-tools/adoption_tools.py",
     "bytes": 21351,
     "sha256": "0b6ed5cf87cb86b15444fd391bf0b67d8a4c455d7573889efcd41f3927bc9f14"
   },
   "reviewed_inputs": {
-    "path": "/workspace/scratch/5cf069d9b2cb/resume-workspace/continuation-20261107/formal-ambient-tvos-v4/reviewed-inputs.json",
-    "bytes": 1168,
-    "sha256": "649dcd58643356591baf3b0db30141b5e0595c4e5e9a8a97bab4f583a3ac646c"
+    "path": "/workspace/scratch/5cf069d9b2cb/resume-workspace/continuation-20261107/formal-ambient-tvos-v4-eof/reviewed-inputs.json",
+    "bytes": 1289,
+    "sha256": "c8f00ee501aee942b2546562dbbfd84f0b081609f9b8c7a72ac5787282b393b6"
   },
   "source_generation": {
-    "path": "/workspace/scratch/5cf069d9b2cb/resume-workspace/continuation-20261107/source-ambient-tvos-v4/source5-generation.json",
-    "bytes": 186196,
-    "sha256": "1d428b2bbc6ea405b6d4fad8e020a24190c3af77f09df6201a0a11bee6b5e9b9"
+    "path": "/workspace/scratch/5cf069d9b2cb/resume-workspace/continuation-20261107/source-ambient-tvos-v4-eof/source5-generation.json",
+    "bytes": 186272,
+    "sha256": "858b926fc7e61d95fc248e749ee77f2fc69f02cb8aaffb0a4784165933c20300"
   },
   "heads": {
     "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
     "udp": "b05db817684d6b006353d5062fdba756d739faea",
     "background": "60e32211b1edf62c668b549043bf0bc4cdd83608",
-    "server": "2ff0f995905e1d318335e50a7cc2af562d67bfac",
-    "statistics": "a106517487a20d1cb91b3dcc59da4f241b5efe14",
-    "icon": "fc0e80d8766754c1d116503a8dadd7c8793fc17c",
-    "settings": "e78cdf4fec994e7579f4f46c13c51f2ef16c4a9c",
-    "integrated": "c2b45ee11140216852c7b4ac4c26d836da87fdae"
+    "server": "4ff1dd609985e84e3d33d37d0eae1c2562c73117",
+    "statistics": "440ba2fafbcdd03703621dfe6e0d3f3045392164",
+    "icon": "401364dd54adb4f6aae3292c56e60d5801d587df",
+    "settings": "2001f2a059f1b01d7a84fa4b39663164ec47ea32",
+    "integrated": "3439f20349118c4581278c919a527a22b5ce8a12"
   },
   "preconditioning_module": {
-    "path": "/workspace/scratch/5cf069d9b2cb/analysis/resume-20261107/common-ambient-tvos-retirement-v4-preparation/payload/Build/runtime_preconditioning.py",
-    "bytes": 84681,
-    "sha256": "26a3ef547586e27538a9f9f53fd80845e7eb9de8574870123afb98d49e675d83"
+    "path": "/workspace/scratch/5cf069d9b2cb/analysis/resume-20261107/common-ambient-tvos-v4-eof-correction/payload/Build/runtime_preconditioning.py",
+    "bytes": 84680,
+    "sha256": "bb5549e0c5f8dc09b23e53f8c5c78665257c50c2169d6e79348945643f85940d"
   },
   "preconditioning_module_bindings": {
     "server": [
       {
         "path": "Build/runtime_preconditioning.py",
         "mode": "100644",
-        "blob": "3d4d3a32f60933275189c07de805dd74b0572e40",
-        "bytes": 84681,
-        "sha256": "26a3ef547586e27538a9f9f53fd80845e7eb9de8574870123afb98d49e675d83",
+        "blob": "3cf4ccec0fa8fb5a32ca217044b2131557c60062",
+        "bytes": 84680,
+        "sha256": "bb5549e0c5f8dc09b23e53f8c5c78665257c50c2169d6e79348945643f85940d",
         "common_path": "Build/runtime_environment.py",
         "common_mode": "100644",
-        "common_blob": "53f984b3b0009b45feec79afbbe9743b6eefdc32",
-        "common_sha256": "874a2f0ce075c069a37cd22e3d782aae681443990e0ece844aa5f70813ba0a09"
+        "common_blob": "00ec695e611780dc8a5b38bddf29d740d53736e2",
+        "common_sha256": "5b37fdc8416375e2f4304ffcb53709ad423af137553f27ade7cf32a0946a6e0d"
       }
     ],
     "statistics": [
       {
         "path": "Build/runtime_preconditioning.py",
         "mode": "100644",
-        "blob": "3d4d3a32f60933275189c07de805dd74b0572e40",
-        "bytes": 84681,
-        "sha256": "26a3ef547586e27538a9f9f53fd80845e7eb9de8574870123afb98d49e675d83",
+        "blob": "3cf4ccec0fa8fb5a32ca217044b2131557c60062",
+        "bytes": 84680,
+        "sha256": "bb5549e0c5f8dc09b23e53f8c5c78665257c50c2169d6e79348945643f85940d",
         "common_path": "Build/runtime_environment.py",
         "common_mode": "100644",
-        "common_blob": "08b32e91e461168c6cbb737a60dc0444eeb9f367",
-        "common_sha256": "2f16b4746673adf35056795c48ee9dad07c3c359180f286ddf9e07ddb89be6bd"
+        "common_blob": "91c354f2d53bcabfc3a4c26feb342bba1a28570d",
+        "common_sha256": "6ffa96e584c2297f66dd36a1b0f0b8887af75af1050bc77caa773346ababddeb"
       }
     ],
     "icon": [
       {
         "path": "Tests/AppIcon/runtime_preconditioning.py",
         "mode": "100644",
-        "blob": "3d4d3a32f60933275189c07de805dd74b0572e40",
-        "bytes": 84681,
-        "sha256": "26a3ef547586e27538a9f9f53fd80845e7eb9de8574870123afb98d49e675d83",
+        "blob": "3cf4ccec0fa8fb5a32ca217044b2131557c60062",
+        "bytes": 84680,
+        "sha256": "bb5549e0c5f8dc09b23e53f8c5c78665257c50c2169d6e79348945643f85940d",
         "common_path": "Tests/AppIcon/runtime_environment.py",
         "common_mode": "100644",
-        "common_blob": "53f984b3b0009b45feec79afbbe9743b6eefdc32",
-        "common_sha256": "874a2f0ce075c069a37cd22e3d782aae681443990e0ece844aa5f70813ba0a09"
+        "common_blob": "00ec695e611780dc8a5b38bddf29d740d53736e2",
+        "common_sha256": "5b37fdc8416375e2f4304ffcb53709ad423af137553f27ade7cf32a0946a6e0d"
       }
     ],
     "settings": [
       {
         "path": "Build/runtime_preconditioning.py",
         "mode": "100644",
-        "blob": "3d4d3a32f60933275189c07de805dd74b0572e40",
-        "bytes": 84681,
-        "sha256": "26a3ef547586e27538a9f9f53fd80845e7eb9de8574870123afb98d49e675d83",
+        "blob": "3cf4ccec0fa8fb5a32ca217044b2131557c60062",
+        "bytes": 84680,
+        "sha256": "bb5549e0c5f8dc09b23e53f8c5c78665257c50c2169d6e79348945643f85940d",
         "common_path": "Build/runtime_environment.py",
         "common_mode": "100644",
-        "common_blob": "53f984b3b0009b45feec79afbbe9743b6eefdc32",
-        "common_sha256": "874a2f0ce075c069a37cd22e3d782aae681443990e0ece844aa5f70813ba0a09"
+        "common_blob": "00ec695e611780dc8a5b38bddf29d740d53736e2",
+        "common_sha256": "5b37fdc8416375e2f4304ffcb53709ad423af137553f27ade7cf32a0946a6e0d"
       }
     ],
     "integrated": [
       {
         "path": "Build/runtime_preconditioning.py",
         "mode": "100644",
-        "blob": "3d4d3a32f60933275189c07de805dd74b0572e40",
-        "bytes": 84681,
-        "sha256": "26a3ef547586e27538a9f9f53fd80845e7eb9de8574870123afb98d49e675d83",
+        "blob": "3cf4ccec0fa8fb5a32ca217044b2131557c60062",
+        "bytes": 84680,
+        "sha256": "bb5549e0c5f8dc09b23e53f8c5c78665257c50c2169d6e79348945643f85940d",
         "common_path": "Build/runtime_environment.py",
         "common_mode": "100644",
-        "common_blob": "53f984b3b0009b45feec79afbbe9743b6eefdc32",
-        "common_sha256": "874a2f0ce075c069a37cd22e3d782aae681443990e0ece844aa5f70813ba0a09"
+        "common_blob": "00ec695e611780dc8a5b38bddf29d740d53736e2",
+        "common_sha256": "5b37fdc8416375e2f4304ffcb53709ad423af137553f27ade7cf32a0946a6e0d"
       },
       {
         "path": "Tests/AppIcon/runtime_preconditioning.py",
         "mode": "100644",
-        "blob": "3d4d3a32f60933275189c07de805dd74b0572e40",
-        "bytes": 84681,
-        "sha256": "26a3ef547586e27538a9f9f53fd80845e7eb9de8574870123afb98d49e675d83",
+        "blob": "3cf4ccec0fa8fb5a32ca217044b2131557c60062",
+        "bytes": 84680,
+        "sha256": "bb5549e0c5f8dc09b23e53f8c5c78665257c50c2169d6e79348945643f85940d",
         "common_path": "Tests/AppIcon/runtime_environment.py",
         "common_mode": "100644",
-        "common_blob": "53f984b3b0009b45feec79afbbe9743b6eefdc32",
-        "common_sha256": "874a2f0ce075c069a37cd22e3d782aae681443990e0ece844aa5f70813ba0a09"
+        "common_blob": "00ec695e611780dc8a5b38bddf29d740d53736e2",
+        "common_sha256": "5b37fdc8416375e2f4304ffcb53709ad423af137553f27ade7cf32a0946a6e0d"
       }
     ]
   },
@@ -119,11 +119,11 @@
     "main": "e1692ab9f23f50213f5bb88fcace0c2fc45541bf",
     "udp": "e87146dc61af2014d534ceb4f790168a73df0a03",
     "background": "1ab318d405a516c42a59f1d9280a62639d1810fd",
-    "server": "7f6446e020ec173c43822eb170127d4b4e334e81",
-    "statistics": "07210a5c3c63c404af3efd0c6d1d488c81f40a2f",
-    "icon": "e9700aab51b9a43f51e488624ee3a69e3e3d6276",
-    "settings": "9014fdf5f82a82785a75e6ce0e5ce137ac82d45f",
-    "integrated": "c2a20e4e458429de0f07d6c14fc31724411d1a0f"
+    "server": "02e21df51bcef386411eb34f3232884e36bac295",
+    "statistics": "e8f57213a71e76f7a5be3ab5c869fda6c43c79bc",
+    "icon": "d03b1538c5e8df4b78dc210fce62641d2ac7d291",
+    "settings": "eefa4a96868c0d3f4a9ea95c6d38541cf91a72cc",
+    "integrated": "8775bef69560a94e1302986ad557b9b7a65febd5"
   },
   "selected": [
     "server",
@@ -140,61 +140,61 @@
   "matrix": [
     {
       "name": "server",
-      "sha": "2ff0f995905e1d318335e50a7cc2af562d67bfac",
+      "sha": "4ff1dd609985e84e3d33d37d0eae1c2562c73117",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "server",
-      "sha": "2ff0f995905e1d318335e50a7cc2af562d67bfac",
+      "sha": "4ff1dd609985e84e3d33d37d0eae1c2562c73117",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "statistics",
-      "sha": "a106517487a20d1cb91b3dcc59da4f241b5efe14",
+      "sha": "440ba2fafbcdd03703621dfe6e0d3f3045392164",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "statistics",
-      "sha": "a106517487a20d1cb91b3dcc59da4f241b5efe14",
+      "sha": "440ba2fafbcdd03703621dfe6e0d3f3045392164",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "icon",
-      "sha": "fc0e80d8766754c1d116503a8dadd7c8793fc17c",
+      "sha": "401364dd54adb4f6aae3292c56e60d5801d587df",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "icon",
-      "sha": "fc0e80d8766754c1d116503a8dadd7c8793fc17c",
+      "sha": "401364dd54adb4f6aae3292c56e60d5801d587df",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "settings",
-      "sha": "e78cdf4fec994e7579f4f46c13c51f2ef16c4a9c",
+      "sha": "2001f2a059f1b01d7a84fa4b39663164ec47ea32",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "settings",
-      "sha": "e78cdf4fec994e7579f4f46c13c51f2ef16c4a9c",
+      "sha": "2001f2a059f1b01d7a84fa4b39663164ec47ea32",
       "os": "xcode-27",
       "runtime": true
     },
     {
       "name": "integrated",
-      "sha": "c2b45ee11140216852c7b4ac4c26d836da87fdae",
+      "sha": "3439f20349118c4581278c919a527a22b5ce8a12",
       "os": "ubuntu-24.04",
       "runtime": false
     },
     {
       "name": "integrated",
-      "sha": "c2b45ee11140216852c7b4ac4c26d836da87fdae",
+      "sha": "3439f20349118c4581278c919a527a22b5ce8a12",
       "os": "xcode-27",
       "runtime": true
     }
@@ -220,24 +220,24 @@
     "953ee8d720cf32311d82dad1bcb1b566333c5d62"
   ],
   "advertised_refs": {
-    "refs/heads/candidate/server": "2ff0f995905e1d318335e50a7cc2af562d67bfac",
-    "refs/heads/candidate/statistics": "a106517487a20d1cb91b3dcc59da4f241b5efe14",
-    "refs/heads/candidate/icon": "fc0e80d8766754c1d116503a8dadd7c8793fc17c",
-    "refs/heads/candidate/settings": "e78cdf4fec994e7579f4f46c13c51f2ef16c4a9c",
-    "refs/heads/candidate/integrated": "c2b45ee11140216852c7b4ac4c26d836da87fdae",
+    "refs/heads/candidate/server": "4ff1dd609985e84e3d33d37d0eae1c2562c73117",
+    "refs/heads/candidate/statistics": "440ba2fafbcdd03703621dfe6e0d3f3045392164",
+    "refs/heads/candidate/icon": "401364dd54adb4f6aae3292c56e60d5801d587df",
+    "refs/heads/candidate/settings": "2001f2a059f1b01d7a84fa4b39663164ec47ea32",
+    "refs/heads/candidate/integrated": "3439f20349118c4581278c919a527a22b5ce8a12",
     "refs/heads/support/main": "0e030aedbd4127e9215b38bb23dd6e38c5872546",
     "refs/heads/support/udp": "b05db817684d6b006353d5062fdba756d739faea",
     "refs/heads/support/background": "60e32211b1edf62c668b549043bf0bc4cdd83608"
   },
-  "bundle_bytes": 347966,
-  "bundle_sha256": "1d1aac6ffacbe640157d06318da6c9690f52f301fe087c7a3a1e3b34ac99043e",
-  "manifest_sha256": "447ba64201ff6d9c7ff730da1c731c0af2c0790cdfd31eea3b41606bb665c50a",
+  "bundle_bytes": 347924,
+  "bundle_sha256": "4c8dede088e07f48d0fd8b59570ff6659558ed6841f6c14cd76411b6c34befd3",
+  "manifest_sha256": "b3d1a1d8c493a0a46f4b6f5347c1e1ebc4d4e6f6ca916ce3d74b7de4c6605a17",
   "remote_snapshot": {
-    "path": "/workspace/scratch/5cf069d9b2cb/resume-workspace/continuation-20261107/source-ambient-tvos-v4-inputs/remote-20261107T003347Z/remote-refs-snapshot.json",
-    "bytes": 9969,
-    "sha256": "9137e408aaadffc363e174bfbd2b826c9ad7fbef291bf2043b23ed4c78b17b90"
+    "path": "/workspace/scratch/5cf069d9b2cb/resume-workspace/continuation-20261107/source-ambient-tvos-v4-eof-inputs/remote-20261107T010907Z/remote-refs-snapshot.json",
+    "bytes": 9959,
+    "sha256": "d1abf7388a0502ceb0892db510ea3c044e85b1fd1c14f9bd36e286258b529aa0"
   },
-  "snapshot_fetched_at": "2026-11-07T00:33:48.283Z",
+  "snapshot_fetched_at": "2026-11-07T01:09:07.570Z",
   "snapshot_is_mutation_lease": false,
   "remote_observation_refreshed_by_this_script": false,
   "canonical8_only_restoration": {
@@ -260,7 +260,7 @@
     "all_source8_trees_match": true
   },
   "original_importer_fixture": {
-    "fixture_commit": "b748a6a2d9f510f2b92211dba814a84eef7bd509",
+    "fixture_commit": "d353ce6670f0002f29aa6a2a3bf88e29a4e38fd3",
     "actual_importer_executed": true,
     "full_matrix_rows": 10,
     "runtime_matrix_rows": 5,
@@ -289,66 +289,58 @@
     "byte_exact": true
   },
   "formal_control_restoration": {
+    "schema": "existing-formal-control-restoration-v1",
     "formal_commit": "0e8a148ead30acad682083fd2b7b1a3b55fb2030",
-    "diagnostic_commit": "78ab750c61bb064bc7889e71b3ac4e1b0699763e",
     "formal_tree": "638c59f0c2aed65112dd2f7004fc6477b49e2ef8",
-    "diagnostic_tree": "3bdcdba44a52e298435845c1c2c6cd5656df6685",
+    "current_control_commit": "7d8a2f9cab8430461fb292a5bf5a840d943a8c19",
+    "current_control_tree": "d691f9999c05180c834c1f5ad462b75e83da39b9",
+    "source_prerequisite_diagnostic_commit": "78ab750c61bb064bc7889e71b3ac4e1b0699763e",
     "changed_paths": [
-      ".github/workflows/udp-echo-candidate.yml",
-      "Bootstrap/observe_runtime_mounts.py",
-      "Bootstrap/observe_runtime_startup.py",
-      "Bootstrap/precondition_runtime_scan.py",
-      "Bootstrap/probe_runtime_scan.py",
-      "Bootstrap/retire_duplicate_registrations.py",
-      "Bootstrap/run_runtime_recovery_probe.py"
+      "Bootstrap/candidates.bundle",
+      "Bootstrap/candidates.json",
+      "Bootstrap/generation-receipt.json",
+      "Bootstrap/run_candidate_runtime.sh"
     ],
-    "required_diagnostic_path_deletions": [
-      "Bootstrap/observe_runtime_mounts.py",
-      "Bootstrap/observe_runtime_startup.py",
-      "Bootstrap/precondition_runtime_scan.py",
-      "Bootstrap/probe_runtime_scan.py",
-      "Bootstrap/retire_duplicate_registrations.py",
-      "Bootstrap/run_runtime_recovery_probe.py"
-    ],
-    "all_other_tracked_entries_byte_and_mode_equal": true,
-    "deletion_identities": [
+    "current_control_file_identities": [
       {
-        "path": "Bootstrap/observe_runtime_mounts.py",
+        "path": "Bootstrap/candidates.bundle",
         "mode": "100644",
-        "blob": "4d3229bcca7aea0502781eb8b3de2543a824bc45",
-        "sha256": "af543a4fcfcab66b6eca6da0de678d7f3f226a53cd3aa1654d5ce55b868117d4"
+        "blob": "45ad960fb5892aa03ac98c47c06679127982f3ce",
+        "bytes": 347966,
+        "sha256": "1d1aac6ffacbe640157d06318da6c9690f52f301fe087c7a3a1e3b34ac99043e"
       },
       {
-        "path": "Bootstrap/observe_runtime_startup.py",
+        "path": "Bootstrap/candidates.json",
         "mode": "100644",
-        "blob": "c9c666aaea503faa90d53721e55082d84aae80f6",
-        "sha256": "481f56b53ab222e8eee732031416115957870da5e640f07504d71fdc893b3d08"
+        "blob": "e896d1b262e534696df61c744979a4e5a2f2f6d3",
+        "bytes": 2937,
+        "sha256": "447ba64201ff6d9c7ff730da1c731c0af2c0790cdfd31eea3b41606bb665c50a"
       },
       {
-        "path": "Bootstrap/precondition_runtime_scan.py",
+        "path": "Bootstrap/generation-receipt.json",
         "mode": "100644",
-        "blob": "9ab181292377973bfd66281a69dd59053c8dfe0f",
-        "sha256": "af5354decb985747fa52cd7ed2cdad431328947869607e0daa82d44154db0c98"
+        "blob": "c8aefda3f043ecc0c390827fcf4edfcb1e960c2d",
+        "bytes": 15171,
+        "sha256": "00e24146b8094e870bfc4be8021e03b567c56ed30f35be4b4b59becdfab1ac78"
       },
       {
-        "path": "Bootstrap/probe_runtime_scan.py",
+        "path": "Bootstrap/run_candidate_runtime.sh",
         "mode": "100644",
-        "blob": "4631866d966282e4466f0769f9410c517c728f9c",
-        "sha256": "3f2215cd723c3ed0622672e39c63908b6971e50b959cc4e665b4ca4ea9568fe4"
-      },
-      {
-        "path": "Bootstrap/retire_duplicate_registrations.py",
-        "mode": "100644",
-        "blob": "bb3abd962664d86ff5780ca0285b5a86abe16989",
-        "sha256": "71ca6a00800ab6a1904d2fc8fa0b9cf87814c961c16770d4224af5e92d5efb6b"
-      },
-      {
-        "path": "Bootstrap/run_runtime_recovery_probe.py",
-        "mode": "100644",
-        "blob": "353ad4912f73d3564323a6f58b0aace06565abe9",
-        "sha256": "038a70cc2bb458b06572edcc7e5d2bbd01e67581b94aa1a9e8a190a0789c33fd"
+        "blob": "c867412957d8a852f8baf5423ab5a2b84f2cc8d0",
+        "bytes": 16047,
+        "sha256": "af1bb45ba3e845047f3659ba5ba3053646ccd4028c770d563ad3ecf81bce6b97"
       }
-    ]
+    ],
+    "required_diagnostic_path_deletions": [],
+    "diagnostic_paths_already_absent": [
+      "Bootstrap/observe_runtime_mounts.py",
+      "Bootstrap/observe_runtime_startup.py",
+      "Bootstrap/precondition_runtime_scan.py",
+      "Bootstrap/probe_runtime_scan.py",
+      "Bootstrap/retire_duplicate_registrations.py",
+      "Bootstrap/run_runtime_recovery_probe.py"
+    ],
+    "all_other_tracked_entries_byte_and_mode_equal": true
   },
   "importer": {
     "source_commit": "0e8a148ead30acad682083fd2b7b1a3b55fb2030",
@@ -357,7 +349,7 @@
   },
   "runtime_wrapper": {
     "source_commit": "0e8a148ead30acad682083fd2b7b1a3b55fb2030",
-    "sha256": "af1bb45ba3e845047f3659ba5ba3053646ccd4028c770d563ad3ecf81bce6b97",
+    "sha256": "b3810aeba326231d53244e286b55aab3948427aeec28b2d165d185ad1c3da78e",
     "only_changes": "Four owner reader SHA256 literals; inverse byte equality checked."
   },
   "historical_generation_receipt_reused": false,
