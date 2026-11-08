@@ -67,10 +67,10 @@ jobs:
           if not root.is_absolute() or root.resolve(strict=True) != root or path.is_symlink() or path.parent.is_symlink():
               raise SystemExit('Status reader must be an unlinked file in the exact source root')
           info = path.stat()
-          if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o644 or info.st_nlink != 1 or info.st_size != 16069:
+          if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o644 or info.st_nlink != 1 or info.st_size != 16072:
               raise SystemExit('Status reader file type, mode, links or size differs')
           raw = path.read_bytes()
-          if len(raw) != 16069 or hashlib.sha256(raw).hexdigest() != '39676b99c7c2c5cd6f30e0bcfd28c15d9039df78f40a753d4bc36357b94dc827':
+          if len(raw) != 16072 or hashlib.sha256(raw).hexdigest() != 'f281d1f307e27d2b44d8436fa18a9c00a9fc9f43387e98ec49590ca910d837fb':
               raise SystemExit('Status reader bytes differ from the frozen reader')
           blob = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
           entry = subprocess.run(['git', '-C', str(root), 'ls-tree', sys.argv[2], '--', relative], capture_output=True, timeout=10)
