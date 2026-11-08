@@ -1,18 +1,18 @@
 {
   "branch": "release/integrated",
-  "frozen_source": "14c10cae5f90e1b12394b466a5689208acb26356",
-  "parents": {
-    "feature/app-icon": "e96fb1b02c90da85f4d09dd29aec3d1274675e7a",
-    "feature/background": "60e32211b1edf62c668b549043bf0bc4cdd83608",
-    "feature/server-control": "c062dba0da7629d02aaaebdea8339a9bf3f281a9",
-    "feature/settings-persistence": "5b7c06c8ed21dca1e02d9f18438a648aef61ad14",
-    "feature/traffic-statistics": "2b7ccde34ec3f2a40ef170e1aeddd7ca9fa62a30",
-    "feature/udp-compat": "b05db817684d6b006353d5062fdba756d739faea"
-  },
+  "frozen_source": "ee8a0a709dae8b701e04e37b3ec236d71d0e5509",
   "owned_documents": [
     "README.md",
     "docs/features/integrated.md"
   ],
+  "parents": {
+    "feature/app-icon": "fbd6d651b50b15351d5830c9dbd5aec197bccfc9",
+    "feature/background": "60e32211b1edf62c668b549043bf0bc4cdd83608",
+    "feature/server-control": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+    "feature/settings-persistence": "2d943bb3ee9566de0310e6658d2e8d960cbc171b",
+    "feature/traffic-statistics": "0b78ca462f847d36ec1c3631bfa3c51285e784cc",
+    "feature/udp-compat": "b05db817684d6b006353d5062fdba756d739faea"
+  },
   "readme_mirror": "docs/features/integrated.md",
   "validation_files": {
     "Build/check.py": "58ed4ef1c607792d37223e864a4e090ee48940b6",
