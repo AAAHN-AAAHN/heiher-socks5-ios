@@ -13,7 +13,7 @@ import sys
 
 OBSERVER_SHA256 = '277f667fd17d96e9b3f6fbd733282d9b3622d782e20d2e2a4ab3a35d2b4575f8'
 OBSERVER_BYTES = 18796
-COMMON_SHA256 = 'edaf397c349d7a2de904149745a28db7640552e49d60cd1ea4ac9b0bc4581fad'
+COMMON_SHA256 = '344fa127c15b83952d0785f9a0eba914b5b5660f1c982c0837e924b299988096'
 OBSERVER_PATH = 'Build/observe_host_during_command.py'
 CONTEXT_KEYS = ('GITHUB_REPOSITORY', 'GITHUB_SHA', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT',
                 'GITHUB_JOB', 'GITHUB_REF', 'RUNNER_NAME', 'RUNNER_OS', 'RUNNER_ARCH', 'DEVELOPER_DIR')
@@ -93,7 +93,7 @@ def save_new(path, value, root):
 
 def checked_common_before(root, source, owner, consumer, before_path):
     value, record = read_json(before_path, root)
-    require(value['schema'] == 'common-runtime-consumer-before-v2'
+    require(value['schema'] == 'installed-runtime-consumer-before-v1'
             and value['consumer'] == consumer and value['result'] == 'BOUND_BEFORE_ORIGINAL_CONSUMER',
             'Original common before did not bind this consumer')
     identity = value['identity']
