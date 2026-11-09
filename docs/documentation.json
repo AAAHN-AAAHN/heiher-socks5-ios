@@ -1,13 +1,13 @@
 {
   "branch": "release/integrated",
-  "frozen_source": "ee8a0a709dae8b701e04e37b3ec236d71d0e5509",
+  "frozen_source": "cbf73b9b508f2850f8155800717ad902eb1de9e0",
   "owned_documents": [
     "README.md",
     "docs/features/integrated.md"
   ],
   "parents": {
     "feature/app-icon": "fbd6d651b50b15351d5830c9dbd5aec197bccfc9",
-    "feature/background": "60e32211b1edf62c668b549043bf0bc4cdd83608",
+    "feature/background": "8817c8e069926a7ed881c74d287afe9857106b9a",
     "feature/server-control": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
     "feature/settings-persistence": "2d943bb3ee9566de0310e6658d2e8d960cbc171b",
     "feature/traffic-statistics": "0b78ca462f847d36ec1c3631bfa3c51285e784cc",
