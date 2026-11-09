@@ -14,9 +14,31 @@ final class AsyncAudioUITests: XCTestCase {
         let audioState = app.staticTexts["background.audioState"]
         @MainActor func expectAudioState(_ value: String, timeout: TimeInterval = 5) {
             XCTAssertTrue(audioState.waitForExistence(timeout: timeout))
-            let expectation = XCTNSPredicateExpectation(
-                predicate: NSPredicate(format: "label == %@", value), object: audioState)
-            XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: timeout), .completed)
+            if #available(iOS 27.0, *) {
+                let startedAt = ProcessInfo.processInfo.systemUptime
+                let reached = audioState.wait(for: \.label, toEqual: value, timeout: timeout)
+                let finishedAt = ProcessInfo.processInfo.systemUptime
+                if !reached {
+                    let details = """
+                        native_label_wait_result=false
+                        expected_label=\(value)
+                        timeout_seconds=\(timeout)
+                        started_system_uptime_seconds=\(startedAt)
+                        finished_system_uptime_seconds=\(finishedAt)
+                        post_wait_label_query=not_performed
+                        """
+                    let outcome = XCTAttachment(
+                        string: String(decoding: details.utf8.prefix(1024), as: UTF8.self))
+                    outcome.name = "async-audio-native-label-wait-failed"
+                    outcome.lifetime = .keepAlways
+                    add(outcome)
+                }
+                XCTAssertTrue(reached)
+            } else {
+                let expectation = XCTNSPredicateExpectation(
+                    predicate: NSPredicate(format: "label == %@", value), object: audioState)
+                XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: timeout), .completed)
+            }
         }
         @MainActor func resetAudio() {
             XCUIDevice.shared.orientation = .portrait
