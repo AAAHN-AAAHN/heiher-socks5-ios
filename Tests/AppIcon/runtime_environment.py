@@ -18,7 +18,7 @@ import subprocess
 import sys
 import time
 
-DEVELOPER = "/Applications/Xcode_27.app/Contents/Developer"
+DEVELOPER = "/Applications/Xcode_27.2.app/Contents/Developer"
 
 UUID_PATTERN = r"[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}"
 
@@ -765,7 +765,7 @@ def prepare_environment(request, context):
     try:
         xcode = capture.run("xcode-version", ["xcodebuild", "-version"]).decode().strip()
         sdk = capture.run("sdk-version", ["xcrun", "--sdk", "iphonesimulator", "--show-sdk-version"]).decode().strip()
-        require(xcode == "Xcode 27.0\nBuild version 27A266a" and sdk == "27.0", "Installed Xcode/SDK differs")
+        require(xcode == "Xcode 27.2\nBuild version 27B52" and sdk == "27.2", "Installed Xcode/SDK differs")
         report["toolchain"] = {"xcode_version": xcode, "simulator_sdk_version": sdk, "tools": {}}
         for tool in ("simctl", "xcodebuild"):
             value = capture.run(tool + "-path", ["xcrun", "--find", tool]).decode().strip()
