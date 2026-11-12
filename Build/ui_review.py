@@ -490,7 +490,7 @@ def main():
         phase = 'boot'
         run(['xcrun', 'simctl', 'boot', identifier], 'boot.log')
         phase = 'bootstatus'
-        run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'ready.log', timeout=120)
+        run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'ready.log', timeout=360)
         phase = 'ui-tests'
         # Keep test failures, runtime warnings and explicit attachments; avoid the
         # optional bulk system-diagnostic collection that stalled after runner exit.
@@ -562,7 +562,7 @@ def main():
         if identifier is not None:
             for action in ('shutdown', 'delete'):
                 try:
-                    run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=30)
+                    run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=120)
                 except Exception as exc:
                     cleanup.append(str(exc))
                     capture_failure(OUT, 'cleanup-' + action, identifier, exc)
