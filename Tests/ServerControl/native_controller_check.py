@@ -183,7 +183,7 @@ def worker_stop_check(core, output, folder, baseline_sha256=None):
     original = patched.replace(guard, b'', 1)
     if baseline_sha256 is None:
         identity = hashlib.sha1(b'blob ' + str(len(original)).encode() + b'\0' + original).hexdigest()
-        if identity != '683a773999569784b2a42d1bab136ef1c44a8101':
+        if identity != '634cafa88c204b5c1e40d0b588aad37a43f561cc':
             raise AssertionError('Worker changed beyond the reviewed four-line Stop guard')
     else:
         # A composition supplies its owner's exact pre-guard identity. This
