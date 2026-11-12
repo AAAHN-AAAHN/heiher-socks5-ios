@@ -27,6 +27,15 @@ def change(root, case):
     source = sorted((root / 'Socks5').rglob('*.swift'))[0]
     if case == 'valid':
         return
+    if case == 'source-ancestry':
+        target = root / 'docs/feature-membership.json'
+        members = json.loads(target.read_bytes())
+        tree = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD^{tree}'], env=ENV).strip().decode()
+        orphan = subprocess.check_output(['git', '-C', str(root), '-c', 'user.name=Fixture',
+            '-c', 'user.email=fixture@example.invalid', 'commit-tree', tree], input=b'Unreachable source fixture\n', env=ENV).strip().decode()
+        next(iter(members['sources'].values()))['commit'] = orphan
+        target.write_text(json.dumps(members))
+        return
     if case == 'parent-content':
         parent_doc.write_bytes(parent_doc.read_bytes() + b'\nUnexpected text.\n')
     elif case == 'parent-missing':
@@ -155,6 +164,9 @@ def main():
              'trailing', 'fence', 'escaping-link', 'repository-link', 'invalid-link-scheme',
              'owned-inventory', 'approval-content', 'approval-index', 'approval-link',
              'approval-mode', 'approval-and-manifest', 'existing-frozen-reference']
+    membership = ROOT / 'docs/feature-membership.json'
+    if membership.is_file() and json.loads(membership.read_bytes()).get('sources'):
+        cases.append('source-ancestry')
     rows = []
     with tempfile.TemporaryDirectory(prefix='documentation-contract-') as directory:
         for number, case in enumerate(cases):
@@ -170,6 +182,8 @@ def main():
                 if not expected and not any(message in result.stderr for message in (
                         'RuntimeError:', 'FileNotFoundError:')):
                     raise RuntimeError(('Unexpected rejection mechanism', case, result.stderr))
+                if case == 'source-ancestry' and 'Membership source is not reachable from HEAD:' not in result.stderr:
+                    raise RuntimeError(('Missing ancestry rejection', result.stderr))
                 rows.append({'case': case, 'accepted': result.returncode == 0, 'expected': expected})
             finally:
                 git('worktree', 'remove', '--force', str(root))

@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """Verify server control without persistent settings, using the production bodies."""
+import hashlib
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-# Preserve every original production hunk across the shared-lifecycle split.
-original_patch = subprocess.check_output(['git', '-C', str(ROOT), 'show',
-    '7e40f951441cb226bc5e22a95d9c0658aba76939:Patches/hev-server-startup-stop.patch'])
+# Lock the reviewed upstream port; executable positive/negative controls below
+# retain the original controller, equality and lifetime behavior requirements.
 shared_patch = (ROOT / 'Patches/hev-server-lifecycle.patch').read_bytes()
 server_patch = (ROOT / 'Patches/hev-server-startup-stop.patch').read_bytes()
-if shared_patch + server_patch != original_patch:
-    raise AssertionError('Shared lifecycle split lost or changed an original ServerControl hunk')
-print('PASS: shared lifecycle and ServerControl remainder exactly reconstruct the canonical original')
+if hashlib.sha256(shared_patch + server_patch).hexdigest() != 'd9ea12d86bf2e45e394317910b20839f77dabac5ba0404373d738cf68918e582':
+    raise AssertionError('Reviewed lifecycle/authentication port changed')
+print('PASS: shared lifecycle and ServerControl remainder match the reviewed upstream port')
 with tempfile.TemporaryDirectory() as name:
     temp = Path(name)
     sources = []

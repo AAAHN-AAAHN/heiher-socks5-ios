@@ -1,7 +1,7 @@
 {
-  "base_commit": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+  "base_commit": "a0a8e4b321222d3e8e193fb0814ed1535bfae4c7",
   "branches": {
-    "feature/server-control": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13"
+    "feature/server-control": "f65adc34913e1c8002c860afbce995d77019ba30"
   },
   "files": {
     "Socks5/AppRoot.swift": "31317abed92503f5855ce077104baf945b02833d08490822bd7307e92aec48a0",
@@ -12,139 +12,139 @@
   "responsibility": "Persistence owns durable options and file handling; the listed server-owned inputs are inherited byte-identically from the pinned latest server-control ancestor.",
   "sources": {
     "Build/check_swift_sdk.sh": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "8bb2aa2d8da52154962516d16012f61f6c05fc91b4c4905453c1663954a072b3"
     },
     "Build/observe_host_during_command.py": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "277f667fd17d96e9b3f6fbd733282d9b3622d782e20d2e2a4ab3a35d2b4575f8"
     },
     "Build/observed_command_status.py": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "f281d1f307e27d2b44d8436fa18a9c00a9fc9f43387e98ec49590ca910d837fb"
     },
     "Build/runtime_environment.py": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "344fa127c15b83952d0785f9a0eba914b5b5660f1c982c0837e924b299988096"
     },
     "Patches/hev-server-lifecycle.patch": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
-      "sha256": "df872f0a6a10d1dfbc4efd23f62c566a4698b6f2a79d6e2298068c39b6ac98a9"
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
+      "sha256": "3dac527989c9b7942432295fb40738d14fa22ed09d69e2b2f3bcbf6eb880c9d4"
     },
     "Patches/hev-server-startup-stop.patch": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
-      "sha256": "e9d9a51850ee252a2c9f26128eecf1d18d98503823d39d2a1f96b28d942b1528"
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
+      "sha256": "11ed96e048d688ae67d42239cf5af60c1921baf8e3e2be78bb0c240183cb51a3"
     },
     "Socks5/ContentView.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "0684c8be1fae897e045ca22471e33c26e1a5ed950c45c107ad04009742ea7208"
     },
     "Socks5/Server/ServerController.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "b8b1791cfbc741e4b167ebdd2c0cc6f36d5d0a5b1d589c7cf7dc107e44f62332"
     },
     "Socks5/Server/ServerSettings.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "e64a89cece6dc47cebe6ee910ba4e6a7d71b17837bc24f4354a30b1307bdd0fd"
     },
     "Tests/ServerControl/ConfigurationParity.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "6e4acbcb6e1ece2952d61bca84a9849f9c9cd45acc4e662b7c0831167306a808"
     },
     "Tests/ServerControl/DelayedCompletionHost.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "6b9ad1c570ed1c500a0f49a656876d91af71b273c52539fd73778b5495175c5e"
     },
     "Tests/ServerControl/EmitConfiguration.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "040498c7bcc6656282148ee9790698dae873e25564647ec456ff9c2c3d8afbf2"
     },
     "Tests/ServerControl/NativeControllerHost.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "ff768e1ed7ca93a049de3a2d85afeafbd77e005f6dcb90ca0fea2ec13e37c8a3"
     },
     "Tests/ServerControl/PrepareStopProbe.c": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "d1e2c5ed883a34aa5f7938894707abac7e4fcc1e52c71258b684fecc9ee9d7bd"
     },
     "Tests/ServerControl/RevalidationTests.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "d5ebb6dcc9e000bf433d1f28a1a5d50085d4e52a10b18cc38469d26af5d72f48"
     },
     "Tests/ServerControl/RunSnapshotTests.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "f4beebd432c88928be226a52b334a6b2926303110ee95c69936162964bd506d5"
     },
     "Tests/ServerControl/ServerControlUITests.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "a7ca68acc92fd82dee032efa47775e4926f2476fe3606ca3f9b7c1f2ad5af9d0"
     },
     "Tests/ServerControl/ServerMocks.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "9a0969cdb720d09928ab6fbec29f77e4e8ab162d670ac61b9eaf83e81a7602b8"
     },
     "Tests/ServerControl/ServerTests.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "f36dc7ea29012b762249eda4613fc91c95fde88c8e7a9c710ea1dbcd0f6eb378"
     },
     "Tests/ServerControl/TransitionBoundary.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "d7ba7f7c650a358fad2e421a47b3336ba67ab984c2cbc29728b36e943c0f0efb"
     },
     "Tests/ServerControl/TransitionMatrix.swift": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "6bff598fee7dd0fa7bf099fe68cfe38c3e8515bf103b553e723964e68bf8ea48"
     },
     "Tests/ServerControl/active_clients_check.py": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "9996cbf49158f8650a24ae09306850421919038bb2dd918f65a03a27aa12c777"
     },
     "Tests/ServerControl/audit_driver_check.py": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "9c9303269def290daadf89be7c0397c866c509885e3799e38f14f4cb9fd3cb67"
     },
     "Tests/ServerControl/auth_startup_probe.c": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "4b2d84bff9a576c0aff13ab9f31eb354fec1c2a4ae64baab5b478218716eb6ad"
     },
     "Tests/ServerControl/configuration_probe.c": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "b7595cd1d6c1b042865e462a63c4306550e63692c1a2ddd4385d4aa507248203"
     },
     "Tests/ServerControl/delayed_completion_check.py": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "220031c4658324a908233af18843451915a1f0c9d43934bd306b06aee403f872"
     },
     "Tests/ServerControl/final_native_check.py": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "e9066f4766602f545108855a4c8b17ac107149591849fe16aed145a9e6f8f865"
     },
     "Tests/ServerControl/input_integrity_check.py": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "a8fff4b29de1f90de8b1a7134d6e7de834e5cd40ba1b0046c88f031c82695c28"
     },
     "Tests/ServerControl/native_controller_check.py": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
-      "sha256": "fe7fd5827d0933e337952c03ae0bc07ecbb45fd74919fc9ea55a61ac393e53a8"
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
+      "sha256": "03775d8142191cc2dfe567843316669bec67189d7dc59774dd4128290ddef5f0"
     },
     "Tests/ServerControl/run_checks.py": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
-      "sha256": "99f605fa3ac4724070610b3d94b4e0f953e5ce244ea4245235c5e27e824a8b71"
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
+      "sha256": "c4671106f1d5d1b6ce8e4e020f6688c7cfea902ce830d08a9a925a5ec0a24c57"
     },
     "Tests/ServerControl/ui_audit.py": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "e037912a1a4a0caad1ea3fe221dd02d9ed2509ce2661727da0fc65dd74438363"
     },
     "Tests/ServerControl/worker_stop_probe.c": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "4460986fd3351e2080d9f545a56aaf5f53065e16d4adca285b34f31b776bd911"
     },
     "Tests/server_lifecycle_host.c": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "294c6f41300beb8b33df3b37796a4b9a215c9161350b2e3ea722264519393cf4"
     },
     "Tests/server_lifecycle_regression.py": {
-      "commit": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
+      "commit": "f65adc34913e1c8002c860afbce995d77019ba30",
       "sha256": "6705e3f54c41ec3e61929d2062cb3eae1d8b64841c40c170059bbe5d6ccd941d"
     }
   }

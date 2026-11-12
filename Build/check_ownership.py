@@ -45,11 +45,12 @@ def main():
         assert (ROOT / controller_path).read_bytes() == show(manifest['branches']['feature/server-control'], controller_path)
     assert 'final class ServerController: @MainActor ObservableObject' in controller
     assert 'private(set) var run: Run?' in controller and 'guard currentID == id else' in controller
-    # Splitting the shared lifecycle prerequisite must preserve every prior hunk.
+    # Lock the reviewed upstream port, rather than obsolete patch context.
+    # Native positive/negative probes still verify the lifecycle/auth behavior.
     lifecycle_patch = (ROOT / 'Patches/hev-server-lifecycle.patch').read_bytes()
     remaining_patch = (ROOT / 'Patches/hev-server-startup-stop.patch').read_bytes()
-    original_patch = show('7e40f951441cb226bc5e22a95d9c0658aba76939', 'Patches/hev-server-startup-stop.patch')
-    assert lifecycle_patch + remaining_patch == original_patch, 'Original lifecycle/authentication guards changed'
+    assert hashlib.sha256(lifecycle_patch + remaining_patch).hexdigest() == \
+        'd9ea12d86bf2e45e394317910b20839f77dabac5ba0404373d738cf68918e582', 'Reviewed lifecycle/authentication port changed'
     # The native probe also reconstructs the exact upstream worker blob and checks
     # that this adds only the pre-yield Stop guard before compiling both versions.
     root = content('Socks5/AppRoot.swift')

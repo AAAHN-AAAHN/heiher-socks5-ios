@@ -6,13 +6,13 @@
     "docs/features/settings-persistence.md"
   ],
   "parents": {
-    "feature/server-control": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13"
+    "feature/server-control": "f65adc34913e1c8002c860afbce995d77019ba30"
   },
   "readme_mirror": "docs/features/settings-persistence.md",
   "validation_files": {
     "Build/check.py": "2db903fee6cf54496dbd805e8be30e6d0c9e6f91",
-    "Build/check_documentation.py": "944d0641ec99802e3f8a64ddd24bf75494561a31",
-    "Build/check_ownership.py": "73c69291d09e8e64a010a57c627f85ff8c0eedae",
-    "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
+    "Build/check_documentation.py": "73f890ee7192c0d3e6c6e13f8cd02bb463cae2e5",
+    "Build/check_ownership.py": "493798c9f3f4bead9277e05f5565184a029d36d0",
+    "Tests/documentation_contract.py": "f1490e1e3258f050c1489522beb0d4080a41ba30"
   }
 }
