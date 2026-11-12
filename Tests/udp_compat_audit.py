@@ -270,7 +270,7 @@ def main():
             ['git', '-C', str(CORE / 'src'), 'rev-parse', '--short', 'HEAD'], text=True).strip()
         includes = ['-I' + str(CORE / path) for path in (
             'src/misc', 'src/core/include', 'src/core/src',
-            'third-part/yaml/src', 'third-part/hev-task-system/include',
+            'third-part/yaml/include', 'third-part/hev-task-system/include',
             'third-part/hev-task-system/src')]
         sources = {CORE / item['repository'] / name
                    for item in CONFIG['patches']
