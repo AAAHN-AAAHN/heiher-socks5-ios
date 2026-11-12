@@ -1,8 +1,8 @@
 diff --git a/src/hev-socks5-misc.c b/src/hev-socks5-misc.c
-index 2b5e12231ac551ac689a9e4d52bad01df02ca281..ca122f8d009a5aef033d11a08226e3944bd9a262 100644
+index 9933d752d3c2769c1614509b8ec15fc26376ec8a..23592ff37678e7687e3647691273a96e236f12f9 100644
 --- a/src/hev-socks5-misc.c
 +++ b/src/hev-socks5-misc.c
-@@ -223,6 +223,7 @@
+@@ -227,6 +227,7 @@ hev_socks5_addr_into_sockaddr6 (const HevSocks5Addr *addr,
          return -1;
      }
  
@@ -10,18 +10,18 @@ index 2b5e12231ac551ac689a9e4d52bad01df02ca281..ca122f8d009a5aef033d11a08226e394
      return 0;
  }
  
-@@ -246,6 +247,10 @@
- hev_socks5_name_resolve_ipv6 (const char *name, struct sockaddr_in6 *saddr)
+@@ -251,6 +252,10 @@ hev_socks5_name_resolve_ipv6 (const char *name, struct sockaddr_in6 *saddr)
  {
      int res;
-+
+ 
 +    /* Preserve scope through the resolver's complete sockaddr result. */
 +    if (strchr (name, '%'))
 +        return -1;
- 
++
      res = inet_pton (AF_INET6, name, &saddr->sin6_addr);
      if (res == 0)
-@@ -282,6 +287,7 @@
+         return -1;
+@@ -286,6 +291,7 @@ hev_socks5_name_resolve_name (const char *name, struct sockaddr_in6 *saddr,
      case AF_INET6: {
          struct sockaddr_in6 *sa = (struct sockaddr_in6 *)result->ai_addr;
          memcpy (&saddr->sin6_addr, &sa->sin6_addr, 16);
@@ -29,7 +29,7 @@ index 2b5e12231ac551ac689a9e4d52bad01df02ca281..ca122f8d009a5aef033d11a08226e394
          *family = HEV_SOCKS5_ADDR_FAMILY_IPV6;
          break;
      }
-@@ -301,6 +307,7 @@
+@@ -305,6 +311,7 @@ hev_socks5_name_into_sockaddr6 (const char *name, int port,
  
      saddr->sin6_family = AF_INET6;
      saddr->sin6_port = htons (port);
@@ -38,10 +38,10 @@ index 2b5e12231ac551ac689a9e4d52bad01df02ca281..ca122f8d009a5aef033d11a08226e394
      res = hev_socks5_name_resolve_ipv4 (name, saddr);
      if (res == 0) {
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index d51e8569570054293b73a647dd25ba9c838dd5da..d20efb7b28f26a20dabe0b3e02a6b881d2ec2bf1 100644
+index 2a3b97add1c8e1efe1fde1c00f1000b2980893b8..defeecf9ffcfaf89640ee7ffd8d91842872b49a8 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
-@@ -27,6 +27,27 @@
+@@ -29,6 +29,27 @@
  
  #define UDP_BUF_SIZE 1500
  
@@ -69,19 +69,20 @@ index d51e8569570054293b73a647dd25ba9c838dd5da..d20efb7b28f26a20dabe0b3e02a6b881
  static int
  task_io_yielder (HevTaskYieldType type, void *data)
  {
-@@ -376,9 +397,8 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -379,9 +400,9 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
      }
  
      if (!HEV_SOCKS5 (self)->udp_associated) {
 -        struct sockaddr *saddr = mvec[0].msg_hdr.msg_name;
 -        socklen_t alen = mvec[0].msg_hdr.msg_namelen;
--        if (connect (fd, saddr, alen) < 0)
+-        if (hev_task_io_socket_connect (fd, saddr, alen, task_io_yielder,
 +        hev_socks5_udp_addr_normalize (&taddr);
-+        if (connect (fd, (struct sockaddr *)&taddr, sizeof (taddr)) < 0)
++        if (hev_task_io_socket_connect (fd, (struct sockaddr *)&taddr,
++                                        sizeof (taddr), task_io_yielder,
+                                         self) < 0)
              return -1;
          HEV_SOCKS5 (self)->udp_associated = 1;
-     }
-@@ -516,6 +536,9 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
+@@ -520,6 +541,9 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
  {
      int i, res;
  
@@ -91,7 +92,7 @@ index d51e8569570054293b73a647dd25ba9c838dd5da..d20efb7b28f26a20dabe0b3e02a6b881
      res = hev_task_io_socket_recvmmsg (fd, svec, num, MSG_DONTWAIT,
                                         task_io_yielder, self);
      if (res > 0) {
-@@ -526,6 +549,7 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
+@@ -530,6 +554,7 @@ hev_socks5_udp_fwd_b (HevSocks5UDP *self, int fd, struct mmsghdr *svec,
              dvec[i].buf = svec[i].msg_hdr.msg_iov->iov_base;
              dvec[i].len = svec[i].msg_len;
              dvec[i].addr = (HevSocks5Addr *)&saddr[i];

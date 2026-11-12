@@ -6,21 +6,21 @@
     "docs/features/integrated.md"
   ],
   "parents": {
-    "feature/app-icon": "fbd6d651b50b15351d5830c9dbd5aec197bccfc9",
-    "feature/background": "8817c8e069926a7ed881c74d287afe9857106b9a",
-    "feature/server-control": "f3c1faac80ad60cf4240754d1eeb072fc92d0a13",
-    "feature/settings-persistence": "2d943bb3ee9566de0310e6658d2e8d960cbc171b",
-    "feature/traffic-statistics": "0b78ca462f847d36ec1c3631bfa3c51285e784cc",
-    "feature/udp-compat": "b05db817684d6b006353d5062fdba756d739faea"
+    "feature/app-icon": "018b175f21b2de94d41c1db6de9e03c077c36e17",
+    "feature/background": "06d86f92ab48bf59f7d56327bf98f1ffde052a83",
+    "feature/server-control": "f65adc34913e1c8002c860afbce995d77019ba30",
+    "feature/settings-persistence": "d58a689cacdef147ce1be565eb89e8ea07178801",
+    "feature/traffic-statistics": "4db4cb75a823121fc81c85dd694664ca87b6c786",
+    "feature/udp-compat": "0d9d1e5e5f20ada88ce224f8ad2f1c062692ca1f"
   },
   "readme_mirror": "docs/features/integrated.md",
   "validation_files": {
     "Build/check.py": "58ed4ef1c607792d37223e864a4e090ee48940b6",
-    "Build/check_documentation.py": "944d0641ec99802e3f8a64ddd24bf75494561a31",
-    "Build/check_ownership.py": "73c69291d09e8e64a010a57c627f85ff8c0eedae",
+    "Build/check_documentation.py": "73f890ee7192c0d3e6c6e13f8cd02bb463cae2e5",
+    "Build/check_ownership.py": "493798c9f3f4bead9277e05f5565184a029d36d0",
     "Tests/AppIcon/check_icon.py": "93cfbf9a90712bc3d7d52fe460947ee4b05c9564",
-    "Tests/Background/check_scope.py": "dd52627dba86359b5cb93cc9fdab0a891eba4e28",
-    "Tests/Statistics/audit.py": "30dc743d20b82a235ce375cbe6b3629fed9a84ac",
-    "Tests/documentation_contract.py": "67381c3afb253569291458508975a461b86d73c6"
+    "Tests/Background/check_scope.py": "df52c0fda8593eb892de17dab216c8dc8311dadc",
+    "Tests/Statistics/audit.py": "d50ac02bc937e65f08ec5f9e7f5d45f021bdad1c",
+    "Tests/documentation_contract.py": "f1490e1e3258f050c1489522beb0d4080a41ba30"
   }
 }

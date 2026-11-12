@@ -1,23 +1,23 @@
 {
   "patch": "hev-server-startup-stop.patch",
-  "patch_sha256": "e9d9a51850ee252a2c9f26128eecf1d18d98503823d39d2a1f96b28d942b1528",
-  "projected_patch_sha256": "5d3fd38ac2c729c92a939b6f3f272d6edaefaee85b44eef106ab85db90edacdb",
+  "patch_sha256": "11ed96e048d688ae67d42239cf5af60c1921baf8e3e2be78bb0c240183cb51a3",
+  "projected_patch_sha256": "230a74b1715fdfd450b896c5fe38c221358800e61d890df8a9c9609ca75c1599",
   "index_lines": [],
   "files": {
     "src/hev-socks5-proxy.c": {
       "before": {
         "mode": "100644",
-        "sha256": "4987b07c6aa2b88a7228f4e98576bcb7189828550618b31015faadfdc17d54da",
-        "blob_sha1": "a466ea06dc8c50c602708a40ca3f148a60a7a307"
+        "sha256": "90bd3a2acb794713dba1d12fe5fdd158c81dcd3294b31b44a8c1530f10dbbbfb",
+        "blob_sha1": "163b7ac0a82a368c9c6b539bf703ad2088ebb69a"
       },
       "after": {
         "mode": "100644",
-        "sha256": "3ad114a95b700e4a3dde7c9e33c4ef0e12c54c626dde98a6bf628fda31bffe07",
-        "blob_sha1": "ebb8d547df8fb29a0edc5debcd52db082bb0795c"
+        "sha256": "d657cda462cc6ac8a545d750774d2eb521af3f541f30e67c6da2d65d71908d30",
+        "blob_sha1": "1c5fb4a79f7e56c45dc837512f686e2c20b8694e"
       }
     }
   },
   "superseded_sections": [
-    "522bc0f271acf5259f271ee28908ba5755c1ca03d71a211abca1d8a4bc94f283"
+    "cb540c20acc706b92f5d3d4d1134d591a7ef1cffb1b1813bba77c1da9733851f"
   ]
 }

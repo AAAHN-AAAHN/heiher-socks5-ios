@@ -1,40 +1,37 @@
 {
   "build": {
-    "built_at_utc": "2026-10-26T18:15:59.184884+00:00",
-    "command": "./build-apple.sh",
+    "built_at_utc": "2026-11-12T14:41:19.348699+00:00",
+    "command": "bash build-apple.sh",
+    "framework_archive_sha256": "449468c63e3e9f71f527f54f937672d915d8e06abead4100cf40a2993d98a3a6",
     "iphoneos_sdk": "27.1",
-    "maintenance_commit": "f98ce2ef786b9f38ec9bf278c2aec877bf61497f",
+    "maintenance_commit": "16dfd4c53ef800492ad3b3eb9efb2e2a35c0acce",
     "patches": [],
-    "workflow_run": "40375961867",
-    "workflow_job": "121758973704",
-    "workflow_artifact": "12674289019",
-    "framework_archive_sha256": "134cdec5c9468a7a2f415ae6f97e69c26c2b7f0ab6006855f09ecfeab88cb2c3",
-    "workflow_artifact_sha256": "4dd5f777e612c50f9fd273d2207e370eb16771c5d9b0433af41c5600edcc4c62",
+    "workflow_run": "43239408921",
     "xcode": "Xcode 27.1\nBuild version 27A9275"
   },
   "files": {
-    "Info.plist": "c63a58f9ffb5ae12e3e665fb6d5ca998e547a18b8c1fa4271ca94e4f3a7304a0",
+    "Info.plist": "73b2ced9337330ca8a54f135016e0c54642280f13c05b5c65b5c6d7d010b8661",
     "ios-arm64/Headers/hev-main.h": "5945613b7debba5217148aaa6db6eae589e1bd30b81564b10d9534bb323bf453",
     "ios-arm64/Headers/module.modulemap": "7c0cb52819fbd2b4be3d45e35fd8f81430225adb3d1f898ebc9ed820ac2b07ba",
-    "ios-arm64/libhev-socks5-server.a": "42d8ef24a78e25088431ca792f1200d3fd658b8103377bbfe8e8a3625554e8a2",
+    "ios-arm64/libhev-socks5-server.a": "bc63c4f8b98e7079cb561a80b3b418c76004f68bd10fd5c246d1c9de5888f423",
     "ios-arm64_x86_64-simulator/Headers/hev-main.h": "5945613b7debba5217148aaa6db6eae589e1bd30b81564b10d9534bb323bf453",
     "ios-arm64_x86_64-simulator/Headers/module.modulemap": "7c0cb52819fbd2b4be3d45e35fd8f81430225adb3d1f898ebc9ed820ac2b07ba",
-    "ios-arm64_x86_64-simulator/libhev-socks5-server.a": "bf5639b705633e7d8b765c359a565701b78370abc66209f7f29b6064c6528c2f",
+    "ios-arm64_x86_64-simulator/libhev-socks5-server.a": "2065a1b52ecfac189ea49ea36cca7973492a9721e53b08b62da306e69bdf2f32",
     "macos-arm64_x86_64/Headers/hev-main.h": "5945613b7debba5217148aaa6db6eae589e1bd30b81564b10d9534bb323bf453",
     "macos-arm64_x86_64/Headers/module.modulemap": "7c0cb52819fbd2b4be3d45e35fd8f81430225adb3d1f898ebc9ed820ac2b07ba",
-    "macos-arm64_x86_64/libhev-socks5-server.a": "4dff67948d9a03d3099073aec670c2a5e516fd46a5624842e9276a3a3b9c650e",
+    "macos-arm64_x86_64/libhev-socks5-server.a": "989d0a28c5139cf424fc50db138dbfd3fe34ffcec3792865161325bc2b4c33f7",
     "tvos-arm64/Headers/hev-main.h": "5945613b7debba5217148aaa6db6eae589e1bd30b81564b10d9534bb323bf453",
     "tvos-arm64/Headers/module.modulemap": "7c0cb52819fbd2b4be3d45e35fd8f81430225adb3d1f898ebc9ed820ac2b07ba",
-    "tvos-arm64/libhev-socks5-server.a": "53a1d4fa9f8da34ff73f3af882c523c51d85b18ac9a6127b91f333f808867910",
+    "tvos-arm64/libhev-socks5-server.a": "b1c8956b4051ad42ace4c02f716a5c4208b39e5b4509510bc0d711e4cf6d3f83",
     "tvos-arm64_x86_64-simulator/Headers/hev-main.h": "5945613b7debba5217148aaa6db6eae589e1bd30b81564b10d9534bb323bf453",
     "tvos-arm64_x86_64-simulator/Headers/module.modulemap": "7c0cb52819fbd2b4be3d45e35fd8f81430225adb3d1f898ebc9ed820ac2b07ba",
-    "tvos-arm64_x86_64-simulator/libhev-socks5-server.a": "2d745f7e51ed563032f1fc0e9d9040441c4d8d9a062fcee5fbb76171023de3dc"
+    "tvos-arm64_x86_64-simulator/libhev-socks5-server.a": "669816ee87d567a3474fd2c171dfb233548a9393a37f9cd6f31d6812cf820226"
   },
   "sources": {
-    ".": "318a2ffebfd87a12b72dbac95a65ca27143eb01b",
-    "src/core": "dadbb54bf7509f6dea3c1b30e45198efa400679c",
-    "third-part/hev-task-system": "4039d2fdbb3577af380fa0096b90d0ad99969dfa",
-    "third-part/yaml": "94441ec8777eb319936735a58b376963d09c73d4"
+    ".": "d23aaad702eb532ddb7c03be4598ed6f79cb79c1",
+    "src/core": "b43fa857fb39c854da01d13bc55eded66b4f4a3b",
+    "third-part/hev-task-system": "ded55c412b3951bc7decb5cb3b9135701e762998",
+    "third-part/yaml": "0c82efd10dc67b9e7f159d2c7f5d1dc3c1b5bc11"
   },
   "upstream_app": "180012e8b9dbaa2002a68ebd2c75bccebcfb789c"
 }

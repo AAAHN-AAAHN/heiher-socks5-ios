@@ -44,12 +44,15 @@ static void worker_wakeup (HevTask *);
 static HevSocks5Session *worker_session_new (int);
 static void worker_object_unref (HevObject *);
 
+#define write worker_write
+#include "lib/io/basic/hev-task-io.c"
+#undef write
+
 #define hev_malloc0 worker_malloc0
 #define hev_free worker_free
-#define socketpair worker_socketpair
+#define hev_task_io_socket_socketpair worker_socketpair
 #define hev_task_add_fd worker_add
 #define hev_task_io_read worker_read
-#define write worker_write
 #define hev_task_io_socket_accept worker_accept
 #define hev_task_new worker_task_new
 #define hev_task_unref worker_task_unref
@@ -59,10 +62,9 @@ static void worker_object_unref (HevObject *);
 #include "hev-socks5-worker.c"
 #undef hev_malloc0
 #undef hev_free
-#undef socketpair
+#undef hev_task_io_socket_socketpair
 #undef hev_task_add_fd
 #undef hev_task_io_read
-#undef write
 #undef hev_task_io_socket_accept
 #undef hev_task_new
 #undef hev_task_unref
@@ -135,7 +137,7 @@ worker_free (void *ptr)
 static int
 worker_socketpair (int domain, int type, int protocol, int fds[2])
 {
-    int res = socketpair (domain, type, protocol, fds);
+    int res = hev_task_io_socket_socketpair (domain, type, protocol, fds);
     if (!res) {
         event_fds[0] = fds[0];
         event_fds[1] = fds[1];

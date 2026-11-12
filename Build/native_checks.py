@@ -67,7 +67,7 @@ for mode in (('buffered', 'splice') if sys.platform == 'linux' and 'statistics' 
             audit.network('fixed-known-' + workers, '--fixed-udp-port', '--known-concurrent', '--workers', workers)
             audit.network('limit-fixed-unknown-' + workers, '--fixed-udp-port', '--workers', workers, observation=True)
         (audit.OUT / 'summary.json').write_text(json.dumps(audit.SUMMARY, indent=2) + '\n')
-        includes = ['-I' + str(CORE / 'src/core/src'), '-I' + str(CORE / 'third-part/hev-task-system/include')]
+        includes = ['-I' + str(CORE / 'src/core/src'), '-I' + str(CORE / 'src/core/include'), '-I' + str(CORE / 'third-part/hev-task-system/include')]
         for label, flags in [('sanitized', ['-O2', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all']),
                              ('optimized', ['-O3', '-fstrict-aliasing'])]:
             executable = OUT / ('udp-' + label)

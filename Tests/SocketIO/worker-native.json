@@ -2,32 +2,32 @@
   "common": {
     "src/core/src/hev-socks5-meter.c": "aeb2a2bd3c04ad35f85c30bf9f3d6d411372fbc9b7227f7ea7e25fdaaec08a23",
     "src/core/src/hev-socks5-meter.h": "a466fb4095f26a509d7079e3dc88ff0f6e0eaba029cb026108a5cf65cbc38e7b",
-    "src/core/src/hev-socks5-server.c": "9481151080eb35a8f7e98c85a46a27cf94ce53355032c5778e5d4bdb5892ea40",
+    "src/core/src/hev-socks5-server.c": "b8b58dcf62461ea8821101bb5edc36433206a13940792513f9b50dc256de10a9",
     "src/core/src/hev-socks5-tcp.c": "3d35efb547a91a452418fc9678553d681d1183bd313b64a9ed3e6d25c82ca28a",
-    "src/core/src/hev-socks5-udp.c": "d9a69449cd507be2f5814bf07a67a994fa4a2e9804b7bafe57d1d7882fbe2cef",
-    "src/core/src/hev-socks5.c": "d97deabdfff39ea6b43644ec4bbecb604088bb6641a968f5cec58c0a642fd267",
-    "src/core/src/hev-socks5.h": "6f3851a0c193360d7cdcf129da07470c920ff65f86843c6f087b635d8d7d3170",
+    "src/core/src/hev-socks5-udp.c": "49cdaae126405407303bed8cfc15ff2188962c51c957a9d0d5a1cde70db37775",
+    "src/core/src/hev-socks5.c": "5264fd555f1c525690d9ef214d13f6455449a992c485011e9be60976630b3f37",
+    "src/core/include/hev-socks5.h": "35e56ca2d3dd62d37923e8d52c2c0eb9611c30ed1836b6e796e637e89576a1e7",
     "src/core/src/worker_meter.c": "facd70853f600a6dc30c3fc295b2d21653b2ab2a1f5b4f2b5fccdcfd56fcf0c2",
     "src/core/src/worker_meter.h": "1cc2984d82fd58b65239ce2f779d991313878f6522a03bfc8a3effc339c476d6",
-    "third-part/hev-task-system/src/lib/io/basic/hev-task-io.c": "62b0a555f15f268c7b1f4dc6b1b33b1abcd3be33af96536ca559de4fc2df7310",
-    "third-part/hev-task-system/src/lib/io/basic/hev-task-io.h": "d93443ca3e9835724236fb2a4974711525ae599711b971c7dde4154413b80212",
-    "third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.c": "cd78f333ca23d4e5071a0065d792c5823e5341a04407b04172e3f91cb3bbf008",
-    "third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.h": "d3f446bdf2c36fa1e9de28234ef0bfffd4d0309eb842d19df3de955f47013b06",
-    "src/hev-socks5-worker.h": "efa2f8223e4349549d3cb03e97eb4eac6016d07381849a05514f2c0094c75c11"
+    "third-part/hev-task-system/src/lib/io/basic/hev-task-io.c": "769e7587d8b417258bf0e5c284907b05d636198df63686ad4f7c3f240a693600",
+    "third-part/hev-task-system/include/hev-task-io.h": "c84935bbe8acd853fd8c14f558590f720772b0c31d2884a6b71394b67c6ac006",
+    "third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.c": "26b339f309f46610ed7d8b28366a78672b0f6e7d0bf8fbcb3c419848689c0835",
+    "third-part/hev-task-system/include/hev-task-io-socket.h": "eab05f5eff14f59af0a30aaccb20656697612f0e2e293ece2f153c7bc8223d57",
+    "src/hev-socks5-worker.h": "46fe03231d11cf57853181bbc2f18a7abe4894d5e8f71ead894411578ba376da"
   },
   "compositions": {
     "statistics": {
-      "src/hev-main.c": "ffc92f5aa6077fd8655034d29956bd77ef025dd8914d88c08725b561f3ffd2ea",
+      "src/hev-main.c": "a2e72be1caceb171ce20000a5a309ab252b87efbbc2ae2410a441e8bc7378342",
       "src/hev-main.h": "5c06f2ef8cbd1436cc06f30df7b9b3881b0dc4b6ae2fa4588ebf0e8cb3ed90ca",
-      "src/hev-socks5-proxy.c": "4987b07c6aa2b88a7228f4e98576bcb7189828550618b31015faadfdc17d54da",
-      "src/hev-socks5-worker.c": "521fef014ebdba8280de296b407c357f0999ee15852216cf100995d8e80d36e8"
+      "src/hev-socks5-proxy.c": "90bd3a2acb794713dba1d12fe5fdd158c81dcd3294b31b44a8c1530f10dbbbfb",
+      "src/hev-socks5-worker.c": "1463fbdd3126b2c79b566041ca4b91d6a409f0aedd02c8c5b6f8cadb411ce737"
     },
     "integrated": {
-      "src/hev-main.c": "ffc92f5aa6077fd8655034d29956bd77ef025dd8914d88c08725b561f3ffd2ea",
+      "src/hev-main.c": "a2e72be1caceb171ce20000a5a309ab252b87efbbc2ae2410a441e8bc7378342",
       "src/hev-main.h": "2094c6ad64d645cda8d2ac05bec5952fb68208c3d996dc8817d84a4771a46566",
-      "src/hev-socks5-proxy.c": "1d93eb556524cf9ffc6a82708f5586c3f55768e42c313a18de78825978a51152",
-      "src/hev-socks5-worker.c": "521fef014ebdba8280de296b407c357f0999ee15852216cf100995d8e80d36e8"
+      "src/hev-socks5-proxy.c": "99e7cd8d41f864d3f4674ad05710d4b1289fb3295fe4ea07d89fd643f121476f",
+      "src/hev-socks5-worker.c": "1463fbdd3126b2c79b566041ca4b91d6a409f0aedd02c8c5b6f8cadb411ce737"
     }
   },
-  "worker_before_stop_guard": "1cd4dc66d302ff251b7a9cf4a6a9584ec5141cdccb65e9397d7d505c24c532e7"
+  "worker_before_stop_guard": "9abcf2040ce0d87c85400585db91581cf669fa61054a592c646c6ea797b5672e"
 }
