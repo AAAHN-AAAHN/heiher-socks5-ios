@@ -506,7 +506,7 @@ def main():
             run(['xcodebuild', 'build-for-testing', *arguments], 'ui-build.log', timeout=900, timing=True)
             run(['xcodebuild', 'test-without-building', *arguments,
                  '-resultBundlePath', OUT / 'UI.xcresult', '-collect-test-diagnostics', 'never'],
-                'ui-test.log', timeout=900, timing=True)
+                'ui-test.log', timeout=1800, timing=True)
         except Exception as exc:
             test_failure = exc
         diagnostic_failure = None

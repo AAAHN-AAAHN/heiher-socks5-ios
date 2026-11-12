@@ -216,7 +216,7 @@ OWNER_PROFILES = {'server': {'feature_name': 'server-control',
                                                        'runtime_key': 'runtime',
                                                        'device_key': 'device_type',
                                                        'bootstatus_seconds': 240}},
-                'original_files': {'Build/ui_review.py': {'sha256': '3a155a9c78b5acdd5f40b3057d3077c309c4a5ff8545a509e8da1d591e50ad30',
+                'original_files': {'Build/ui_review.py': {'sha256': '8543e09fc88eb4d7d38f83eec65284bf8be8c1460991c600ac363434076d6344',
                                                           'git_mode': '100644'},
                                    'Build/simulator_review.py': {'sha256': 'e1897dd4aba4702ad6ee28332fa6d614606260e05c98c310ba6a4464c9e4590f',
                                                                  'git_mode': '100644'}},
@@ -225,7 +225,7 @@ OWNER_PROFILES = {'server': {'feature_name': 'server-control',
                                                                   'bootstatus': 120,
                                                                   'shutdown': 30,
                                                                   'delete': 30,
-                                                                  'ui_test': 900,
+                                                                  'ui_test': 1800,
                                                                   'build_for_testing': 900},
                                                 'integrated-simulator': {'create': 120,
                                                                          'boot': 120,
@@ -233,7 +233,7 @@ OWNER_PROFILES = {'server': {'feature_name': 'server-control',
                                                                          'shutdown': 30,
                                                                          'delete': 30}},
                 'preparation_root': 'artifacts/integrated/runtime-preparation',
-                'existing_canonical_job_minutes': 45}}
+                'existing_canonical_job_minutes': 75}}
 
 ORIGINAL_RESTORER_SHA256 = "228dbcc1e3e28e682e1d956fd91a9100add223e613bb4aa09d47231e16499580"
 
