@@ -297,7 +297,7 @@ def main():
         network('limit-fixed-unknown-' + workers, '--fixed-udp-port', '--workers', workers, observation=True)
 
     compiler = os.environ.get('CC', 'clang')
-    includes = ['-I' + str(CORE / 'src'), '-I' + str(CORE / 'src/core/src'),
+    includes = ['-I' + str(CORE / 'src'), '-I' + str(CORE / 'src/core/src'), '-I' + str(CORE / 'src/core/include'),
                 '-I' + str(CORE / 'src/misc'),
                 '-I' + str(CORE / 'third-part/hev-task-system/include'),
                 '-I' + str(CORE / 'third-part/hev-task-system/src')]

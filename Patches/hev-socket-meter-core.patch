@@ -1,3 +1,17 @@
+diff --git a/include/hev-socks5.h b/include/hev-socks5.h
+index 3e9d6486d0cf9d9e3ee2063f87d93b78f0337f2d..da8d1e61ba60d3334647c349418549894e705288 100644
+--- a/include/hev-socks5.h
++++ b/include/hev-socks5.h
+@@ -47,6 +47,9 @@ struct _HevSocks5
+     HevObject base;
+ 
+     int fd;
++    void *io_peer;
++    void *io_destination;
++    void *io_udp_peer;
+     int timeout;
+     unsigned int type : 2;
+     unsigned int udp_associated : 1;
 diff --git a/src/hev-socks5-meter.c b/src/hev-socks5-meter.c
 new file mode 100644
 index 0000000000000000000000000000000000000000..20efd87d849fbd3ca672c18711ccdfde38e2d272
@@ -226,7 +240,7 @@ index 0000000000000000000000000000000000000000..1266ebf04d1dae3dd64eda145236a6f3
 +                        HevTaskIOYielder yielder, void *self);
 +#endif
 diff --git a/src/hev-socks5-server.c b/src/hev-socks5-server.c
-index f4198b25ae138c580b1b3a1614e44eaf82c078c4..1001be1d0b78d24018710e986dc7aa473097bf38 100644
+index 6dd2c7edf9a7231a45465d1bd47ac11f91458fea..2175d26d8e3b75ceca79beae49b6f2e95237ae7b 100644
 --- a/src/hev-socks5-server.c
 +++ b/src/hev-socks5-server.c
 @@ -20,6 +20,7 @@
@@ -326,7 +340,7 @@ index f4198b25ae138c580b1b3a1614e44eaf82c078c4..1001be1d0b78d24018710e986dc7aa47
      if (res != 5) {
          LOG_I ("%p socks5 server read request", self);
          return -1;
-@@ -285,8 +285,8 @@ hev_socks5_server_read_request (HevSocks5Server *self, int *cmd, int *rep,
+@@ -286,8 +286,8 @@ hev_socks5_server_read_request (HevSocks5Server *self, int *cmd, int *rep,
          return 0;
      }
  
@@ -337,7 +351,7 @@ index f4198b25ae138c580b1b3a1614e44eaf82c078c4..1001be1d0b78d24018710e986dc7aa47
      if (res != addrlen) {
          *rep = HEV_SOCKS5_RES_REP_ADDR;
          LOG_I ("%p socks5 server read addr", self);
-@@ -343,8 +343,8 @@ hev_socks5_server_write_response (HevSocks5Server *self, int rep,
+@@ -344,8 +344,8 @@ hev_socks5_server_write_response (HevSocks5Server *self, int rep,
      res.rsv = 0;
  
      len = 3 + hev_socks5_addr_from_sockaddr6 (&res.addr, addr);
@@ -348,7 +362,7 @@ index f4198b25ae138c580b1b3a1614e44eaf82c078c4..1001be1d0b78d24018710e986dc7aa47
      if (ret != len) {
          LOG_I ("%p socks5 server write response", self);
          return -1;
-@@ -394,6 +394,10 @@ hev_socks5_server_connect (HevSocks5Server *self, struct sockaddr_in6 *addr)
+@@ -395,6 +395,10 @@ hev_socks5_server_connect (HevSocks5Server *self, struct sockaddr_in6 *addr)
      hev_socks5_set_timeout (HEV_SOCKS5 (self), timeout);
  
      self->fds[0] = fd;
@@ -359,7 +373,7 @@ index f4198b25ae138c580b1b3a1614e44eaf82c078c4..1001be1d0b78d24018710e986dc7aa47
  
      return 0;
  }
-@@ -622,6 +626,7 @@ hev_socks5_server_construct (HevSocks5Server *self, int fd)
+@@ -626,6 +630,7 @@ hev_socks5_server_construct (HevSocks5Server *self, int fd)
      HEV_OBJECT (self)->klass = HEV_SOCKS5_SERVER_TYPE;
  
      HEV_SOCKS5 (self)->fd = fd;
@@ -392,10 +406,10 @@ index c947402b4dcf215fa00ed25b46b069ddb3542e63..813ee773f1a1dbdfe9646b701f641565
      return 0;
  }
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index a8b5cea6a2dcce20ecf95fa75221698773984e31..32f04e70f183e8b72dd5018dd0fd7bc14b6907a5 100644
+index 0900acd9c1e48ad6169302bd6459b35e88f9d407..c2867fdfd440428f5d87e801839ecfcb0a942439 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
-@@ -28,6 +28,7 @@
+@@ -30,6 +30,7 @@
  #include "hev-socks5-logger-priv.h"
  
  #include "hev-socks5-udp.h"
@@ -403,7 +417,7 @@ index a8b5cea6a2dcce20ecf95fa75221698773984e31..32f04e70f183e8b72dd5018dd0fd7bc1
  
  #define UDP_BUF_SIZE 1500
  
-@@ -386,8 +387,8 @@
+@@ -388,8 +389,8 @@ udp_buffer_recvmmsg (HevSocks5UDP *self, int fd, struct mmsghdr *messages,
      unsigned int i;
  
      if (!buffers)
@@ -414,7 +428,7 @@ index a8b5cea6a2dcce20ecf95fa75221698773984e31..32f04e70f183e8b72dd5018dd0fd7bc1
      for (i = 0; i < num; i++) {
          struct msghdr *msg = &messages[i].msg_hdr;
          ssize_t needed;
-@@ -412,8 +413,8 @@
+@@ -414,8 +415,8 @@ udp_buffer_recvmmsg (HevSocks5UDP *self, int fd, struct mmsghdr *messages,
          msg->msg_iov[0].iov_len = buffers[i].capacity;
          msg->msg_flags = 0;
          do {
@@ -425,7 +439,7 @@ index a8b5cea6a2dcce20ecf95fa75221698773984e31..32f04e70f183e8b72dd5018dd0fd7bc1
          } while (res == -1 && errno == EINTR);
          if (res <= 0)
              return i ? (int)i : res;
-@@ -457,6 +458,8 @@
+@@ -459,6 +460,8 @@ udp_control_check (HevSocks5 *self)
          do {
              res = recv (self->fd, &buf, sizeof (buf), 0);
          } while (res == -1 && errno == EINTR);
@@ -434,7 +448,7 @@ index a8b5cea6a2dcce20ecf95fa75221698773984e31..32f04e70f183e8b72dd5018dd0fd7bc1
          if ((res == 0) || ((res < 0) && (errno != EAGAIN))) {
              hev_socks5_set_timeout (self, 0);
              return -1;
-@@ -549,8 +552,8 @@
+@@ -551,8 +554,8 @@ udp_sendmmsg (HevSocks5UDP *self, int fd, struct mmsghdr *messages,
  #endif
  
      do {
@@ -445,7 +459,7 @@ index a8b5cea6a2dcce20ecf95fa75221698773984e31..32f04e70f183e8b72dd5018dd0fd7bc1
          if (res > 0)
              done += res;
  #if defined(__APPLE__)
-@@ -635,8 +638,8 @@
+@@ -637,8 +640,8 @@ hev_socks5_udp_sendmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          mh.msg_iovlen = chunk * 3;
          for (size_t j = 0; j < mh.msg_iovlen; j++)
              bytes += mh.msg_iov[j].iov_len;
@@ -456,7 +470,7 @@ index a8b5cea6a2dcce20ecf95fa75221698773984e31..32f04e70f183e8b72dd5018dd0fd7bc1
          if (res < 0 || (size_t)res != bytes) {
              /* A partial frame cannot be followed by a new frame on this stream. */
              hev_socks5_set_timeout (HEV_SOCKS5 (self), 0);
-@@ -854,12 +857,10 @@
+@@ -857,12 +860,10 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          int addrlen;
          ssize_t res;
  
@@ -472,7 +486,7 @@ index a8b5cea6a2dcce20ecf95fa75221698773984e31..32f04e70f183e8b72dd5018dd0fd7bc1
              if (tail != 5 - res) {
                  if (tail >= 0)
                      errno = EPIPE;
-@@ -910,8 +911,7 @@
+@@ -913,8 +914,7 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          iov[1].iov_base = msgv[i].buf + addrlen;
          iov[1].iov_len = udp.datlen;
  
@@ -482,7 +496,7 @@ index a8b5cea6a2dcce20ecf95fa75221698773984e31..32f04e70f183e8b72dd5018dd0fd7bc1
          if (res != (addrlen - 2 + udp.datlen)) {
              LOG_D ("%p socks5 udp read udp data", self);
              if (res >= 0)
-@@ -1015,6 +1015,8 @@
+@@ -1019,6 +1019,8 @@ retry:
                  return -1;
              peer = taddr[i];
              HEV_SOCKS5 (self)->udp_associated = 1;
@@ -491,7 +505,7 @@ index a8b5cea6a2dcce20ecf95fa75221698773984e31..32f04e70f183e8b72dd5018dd0fd7bc1
          }
  
          msgv[count].addr = &udp->addr;
-@@ -1273,6 +1275,10 @@
+@@ -1297,6 +1299,10 @@ hev_socks5_udp_splicer (HevSocks5UDP *self, int fd_b)
          buffers.slots[i].owner = &buffers;
      }
  
@@ -503,10 +517,10 @@ index a8b5cea6a2dcce20ecf95fa75221698773984e31..32f04e70f183e8b72dd5018dd0fd7bc1
          HevTaskYieldType type;
  
 diff --git a/src/hev-socks5.c b/src/hev-socks5.c
-index d06b5d4b0506f75ef8eecccd5fe68e76630251b5..e154cf173c4794a0cbc42c31084a1f7b23144796 100644
+index d8ab77e7ced153deb54dc26e37ea02716a84f0fa..f7d96f35c9eb32be17041ef2fa1d9211fbd97ed0 100644
 --- a/src/hev-socks5.c
 +++ b/src/hev-socks5.c
-@@ -67,6 +67,9 @@ hev_socks5_construct (HevSocks5 *self, HevSocks5Type type)
+@@ -66,6 +66,9 @@ hev_socks5_construct (HevSocks5 *self, HevSocks5Type type)
      HEV_OBJECT (self)->klass = HEV_SOCKS5_TYPE;
  
      self->fd = -1;
@@ -516,20 +530,6 @@ index d06b5d4b0506f75ef8eecccd5fe68e76630251b5..e154cf173c4794a0cbc42c31084a1f7b
      self->timeout = -1;
      self->type = type;
      self->addr_family = HEV_SOCKS5_ADDR_FAMILY_UNSPEC;
-diff --git a/src/hev-socks5.h b/src/hev-socks5.h
-index 40ad1cf31d97f237488fc49ee8dd710eb9260e69..b844baa8556462c189186b2f5ab927720a9ed137 100644
---- a/src/hev-socks5.h
-+++ b/src/hev-socks5.h
-@@ -48,6 +48,9 @@ struct _HevSocks5
-     HevObject base;
- 
-     int fd;
-+    void *io_peer;
-+    void *io_destination;
-+    void *io_udp_peer;
-     int timeout;
-     unsigned int type : 2;
-     unsigned int udp_associated : 1;
 diff --git a/src/worker_meter.c b/src/worker_meter.c
 new file mode 100644
 index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca31661b39774

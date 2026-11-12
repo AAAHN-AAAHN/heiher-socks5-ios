@@ -198,7 +198,7 @@ def native_checks(mode):
     libs = [CORE / 'bin/libhev-socks5-server.a', CORE / 'third-part/yaml/bin/libyaml.a',
             task / 'bin/libhev-task-system.a']
     common = ['clang', '-std=gnu11', '-O2', '-Wall', '-Werror', '-pthread']
-    includes = ['-I' + str(CORE / 'src'), '-I' + str(CORE / 'src/core/src'),
+    includes = ['-I' + str(CORE / 'src'), '-I' + str(CORE / 'src/core/src'), '-I' + str(CORE / 'src/core/include'),
                 '-I' + str(CORE / 'src/misc'),
                 '-I' + str(task / 'src'), '-I' + str(task / 'include')]
     writer = OUT / 'socket-writer'

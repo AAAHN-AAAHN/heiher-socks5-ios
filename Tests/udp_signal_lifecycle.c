@@ -9,10 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
 #include <hev-task.h>
 #include <hev-task-io.h>
+#include <hev-task-io-pipe.h>
 #include <hev-task-system.h>
 #include "hev-main.h"
 #include "hev-socks5-worker.h"
@@ -35,7 +35,8 @@ static atomic_int fixture_drain, fixture_finished;
 static volatile sig_atomic_t fixture_host_reload, fixture_host_pipe;
 static int fixture_created, fixture_faults, fixture_main_finalized;
 static atomic_int fixture_mode, fixture_fds[12];
-static _Atomic (HevSocks5Worker *) fixture_borrowed;
+static atomic_int fixture_borrowed, fixture_reload_queued;
+static int fixture_reload_fds[2];
 static int fixture_workers;
 static atomic_int fixture_publications, fixture_notifications;
 static atomic_int fixture_gate_armed, fixture_gate_hits;
@@ -45,19 +46,19 @@ static void fixture_worker_start (HevSocks5Worker *);
 static void fixture_check_action (int, const struct sigaction *);
 static void fixture_task_system_fini (void);
 static HevSocks5Worker *fixture_worker_new (int);
-static void fixture_signal_notify (HevSocks5Worker *);
+static void fixture_signal_handler (int);
+static int fixture_pipe (int[2]);
 static int fixture_usleep (useconds_t);
 static int fixture_sigaction (int, const struct sigaction *,
                               struct sigaction *);
-static int fixture_ioctl (int, unsigned long, void *);
 static void fixture_set_auth (HevSocks5Worker *, HevSocks5Authenticator *);
 static ssize_t fixture_write (int, const void *, size_t);
-static ssize_t fixture_read (int, void *, size_t, HevTaskIOYielder, void *);
+static ssize_t fixture_read (int, void *, size_t);
 
 #define hev_task_system_fini fixture_task_system_fini
 #define hev_socks5_worker_start fixture_worker_start
 #define hev_socks5_worker_new fixture_worker_new
-#define hev_socks5_worker_signal_reload fixture_signal_notify
+#define hev_task_io_pipe_pipe fixture_pipe
 #define hev_socks5_worker_set_auth fixture_set_auth
 #define usleep fixture_usleep
 #define sigaction(...) fixture_sigaction (__VA_ARGS__)
@@ -65,7 +66,7 @@ static ssize_t fixture_read (int, void *, size_t, HevTaskIOYielder, void *);
 #undef hev_task_system_fini
 #undef hev_socks5_worker_start
 #undef hev_socks5_worker_new
-#undef hev_socks5_worker_signal_reload
+#undef hev_task_io_pipe_pipe
 #undef hev_socks5_worker_set_auth
 #undef usleep
 #undef sigaction
@@ -76,19 +77,20 @@ static ssize_t fixture_read (int, void *, size_t, HevTaskIOYielder, void *);
 #define SYNC_LOAD WORKER_SYNC_LOAD
 #define SYNC_SENT_S WORKER_SYNC_SENT_S
 #define SYNC_SENT_R WORKER_SYNC_SENT_R
-#define ioctl(...) fixture_ioctl (__VA_ARGS__)
-#define write fixture_write
-#define hev_task_io_read fixture_read
 #include "hev-socks5-worker.c"
-#undef write
-#undef hev_task_io_read
-#undef ioctl
 #undef SYNC_SEND
 #undef SYNC_WAIT
 #undef SYNC_STOP
 #undef SYNC_LOAD
 #undef SYNC_SENT_S
 #undef SYNC_SENT_R
+
+/* Exercise the actual task I/O EINTR retry, not a test reimplementation. */
+#define write fixture_write
+#define read fixture_read
+#include "lib/io/basic/hev-task-io.c"
+#undef write
+#undef read
 
 static void
 fixture_task_system_fini (void)
@@ -124,22 +126,28 @@ fixture_worker_new (int fd)
 }
 
 static void
-fixture_signal_notify (HevSocks5Worker *worker)
+fixture_signal_handler (int number)
 {
     atomic_fetch_add (&fixture_notifications, 1);
-    if (fixture_mode != FIX_LIVE) {
-        atomic_fetch_add (&fixture_in_signal, 1);
-        hev_socks5_worker_signal_reload (worker);
-        atomic_fetch_sub (&fixture_in_signal, 1);
-        return;
+    atomic_fetch_add (&fixture_in_signal, 1);
+    sigusr1_handler (number);
+    atomic_fetch_sub (&fixture_in_signal, 1);
+}
+
+static int
+fixture_pipe (int fds[2])
+{
+    if (fixture_mode == FIX_NOTIFY_FAIL) {
+        fixture_faults++;
+        errno = EMFILE;
+        return -1;
     }
-    /* The real handler has already incremented users and borrowed worker. */
-    assert (atomic_load (&signal_users) == 1);
-    fixture_borrowed = worker;
-    atomic_store (&fixture_captured, 1);
-    while (!atomic_load (&fixture_release))
-        ;
-    hev_socks5_worker_signal_reload (worker);
+    int result = hev_task_io_pipe_pipe (fds);
+    assert (!result);
+    fixture_reload_fds[0] = fds[0];
+    fixture_reload_fds[1] = fds[1];
+    assert (fcntl (fds[1], F_GETFL) & O_NONBLOCK);
+    return result;
 }
 
 static void
@@ -158,11 +166,19 @@ fixture_set_auth (HevSocks5Worker *worker, HevSocks5Authenticator *auth)
 static ssize_t
 fixture_write (int fd, const void *buffer, size_t size)
 {
-    if (atomic_exchange (&fixture_gate_armed, 0)) {
-        assert (!fixture_in_signal && fd == fixture_fds[2]);
+    if (fd == fixture_fds[2] && atomic_exchange (&fixture_gate_armed, 0)) {
+        assert (!fixture_in_signal);
         assert (atomic_load (&worker_list[0].worker->tsync) & WORKER_SYNC_WAIT);
         atomic_fetch_add (&fixture_gate_hits, 1);
         assert (!pthread_kill (pthread_self (), SIGUSR1));
+    }
+    if (fixture_in_signal && fixture_mode == FIX_LIVE) {
+        assert (fd == fixture_reload_fds[1]);
+        assert (atomic_load (&signal_users) == 1);
+        fixture_borrowed = fd;
+        atomic_store (&fixture_captured, 1);
+        while (!atomic_load (&fixture_release))
+            ;
     }
     if (fixture_in_signal && atomic_exchange (&fixture_eintr_armed, 0)) {
         atomic_fetch_add (&fixture_eintr_hits, 1);
@@ -171,19 +187,26 @@ fixture_write (int fd, const void *buffer, size_t size)
     }
     if (fd == fixture_fds[2])
         assert (atomic_fetch_add (&fixture_queued, 1) < 2);
+    if (fd == fixture_reload_fds[1])
+        assert (atomic_fetch_add (&fixture_reload_queued, 1) < 2);
     ssize_t result = write (fd, buffer, size);
-    if (fd == fixture_fds[2] && result < 0)
-        atomic_fetch_sub (&fixture_queued, 1);
+    if (result < 0) {
+        if (fd == fixture_fds[2])
+            atomic_fetch_sub (&fixture_queued, 1);
+        if (fd == fixture_reload_fds[1])
+            atomic_fetch_sub (&fixture_reload_queued, 1);
+    }
     return result;
 }
 
 static ssize_t
-fixture_read (int fd, void *buffer, size_t size, HevTaskIOYielder yielder,
-              void *data)
+fixture_read (int fd, void *buffer, size_t size)
 {
-    ssize_t result = hev_task_io_read (fd, buffer, size, yielder, data);
-    if (fd == fixture_fds[1] && result == 1)
-        assert (atomic_fetch_sub (&fixture_queued, 1) > 0);
+    ssize_t result = read (fd, buffer, size);
+    if (result > 0 && fd == fixture_fds[1])
+        assert (atomic_fetch_sub (&fixture_queued, result) >= result);
+    if (result > 0 && fd == fixture_reload_fds[0])
+        assert (atomic_fetch_sub (&fixture_reload_queued, result) >= result);
     return result;
 }
 
@@ -191,7 +214,7 @@ static void
 fixture_wait_reload (int target)
 {
     while (atomic_load (&fixture_publications) < target ||
-           atomic_load (&signal_reload) ||
+           atomic_load (&reload_pending) ||
            (atomic_load (&worker_list[0].worker->tsync) & WORKER_SYNC_SENT_R))
         usleep (100);
 }
@@ -256,7 +279,7 @@ static int
 fixture_usleep (useconds_t duration)
 {
     if (pthread_equal (pthread_self (), fixture_owner) &&
-        !atomic_load (&signal_worker) && atomic_load (&signal_users))
+        atomic_load (&reload_fd) < 0 && atomic_load (&signal_users))
         atomic_store (&fixture_drain, 1);
     return usleep (duration);
 }
@@ -268,27 +291,19 @@ fixture_sigaction (int number, const struct sigaction *action,
     if (action && ((fixture_mode == FIX_PIPE_FAIL && number == SIGPIPE &&
                     action->sa_handler == SIG_IGN) ||
                    (fixture_mode == FIX_RELOAD_FAIL && number == SIGUSR1 &&
-                    action->sa_handler == reload_signal_handler))) {
+                    action->sa_handler == sigusr1_handler))) {
         fixture_faults++;
         errno = EINVAL;
         return -1;
     }
-    if (action && number == SIGUSR1 &&
-        action->sa_handler != reload_signal_handler)
+    if (action && number == SIGUSR1 && action->sa_handler != sigusr1_handler)
         assert (worker_list == NULL && fixture_main_finalized);
-    return sigaction (number, action, previous);
-}
-
-static int
-fixture_ioctl (int fd, unsigned long request, void *argument)
-{
-    if (fixture_mode == FIX_NOTIFY_FAIL && worker_list &&
-        worker_list[0].worker && fd == worker_list[0].worker->event_fds[1]) {
-        fixture_faults++;
-        errno = EIO;
-        return -1;
+    if (action && number == SIGUSR1 && action->sa_handler == sigusr1_handler) {
+        struct sigaction intercepted = *action;
+        intercepted.sa_handler = fixture_signal_handler;
+        return sigaction (number, &intercepted, previous);
     }
-    return ioctl (fd, request, argument);
+    return sigaction (number, action, previous);
 }
 
 static void
@@ -344,7 +359,8 @@ fixture_stop_thread (void *data)
     while (!atomic_load (&fixture_drain) && !atomic_load (&fixture_finished))
         usleep (100);
     if (atomic_load (&fixture_drain)) {
-        assert (worker_list && fixture_borrowed == worker_list[0].worker);
+        assert (worker_list && fixture_borrowed == fixture_reload_fds[1]);
+        assert (fcntl (fixture_borrowed, F_GETFD) >= 0);
         assert (atomic_load (&signal_users) == 1);
         for (int i = 0; i < fixture_created * 3; i++)
             assert (fcntl (fixture_fds[i], F_GETFD) >= 0);
@@ -379,7 +395,9 @@ fixture_case (int mode, int workers)
     atomic_store (&fixture_eintr_hits, 0);
     atomic_store (&fixture_queued, 0);
     fixture_created = fixture_faults = fixture_main_finalized = 0;
-    fixture_borrowed = NULL;
+    fixture_borrowed = -1;
+    fixture_reload_fds[0] = fixture_reload_fds[1] = -1;
+    atomic_store (&fixture_reload_queued, 0);
     fixture_host_reload = fixture_host_pipe = 0;
     atomic_store (&fixture_started, 0);
     atomic_store (&fixture_captured, 0);
@@ -434,13 +452,21 @@ fixture_case (int mode, int workers)
     } else {
         assert (result == -1 && fixture_faults == 1);
     }
-    assert (fixture_created == workers);
-    assert (!signal_installed && !atomic_load (&signal_worker));
-    assert (!atomic_load (&signal_users) && !atomic_load (&signal_reload));
+    assert (fixture_created == (mode == FIX_NOTIFY_FAIL ? 0 : workers));
+    assert (!signal_installed && atomic_load (&reload_fd) < 0);
+    assert (!atomic_load (&signal_users) && !atomic_load (&reload_pending));
     assert (!(atomic_load (&tsync) & (SYNC_SEND | SYNC_WAIT | SYNC_STOP)));
     for (int i = 0; i < fixture_created * 3; i++) {
         errno = 0;
         assert (fcntl (fixture_fds[i], F_GETFD) == -1 && errno == EBADF);
+    }
+    assert (reload_fds[0] == -1 && reload_fds[1] == -1);
+    for (int i = 0; i < 2; i++) {
+        if (fixture_reload_fds[i] >= 0) {
+            errno = 0;
+            assert (fcntl (fixture_reload_fds[i], F_GETFD) == -1 &&
+                    errno == EBADF);
+        }
     }
     fixture_check_action (SIGUSR1, &previous_reload);
     fixture_check_action (SIGPIPE, &previous_pipe);
