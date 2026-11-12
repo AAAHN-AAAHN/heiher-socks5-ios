@@ -1,6 +1,6 @@
 {
   "branch": "feature/settings-persistence",
-  "frozen_source": "69009576a68ea3d8a1e05dd2daa3cc0274be3a78",
+  "frozen_source": "a50aaec2b5677623e79bc715e21101df42ad2ed1",
   "owned_documents": [
     "README.md",
     "docs/features/settings-persistence.md"
