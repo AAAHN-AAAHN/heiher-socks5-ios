@@ -33,12 +33,12 @@
       "sha256": "277f667fd17d96e9b3f6fbd733282d9b3622d782e20d2e2a4ab3a35d2b4575f8"
     },
     "Build/observed_command_status.py": {
-      "commit": "95a98d167968f33b57b7c9f874042516668c2bcb",
-      "sha256": "59a6ef2a9c7c67c78fb5dfe37a9dc32b47efb283daf413eacab437344f75b6f3"
+      "commit": "40ac9c4655390589419ab80d7d3b87bcea4ba46c",
+      "sha256": "503dd8791a5f02c52a927e4fe9e88442601c1856b4e25caafde4045c9607dde9"
     },
     "Build/runtime_environment.py": {
-      "commit": "95a98d167968f33b57b7c9f874042516668c2bcb",
-      "sha256": "80f4802d76d844d5268d6ad9ba66f28207958508d6a6703837b3c4a2b3893a27"
+      "commit": "40ac9c4655390589419ab80d7d3b87bcea4ba46c",
+      "sha256": "df35ae4bbd98c8051f496d1bc2b50b0e438b1dede039ad9b2276bc47a005cd8e"
     },
     "Patches/hev-netaddr-result.patch": {
       "commit": "0b78ca462f847d36ec1c3631bfa3c51285e784cc",
@@ -205,8 +205,8 @@
       "sha256": "deb568cfc732699922a23bfd09dee909d8a0d82e0866ffc0b2a8c879eb02a68b"
     },
     "Tests/AppIcon/runtime_environment.py": {
-      "commit": "95a98d167968f33b57b7c9f874042516668c2bcb",
-      "sha256": "80f4802d76d844d5268d6ad9ba66f28207958508d6a6703837b3c4a2b3893a27"
+      "commit": "40ac9c4655390589419ab80d7d3b87bcea4ba46c",
+      "sha256": "df35ae4bbd98c8051f496d1bc2b50b0e438b1dede039ad9b2276bc47a005cd8e"
     },
     "Tests/AppIcon/test_audit_boundaries.py": {
       "commit": "fbd6d651b50b15351d5830c9dbd5aec197bccfc9",
