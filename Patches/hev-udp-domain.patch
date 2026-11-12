@@ -1,11 +1,31 @@
+diff --git a/src/hev-socks5-client-tcp.c b/src/hev-socks5-client-tcp.c
+index 167baeef6bb54b8a0785f586dd4e0789cd95501d..644cbc89afa35604942a9e927a6779ca9dc963fc 100644
+--- a/src/hev-socks5-client-tcp.c
++++ b/src/hev-socks5-client-tcp.c
+@@ -23,11 +23,14 @@ hev_socks5_client_tcp_new_name (const char *name, int port)
+     HevSocks5Addr addr;
+     int res;
+ 
++    res = hev_socks5_addr_from_name (&addr, name, port);
++    if (res < 0)
++        return NULL;
++
+     self = hev_malloc0 (sizeof (HevSocks5ClientTCP));
+     if (!self)
+         return NULL;
+ 
+-    hev_socks5_addr_from_name (&addr, name, port);
+     res = hev_socks5_client_tcp_construct (self, &addr);
+     if (res < 0) {
+         hev_free (self);
 diff --git a/src/hev-socks5-misc-priv.h b/src/hev-socks5-misc-priv.h
-index 8770a5facf2c7465ea812b12bbf867de89db028c..c17dc5f3ddba70ea9a56ed17b99ad1d5e8308545 100644
+index 01877bdcee48b6a9527c6141130e44c0850de924..fc8af6fd4874ac54ef72437a3adf7359d4cbeaca 100644
 --- a/src/hev-socks5-misc-priv.h
 +++ b/src/hev-socks5-misc-priv.h
 @@ -11,6 +11,7 @@
  #define __HEV_SOCKS5_MISC_PRIV_H__
  
- #include <netinet/in.h>
+ #include <hev-sys.h>
 +#include <string.h>
  
  #include <hev-task.h>
@@ -28,10 +48,10 @@ index 8770a5facf2c7465ea812b12bbf867de89db028c..c17dc5f3ddba70ea9a56ed17b99ad1d5
  
  const char *hev_socks5_addr_into_str (const HevSocks5Addr *addr, char *buf,
 diff --git a/src/hev-socks5-misc.c b/src/hev-socks5-misc.c
-index ca122f8d009a5aef033d11a08226e3944bd9a262..3ba5c7fc03ddb281bbce729d17351784024740ce 100644
+index 23592ff37678e7687e3647691273a96e236f12f9..b3e667d05cc89c30d5b03ad6ef50e0321fd67188 100644
 --- a/src/hev-socks5-misc.c
 +++ b/src/hev-socks5-misc.c
-@@ -133,9 +133,12 @@ int
+@@ -137,9 +137,12 @@ int
  hev_socks5_addr_from_name (HevSocks5Addr *addr, const char *name, int _port)
  {
      uint16_t port = _port;
@@ -46,7 +66,7 @@ index ca122f8d009a5aef033d11a08226e3944bd9a262..3ba5c7fc03ddb281bbce729d17351784
      memcpy ((char *)addr->domain.addr + addr->domain.len, &port, 2);
      return 4 + addr->domain.len;
  }
-@@ -213,6 +216,8 @@ hev_socks5_addr_into_sockaddr6 (const HevSocks5Addr *addr,
+@@ -217,6 +220,8 @@ hev_socks5_addr_into_sockaddr6 (const HevSocks5Addr *addr,
      case HEV_SOCKS5_ADDR_TYPE_NAME: {
          char name[256];
          uint16_t port;
@@ -56,10 +76,10 @@ index ca122f8d009a5aef033d11a08226e3944bd9a262..3ba5c7fc03ddb281bbce729d17351784
          name[addr->domain.len] = '\0';
          memcpy (&port, addr->domain.addr + addr->domain.len, 2);
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index db7682284981c9687e2516cb3d325ce94108203f..a8b5cea6a2dcce20ecf95fa75221698773984e31 100644
+index 60d8b471190e2b734abfcde5d7d4b33b1a61372e..0900acd9c1e48ad6169302bd6459b35e88f9d407 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
-@@ -603,8 +603,8 @@
+@@ -605,8 +605,8 @@ hev_socks5_udp_sendmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          int addrlen;
  
          addrlen = hev_socks5_addr_len (msgv[i].addr);
@@ -70,7 +90,7 @@ index db7682284981c9687e2516cb3d325ce94108203f..a8b5cea6a2dcce20ecf95fa752216987
              expected > (size_t)SSIZE_MAX - (3 + addrlen + msgv[i].len)) {
              LOG_D ("%p socks5 udp addr", self);
              return -1;
-@@ -751,7 +751,8 @@
+@@ -754,7 +754,8 @@ hev_socks5_udp_sendmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          int addrlen;
  
          addrlen = hev_socks5_addr_len (msgv[i].addr);
@@ -80,7 +100,7 @@ index db7682284981c9687e2516cb3d325ce94108203f..a8b5cea6a2dcce20ecf95fa752216987
              LOG_D ("%p socks5 udp addr", self);
              return -1;
          }
-@@ -847,6 +848,7 @@
+@@ -850,6 +851,7 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
  
      for (i = 0; i < num; i++) {
          HevSocks5UDPHdr udp;
@@ -88,7 +108,7 @@ index db7682284981c9687e2516cb3d325ce94108203f..a8b5cea6a2dcce20ecf95fa752216987
          struct iovec iov[2];
          struct msghdr mh = { 0 };
          int addrlen;
-@@ -917,14 +919,20 @@
+@@ -920,14 +922,20 @@ hev_socks5_udp_recvmmsg_tcp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
              hev_socks5_set_timeout (HEV_SOCKS5 (self), 0);
              return rlen ? rlen : -1;
          }
@@ -112,7 +132,7 @@ index db7682284981c9687e2516cb3d325ce94108203f..a8b5cea6a2dcce20ecf95fa752216987
  
          rlen++;
      }
-@@ -996,7 +1004,8 @@
+@@ -999,7 +1007,8 @@ retry:
          if (udp->addr.atype == HEV_SOCKS5_ADDR_TYPE_NAME && mvec[i].msg_len < 5)
              continue;
          addrlen = hev_socks5_addr_len (&udp->addr);
@@ -122,23 +142,3 @@ index db7682284981c9687e2516cb3d325ce94108203f..a8b5cea6a2dcce20ecf95fa752216987
              continue;
          doff = 3 + addrlen;
  
-diff --git a/src/hev-socks5-client-tcp.c b/src/hev-socks5-client-tcp.c
-index 167baeef6bb54b8a0785f586dd4e0789cd95501d..644cbc89afa35604942a9e927a6779ca9dc963fc 100644
---- a/src/hev-socks5-client-tcp.c
-+++ b/src/hev-socks5-client-tcp.c
-@@ -23,11 +23,14 @@ hev_socks5_client_tcp_new_name (const char *name, int port)
-     HevSocks5Addr addr;
-     int res;
- 
-+    res = hev_socks5_addr_from_name (&addr, name, port);
-+    if (res < 0)
-+        return NULL;
-+
-     self = hev_malloc0 (sizeof (HevSocks5ClientTCP));
-     if (!self)
-         return NULL;
- 
--    hev_socks5_addr_from_name (&addr, name, port);
-     res = hev_socks5_client_tcp_construct (self, &addr);
-     if (res < 0) {
-         hev_free (self);

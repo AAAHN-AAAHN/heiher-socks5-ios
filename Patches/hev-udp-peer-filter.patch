@@ -1,8 +1,8 @@
 diff --git a/src/hev-socks5-udp.c b/src/hev-socks5-udp.c
-index d20efb7b28f26a20dabe0b3e02a6b881d2ec2bf1..a118dcfe670d0bdf39d1d5fe46fc6b34d052d24c 100644
+index defeecf9ffcfaf89640ee7ffd8d91842872b49a8..ecfb5d89060206d62e384da4f1d0abfadefc5426 100644
 --- a/src/hev-socks5-udp.c
 +++ b/src/hev-socks5-udp.c
-@@ -361,19 +361,21 @@ static int
+@@ -364,19 +364,21 @@ static int
  hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
                               unsigned int num, int nonblock)
  {
@@ -28,7 +28,7 @@ index d20efb7b28f26a20dabe0b3e02a6b881d2ec2bf1..a118dcfe670d0bdf39d1d5fe46fc6b34
          mvec[i].msg_hdr.msg_control = NULL;
          mvec[i].msg_hdr.msg_controllen = 0;
          mvec[i].msg_hdr.msg_iov = &iov[i];
-@@ -383,11 +385,6 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -386,11 +388,6 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          iov[i].iov_len = msgv[i].len;
      }
  
@@ -40,20 +40,22 @@ index d20efb7b28f26a20dabe0b3e02a6b881d2ec2bf1..a118dcfe670d0bdf39d1d5fe46fc6b34
      res = hev_task_io_socket_recvmmsg (fd, mvec, num, nonblock, task_io_yielder,
                                         self);
      if (res <= 0) {
-@@ -396,25 +393,43 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -399,27 +396,44 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          return res;
      }
  
 -    if (!HEV_SOCKS5 (self)->udp_associated) {
 -        hev_socks5_udp_addr_normalize (&taddr);
--        if (connect (fd, (struct sockaddr *)&taddr, sizeof (taddr)) < 0)
+-        if (hev_task_io_socket_connect (fd, (struct sockaddr *)&taddr,
+-                                        sizeof (taddr), task_io_yielder,
+-                                        self) < 0)
 -            return -1;
 -        HEV_SOCKS5 (self)->udp_associated = 1;
 -    }
 +    /* Port-zero discovery must retain the control connection's peer IP.
 +     * Check connected batches too: datagrams queued before connect may remain. */
 +    i = HEV_SOCKS5 (self)->udp_associated ? fd : HEV_SOCKS5 (self)->fd;
-+    if (getpeername (i, (struct sockaddr *)&peer, &alen) < 0)
++    if (hev_task_io_socket_getpeername (i, (struct sockaddr *)&peer, &alen) < 0)
 +        return -1;
 +    hev_socks5_udp_addr_normalize (&peer);
  
@@ -72,8 +74,9 @@ index d20efb7b28f26a20dabe0b3e02a6b881d2ec2bf1..a118dcfe670d0bdf39d1d5fe46fc6b34
 +            continue;
 +
 +        if (!HEV_SOCKS5 (self)->udp_associated) {
-+            if (connect (fd, (struct sockaddr *)&taddr[i], sizeof (taddr[i])) <
-+                0)
++            if (hev_task_io_socket_connect (fd, (struct sockaddr *)&taddr[i],
++                                            sizeof (taddr[i]), task_io_yielder,
++                                            self) < 0)
 +                return -1;
 +            peer = taddr[i];
 +            HEV_SOCKS5 (self)->udp_associated = 1;
@@ -91,7 +94,7 @@ index d20efb7b28f26a20dabe0b3e02a6b881d2ec2bf1..a118dcfe670d0bdf39d1d5fe46fc6b34
          if (addrlen <= 0) {
              LOG_D ("%p socks5 udp addr", self);
              msgv[i].addr = NULL;
-@@ -433,9 +448,16 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
+@@ -438,9 +452,16 @@ hev_socks5_udp_recvmmsg_udp (HevSocks5UDP *self, HevSocks5UDPMsg *msgv,
          msgv[i].addr = &udp->addr;
          msgv[i].buf += doff;
          msgv[i].len -= doff;

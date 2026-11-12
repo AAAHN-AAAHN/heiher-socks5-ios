@@ -1,7 +1,7 @@
 diff --git a/src/hev-main.h b/src/hev-main.h
 --- a/src/hev-main.h
 +++ b/src/hev-main.h
-@@ -15,2 +15,14 @@
+@@ -18,2 +18,14 @@
  #endif
 +
 +/* Read-only metadata for an actual ready TCP listener. No socket is borrowed.
@@ -16,19 +16,38 @@ diff --git a/src/hev-main.h b/src/hev-main.h
 +} HevSocks5ListenerInfo;
 +int hev_socks5_server_listener_info (HevSocks5ListenerInfo *info);
  
+diff --git a/src/hev-socket-factory.c b/src/hev-socket-factory.c
+--- a/src/hev-socket-factory.c
++++ b/src/hev-socket-factory.c
+@@ -74,2 +74,8 @@
+ int
++hev_socket_factory_is_ipv4 (HevSocketFactory *self)
++{
++    return IN6_IS_ADDR_V4MAPPED (&self->addr.sin6_addr);
++}
++
++int
+ hev_socket_factory_get (HevSocketFactory *self)
+diff --git a/src/hev-socket-factory.h b/src/hev-socket-factory.h
+--- a/src/hev-socket-factory.h
++++ b/src/hev-socket-factory.h
+@@ -19,2 +19,3 @@
+ int hev_socket_factory_get (HevSocketFactory *self);
++int hev_socket_factory_is_ipv4 (HevSocketFactory *self);
+ 
 diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
 --- a/src/hev-socks5-proxy.c
 +++ b/src/hev-socks5-proxy.c
-@@ -17,2 +17,3 @@
+@@ -16,2 +16,3 @@
  #include <stdatomic.h>
 +#include <arpa/inet.h>
  
-@@ -30,2 +31,3 @@
+@@ -35,2 +36,3 @@
  #include "hev-socks5-proxy.h"
 +#include "hev-main.h"
  
-@@ -56,2 +58,82 @@
- static int signal_installed;
+@@ -64,2 +66,82 @@
+ #endif
 +static pthread_mutex_t listener_lock = PTHREAD_MUTEX_INITIALIZER;
 +static HevSocks5ListenerInfo listener_info;
 +static int listener_ready;
@@ -110,16 +129,16 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
 +    pthread_mutex_unlock (&listener_lock);
 +}
  
-@@ -229,2 +311,3 @@
+@@ -344,2 +426,3 @@
      HevSocketFactory *factory;
 +    HevSocks5ListenerInfo actual_listener = { 0 };
      const char *listen_addr;
-@@ -238,2 +321,4 @@
+@@ -358,2 +441,4 @@
  
 +    listener_clear ();
 +
      LOG_D ("socks5 proxy init");
-@@ -285,5 +370,9 @@
+@@ -417,5 +502,9 @@
  
 -        /* Skip worker 0 */
 -        if (i == 0)
@@ -131,36 +150,15 @@ diff --git a/src/hev-socks5-proxy.c b/src/hev-socks5-proxy.c
              continue;
 +        }
  
-@@ -323,2 +412,3 @@
+@@ -461,2 +550,3 @@
      atomic_fetch_or (&tsync, SYNC_SEND);
 +    listener_publish (&actual_listener);
  
-@@ -341,2 +431,4 @@
+@@ -479,2 +569,3 @@
  
 +    listener_clear ();
-+
-     atomic_store (&signal_worker, NULL);
-@@ -409,2 +501,3 @@
+     atomic_store (&reload_fd, -1);
+@@ -581,2 +672,3 @@
  
 +    listener_clear ();
      if (res & SYNC_SEND) {
-diff --git a/src/hev-socket-factory.c b/src/hev-socket-factory.c
---- a/src/hev-socket-factory.c
-+++ b/src/hev-socket-factory.c
-@@ -72,2 +72,8 @@
- int
-+hev_socket_factory_is_ipv4 (HevSocketFactory *self)
-+{
-+    return IN6_IS_ADDR_V4MAPPED (&self->addr.sin6_addr);
-+}
-+
-+int
- hev_socket_factory_get (HevSocketFactory *self)
-diff --git a/src/hev-socket-factory.h b/src/hev-socket-factory.h
---- a/src/hev-socket-factory.h
-+++ b/src/hev-socket-factory.h
-@@ -19,3 +19,4 @@
- int hev_socket_factory_get (HevSocketFactory *self);
-+int hev_socket_factory_is_ipv4 (HevSocketFactory *self);
-
- #endif /* __HEV_SOCKET_FACTORY_H__ */

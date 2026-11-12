@@ -1,8 +1,8 @@
 /* Exercise the actual patched translation unit; replace only OS I/O boundaries. */
 #define recv audit_control_recv
 #define hev_socks5_task_io_yielder audit_yield
-#define connect audit_connect
-#define getpeername audit_getpeername
+#define hev_task_io_socket_connect audit_connect
+#define hev_task_io_socket_getpeername audit_getpeername
 #define hev_task_io_socket_recvmmsg audit_recv
 #define hev_task_io_socket_sendmmsg audit_send
 #if defined(__APPLE__)
@@ -11,8 +11,8 @@
 #include "hev-socks5-udp.c"
 #undef recv
 #undef hev_socks5_task_io_yielder
-#undef connect
-#undef getpeername
+#undef hev_task_io_socket_connect
+#undef hev_task_io_socket_getpeername
 #undef hev_task_io_socket_recvmmsg
 #undef hev_task_io_socket_sendmmsg
 #if defined(__APPLE__)
@@ -115,8 +115,10 @@ audit_getpeername (int fd, struct sockaddr *addr, socklen_t *length)
 }
 
 int
-audit_connect (int fd, const struct sockaddr *addr, socklen_t length)
+audit_connect (int fd, const struct sockaddr *addr, socklen_t length,
+               HevTaskIOYielder yielder, void *data)
 {
+    assert (yielder && data);
     assert (fd == 10 && length == sizeof (peer));
     memcpy (&peer, addr, sizeof (peer));
     assert (peer.sin6_family == AF_INET6);

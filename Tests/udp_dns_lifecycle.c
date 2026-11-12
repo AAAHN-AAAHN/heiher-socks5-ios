@@ -40,13 +40,14 @@ static _Thread_local int fixture_role;
 static atomic_int fixture_mode, fixture_held, fixture_done;
 static atomic_int fixture_waiters, fixture_registered, fixture_creates;
 static atomic_int fixture_requests, fixture_replies, fixture_lookups;
+static atomic_int fixture_drains, fixture_drain_replies;
 static atomic_int fixture_injected;
 static atomic_int fixture_reply_fd, fixture_request_fd;
 static int fixture_release;
 static int fixture_create (pthread_t *, const pthread_attr_t *,
                            void *(*)(void *), void *);
 static int fixture_mutex_lock (pthread_mutex_t *);
-static int fixture_aide_add (HevTaskAideWork *);
+static int fixture_aide_add (HevTaskAide *aide, HevTaskAideWork *);
 static ssize_t fixture_read (int, void *, size_t);
 static ssize_t fixture_write (int, const void *, size_t);
 
@@ -111,7 +112,7 @@ fixture_handler (unsigned int events, void *data)
 }
 
 static int
-fixture_aide_add (HevTaskAideWork *work)
+fixture_aide_add (HevTaskAide *aide, HevTaskAideWork *work)
 {
     int result, mode = atomic_load (&fixture_mode);
     if (mode >= FIXTURE_ACK) {
@@ -121,7 +122,7 @@ fixture_aide_add (HevTaskAideWork *work)
         if (mode == FIXTURE_ACK || mode == FIXTURE_QUEUED)
             work->handler = fixture_handler;
     }
-    result = hev_task_aide_add (work);
+    result = hev_task_aide_add (aide, work);
     if (fixture_role == 2 && !result)
         atomic_fetch_add (&fixture_registered, 1);
     return result;
@@ -157,8 +158,14 @@ fixture_write (int fd, const void *buffer, size_t length)
     }
     result = write (fd, buffer, length);
     if (result == 1 && (mode == FIXTURE_ACK || mode == FIXTURE_QUEUED)) {
-        if (fd == atomic_load (&fixture_request_fd))
+        if (fd == atomic_load (&fixture_request_fd)) {
             atomic_fetch_add (&fixture_requests, 1);
+            if (*(const char *)buffer == 'd')
+                atomic_fetch_add (&fixture_drains, 1);
+        }
+        if (fd == atomic_load (&fixture_reply_fd) &&
+            *(const char *)buffer == 'd')
+            atomic_fetch_add (&fixture_drain_replies, 1);
         if (fd == atomic_load (&fixture_reply_fd) &&
             !atomic_fetch_add (&fixture_replies, 1))
             fixture_hold ();
@@ -182,6 +189,11 @@ fixture_resolve (void *unused)
         assert (!status && result && result->ai_family == AF_INET6);
         assert (result->ai_addrlen == sizeof (struct sockaddr_in6));
         freeaddrinfo (result);
+        /* Retain the shared aide until all peers have registered. Its new
+         * last-user teardown is otherwise allowed to recreate it. */
+        if (fixture_role == 2)
+            while (atomic_load (&fixture_registered) != FIXTURE_PEERS)
+                usleep (100);
     }
 }
 
@@ -315,24 +327,20 @@ fixture_ack (int queued)
     atomic_store (&fixture_done, 0);
     atomic_store (&fixture_requests, 0);
     atomic_store (&fixture_replies, 0);
+    atomic_store (&fixture_drains, 0);
+    atomic_store (&fixture_drain_replies, 0);
     atomic_store (&fixture_mode, queued ? FIXTURE_QUEUED : FIXTURE_ACK);
-    if (queued)
-        assert (
-            !pthread_create (&releaser, NULL, fixture_queued_release, NULL));
+    /* Upstream now explicitly drains the callback before freeing the proxy.
+     * In ACK mode the second request is the teardown 'd'; in queued mode it
+     * is the second lookup. Neither may complete while the reply is held. */
+    assert (!pthread_create (&releaser, NULL, fixture_queued_release, NULL));
     fixture_run (fixture_resolve, queued ? 2 : 1);
-    if (queued) {
-        assert (!pthread_join (releaser, NULL));
-    } else {
-        while (!atomic_load (&fixture_held))
-            usleep (100);
-        assert (!atomic_load (&fixture_done));
-        /* The receiving task, proxy and its actual allocator are already gone. */
-        fixture_resume ();
-    }
-    while (atomic_load (&fixture_done) != (queued ? 2 : 1))
-        usleep (100);
-    assert (atomic_load (&fixture_requests) == (queued ? 2 : 1));
-    assert (atomic_load (&fixture_replies) == (queued ? 2 : 1));
+    assert (!pthread_join (releaser, NULL));
+    assert (atomic_load (&fixture_done) >= 1);
+    assert (atomic_load (&fixture_drains) == 1);
+    assert (atomic_load (&fixture_drain_replies) == 1);
+    assert (atomic_load (&fixture_requests) == (queued ? 3 : 2));
+    assert (atomic_load (&fixture_replies) == (queued ? 3 : 2));
     atomic_store (&fixture_mode, FIXTURE_IDLE);
 }
 

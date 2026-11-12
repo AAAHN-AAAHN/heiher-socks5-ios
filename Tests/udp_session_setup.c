@@ -76,9 +76,9 @@ static void *setup_meter_peer (const struct sockaddr *, socklen_t);
 #undef LOG_ON_E
 #include "hev-misc.c"
 #undef hev_task_dns_getaddrinfo
-#define bind setup_bind
+#define hev_task_io_socket_bind setup_bind
 #include "hev-socks5-session.c"
-#undef bind
+#undef hev_task_io_socket_bind
 #include "hev-socks5-worker.c"
 
 static atomic_int iface_calls;
