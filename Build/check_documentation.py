@@ -129,6 +129,12 @@ def check_membership(root, baseline, value):
         return
     original = json.loads(show(root, value['frozen_source'], path))
     current = json.loads((root / path).read_bytes())
+    # A standalone HEAD bundle must include every immutable source reference.
+    for ref in {entry['commit'] for entry in current.get('sources', {}).values()}:
+        try:
+            git(root, 'merge-base', '--is-ancestor', ref, 'HEAD')
+        except subprocess.CalledProcessError as error:
+            raise RuntimeError('Membership source is not reachable from HEAD: ' + ref) from error
     require(set(current) == set(original), 'Membership structure changed')
     require(current.get('branches', {}) == value['parents'], 'Membership document parents differ')
     for key in set(original) - {'sources', 'files'}:

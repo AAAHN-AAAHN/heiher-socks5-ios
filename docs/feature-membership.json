@@ -1,13 +1,13 @@
 {
-  "base_commit": "d3f20d7e3905dcc300f0a5ebf155aa4cc2869774",
+  "base_commit": "a0a8e4b321222d3e8e193fb0814ed1535bfae4c7",
   "branches": {
-    "main": "0e030aedbd4127e9215b38bb23dd6e38c5872546"
+    "main": "a0a8e4b321222d3e8e193fb0814ed1535bfae4c7"
   },
   "sources": {
     "Patches/hev-server-lifecycle.patch": {
-      "commit": "2e0d6932a3a551380b3f304bb31e98bc942f13f4",
+      "commit": "b933bbe7c4171a65e5155e473f02573217f990a5",
       "path": "Build/native/hev-server-lifecycle.patch",
-      "sha256": "df872f0a6a10d1dfbc4efd23f62c566a4698b6f2a79d6e2298068c39b6ac98a9"
+      "sha256": "3dac527989c9b7942432295fb40738d14fa22ed09d69e2b2f3bcbf6eb880c9d4"
     }
   },
   "files": {},
