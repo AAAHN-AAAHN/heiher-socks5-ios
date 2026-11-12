@@ -368,6 +368,51 @@ def validate_current_environment(source, control, mode):
             "attempt": positive_decimal(os.environ["GITHUB_RUN_ATTEMPT"]), "job": job,
             "helper": control, "runner_os": "macOS"}
 
+def isolated_review_binding(request, source, control, caller, root):
+    """Opt in to one canonical consumer on its own hosted boot session.
+
+    The ordinary integrated contract remains sequential. Environment alone cannot
+    select isolation, and a receipt from another matrix leg/host is not reusable.
+    """
+    selected = request.get("isolated_consumer")
+    declared = os.environ.get("REVIEW_CONSUMER")
+    if selected is None:
+        require(declared is None, "REVIEW_CONSUMER requires explicit isolated-consumer mode")
+        return None
+    require(request["mode"] == "canonical" and request["owner"] == "integrated"
+            and selected in ("integrated-ui", "integrated-simulator") and declared == selected,
+            "Isolation requires the matching canonical integrated consumer")
+    require(source == control and source["commit"] == os.environ.get("GITHUB_SHA")
+            and caller["job"] == "review-macos",
+            "Isolated review must use the actual canonical source and review job")
+    workflow = ".github/workflows/verify-build.yml"
+    reference = os.environ.get("GITHUB_REF", "")
+    require(reference.startswith("refs/") and not any(c.isspace() for c in reference)
+            and os.environ.get("GITHUB_WORKFLOW_REF") == caller["repository"] + "/" + workflow + "@" + reference
+            and os.environ.get("GITHUB_WORKFLOW_SHA") == source["commit"],
+            "Isolated review workflow identity differs from the actual source")
+    raw_workflow, workflow_file = tracked_regular_file(root, source["commit"], workflow)
+    # Bind the deliberately reviewed matrix syntax, not an arbitrary opt-in env.
+    # This is a fail-closed source check, not a general YAML interpreter.
+    job_header = (b"  review-macos:\n    strategy:\n      fail-fast: false\n      matrix:\n"
+                  b"        consumer: [integrated-ui, integrated-simulator]\n")
+    require(raw_workflow.count(job_header) == 1
+            and raw_workflow.count(b"      REVIEW_CONSUMER: ${{ matrix.consumer }}\n") == 1
+            and all(raw_workflow.count(("        if: matrix.consumer == '" + item + "'\n").encode()) == 1
+                    for item in ("integrated-ui", "integrated-simulator")),
+            "Canonical workflow lacks the reviewed isolated consumer matrix")
+    runner = os.environ.get("RUNNER_NAME", "")
+    require(bool(runner) and not any(ord(c) < 32 for c in runner), "Missing isolated runner identity")
+    boot = subprocess.run(["/usr/sbin/sysctl", "-n", "kern.bootsessionuuid"],
+                          capture_output=True, timeout=META)
+    boot_id = boot.stdout.decode().strip()
+    require(boot.returncode == 0 and boot.stderr == b"" and re.fullmatch(UUID_PATTERN, boot_id),
+            "Could not bind the current hosted boot session")
+    return {"schema": "isolated-integrated-consumer-v1", "consumer": selected,
+            "workflow_ref": os.environ["GITHUB_WORKFLOW_REF"], "workflow_sha": source["commit"],
+            "workflow_file": workflow_file, "runner_name": runner,
+            "host_name": os.uname().nodename, "boot_session_uuid": boot_id}
+
 def git_ref_commit(root, reference):
     # Exact read-only resolution; the input is an argv element, never shell code.
     value = subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "--quiet", "--end-of-options",
@@ -539,6 +584,9 @@ def context_for(request):
         raw_receipt, receipt_info = regular_bytes(receipt_path, root, maximum=64 * 1024 * 1024)
         result["original_restorer_binding"] = {"matrix": matrix_info, "restorer": restorer_info, "receipt": receipt_info,
             "identity": validate_candidate_receipt(decode(raw_receipt), owner, source, pins, consumer, decode(raw_matrix))}
+    isolation = isolated_review_binding(request, source, control, consumer, root)
+    if isolation is not None:
+        result["isolated_review"] = isolation
     return result
 
 def recheck_context(request, expected):
@@ -560,7 +608,18 @@ def digest(raw):
 def consumer_profile(context, consumer):
     profiles = OWNER_PROFILES[context["owner"]]["consumers"]
     require(consumer in profiles, "Consumer is outside the actual source owner")
+    require(consumer in consumer_order(context), "Consumer differs from the isolated review assignment")
     return profiles[consumer]
+
+def consumer_order(context):
+    isolated = context.get("isolated_review")
+    if isolated is not None:
+        require(context["mode"] == "canonical" and context["owner"] == "integrated"
+                and isolated.get("schema") == "isolated-integrated-consumer-v1"
+                and isolated.get("consumer") in ("integrated-ui", "integrated-simulator"),
+                "Invalid isolated consumer context")
+        return [isolated["consumer"]]
+    return list(OWNER_PROFILES[context["owner"]]["consumers"])
 
 def write_json(path, value, root, replace=False):
     unlinked_path(path, root)
@@ -674,7 +733,7 @@ def validate_observation(report, context):
             and report.get("errors") == [] and report.get("product_pass") is False
             and report.get("candidate_credit") is False,
             "Installed observation did not complete under this exact source/control identity")
-    order = list(OWNER_PROFILES[context["owner"]]["consumers"])
+    order = consumer_order(context)
     require(report.get("consumer_order") == order, "Installed observation consumer order differs")
     observed = report["installed_observation"]
     require(report.get("observations") == [observed] and set(observed["selections"]) == set(order),
@@ -697,7 +756,7 @@ def prepare_environment(request, context):
     root, output = Path(context["source_root"]), preparation_root(context)
     require(not output.exists(), "Prepare once; prior evidence is neither reused nor deleted")
     output.mkdir(mode=0o700, parents=True)
-    order = list(OWNER_PROFILES[context["owner"]]["consumers"])
+    order = consumer_order(context)
     report = {"schema": PREPARE_SCHEMA, "identity": context, "request": request,
               "started_utc": utc(), "commands": [], "observations": [], "errors": [],
               "product_pass": False, "candidate_credit": False, "consumer_order": order,
@@ -760,7 +819,7 @@ def load_preparation(context):
 
 
 def preceding_consumer(context, consumer, binding, initial):
-    order = list(OWNER_PROFILES[context["owner"]]["consumers"])
+    order = consumer_order(context)
     position = order.index(consumer)
     baseline = decode(canonical(initial["selections"][consumer]))
     if position == 0:
@@ -880,7 +939,7 @@ def after_consumer(request, context, consumer, original_status):
         failure_record(report, "source_control_after", error)
     # Only a fully bound successful UI receipt permits Integrated's next
     # consumer. Unknown original/observer evidence never earns a zero here.
-    report["terminal"] = not (consumer == "integrated-ui" and original_status == 0
+    report["terminal"] = not ("isolated_review" not in context and consumer == "integrated-ui" and original_status == 0
                               and type(report["observer_status"]) is int
                               and report["observer_status"] == 0 and not report["errors"])
     if report["terminal"]:
@@ -909,12 +968,12 @@ def main():
     parser.add_argument("--owner", required=True, choices=tuple(OWNER_PROFILES))
     for name in ("source-root", "source-commit", "source-tree"):
         parser.add_argument("--" + name, required=True)
-    for name in ("control-root", "control-commit", "control-tree", "workflow-input-ref", "consumer"):
+    for name in ("control-root", "control-commit", "control-tree", "workflow-input-ref", "consumer", "isolated-consumer"):
         parser.add_argument("--" + name)
     parser.add_argument("--actual-status", type=int)
     args = parser.parse_args()
     request = {key: getattr(args, key) for key in ("mode", "owner", "source_root", "source_commit", "source_tree",
-               "control_root", "control_commit", "control_tree", "workflow_input_ref")}
+               "control_root", "control_commit", "control_tree", "workflow_input_ref", "isolated_consumer")}
     try:
         context = context_for(request)
         if args.action == "prepare":

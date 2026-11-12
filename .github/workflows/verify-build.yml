@@ -104,11 +104,16 @@ jobs:
           retention-days: 30
 
   review-macos:
-    name: Simulator and integrated UI (xcode-27)
+    strategy:
+      fail-fast: false
+      matrix:
+        consumer: [integrated-ui, integrated-simulator]
+    name: ${{ matrix.consumer }} review (xcode-27)
     needs: verify-macos
     runs-on: xcode-27
     timeout-minutes: 75
     env:
+      REVIEW_CONSUMER: ${{ matrix.consumer }}
       DEVELOPER_DIR: /Applications/Xcode_27.app/Contents/Developer
       REVIEW_INPUT_ARTIFACT_ID: ${{ needs.verify-macos.outputs.review-artifact-id }}
       REVIEW_INPUT_ARTIFACT_DIGEST: ${{ needs.verify-macos.outputs.review-artifact-digest }}
@@ -120,6 +125,8 @@ jobs:
           ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
           fetch-depth: 0
+      - name: Validate isolated runtime provenance boundaries
+        run: python3 Tests/Integration/isolated_runtime_boundaries.py
       - name: Record the independent Apple review environment
         shell: bash
         run: |
@@ -150,6 +157,7 @@ jobs:
           allow-prereleases: false
           freethreaded: false
       - name: Actual integrated UI, saved intent and native response
+        if: matrix.consumer == 'integrated-ui'
         run: |
           set -euo pipefail
           runtime_observer_bind() {
@@ -164,7 +172,7 @@ jobs:
           if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o644 or info.st_nlink != 1 or info.st_size != 16072:
               raise SystemExit('Status reader file type, mode, links or size differs')
           raw = path.read_bytes()
-          if len(raw) != 16072 or hashlib.sha256(raw).hexdigest() != '1997920482a35e88c5f72bb60e75a945ea70f727e4af34592fd0a849e7dafd92':
+          if len(raw) != 16072 or hashlib.sha256(raw).hexdigest() != '37fbd6efbcc32144b2daf532b0d6de8ee7911e50740dfab3ee1f2c6ed8a3337b':
               raise SystemExit('Status reader bytes differ from the frozen reader')
           blob = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
           entry = subprocess.run(['git', '-C', str(root), 'ls-tree', sys.argv[2], '--', relative], capture_output=True, timeout=10)
@@ -187,6 +195,7 @@ jobs:
           runtime_common_args=(--mode canonical --owner integrated
             --source-root "$runtime_common_source_root" --source-commit "$runtime_common_source_commit" --source-tree "$runtime_common_source_tree")
           runtime_common_args+=(--control-root "$runtime_common_source_root" --control-commit "$GITHUB_SHA" --control-tree "$runtime_common_source_tree")
+          runtime_common_args+=(--isolated-consumer "$REVIEW_CONSUMER")
           runtime_common_invoke() {
             "$runtime_common_python" "$runtime_common_helper" "$@" "${runtime_common_args[@]}"
           }
@@ -233,6 +242,7 @@ jobs:
           if [ "$runtime_observer_binding_status" -ne 0 ]; then exit "$runtime_observer_binding_status"; fi
           if [ "$runtime_common_after_status" -ne 0 ]; then exit "$runtime_common_after_status"; fi
       - name: Original and remapped Simulator installs, saved tabs and real TCP
+        if: matrix.consumer == 'integrated-simulator'
         run: |
           set -euo pipefail
           runtime_observer_bind() {
@@ -247,7 +257,7 @@ jobs:
           if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o644 or info.st_nlink != 1 or info.st_size != 16072:
               raise SystemExit('Status reader file type, mode, links or size differs')
           raw = path.read_bytes()
-          if len(raw) != 16072 or hashlib.sha256(raw).hexdigest() != '1997920482a35e88c5f72bb60e75a945ea70f727e4af34592fd0a849e7dafd92':
+          if len(raw) != 16072 or hashlib.sha256(raw).hexdigest() != '37fbd6efbcc32144b2daf532b0d6de8ee7911e50740dfab3ee1f2c6ed8a3337b':
               raise SystemExit('Status reader bytes differ from the frozen reader')
           blob = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
           entry = subprocess.run(['git', '-C', str(root), 'ls-tree', sys.argv[2], '--', relative], capture_output=True, timeout=10)
@@ -270,9 +280,23 @@ jobs:
           runtime_common_args=(--mode canonical --owner integrated
             --source-root "$runtime_common_source_root" --source-commit "$runtime_common_source_commit" --source-tree "$runtime_common_source_tree")
           runtime_common_args+=(--control-root "$runtime_common_source_root" --control-commit "$GITHUB_SHA" --control-tree "$runtime_common_source_tree")
+          runtime_common_args+=(--isolated-consumer "$REVIEW_CONSUMER")
           runtime_common_invoke() {
             "$runtime_common_python" "$runtime_common_helper" "$@" "${runtime_common_args[@]}"
           }
+          # Capture real process status even under the original set -e discipline.
+          if runtime_common_invoke prepare; then
+            runtime_common_prepare_status=0
+          else
+            runtime_common_prepare_status=$?
+          fi
+          if runtime_common_invoke record-prepare-exit --actual-status "$runtime_common_prepare_status"; then
+            runtime_common_record_status=0
+          else
+            runtime_common_record_status=$?
+          fi
+          if [ "$runtime_common_prepare_status" -ne 0 ]; then exit "$runtime_common_prepare_status"; fi
+          if [ "$runtime_common_record_status" -ne 0 ]; then exit "$runtime_common_record_status"; fi
           runtime_common_invoke before --consumer integrated-simulator
           runtime_observer_bind before integrated integrated-simulator "$runtime_common_source_root" "$runtime_common_source_commit" "$runtime_common_source_tree"
           runtime_observer_output="$runtime_common_source_root/artifacts/integrated/runtime-preparation/consumers/integrated-simulator/host-observation"
@@ -311,6 +335,6 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: Integrated-review-macOS-${{ github.run_id }}-${{ github.run_attempt }}
+          name: Integrated-review-${{ matrix.consumer }}-macOS-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/integrated/
           retention-days: 30
