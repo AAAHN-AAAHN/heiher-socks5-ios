@@ -194,7 +194,7 @@ def main():
         phase = 'boot'
         run('xcrun', 'simctl', 'boot', device, log='boot-request.log')
         phase = 'bootstatus'
-        run('xcrun', 'simctl', 'bootstatus', device, '-b', timeout=240, log='boot.log')
+        run('xcrun', 'simctl', 'bootstatus', device, '-b', timeout=360, log='boot.log')
         phase = 'scenarios'
         for suffix in ('', '.REMAPTEST'):
             bundle = 'hev.Socks5' + suffix
@@ -203,7 +203,7 @@ def main():
             (app / 'Info.plist').write_bytes(plistlib.dumps(info))
             run('codesign', '--force', '--sign', '-', app)
             installation_started = True
-            run('xcrun', 'simctl', 'install', device, app)
+            run('xcrun', 'simctl', 'install', device, app, timeout=360)
             container = Path(run('xcrun', 'simctl', 'get_app_container', device, bundle, 'data'))
             settings_file = container / 'Library/Application Support/Socks5/settings.json'
             settings_file.parent.mkdir(parents=True, exist_ok=True)
@@ -271,7 +271,7 @@ def main():
         if device is not None:
             for action in ('shutdown', 'delete'):
                 try:
-                    run('xcrun', 'simctl', action, device, timeout=30, log='cleanup-' + action + '.log')
+                    run('xcrun', 'simctl', action, device, timeout=120, log='cleanup-' + action + '.log')
                 except Exception as error:
                     cleanup.append({'action': action, 'error': repr(error)})
                     capture_failure(OUT, 'cleanup-' + action, device, error)
