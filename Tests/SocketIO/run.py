@@ -29,7 +29,7 @@ observed.write_text('extern void socket_io_worker_wait (const void *, int);\n'+
                    worker.replace(yield_point,'    socket_io_worker_wait (self, type);\n'+yield_point))
 restart_host=out/'restart-host'
 run([a.cc,'-O2','-pthread',*['-I'+str(n/path) for path in
-     ('src','src/misc','src/core/include','third-part/yaml/src','third-part/hev-task-system/include')],
+     ('src','src/misc','src/core/include','third-part/yaml/include','third-part/hev-task-system/include')],
      HERE/'restart_host.c',observed,n/'bin/libhev-socks5-server.a',
      n/'third-part/yaml/bin/libyaml.a',task/'bin/libhev-task-system.a','-o',restart_host])
 for name,defines in [('socket_observer',[]),('socket_observer',['-DFORCE_FALLBACK']),('stream_matrix',['-DENABLE_IO_SPLICE_SYSCALL'] if a.mode=='splice' else []),('registry',[]),('worker_boundaries',[]),('worker_sessions',[])]:

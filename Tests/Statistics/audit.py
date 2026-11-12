@@ -320,7 +320,7 @@ def ios_checks(changed):
     sdk = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path'], text=True).strip()
     task = CORE / 'third-part/hev-task-system'
     includes = ['-I' + str(p) for p in (CORE / 'src', CORE / 'src/misc',
-                CORE / 'src/core/include', CORE / 'src/core/src', CORE / 'third-part/yaml/src',
+                CORE / 'src/core/include', CORE / 'src/core/src', CORE / 'third-part/yaml/include',
                 task / 'include', task / 'src')]
     # Upstream task-io.h expects hev-task.h first; C sources keep their own includes.
     headers = OUT / 'statistics-headers.c'
