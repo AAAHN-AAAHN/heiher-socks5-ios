@@ -244,7 +244,16 @@ class IsolatedWorkflowBoundaries(unittest.TestCase):
         self.assertIn('consumer: [integrated-ui, integrated-simulator]', current)
         self.assertNotIn('continue-on-error', current)
         self.assertIn('name: Integrated-review-${{ matrix.consumer }}-macOS-', current)
-        self.assertEqual(current.split('  review-macos:', 1)[0], previous.split('  review-macos:', 1)[0])
+        old_checkout = '          ref: ${{ inputs.ref || github.sha }}\n'
+        new_checkout = '          ref: ${{ github.sha }}\n'
+        previous_build = previous.split('  review-macos:', 1)[0]
+        self.assertEqual(previous.count(old_checkout), 3)
+        self.assertEqual(previous_build.count(old_checkout), 2)
+        self.assertEqual(current.count(new_checkout), 3)
+        self.assertNotIn('inputs.ref', current)
+        self.assertIn('  workflow_dispatch:\npermissions:\n', current)
+        self.assertEqual(current.split('  review-macos:', 1)[0],
+                         previous_build.replace(old_checkout, new_checkout))
 
 
 if __name__ == '__main__':
