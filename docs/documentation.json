@@ -6,12 +6,12 @@
     "docs/features/integrated.md"
   ],
   "parents": {
-    "feature/app-icon": "018b175f21b2de94d41c1db6de9e03c077c36e17",
-    "feature/background": "79e2687223f4977312b860db98492db8ed4170f8",
-    "feature/server-control": "f65adc34913e1c8002c860afbce995d77019ba30",
-    "feature/settings-persistence": "d58a689cacdef147ce1be565eb89e8ea07178801",
-    "feature/traffic-statistics": "d27f2cd984b5b826a6e9bf4fb7fa1712da8eebfa",
-    "feature/udp-compat": "8f566f670d5c78beb0891cb146d5f16337651c78"
+    "feature/app-icon": "c1ff5e46e03deb2fbfb995ba941e6c8336d0e52c",
+    "feature/background": "c31e6e681f372dca74c65ff922784dfb3a80f3c9",
+    "feature/server-control": "09ce6721e71029cbff4673812961f18392559315",
+    "feature/settings-persistence": "0d8e1535797432f6d5ca044c9010fb7e299c86bd",
+    "feature/traffic-statistics": "92c1a1e2ebe235e494854ae92b04245675b6f292",
+    "feature/udp-compat": "306dd871afe82ba5cc44ddd3cd9854383f707bdc"
   },
   "readme_mirror": "docs/features/integrated.md",
   "validation_files": {
@@ -19,7 +19,7 @@
     "Build/check_documentation.py": "73f890ee7192c0d3e6c6e13f8cd02bb463cae2e5",
     "Build/check_ownership.py": "493798c9f3f4bead9277e05f5565184a029d36d0",
     "Tests/AppIcon/check_icon.py": "93cfbf9a90712bc3d7d52fe460947ee4b05c9564",
-    "Tests/Background/check_scope.py": "df52c0fda8593eb892de17dab216c8dc8311dadc",
+    "Tests/Background/check_scope.py": "6adf1f035612612a07c07e04cf2510e5b0476e95",
     "Tests/Statistics/audit.py": "f5b482cf2ea5ffad9e25c362692042b8bd1c9dad",
     "Tests/documentation_contract.py": "f1490e1e3258f050c1489522beb0d4080a41ba30"
   }
