@@ -12,6 +12,7 @@ import plistlib
 import shutil
 import subprocess
 import zipfile
+import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'artifacts/audio-async-ui'
@@ -26,6 +27,82 @@ def run(args, log, timeout=180):
     with (OUT / log).open('w') as stream:
         subprocess.run(list(map(str, args)), cwd=ROOT, stdout=stream,
                        stderr=subprocess.STDOUT, check=True, timeout=timeout)
+
+
+def cleanup_simulator(identifier):
+    """Accept only a verified already-Shutdown device followed by successful deletion."""
+    errors, observation = [], {'uuid': identifier, 'shutdown': 'pending', 'delete': 'pending'}
+    shutdown_error = None
+    confirmed_shutdown = False
+    command = ['xcrun', 'simctl', 'shutdown', identifier]
+    try:
+        run(command, 'cleanup-shutdown.log', timeout=120)
+        observation['shutdown'] = 'completed'
+    except Exception as exc:
+        shutdown_error = exc
+        observation['shutdown_error'] = str(exc)
+        expected = ('An error was encountered processing the command '
+                    '(domain=com.apple.CoreSimulator.SimError, code=405):\n'
+                    'Unable to shutdown device in current state: Shutdown')
+        try:
+            if (not isinstance(exc, subprocess.CalledProcessError) or exc.returncode != 149
+                    or exc.cmd != command or (OUT / 'cleanup-shutdown.log').read_text().strip() != expected):
+                raise ValueError('Shutdown failure is not the recognized already-Shutdown case')
+            run(['xcrun', 'simctl', 'list', 'devices', '-j'], 'cleanup-state.json', timeout=5)
+            def unique(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise ValueError('Duplicate state key')
+                    result[key] = value
+                return result
+            with (OUT / 'cleanup-state.json').open() as stream:
+                raw = stream.read(1024 * 1024 + 1)
+            if len(raw) > 1024 * 1024:
+                raise ValueError('State response exceeds limit')
+            def invalid_constant(_):
+                raise ValueError('Nonfinite state value')
+            devices = json.loads(raw, object_pairs_hook=unique, parse_constant=invalid_constant)['devices']
+            if not isinstance(devices, dict) or any(not isinstance(group, list) for group in devices.values()):
+                raise ValueError('Malformed device collection')
+            target = uuid.UUID(identifier)
+            matches = [device for group in devices.values() for device in group
+                       if uuid.UUID(device['udid']) == target]
+            if len(matches) != 1 or matches[0]['state'] != 'Shutdown':
+                raise ValueError('Exact UUID is not uniquely Shutdown')
+            confirmed_shutdown = True
+            observation['shutdown'] = 'verified-already-shutdown-pending-delete'
+        except Exception as diagnostic:
+            observation['shutdown'] = 'failed'
+            observation['state_check_error'] = str(diagnostic)
+    try:
+        run(['xcrun', 'simctl', 'delete', identifier], 'cleanup-delete.log', timeout=120)
+        observation['delete'] = 'completed'
+    except Exception as exc:
+        observation['delete'] = 'failed'
+        errors.append(str(exc))
+    if shutdown_error is not None:
+        if confirmed_shutdown and observation['delete'] == 'completed':
+            observation['shutdown'] = 'accepted-idempotent-already-shutdown'
+        else:
+            errors.insert(0, str(shutdown_error))
+    try:
+        (OUT / 'cleanup-observation.json').write_text(json.dumps(observation, indent=2) + '\n')
+    except Exception as exc:
+        errors.append('Cleanup evidence write failed: ' + str(exc))
+    return errors
+
+
+def finish_audit(failure, cleanup):
+    """Preserve an original failure even if cleanup or its evidence write also fails."""
+    try:
+        (OUT / 'cleanup.json').write_text(json.dumps(cleanup))
+    except Exception as exc:
+        cleanup.append('Cleanup error record write failed: ' + str(exc))
+    if failure is not None:
+        raise failure
+    if cleanup:
+        raise RuntimeError('Simulator cleanup failed: ' + repr(cleanup))
 
 
 def add_test_target(app):
@@ -116,7 +193,6 @@ def main():
     identifier = output('xcrun', 'simctl', 'create', 'Background Async Audio', device, runtime['identifier']).strip()
     (OUT / 'runtime.json').write_text(json.dumps(dict(runtime=runtime, device=device, udid=identifier), indent=2))
     failure = None
-    cleanup = []
     try:
         run(['xcrun', 'simctl', 'boot', identifier], 'boot.log')
         run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'ready.log', timeout=300)
@@ -177,16 +253,8 @@ def main():
                 except Exception:
                     pass
     finally:
-        for action in ('shutdown', 'delete'):
-            try:
-                run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=120)
-            except Exception as exc:
-                cleanup.append(str(exc))
-    (OUT / 'cleanup.json').write_text(json.dumps(cleanup))
-    if failure:
-        raise failure
-    if cleanup:
-        raise RuntimeError('Simulator cleanup failed: ' + repr(cleanup))
+        cleanup = cleanup_simulator(identifier)
+    finish_audit(failure, cleanup)
     (OUT / 'SUCCESS.txt').write_text('PASS: actual iOS27 Simulator audio On/Off, playback, saved intent and advisory check. No physical SideStore, LiveContainer, background survival or IPA.\n')
 
 

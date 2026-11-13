@@ -149,5 +149,10 @@
       "commit": "35e10c64ceb82d69f69b017088da8c79e4902a5b",
       "sha256": "9ee48e4bcb9ab9a64d201170c2df175dc3211cedda0ef99cfef1bd2e03cac3fa"
     }
+  },
+  "files": {
+    "Tests/Background/check_async_ui.py": "fbc9616a36ff772622e79b0fc56189c7b9ab954505767485b19ea80d297e339c",
+    "Tests/Background/check_simulator_cleanup.py": "712fb630f37ee435ef79dfed8ddfe67cd68400b917f6d894286f44516783c6d5",
+    "Tests/Background/check_audit_integrity.py": "5caffb2dd39da3a2a88c4961e459a510a6aa42afe3f613ffb8bea2b8d06d21c0"
   }
 }

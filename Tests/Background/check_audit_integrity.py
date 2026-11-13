@@ -266,6 +266,7 @@ def main():
     count += optimization_boundaries()
     count += native_copy_boundaries()
     print(f'SUMMARY: {count} actual audit-entry boundary cases, including retained and exact-prior negative controls')
+    subprocess.run([sys.executable, str(ROOT / 'Tests/Background/check_simulator_cleanup.py')], check=True)
 
 
 if __name__ == '__main__':
