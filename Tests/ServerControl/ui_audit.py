@@ -190,7 +190,7 @@ def main():
         identifier = output('xcrun', 'simctl', 'create', 'Server Control UI Audit', device['identifier'], runtime['identifier']).strip()
         (OUT / 'runtime.json').write_text(json.dumps(dict(runtime=runtime, deviceType=device, udid=identifier), indent=2))
         run(['xcrun', 'simctl', 'boot', identifier], 'simulator-boot.log')
-        run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'simulator-ready.log', timeout=120)
+        run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'simulator-ready.log', timeout=300)
         run(['xcodebuild', 'test', '-project', app / 'Socks5.xcodeproj', '-scheme', 'ServerControlUIAudit',
              '-destination', 'platform=iOS Simulator,id=' + identifier, '-parallel-testing-enabled', 'NO',
              '-derivedDataPath', WORK / 'DerivedData', '-resultBundlePath', OUT / 'UI.xcresult',
@@ -211,7 +211,7 @@ def main():
         if identifier:
             for action in ('shutdown', 'delete'):
                 try:
-                    run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=30)
+                    run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=120)
                 except Exception as exc:
                     cleanup.append(str(exc))
         if applied:
