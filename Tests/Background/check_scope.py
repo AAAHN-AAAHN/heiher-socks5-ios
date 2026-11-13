@@ -17,7 +17,7 @@ if not __debug__:
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = json.loads((ROOT / 'Build/features.json').read_bytes())
 BASE = CONFIG['base_commit']
-assert BASE == '9270e4e54736d4919e5f208fd308f6184787d65c'
+assert BASE == 'e30ded4906f98c2ef494fdfb5f3fd98759cc3818'
 PARENT = json.loads((ROOT / 'docs/documentation.json').read_bytes())['parents']['feature/udp-compat']
 ECHO_SOURCES = ('Socks5UDPClient.swift', 'Socks5ServerEndpoint.swift', 'PeriodicUDPEchoModel.swift',
                 'PeriodicUDPEchoService.swift', 'PeriodicUDPEchoStore.swift')
