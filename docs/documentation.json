@@ -6,7 +6,7 @@
     "docs/features/settings-persistence.md"
   ],
   "parents": {
-    "feature/server-control": "f65adc34913e1c8002c860afbce995d77019ba30"
+    "feature/server-control": "09ce6721e71029cbff4673812961f18392559315"
   },
   "readme_mirror": "docs/features/settings-persistence.md",
   "validation_files": {
