@@ -6,7 +6,7 @@
     "docs/features/traffic-statistics.md"
   ],
   "parents": {
-    "feature/udp-compat": "8f566f670d5c78beb0891cb146d5f16337651c78"
+    "feature/udp-compat": "306dd871afe82ba5cc44ddd3cd9854383f707bdc"
   },
   "readme_mirror": "docs/features/traffic-statistics.md",
   "validation_files": {
