@@ -163,7 +163,7 @@ def main():
         identifier = output('xcrun', 'simctl', 'create', 'Settings Persistence UI Audit', device['identifier'], runtime['identifier']).strip()
         (OUT / 'runtime.json').write_text(json.dumps(dict(runtime=runtime, deviceType=device, udid=identifier), indent=2))
         run(['xcrun', 'simctl', 'boot', identifier], 'simulator-boot.log')
-        run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'simulator-ready.log', timeout=120)
+        run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'simulator-ready.log', timeout=300)
         # Compile the generated app and UI target in a separate bounded phase.
         # The original test invocation and result bundle remain below.
         run(['xcodebuild', 'build-for-testing', '-project', app / 'Socks5.xcodeproj', '-scheme', 'ServerControlUIAudit',
@@ -220,7 +220,7 @@ def main():
         if identifier:
             for action in ('shutdown', 'delete'):
                 try:
-                    run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=30)
+                    run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=120)
                 except Exception as exc:
                     cleanup.append(str(exc))
         if applied:
