@@ -71,7 +71,30 @@ def projection_boundaries():
     return len(cases)
 
 
+def runtime_input_contract():
+    """Exercise the real committed consumer pins before any host preparation."""
+    runtime = load('Build/runtime_environment.py')
+    commit = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip()
+    profile = runtime.OWNER_PROFILES['integrated']
+    helpers = [runtime.tracked_regular_file(ROOT, commit, path)[1]
+               for path in profile['helper_paths']]
+    assert len({(item['sha256'], item['git_blob'], item['git_mode']) for item in helpers}) == 1
+    for path, expected in profile['original_files'].items():
+        runtime.tracked_regular_file(ROOT, commit, path, expected['sha256'], expected['git_mode'])
+    # Previously accepted fixture ref syntax did not exercise this real byte pin.
+    stale = '1c5fb3603e6ecebb15dc899d4a601196f668e3948ad3a09971148535987f601d'
+    assert profile['original_files']['Build/ui_review.py']['sha256'] != stale
+    try:
+        runtime.tracked_regular_file(ROOT, commit, 'Build/ui_review.py', stale, '100644')
+    except ValueError as error:
+        assert str(error) == 'Original consumer/input bytes changed'
+    else:
+        raise AssertionError('Stale runtime consumer pin accepted')
+    print('PASS: actual integrated runtime input pins and stale-pin rejection; no host preparation.')
+
+
 def main():
+    runtime_input_contract()
     if not __debug__:
         raise SystemExit('Assertions must be enabled')
     driver = load('Tests/ServerControl/input_integrity_check.py')

@@ -13,7 +13,8 @@
     "Tests/ServerControl/auth_startup_probe.c": "56ee52b3cec88671b266c7c5f564a71a4b1c09e6a9103f752eb950f31d5503db",
     "Tests/udp_buffer_network.py": "66fb430ab26f7d69c8b5d22a78f8d1d50428919f83bf4b354ea10c90e5fc7703",
     "Build/ui_review.py": "b0f38e6f013dd85b8617c86c4d1d2142fe26bc3fe473e20813abea332713adf1",
-    "Tests/Integration/IntegrationUITests.swift": "afd8467072ef02cf5ea39e25c018ec63be845b9e0f0f8943d016601a4a93a2d1"
+    "Tests/Integration/IntegrationUITests.swift": "afd8467072ef02cf5ea39e25c018ec63be845b9e0f0f8943d016601a4a93a2d1",
+    "Tests/Integration/input_boundaries.py": "cdb2a726ff49f22a1d4250e799e0b06be9fed4e17795da8871c831c340435e20"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
@@ -35,12 +36,12 @@
       "sha256": "277f667fd17d96e9b3f6fbd733282d9b3622d782e20d2e2a4ab3a35d2b4575f8"
     },
     "Build/observed_command_status.py": {
-      "commit": "fed053fe2edc10b58d184d21e25aae8cb92e838c",
-      "sha256": "314121f83590948d6194f9d00dda07fea657c5ad01a6fb2ce24e5282e1382224"
+      "commit": "9c1f67f979ff4544ac3710e67f1d09a54f1a1071",
+      "sha256": "2cd7f01093b5e47606716bc4b3c6395ee9decd9c2a4f10297ded1ddd25c8bf9c"
     },
     "Build/runtime_environment.py": {
-      "commit": "fed053fe2edc10b58d184d21e25aae8cb92e838c",
-      "sha256": "dcb97d39f9da5b47825f1637ba45fe802ff110b349fe8e11042c2600a020686b"
+      "commit": "9c1f67f979ff4544ac3710e67f1d09a54f1a1071",
+      "sha256": "c28cbbe2181245dea07e7c8e6f2920ca17804cc148a1cea63e2d4e78fa4c1e2d"
     },
     "Patches/hev-netaddr-result.patch": {
       "commit": "c0781081000caa4e88aa33bdad06a797164ff8f7",
@@ -207,8 +208,8 @@
       "sha256": "deb568cfc732699922a23bfd09dee909d8a0d82e0866ffc0b2a8c879eb02a68b"
     },
     "Tests/AppIcon/runtime_environment.py": {
-      "commit": "fed053fe2edc10b58d184d21e25aae8cb92e838c",
-      "sha256": "dcb97d39f9da5b47825f1637ba45fe802ff110b349fe8e11042c2600a020686b"
+      "commit": "9c1f67f979ff4544ac3710e67f1d09a54f1a1071",
+      "sha256": "c28cbbe2181245dea07e7c8e6f2920ca17804cc148a1cea63e2d4e78fa4c1e2d"
     },
     "Tests/AppIcon/test_audit_boundaries.py": {
       "commit": "b4efcacdfa370749bde9d4f85e30352c55bf960f",

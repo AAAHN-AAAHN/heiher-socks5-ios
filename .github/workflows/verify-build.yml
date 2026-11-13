@@ -172,7 +172,7 @@ jobs:
           if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o644 or info.st_nlink != 1 or info.st_size != 16072:
               raise SystemExit('Status reader file type, mode, links or size differs')
           raw = path.read_bytes()
-          if len(raw) != 16072 or hashlib.sha256(raw).hexdigest() != '314121f83590948d6194f9d00dda07fea657c5ad01a6fb2ce24e5282e1382224':
+          if len(raw) != 16072 or hashlib.sha256(raw).hexdigest() != '2cd7f01093b5e47606716bc4b3c6395ee9decd9c2a4f10297ded1ddd25c8bf9c':
               raise SystemExit('Status reader bytes differ from the frozen reader')
           blob = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
           entry = subprocess.run(['git', '-C', str(root), 'ls-tree', sys.argv[2], '--', relative], capture_output=True, timeout=10)
@@ -257,7 +257,7 @@ jobs:
           if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o644 or info.st_nlink != 1 or info.st_size != 16072:
               raise SystemExit('Status reader file type, mode, links or size differs')
           raw = path.read_bytes()
-          if len(raw) != 16072 or hashlib.sha256(raw).hexdigest() != '314121f83590948d6194f9d00dda07fea657c5ad01a6fb2ce24e5282e1382224':
+          if len(raw) != 16072 or hashlib.sha256(raw).hexdigest() != '2cd7f01093b5e47606716bc4b3c6395ee9decd9c2a4f10297ded1ddd25c8bf9c':
               raise SystemExit('Status reader bytes differ from the frozen reader')
           blob = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
           entry = subprocess.run(['git', '-C', str(root), 'ls-tree', sys.argv[2], '--', relative], capture_output=True, timeout=10)
