@@ -1,7 +1,7 @@
 {
-  "base_commit": "9270e4e54736d4919e5f208fd308f6184787d65c",
+  "base_commit": "e30ded4906f98c2ef494fdfb5f3fd98759cc3818",
   "branches": {
-    "main": "9270e4e54736d4919e5f208fd308f6184787d65c"
+    "main": "e30ded4906f98c2ef494fdfb5f3fd98759cc3818"
   },
   "sources": {
     "Patches/hev-server-lifecycle.patch": {
