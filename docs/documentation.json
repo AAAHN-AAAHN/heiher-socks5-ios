@@ -10,7 +10,7 @@
     "feature/background": "79e2687223f4977312b860db98492db8ed4170f8",
     "feature/server-control": "f65adc34913e1c8002c860afbce995d77019ba30",
     "feature/settings-persistence": "d58a689cacdef147ce1be565eb89e8ea07178801",
-    "feature/traffic-statistics": "ec6a7be3eeb8ae7284927733de5f353092e21d93",
+    "feature/traffic-statistics": "8de3a8233663a0cbd3d877aaa2844da247872fec",
     "feature/udp-compat": "8f566f670d5c78beb0891cb146d5f16337651c78"
   },
   "readme_mirror": "docs/features/integrated.md",
