@@ -119,7 +119,7 @@ def main():
     cleanup = []
     try:
         run(['xcrun', 'simctl', 'boot', identifier], 'boot.log')
-        run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'ready.log', timeout=120)
+        run(['xcrun', 'simctl', 'bootstatus', identifier, '-b'], 'ready.log', timeout=300)
         test_failure = None
         try:
             run(['xcodebuild', 'test', '-project', app / 'Socks5.xcodeproj', '-scheme', 'AsyncAudioAudit',
@@ -179,7 +179,7 @@ def main():
     finally:
         for action in ('shutdown', 'delete'):
             try:
-                run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=30)
+                run(['xcrun', 'simctl', action, identifier], 'cleanup-' + action + '.log', timeout=120)
             except Exception as exc:
                 cleanup.append(str(exc))
     (OUT / 'cleanup.json').write_text(json.dumps(cleanup))
