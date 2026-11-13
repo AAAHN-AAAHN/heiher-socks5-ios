@@ -1,6 +1,6 @@
 {
   "branch": "feature/server-control",
-  "frozen_source": "2800de27fc53d524ecb32eb472246f0a972ec5f0",
+  "frozen_source": "196c104253a5e16c9166b8bba55ae8935973cb25",
   "owned_documents": [
     "README.md",
     "docs/features/server-control.md"
