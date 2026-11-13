@@ -8,8 +8,8 @@
   "parents": {
     "feature/app-icon": "b4efcacdfa370749bde9d4f85e30352c55bf960f",
     "feature/background": "f1edfe174bd8cd20baf95cf2c4ee032c29fde782",
-    "feature/server-control": "f5b936ead2f6767d0db719dfda2e73e5dd0ece25",
-    "feature/settings-persistence": "7563e664a2e3ade8f36952dc90ae1cfe4cbeb8f5",
+    "feature/server-control": "d924a80077494f1f765b07003879447daab29b5c",
+    "feature/settings-persistence": "28b82090ce76ec1304e71d02287869f0d068902f",
     "feature/traffic-statistics": "c0781081000caa4e88aa33bdad06a797164ff8f7",
     "feature/udp-compat": "35e10c64ceb82d69f69b017088da8c79e4902a5b"
   },
