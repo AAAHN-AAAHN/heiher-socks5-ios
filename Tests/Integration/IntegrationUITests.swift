@@ -383,23 +383,23 @@ final class IntegrationUITests: XCTestCase {
                     "elapsed_seconds=\(ProcessInfo.processInfo.systemUptime - started); outcome may be unknown"
             ])
         }
-        func checkDeadline(_ stage: String) throws {
-            if ProcessInfo.processInfo.systemUptime >= deadline { throw socketError(ETIMEDOUT, stage) }
+        func checkDeadline(_ stage: String, _ bytes: Int = 0) throws {
+            if ProcessInfo.processInfo.systemUptime >= deadline { throw socketError(ETIMEDOUT, stage, bytes) }
         }
-        func wait(_ events: Int16, _ stage: String) throws {
+        func wait(_ events: Int16, _ stage: String, _ bytes: Int = 0) throws {
             while true {
                 let remaining = deadline - ProcessInfo.processInfo.systemUptime
-                guard remaining > 0 else { throw socketError(ETIMEDOUT, stage) }
+                guard remaining > 0 else { throw socketError(ETIMEDOUT, stage, bytes) }
                 var descriptor = pollfd(fd: fd, events: events, revents: 0)
                 let milliseconds = Int32(min(5000, max(1, (remaining * 1000).rounded(.up))))
                 let count = Darwin.poll(&descriptor, 1, milliseconds)
                 if count < 0 {
                     if errno == EINTR { continue }
-                    throw socketError(errno, stage)
+                    throw socketError(errno, stage, bytes)
                 }
-                try checkDeadline(stage)
+                try checkDeadline(stage, bytes)
                 if count == 0 { continue }
-                if descriptor.revents & Int16(POLLNVAL) != 0 { throw socketError(EBADF, stage) }
+                if descriptor.revents & Int16(POLLNVAL) != 0 { throw socketError(EBADF, stage, bytes) }
                 // Let the following syscall report EOF, HUP or the actual socket error.
                 return
             }
@@ -449,7 +449,7 @@ final class IntegrationUITests: XCTestCase {
         var buffer = [UInt8](repeating: 0, count: 1024)
         while !response.contains(10) {
             guard response.count < 16_384 else { throw socketError(EMSGSIZE, "response-size", response.count) }
-            try wait(Int16(POLLIN), "recv")
+            try wait(Int16(POLLIN), "recv", response.count)
             let capacity = min(buffer.count, 16_384 - response.count)
             let count = buffer.withUnsafeMutableBytes { Darwin.recv(fd, $0.baseAddress, capacity, 0) }
             let receiveErrno = errno
@@ -457,7 +457,7 @@ final class IntegrationUITests: XCTestCase {
             guard count > 0 else { throw socketError(count == 0 ? ECONNRESET : receiveErrno, "recv", response.count) }
             response.append(contentsOf: buffer.prefix(count))
         }
-        try checkDeadline("response")
+        try checkDeadline("response", response.count)
         return try JSONDecoder().decode(EchoObservation.self, from: response)
     }
 

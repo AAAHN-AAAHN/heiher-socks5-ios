@@ -13,7 +13,7 @@
     "Tests/ServerControl/auth_startup_probe.c": "56ee52b3cec88671b266c7c5f564a71a4b1c09e6a9103f752eb950f31d5503db",
     "Tests/udp_buffer_network.py": "66fb430ab26f7d69c8b5d22a78f8d1d50428919f83bf4b354ea10c90e5fc7703",
     "Build/ui_review.py": "b0f38e6f013dd85b8617c86c4d1d2142fe26bc3fe473e20813abea332713adf1",
-    "Tests/Integration/IntegrationUITests.swift": "5a6ed0567a93abecd800856fddb2cfd06fe2a294be3dc1601d2fe8e8feff4df5"
+    "Tests/Integration/IntegrationUITests.swift": "afd8467072ef02cf5ea39e25c018ec63be845b9e0f0f8943d016601a4a93a2d1"
   },
   "sources": {
     "Build/check_swift_sdk.sh": {
