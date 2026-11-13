@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Install formatter without overriding the compiler
@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Install formatter without overriding the compiler
@@ -122,7 +122,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Validate isolated runtime provenance boundaries
@@ -172,7 +172,7 @@ jobs:
           if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o644 or info.st_nlink != 1 or info.st_size != 16072:
               raise SystemExit('Status reader file type, mode, links or size differs')
           raw = path.read_bytes()
-          if len(raw) != 16072 or hashlib.sha256(raw).hexdigest() != '0d889cb49eeeffd20acac222f9fa6e45ba0799272c34a3c128e73439c890f496':
+          if len(raw) != 16072 or hashlib.sha256(raw).hexdigest() != '148df91722e6210ca7e0fb2e4cfa1e2cce01c809120f19c20ee8d2e19301da29':
               raise SystemExit('Status reader bytes differ from the frozen reader')
           blob = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
           entry = subprocess.run(['git', '-C', str(root), 'ls-tree', sys.argv[2], '--', relative], capture_output=True, timeout=10)
@@ -257,7 +257,7 @@ jobs:
           if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o644 or info.st_nlink != 1 or info.st_size != 16072:
               raise SystemExit('Status reader file type, mode, links or size differs')
           raw = path.read_bytes()
-          if len(raw) != 16072 or hashlib.sha256(raw).hexdigest() != '0d889cb49eeeffd20acac222f9fa6e45ba0799272c34a3c128e73439c890f496':
+          if len(raw) != 16072 or hashlib.sha256(raw).hexdigest() != '148df91722e6210ca7e0fb2e4cfa1e2cce01c809120f19c20ee8d2e19301da29':
               raise SystemExit('Status reader bytes differ from the frozen reader')
           blob = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
           entry = subprocess.run(['git', '-C', str(root), 'ls-tree', sys.argv[2], '--', relative], capture_output=True, timeout=10)
