@@ -370,52 +370,94 @@ final class IntegrationUITests: XCTestCase {
         let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
         guard fd >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
         defer { Darwin.close(fd) }
+        // One client-authoritative deadline for connect, partial sends and all reads.
+        // Host/helper clocks are not assumed to share this epoch.
+        let started = ProcessInfo.processInfo.systemUptime
+        let startedUnix = Date().timeIntervalSince1970
+        let deadline = started + 5
+        func socketError(_ code: Int32, _ stage: String, _ bytes: Int = 0) -> NSError {
+            NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [
+                NSLocalizedDescriptionKey: "UDP Echo fixture \(stage): command=\(command), " +
+                    "errno=\(code), received_bytes=\(bytes), " +
+                    "started_unix=\(startedUnix), finished_unix=\(Date().timeIntervalSince1970), " +
+                    "elapsed_seconds=\(ProcessInfo.processInfo.systemUptime - started); outcome may be unknown"
+            ])
+        }
+        func checkDeadline(_ stage: String) throws {
+            if ProcessInfo.processInfo.systemUptime >= deadline { throw socketError(ETIMEDOUT, stage) }
+        }
+        func wait(_ events: Int16, _ stage: String) throws {
+            while true {
+                let remaining = deadline - ProcessInfo.processInfo.systemUptime
+                guard remaining > 0 else { throw socketError(ETIMEDOUT, stage) }
+                var descriptor = pollfd(fd: fd, events: events, revents: 0)
+                let milliseconds = Int32(min(5000, max(1, (remaining * 1000).rounded(.up))))
+                let count = Darwin.poll(&descriptor, 1, milliseconds)
+                if count < 0 {
+                    if errno == EINTR { continue }
+                    throw socketError(errno, stage)
+                }
+                try checkDeadline(stage)
+                if count == 0 { continue }
+                if descriptor.revents & Int16(POLLNVAL) != 0 { throw socketError(EBADF, stage) }
+                // Let the following syscall report EOF, HUP or the actual socket error.
+                return
+            }
+        }
         var noSignal: Int32 = 1
-        var timeout = timeval(tv_sec: 5, tv_usec: 0)
-        guard setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal,
-                         socklen_t(MemoryLayout.size(ofValue: noSignal))) == 0,
-              setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                         socklen_t(MemoryLayout.size(ofValue: timeout))) == 0,
-              setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                         socklen_t(MemoryLayout.size(ofValue: timeout))) == 0 else {
-            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        let flags = fcntl(fd, F_GETFL)
+        guard flags >= 0, fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0,
+              setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal,
+                         socklen_t(MemoryLayout.size(ofValue: noSignal))) == 0 else {
+            throw socketError(errno, "setup")
         }
         var address = sockaddr_in()
         address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         address.sin_family = sa_family_t(AF_INET)
         address.sin_port = port.bigEndian
-        guard inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) == 1,
-              withUnsafePointer(to: &address, {
-                  $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                      Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
-                  }
-              }) == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        guard inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) == 1 else {
+            throw socketError(EINVAL, "address")
+        }
+        try checkDeadline("connect")
+        let connected = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        if connected != 0 {
+            guard errno == EINPROGRESS || errno == EINTR else { throw socketError(errno, "connect") }
+            try wait(Int16(POLLOUT), "connect")
+            var failure: Int32 = 0
+            var length = socklen_t(MemoryLayout.size(ofValue: failure))
+            guard getsockopt(fd, SOL_SOCKET, SO_ERROR, &failure, &length) == 0 else {
+                throw socketError(errno, "connect-status")
+            }
+            guard failure == 0 else { throw socketError(failure, "connect-status") }
+        }
         let request = Array((command + "\n").utf8)
         var offset = 0
         while offset < request.count {
+            try wait(Int16(POLLOUT), "send")
             let count = request.withUnsafeBytes {
                 Darwin.send(fd, $0.baseAddress!.advanced(by: offset), $0.count - offset, 0)
             }
-            guard count > 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+            if count < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) { continue }
+            guard count > 0 else { throw socketError(count == 0 ? EPIPE : errno, "send") }
             offset += count
         }
         var response = Data()
         var buffer = [UInt8](repeating: 0, count: 1024)
-        while !response.contains(10) && response.count < 16_384 {
-            let receiveStartedUnix = Date().timeIntervalSince1970
-            let receiveStarted = ProcessInfo.processInfo.systemUptime
-            let count = buffer.withUnsafeMutableBytes { Darwin.recv(fd, $0.baseAddress, $0.count, 0) }
+        while !response.contains(10) {
+            guard response.count < 16_384 else { throw socketError(EMSGSIZE, "response-size", response.count) }
+            try wait(Int16(POLLIN), "recv")
+            let capacity = min(buffer.count, 16_384 - response.count)
+            let count = buffer.withUnsafeMutableBytes { Darwin.recv(fd, $0.baseAddress, capacity, 0) }
             let receiveErrno = errno
-            guard count > 0 else {
-                throw NSError(domain: NSPOSIXErrorDomain, code: Int(receiveErrno), userInfo: [
-                    NSLocalizedDescriptionKey: "UDP Echo fixture recv: command=\(command), " +
-                        "count=\(count), errno=\(receiveErrno), received_bytes=\(response.count), " +
-                        "started_unix=\(receiveStartedUnix), finished_unix=\(Date().timeIntervalSince1970), " +
-                        "elapsed_seconds=\(ProcessInfo.processInfo.systemUptime - receiveStarted)"
-                ])
-            }
+            if count < 0 && (receiveErrno == EINTR || receiveErrno == EAGAIN || receiveErrno == EWOULDBLOCK) { continue }
+            guard count > 0 else { throw socketError(count == 0 ? ECONNRESET : receiveErrno, "recv", response.count) }
             response.append(contentsOf: buffer.prefix(count))
         }
+        try checkDeadline("response")
         return try JSONDecoder().decode(EchoObservation.self, from: response)
     }
 

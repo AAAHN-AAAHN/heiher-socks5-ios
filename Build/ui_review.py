@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import shutil
 import socketserver
+import select
 import subprocess
 import sys
 import threading
@@ -32,16 +33,68 @@ def echo_module():
     return module
 
 
-def echo_command(echo, command):
+def echo_command(echo, command, deadline=None):
+    """One atomic before/after snapshot; never reacquire Echo's nonrecursive lock."""
     if command not in ('reply', 'drop', 'snapshot'):
         raise ValueError('Unknown fixture command')
-    if command != 'snapshot':
-        # Preserve the bound UDP7 sockets: a reply-mode transition must not
-        # create a port-unreachable error in the otherwise healthy relay.
-        with echo.lock:
+    deadline = time.monotonic() + 5 if deadline is None else deadline
+    if not echo.lock.acquire(timeout=remaining(deadline)):
+        raise TimeoutError("Fixture state lock deadline")
+    try:
+        remaining(deadline)
+        def snapshot():
+            return {'replies': echo.replies,
+                    'packets': {family: list(values) for family, values in echo.received.items()}}
+        before = snapshot() if command != 'snapshot' else None
+        if before is not None:
             echo.replies = command == 'reply'
             echo.received = {4: [], 6: []}
-    return {'replies': echo.replies, 'packets': echo.snapshot()}
+        return {'before': before, 'after': snapshot()}
+    finally:
+        echo.lock.release()
+
+
+def remaining(deadline):
+    value = deadline - time.monotonic()
+    if value <= 0:
+        raise TimeoutError('Fixture control deadline expired; mutation outcome may be unknown')
+    return value
+
+
+def helper_exchange(process, command, deadline):
+    """One request, bounded raw pipe framing; never replay an uncertain mutation."""
+    reader, writer = process.stdout.fileno(), process.stdin.fileno()
+    os.set_blocking(reader, False)
+    os.set_blocking(writer, False)
+    request, offset, response = (command + '\n').encode('ascii'), 0, bytearray()
+    while offset < len(request):
+        try:
+            if not select.select([], [writer], [], remaining(deadline))[1]:
+                raise TimeoutError('Fixture helper send deadline')
+            remaining(deadline)
+            count = os.write(writer, request[offset:])
+            if count <= 0:
+                raise EOFError('Fixture helper pipe closed')
+            offset += count
+        except (InterruptedError, BlockingIOError):
+            continue
+    while b'\n' not in response:
+        try:
+            if not select.select([reader], [], [], remaining(deadline))[0]:
+                raise TimeoutError('Fixture helper response deadline')
+            remaining(deadline)
+            chunk = os.read(reader, min(65536, 1024 * 1024 + 1 - len(response)))
+            if not chunk:
+                raise EOFError('Fixture helper response closed')
+            response.extend(chunk)
+            if len(response) > 1024 * 1024:
+                raise ValueError('Fixture helper response exceeds limit')
+        except (InterruptedError, BlockingIOError):
+            continue
+    remaining(deadline)
+    if response.count(b'\n') != 1 or not response.endswith(b'\n'):
+        raise ValueError('Unexpected extra fixture response')
+    return json.loads(response)
 
 
 def write_diagnostic(message):
@@ -81,26 +134,28 @@ class UDPEchoFixture:
         self.errors = []
         self.control_observations = []
         self.epoch = 0
+        self.poisoned = False
         owner = self
 
         class Control(socketserver.StreamRequestHandler):
             def handle(self):
-                self.request.settimeout(5)
+                # Host-local finite guard, NOT a shared clock/client end-to-end deadline.
+                deadline = time.monotonic() + 5
                 command = None
                 try:
+                    self.request.settimeout(remaining(deadline))
                     command = owner.observe_control('read', lambda: self.rfile.readline(32)).decode('ascii').rstrip('\n')
                     if command not in ('reply', 'drop', 'snapshot'):
                         raise ValueError('Unknown fixture command')
-                    if command != 'snapshot':
-                        owner.record('before-' + command)
-                        owner.epoch += 1
-                    result = owner.record(command, command)
+                    result = owner.record(command, command, deadline)
+                    payload = json.dumps(result).encode() + b'\n'
+                    self.request.settimeout(remaining(deadline))
+                    owner.observe_control('write', lambda: self.wfile.write(payload),
+                                          command=command, requested_bytes=len(payload))
                 except Exception as error:
+                    # A late response/mutation is uncertain: no new command or automatic retry.
+                    owner.poisoned = True
                     owner.errors.append(repr(error))
-                    result = {'error': repr(error)}
-                payload = json.dumps(result).encode() + b'\n'
-                owner.observe_control('write', lambda: self.wfile.write(payload),
-                                      command=command, requested_bytes=len(payload))
 
         try:
             self.control = socketserver.TCPServer(('127.0.0.1', 0), Control)
@@ -111,10 +166,26 @@ class UDPEchoFixture:
                                        kwargs={'poll_interval': .1})
         self.thread.start()
 
-    def record(self, name, command='snapshot'):
-        observed = self.observe_control('ipc', lambda: (
-            self.module.command(self.helper, command) if self.helper is not None else
-            echo_command(self.echo, command)), event=name, command=command)
+    def record(self, name, command='snapshot', deadline=None):
+        if self.poisoned:
+            raise RuntimeError('Fixture control is poisoned; no further command permitted')
+        deadline = time.monotonic() + 5 if deadline is None else deadline
+        def exchange():
+            remaining(deadline)
+            return (helper_exchange(self.helper, command, deadline) if self.helper is not None else
+                    echo_command(self.echo, command, deadline))
+        try:
+            observed = self.observe_control('ipc', exchange, event=name, command=command)
+            remaining(deadline)
+            if command != 'snapshot':
+                self.record_observation('before-' + command, observed['before'])
+                self.epoch += 1
+            return self.record_observation(name, observed['after'])
+        except Exception:
+            self.poisoned = True
+            raise
+
+    def record_observation(self, name, observed):
         packets = {int(family): values for family, values in observed['packets'].items()}
         result = {'epoch': self.epoch, 'replies': observed['replies'],
                   'counts': {str(family): len(values) for family, values in packets.items()},
@@ -208,6 +279,8 @@ class UDPEchoFixture:
         self.thread.join(3)
         assert not self.thread.is_alive(), 'Fixture control did not stop'
         try:
+            if self.poisoned:
+                raise RuntimeError('Final snapshot unavailable: fixture control poisoned')
             self.record('final')
         finally:
             try:
@@ -215,7 +288,7 @@ class UDPEchoFixture:
             finally:
                 self.save_control_observations()
                 (OUT / 'udp-echo-fixture.json').write_text(json.dumps(
-                    {'events': self.events, 'errors': self.errors}, indent=2) + '\n')
+                    {'events': self.events, 'errors': self.errors, 'control_poisoned': self.poisoned}, indent=2) + '\n')
         assert not self.errors, self.errors
 
 
