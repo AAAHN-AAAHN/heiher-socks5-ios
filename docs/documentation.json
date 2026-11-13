@@ -1,6 +1,6 @@
 {
   "branch": "feature/traffic-statistics",
-  "frozen_source": "1a45e7b2ca51a37024da2e89d8d46b1031e42fc4",
+  "frozen_source": "b326fcbad36708fa98515219281d5b29654478e7",
   "owned_documents": [
     "README.md",
     "docs/features/traffic-statistics.md"
