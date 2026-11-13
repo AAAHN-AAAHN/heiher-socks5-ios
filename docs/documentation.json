@@ -2,7 +2,7 @@
   "branch": "feature/background",
   "frozen_source": "0c014f30babc6cee610d3c128e4d0a04c49f8180",
   "parents": {
-    "feature/udp-compat": "8f566f670d5c78beb0891cb146d5f16337651c78"
+    "feature/udp-compat": "306dd871afe82ba5cc44ddd3cd9854383f707bdc"
   },
   "owned_documents": [
     "README.md",
@@ -12,7 +12,7 @@
   "validation_files": {
     "Build/check.py": "19e79b43697dc4b4cf9b9d5d5fdc990a3316dd93",
     "Build/check_documentation.py": "73f890ee7192c0d3e6c6e13f8cd02bb463cae2e5",
-    "Tests/Background/check_scope.py": "df52c0fda8593eb892de17dab216c8dc8311dadc",
+    "Tests/Background/check_scope.py": "6adf1f035612612a07c07e04cf2510e5b0476e95",
     "Tests/documentation_contract.py": "f1490e1e3258f050c1489522beb0d4080a41ba30"
   }
 }

@@ -406,9 +406,14 @@ def workflow_boundaries(current_build):
         branch_commit = git(root, 'rev-parse', 'HEAD').decode().strip()
         git(root, 'branch', '-f', 'event-tip', branch_commit)
         for label, source in (('previous', previous), ('current', workflow)):
-            match = re.search(r'ref: \$\{\{ inputs.ref \|\| github\.(ref|sha) \}\}', source)
-            if match is None:
+            refs = re.findall(r'^\s+ref: (.+)$', source, re.MULTILINE)
+            selections = [re.fullmatch(r'\$\{\{ (?:inputs\.ref \|\| )?github\.(ref|sha) \}\}', ref)
+                          for ref in refs]
+            if not selections or any(match is None for match in selections):
                 raise RuntimeError('Unknown checkout selection')
+            if label == 'current' and any(match[1] != 'sha' for match in selections):
+                raise RuntimeError('Current checkout must use the event commit, not a moving ref')
+            match = selections[0]
             for explicit in (False, True):
                 selected = event_commit if explicit or match[1] == 'sha' else 'refs/heads/event-tip'
                 actual = git(root, 'rev-parse', selected).decode().strip()

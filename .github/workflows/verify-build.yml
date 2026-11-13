@@ -15,7 +15,7 @@ jobs:
     if: ${{ !contains(github.event.head_commit.message, '[audio-checks-only]') }}
     uses: ./.github/workflows/udp-compat-audit.yml
     with:
-      ref: 8f566f670d5c78beb0891cb146d5f16337651c78
+      ref: 306dd871afe82ba5cc44ddd3cd9854383f707bdc
   verify:
     needs: udp-prerequisite
     if: ${{ !contains(github.event.head_commit.message, '[audio-checks-only]') }}
