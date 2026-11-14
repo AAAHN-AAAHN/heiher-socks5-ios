@@ -28,13 +28,21 @@ for name, (raw, mode) in payloads.items():
 release_source.check_product()
 original = ui_review.ui_test_source
 trace_swift = r'''
+import UIKit
+import ObjectiveC
 // NONCANONICAL diagnostic binary only. Bounded Boolean/revision trace; no settings content.
 @MainActor private enum DiagnosticAudioTrace {
     static var count = 0
+    static let installation: Void = {
+        guard let original = class_getInstanceMethod(UIApplication.self, #selector(UIApplication.sendEvent(_:))),
+              let probe = class_getInstanceMethod(UIApplication.self, #selector(UIApplication.diagnosticAudioSendEvent(_:))) else { return }
+        method_exchangeImplementations(original, probe)
+    }()
     static func record(_ event: String) {
+        _ = installation
         guard count < 200 else { return }
         count += 1
-        let line = "\(ProcessInfo.processInfo.processIdentifier) \(ProcessInfo.processInfo.systemUptime) \(count) \(event)\n"
+        let line = "\(ProcessInfo.processInfo.processIdentifier) \(ProcessInfo.processInfo.systemUptime) \(count) wall=\(Date.timeIntervalSinceReferenceDate) \(event)\n"
         guard let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -46,6 +54,26 @@ trace_swift = r'''
             guard size < 524288 else { return }
             try handle.write(contentsOf: Data(line.utf8))
         } catch { NSLog("AUDIO_DIAGNOSTIC_WRITE_FAILURE %@", String(describing: error)) }
+    }
+}
+
+@MainActor extension UIApplication {
+    @objc func diagnosticAudioSendEvent(_ event: UIEvent) {
+        let touches = Array(event.allTouches ?? []).prefix(5)
+        for touch in touches where touch.phase == .began || touch.phase == .ended || touch.phase == .cancelled {
+            let point = touch.location(in: touch.window)
+            var names: [String] = []
+            var view = touch.view
+            while let current = view, names.count < 6 {
+                names.append(String(describing: type(of: current)))
+                view = current.superview
+            }
+            DiagnosticAudioTrace.record("touch-before phase=\(touch.phase.rawValue) timestamp=\(touch.timestamp) x=\(point.x) y=\(point.y) viewFrame=\(String(describing: touch.view?.frame)) views=\(names.joined(separator: "/"))")
+        }
+        diagnosticAudioSendEvent(event) // Exchanged original; never suppress or synthesize events.
+        for touch in touches where touch.phase == .began || touch.phase == .ended || touch.phase == .cancelled {
+            DiagnosticAudioTrace.record("touch-after phase=\(touch.phase.rawValue) timestamp=\(touch.timestamp)")
+        }
     }
 }
 '''.replace('private enum DiagnosticAudioTrace', 'enum DiagnosticAudioTrace')

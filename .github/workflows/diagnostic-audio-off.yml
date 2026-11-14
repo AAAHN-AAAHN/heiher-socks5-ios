@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        trial: [4]
+        trial: [5]
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
       DIAGNOSTIC_TRIAL: ${{ matrix.trial }}
