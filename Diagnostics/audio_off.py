@@ -40,7 +40,7 @@ point = b'''        XCTAssertEqual(audio.value as? String, "1", "Saved audio int
         expectAudioState("Playing silent WAV continuously", timeout: 10)
         audio.tap()
 '''
-extra = b'        recordAudioDiagnostic("before-relaunch-off-tap")\n        defer { recordAudioDiagnostic("after-relaunch-off-attempt") }\n'
+extra = b'        recordAudioDiagnostic("before-relaunch-off-tap")\n        do {\n        defer { recordAudioDiagnostic("after-relaunch-off-attempt") }\n'
 def diagnostic_source():
     raw = original()
     assert raw.count(point) == 1
@@ -51,7 +51,11 @@ def diagnostic_source():
     body = body.replace(anchor, anchor + helper, 1)
     updated = before + b'final class IntegrationUITests:' + body + b'    @MainActor func testPeriodicUDPEchoThroughRunningServerAndPersistence()' + after
     updated = updated.replace(point, point.replace(b'        audio.tap()\n', extra + b'        audio.tap()\n'), 1)
-    assert updated.replace(helper, b'', 1).replace(extra, b'', 1) == raw
+    close_anchor = b'        XCTAssertEqual(audio.value as? String, \"0\")\n        expectAudioState(\"Off\")\n        XCTAssertEqual(app.switches[\"Continuous location\"].value as? String, \"0\")'
+    assert updated.count(close_anchor) == 1
+    updated = updated.replace(close_anchor, close_anchor.replace(b'        expectAudioState', b'        }\n        expectAudioState', 1), 1)
+    restored = updated.replace(helper, b'', 1).replace(extra, b'', 1).replace(b'        }\n        expectAudioState(\"Off\")\n        XCTAssertEqual(app.switches[\"Continuous location\"].value as? String, \"0\")', b'        expectAudioState(\"Off\")\n        XCTAssertEqual(app.switches[\"Continuous location\"].value as? String, \"0\")', 1)
+    assert restored == raw
     (handoff.OUT / 'diagnostic-generated-test.swift').write_bytes(updated)
     return updated
 ui_review.ui_test_source = diagnostic_source
