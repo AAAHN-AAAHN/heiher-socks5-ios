@@ -48,6 +48,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
         var retryAt: UInt64?
         var nextRound: UInt64?
         var sent = false
+        var roundFailed = false
         var error: String?
     }
 
@@ -272,6 +273,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
             slot.retries = 0
             slot.retryAt = nil
             slot.sent = false
+            slot.roundFailed = false
             slot.error = nil
             client?.stop()
         }
@@ -331,6 +333,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
         for slot in slots where slot.client?.isReady == true && slot.cursor == nil {
             if let deadline = slot.nextRound, now >= deadline {
                 slot.cursor = 0
+                slot.roundFailed = false
                 requestPump()
             }
         }
@@ -346,6 +349,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
             slot.error = nil
             if slot.nextRound == nil {
                 slot.cursor = 0
+                slot.roundFailed = false
             }
             requestPump()
         case .writable:
@@ -391,6 +395,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
             }
             guard cursor < plan.targets[index].count else {
                 slot.cursor = nil
+                if !slot.roundFailed { slot.error = nil }
                 let now = DispatchTime.now().uptimeNanoseconds
                 if let deadline = slot.nextRound, now >= deadline {
                     slot.nextRound = Self.after(now, plan.interval)
@@ -407,6 +412,7 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
                 slot.cursor = cursor + 1
                 if cursor == 0 { slot.nextRound = Self.after(DispatchTime.now().uptimeNanoseconds, plan.interval) }
             case .dropped(let code):
+                slot.roundFailed = true
                 slot.error = "UDP send error \(code); continuing at the configured period"
                 slot.cursor = cursor + 1
                 if cursor == 0 { slot.nextRound = Self.after(DispatchTime.now().uptimeNanoseconds, plan.interval) }
@@ -426,10 +432,10 @@ final class PeriodicUDPEchoService: @unchecked Sendable {
 
     private func showProgress() {
         guard server != nil, observer != nil else { return }
-        if slots.contains(where: { $0.sent && $0.client?.isReady == true }) {
-            show("Sending UDP Echo")
-        } else if let error = slots.compactMap(\.error).first {
+        if let error = slots.compactMap(\.error).first {
             show(error)
+        } else if slots.contains(where: { $0.sent && $0.client?.isReady == true }) {
+            show("Sending UDP Echo")
         } else if slots.contains(where: { $0.client?.isReady == true }) {
             show("UDP Echo ready")
         } else {

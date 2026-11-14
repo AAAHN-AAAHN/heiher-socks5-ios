@@ -21,6 +21,11 @@ subprocess.run([sys.executable, str(HERE / 'check_loop_audio.py')], check=True)
 for entry in ('check_udp_echo.py', 'UDPEchoTransportTests.py', 'UDPEchoSchedulerTests.py',
               'check_udp_echo_counter.py'):
     subprocess.run([sys.executable, str(HERE / entry)], check=True)
+if sys.platform == 'linux':
+    subprocess.run([sys.executable, str(HERE / 'check_udp_echo_send_state.py')], check=True)
+else:
+    print('Dropped-send state fault injection is Linux-only; no Darwin fault-injection claim.', flush=True)
+
 if options.core is not None:
     subprocess.run([sys.executable, str(HERE / 'check_udp_echo_native.py'), '--native', str(options.core)], check=True)
 else:
