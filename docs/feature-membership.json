@@ -7,7 +7,7 @@
     "Socks5/AppRoot.swift": "31317abed92503f5855ce077104baf945b02833d08490822bd7307e92aec48a0",
     "Socks5/Settings/AppSettings.swift": "261e76ef48d8eff7c3c651d229a252011068744698b2b0f7e4bfd37e1583f4ca",
     "Socks5/Settings/SettingsStore.swift": "1fdecaddc321269c0c0b8e782952cdf6acda540a3c9e3b84e8e81f343eaa432f",
-    "Socks5/Settings/SettingsView.swift": "61136a0cc98d3dfcb3c55657ae118370f614d1b8e040dfcd13ef1436ed8f6767"
+    "Socks5/Settings/SettingsView.swift": "20439ece036f8ab0db2020fcb04b67408821f03fef4061a267ea4aa32d8ae97c"
   },
   "responsibility": "Persistence owns durable options and file handling. Server-owned inputs are inherited byte-identically from the pinned latest server-control ancestor, except Build/runtime_environment.py and Build/observed_command_status.py: these exact shared-source snapshots bind the Settings-specific runtime preparation profile and its status reader.",
   "sources": {

@@ -10,6 +10,10 @@ import subprocess
 import sys
 
 CASES = {
+    'old-exporter-new-import': 'OLDER_EXPORTER_REPLACED_NEWER_FEEDBACK',
+    'old-exporter-new-invalid': 'OLDER_EXPORTER_REPLACED_NEWER_FEEDBACK',
+    'old-exporter-new-retry': 'OLDER_EXPORTER_REPLACED_NEWER_FEEDBACK',
+    'old-exporter-new-export': 'OLDER_EXPORTER_REPLACED_NEWER_FEEDBACK',
     'delayed-export-alone': None,
     'delayed-export-new-import-picker': 'STALE_EXPORT_PRESENTED_OVER_NEW_IMPORT_PICKER',
     'normal-import-success-clears-error': 'NORMAL_IMPORT_SUCCESS_LEFT_STALE_ERROR',
@@ -72,10 +76,21 @@ def build_sources(root, work):
         assert view.count(anchor) == 1 and fixture.count('// ' + marker) == 1, marker
         opening = view.index(anchor) + len(anchor) - 1
         action = view[opening + 1:end(view, opening)]
-        if callback:
+        if marker == 'EXPORT_COMPLETION':
+            # Retain the operation capture at callback creation, never sample
+            # exportRequest later at callback delivery. [self] only retains the
+            # class-based test host corresponding to production View storage.
+            header, body = action.split(' result in', 1)
+            assert header in ('', ' [request = exportRequest]'), header
+            capture = '[self, request = exportRequest]' if header else '[self]'
+            actions[marker] = {'sha256': hashlib.sha256(action.encode()).hexdigest(),
+                               'exact_callback': action, 'capture_adapter': 'retain class host self'}
+            action = 'return { ' + capture + ' result in' + body + '\n        }'
+        elif callback:
             assert action.startswith(' result in')
             action = action[len(' result in'):]
-        actions[marker] = {'sha256': hashlib.sha256(action.encode()).hexdigest(), 'exact_body': action}
+        if marker != 'EXPORT_COMPLETION':
+            actions[marker] = {'sha256': hashlib.sha256(action.encode()).hexdigest(), 'exact_body': action}
         if marker == 'EXPORT_ACTION':
             # Add only a controllable timing boundary; delegate production JSON
             # encoding after the gate. Preserve all control-flow/state statements.
@@ -104,7 +119,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--source', required=True, type=Path)
     parser.add_argument('--out', required=True, type=Path)
-    parser.add_argument('--expect-original', action='store_true')
+    controls = parser.add_mutually_exclusive_group()
+    controls.add_argument('--expect-original', action='store_true')
+    controls.add_argument('--expect-stale-exporter', action='store_true')
     parser.add_argument('--extract-only', action='store_true')
     args = parser.parse_args()
     root, out = args.source.resolve(), args.out.resolve()
@@ -133,10 +150,11 @@ def main():
         run('compile-' + mode, ['swiftc', '-swift-version', '5', '-strict-concurrency=complete', '-warnings-as-errors', flag,
                               *inputs, '-o', executable])
         for case, expected in CASES.items():
-            run(mode + '-' + case, [executable, case], expected if args.expect_original else None)
-    summary = {'status': 'PASS', 'platform': platform.system(), 'original_negative_control': args.expect_original,
+            run(mode + '-' + case, [executable, case], expected if args.expect_original or (args.expect_stale_exporter and case.startswith('old-exporter-')) else None)
+    summary = {'status': 'PASS', 'platform': platform.system(), 'original_negative_control': args.expect_original, 'stale_exporter_negative_control': args.expect_stale_exporter,
                'case_count_per_optimization': len(CASES), 'optimization_modes': 2,
-               'expected_defect_cases_per_optimization': sum(value is not None for value in CASES.values()) if args.expect_original else 0,
+               'expected_defect_cases_per_optimization': (sum(value is not None for value in CASES.values()) if args.expect_original else
+                                                              sum(case.startswith('old-exporter-') for case in CASES) if args.expect_stale_exporter else 0),
                'records': records, 'limits': 'Actual SettingsStore with controlled Storage seams. Exact UI action bodies, not SwiftUI rendering or physical provider acceptance.'}
     (out / 'verification.json').write_text(json.dumps(summary, indent=2) + '\n')
     print(json.dumps({key: value for key, value in summary.items() if key != 'records'}))

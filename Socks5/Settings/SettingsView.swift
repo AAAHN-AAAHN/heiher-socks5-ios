@@ -25,6 +25,7 @@ struct SettingsView: View {
     @State private var document = SettingsDocument(data: Data())
     @State private var message: String?
     @State private var fileRequest: UUID?
+    @State private var exportRequest: UUID?
 
     private func beginFileRequest() -> UUID {
         let request = UUID()
@@ -49,6 +50,7 @@ struct SettingsView: View {
                                 }.value
                                 guard fileRequest == request else { return }
                                 document = SettingsDocument(data: data)
+                                exportRequest = request
                                 exporting = true
                             } catch {
                                 if fileRequest == request { message = error.localizedDescription }
@@ -101,7 +103,8 @@ struct SettingsView: View {
                 }
             }
             .fileExporter(isPresented: $exporting, document: document, contentType: .json,
-                          defaultFilename: "Socks5-settings") { result in
+                          defaultFilename: "Socks5-settings") { [request = exportRequest] result in
+                guard let request, fileRequest == request else { return }
                 if case .failure(let error) = result { message = error.localizedDescription }
             }
             .alert("Settings", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
