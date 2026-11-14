@@ -158,7 +158,7 @@ class Fixture:
                     length = 4 if target_family == socket.AF_INET else 16
                     target = socket.inet_ntop(target_family, packet[4:4 + length])
                     assert packet[:3] == b"\x00\x00\x00"
-                    assert target == self.target
+                    assert target in self.target if isinstance(self.target, tuple) else target == self.target
                     assert packet[4 + length:] == b"\x00\x07\x00"
                     self.datagrams.append(packet)
                     if self.mode == "silence":

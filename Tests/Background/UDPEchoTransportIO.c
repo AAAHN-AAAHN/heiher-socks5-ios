@@ -16,6 +16,17 @@ send (int fd, const void *data, size_t length, int flags)
 
     if (!real_send)
         real_send = dlsym (RTLD_NEXT, "send");
+    /* Separate diagnostic mode: a real successful datagram, two dropped
+     * attempts, then real successful recovery. No timing-dependent trigger. */
+    if (getenv ("UDP_ECHO_SEND_STATE") &&
+        getsockopt (fd, SOL_SOCKET, SO_TYPE, &type, &type_length) == 0 &&
+        type == SOCK_DGRAM) {
+        unsigned int call = ++udp_calls;
+        if (call == 2 || call == 3) {
+            errno = EMSGSIZE;
+            return -1;
+        }
+    }
     if (getenv ("UDP_ECHO_IO_FAULTS") &&
         getsockopt (fd, SOL_SOCKET, SO_TYPE, &type, &type_length) == 0) {
         unsigned int call = type == SOCK_STREAM ? ++tcp_calls : ++udp_calls;
