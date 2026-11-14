@@ -27,39 +27,70 @@ for name, (raw, mode) in payloads.items():
     target.chmod(mode)
 release_source.check_product()
 original = ui_review.ui_test_source
-helper = b'''        @MainActor func recordAudioDiagnostic(_ phase: String) {
-            let detail = "phase=\\(phase) uptime=\\(ProcessInfo.processInfo.systemUptime) frame=\\(audio.frame) exists=\\(audio.exists) hittable=\\(audio.isHittable) enabled=\\(audio.isEnabled) value=\\(String(describing: audio.value)) state=\\(audioState.label)\\n\\(app.debugDescription)"
-            let attachment = XCTAttachment(string: detail)
-            attachment.name = "audio-intent-" + phase
-            attachment.lifetime = .keepAlways
-            add(attachment)
-        }
-'''
-anchor = b'        let audioState = app.staticTexts["background.audioState"]\n'
-point = b'''        XCTAssertEqual(audio.value as? String, "1", "Saved audio intent must survive relaunch")
-        expectAudioState("Playing silent WAV continuously", timeout: 10)
-        audio.tap()
-'''
-extra = b'        recordAudioDiagnostic("before-relaunch-off-tap")\n        do {\n        defer { recordAudioDiagnostic("after-relaunch-off-attempt") }\n'
+trace_swift = r'''
+// NONCANONICAL diagnostic binary only. Bounded Boolean/revision trace; no settings content.
+@MainActor private enum DiagnosticAudioTrace {
+    static var count = 0
+    static func record(_ event: String) {
+        guard count < 200 else { return }
+        count += 1
+        let line = "\(ProcessInfo.processInfo.processIdentifier) \(ProcessInfo.processInfo.systemUptime) \(count) \(event)\n"
+        guard let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let file = directory.appendingPathComponent("audio-diagnostic.txt")
+            if !FileManager.default.fileExists(atPath: file.path) { _ = FileManager.default.createFile(atPath: file.path, contents: nil) }
+            let handle = try FileHandle(forWritingTo: file)
+            defer { try? handle.close() }
+            let size = try handle.seekToEnd()
+            guard size < 524288 else { return }
+            try handle.write(contentsOf: Data(line.utf8))
+        } catch { NSLog("AUDIO_DIAGNOSTIC_WRITE_FAILURE %@", String(describing: error)) }
+    }
+}
+'''.replace('private enum DiagnosticAudioTrace', 'enum DiagnosticAudioTrace')
 def diagnostic_source():
-    raw = original()
-    assert raw.count(point) == 1
-    # Scope the helper to the integration test; other classes can share audioState.
-    before, rest = raw.split(b'final class IntegrationUITests:', 1)
-    body, after = rest.split(b'    @MainActor func testPeriodicUDPEchoThroughRunningServerAndPersistence()', 1)
-    assert body.count(anchor) == 1
-    body = body.replace(anchor, anchor + helper, 1)
-    updated = before + b'final class IntegrationUITests:' + body + b'    @MainActor func testPeriodicUDPEchoThroughRunningServerAndPersistence()' + after
-    updated = updated.replace(point, point.replace(b'        audio.tap()\n', extra + b'        audio.tap()\n'), 1)
-    close_anchor = b'        XCTAssertEqual(audio.value as? String, \"0\")\n        expectAudioState(\"Off\")\n        XCTAssertEqual(app.switches[\"Continuous location\"].value as? String, \"0\")'
-    assert updated.count(close_anchor) == 1
-    updated = updated.replace(close_anchor, close_anchor.replace(b'        expectAudioState', b'        }\n        expectAudioState', 1), 1)
-    restored = updated.replace(helper, b'', 1).replace(extra, b'', 1).replace(b'        }\n        expectAudioState(\"Off\")\n        XCTAssertEqual(app.switches[\"Continuous location\"].value as? String, \"0\")', b'        expectAudioState(\"Off\")\n        XCTAssertEqual(app.switches[\"Continuous location\"].value as? String, \"0\")', 1)
-    assert restored == raw
-    (handoff.OUT / 'diagnostic-generated-test.swift').write_bytes(updated)
-    return updated
+    app = ui_review.WORK / 'application'
+    path = app / 'Socks5/AppRoot.swift'
+    raw = path.read_text()
+    marker = '    private func applyAudioIntent(_ enabled: Bool) {\n'
+    assert raw.count(marker) == 1
+    details = r'enabled=\(enabled) value=\(settings.value.background.silentAudio) stamp=\(settings.audioChange) load=\(settings.loadState)'
+    updated = raw.replace(marker, marker + '        DiagnosticAudioTrace.record("setter-entry ' + details + '")\n        defer { DiagnosticAudioTrace.record("setter-exit ' + details + '") }\n', 1)
+    guard = '        guard settings.audioChange == previous else { return }'
+    assert updated.count(guard) == 1
+    updated = updated.replace(guard, '        guard settings.audioChange == previous else { DiagnosticAudioTrace.record("setter-guard-skip"); return }', 1)
+    marker = '    private func restoreServices() {\n'
+    assert updated.count(marker) == 1
+    details = r'value=\(settings.value.background.silentAudio) stamp=\(settings.audioChange) change=\(settings.change) load=\(settings.loadState)'
+    updated = updated.replace(marker, marker + '        DiagnosticAudioTrace.record("restore-entry ' + details + '")\n        defer { DiagnosticAudioTrace.record("restore-exit ' + details + '") }\n', 1)
+    path.write_text(updated + trace_swift)
+    path = app / 'Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift'
+    facade = path.read_text(); marker = '    func setAudio(_ enabled: Bool) {\n'
+    assert facade.count(marker) == 1
+    facade = facade.replace(marker, marker + r'        DiagnosticAudioTrace.record("service-entry enabled=\(enabled) old=\(audioEnabled) state=\(audioState)")' + '\n' + r'        defer { DiagnosticAudioTrace.record("service-exit enabled=\(enabled) now=\(audioEnabled) state=\(audioState)") }' + '\n', 1)
+    path.write_text(facade)
+    # Keep exact original test bodies. Only temporary app sources gain trace calls.
+    (handoff.OUT / 'instrumented-AppRoot.swift').write_text(updated + trace_swift)
+    (handoff.OUT / 'instrumented-BackgroundKeepAlive.swift').write_text(facade)
+    return original()
 ui_review.ui_test_source = diagnostic_source
-receipt = {'scope': 'NONCANONICAL diagnostic XCTest overlay only; pre-tap snapshot changes timing. No real tap delivery coordinate or Binding setter trace is claimed.', 'product_commit': SOURCE, 'control_commit': os.environ['GITHUB_SHA'], 'run': os.environ['GITHUB_RUN_ID'], 'trial': os.environ['DIAGNOSTIC_TRIAL'], 'producer_manifest': manifest, 'runner_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), 'retry_inside_test': False, 'original_assertions_retained': True}
+original_run = ui_review.run
+def trace_run(args, *positional, **keywords):
+    try:
+        return original_run(args, *positional, **keywords)
+    finally:
+        if args[:2] == ['xcodebuild', 'test-without-building']:
+            import subprocess
+            identifier = (ui_review.OUT / 'created-device.txt').read_text().strip()
+            try:
+                container = subprocess.check_output(['xcrun', 'simctl', 'get_app_container', identifier, 'hev.Socks5', 'data'], text=True, timeout=30).strip()
+                trace = Path(container) / 'Library/Application Support/audio-diagnostic.txt'
+                (handoff.OUT / 'audio-diagnostic.txt').write_bytes(trace.read_bytes())
+            except Exception as error:
+                (handoff.OUT / 'audio-diagnostic-collection-error.txt').write_text(repr(error))
+ui_review.run = trace_run
+receipt = {'scope': 'NONCANONICAL instrumented app binary; bounded synchronous trace perturbs timing. Tests unchanged. Not release acceptance.', 'product_commit': SOURCE, 'control_commit': os.environ['GITHUB_SHA'], 'run': os.environ['GITHUB_RUN_ID'], 'trial': os.environ['DIAGNOSTIC_TRIAL'], 'producer_manifest': manifest, 'runner_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), 'retry_inside_test': False, 'original_assertions_retained': True}
 try:
     ui_review.main()
     receipt['result'] = 'passed-instrumented-test-not-root-cause-resolution'
