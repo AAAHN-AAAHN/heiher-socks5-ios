@@ -1,0 +1,53 @@
+name: Diagnostic audio Off input only (not release acceptance)
+on:
+  push:
+    branches: [diagnostics/settings-audio-off-20261114]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnostic:
+    runs-on: xcode-27
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        trial: [1, 2]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+      DIAGNOSTIC_TRIAL: ${{ matrix.trial }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: controls
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 738f949d549b9e703fbd6e9e8a1862db29278065
+          path: product-source
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 43587714393
+          artifact-ids: 14113285088
+          path: producer
+          merge-multiple: true
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.14.9'
+          architecture: arm64
+          check-latest: false
+      - name: Diagnostic-only original test with AX snapshot attachments
+        working-directory: product-source
+        run: python3 ../controls/Diagnostics/audio_off.py "$PWD" "$GITHUB_WORKSPACE/producer/review-input.tar.gz"
+      - name: Preserve diagnostic evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: audio-off-diagnostic-${{ github.run_id }}-${{ matrix.trial }}
+          path: product-source/artifacts/integrated/
+          retention-days: 30
+          if-no-files-found: error
