@@ -81,8 +81,11 @@ private final class ExportBoundary: @unchecked Sendable {
     func retry() async {
         // RETRY_ACTION
     }
-    func completeExport(_ result: Result<URL, Error>) {
+    func exportCompletion() -> (Result<URL, Error>) -> Void {
         // EXPORT_COMPLETION
+    }
+    func completeExport(_ result: Result<URL, Error>) {
+        exportCompletion()(result)
     }
     func openImportPicker() {
         // IMPORT_OPEN_ACTION
@@ -177,6 +180,39 @@ private final class ExportBoundary: @unchecked Sendable {
                 check(host.exporting && exported == original,
                       "CURRENT_DELAYED_EXPORT_NOT_PRESENTED")
             }
+        case "old-exporter-new-import", "old-exporter-new-invalid", "old-exporter-new-retry", "old-exporter-new-export":
+            if mode == "old-exporter-new-retry" {
+                boundary.failWrites(true)
+                store.set(\.background.periodicUDPEcho.period, "251")
+                do { try await store.flush(); fatalError("RETRY_PRECONDITION_MISSED") } catch { }
+                boundary.failWrites(false)
+            }
+            await host.export()
+            check(host.exporting, "OLD_EXPORT_NOT_PRESENTED")
+            // Model a provider callback retained at the original presentation.
+            // Apple documents dismissal before completion; interleaving here
+            // is a controlled boundary, not a physical FileProvider claim.
+            let olderCompletion = host.exportCompletion()
+            host.exporting = false
+            if mode == "old-exporter-new-import" {
+                await host.importFile(.success(second))
+                check(try store.value == b && disk() == b, "NEW_IMPORT_NOT_DURABLE")
+            } else if mode == "old-exporter-new-invalid" {
+                await host.importFile(.success(invalid))
+                check(host.message != nil, "NEW_IMPORT_ERROR_MISSING")
+            } else if mode == "old-exporter-new-retry" {
+                await host.retry()
+                check(!store.savePending && store.errorMessage == nil, "NEW_RETRY_FAILED")
+            } else {
+                await host.export()
+                check(host.exporting, "NEW_EXPORT_NOT_PRESENTED")
+                let newerCompletion = host.exportCompletion()
+                newerCompletion(.failure(fault("New exporter error", 47)))
+                check(host.message == "New exporter error", "CURRENT_EXPORT_ERROR_HIDDEN")
+            }
+            let newestMessage = host.message
+            olderCompletion(.failure(fault("Older exporter error", 46)))
+            check(host.message == newestMessage, "OLDER_EXPORTER_REPLACED_NEWER_FEEDBACK")
         case "normal-import-success-clears-error":
             host.message = "Earlier operation error"
             await host.importFile(.success(second))
