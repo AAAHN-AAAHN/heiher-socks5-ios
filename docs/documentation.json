@@ -10,7 +10,7 @@
     "feature/background": "d8aa42e66908385c3ff444e749c33c5092acfd5d",
     "feature/server-control": "d924a80077494f1f765b07003879447daab29b5c",
     "feature/settings-persistence": "a5e0b5d629bce79d388756db1fff0565b556cfca",
-    "feature/traffic-statistics": "c22f5b49b0edfff9aecac531346bf951716d1c8c",
+    "feature/traffic-statistics": "7d07244a5dfe88e1bcb5cac07acfd62ff9c7db8d",
     "feature/udp-compat": "35e10c64ceb82d69f69b017088da8c79e4902a5b"
   },
   "readme_mirror": "docs/features/integrated.md",
@@ -20,7 +20,7 @@
     "Build/check_ownership.py": "493798c9f3f4bead9277e05f5565184a029d36d0",
     "Tests/AppIcon/check_icon.py": "93cfbf9a90712bc3d7d52fe460947ee4b05c9564",
     "Tests/Background/check_scope.py": "d7925bff29740475b17333f8a64403f34bb335b4",
-    "Tests/Statistics/audit.py": "b0cdebdeef95e604d9d7003efe51360c21332608",
+    "Tests/Statistics/audit.py": "82fac539d19af6cdc5912fc253175c903328630a",
     "Tests/documentation_contract.py": "f1490e1e3258f050c1489522beb0d4080a41ba30"
   }
 }
