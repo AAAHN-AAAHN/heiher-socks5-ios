@@ -181,6 +181,18 @@ def verify_presentation():
             '        statistics = sampledStatistics\n' + publication +
             '        clientsIncomplete = required > capacity\n'
             '        sampledGeneration = generation\n')
+    approved_sample = approved_sample.replace(
+        '        hev_socks5_server_endpoint_stats(&received, &sent)',
+        '        guard hev_socks5_server_endpoint_try_stats(&received, &sent) == 0 else {\n'
+        '            clientsIncomplete = true\n            return\n        }').replace(
+        'let capacity = hev_socks5_server_endpoint_rows(nil, 0)',
+        'let capacity = hev_socks5_server_endpoint_try_rows(nil, 0)\n'
+        '        guard capacity >= 0 else {\n            clientsIncomplete = true\n            return\n        }').replace(
+        '            hev_socks5_server_endpoint_rows($0.baseAddress, $0.count)',
+        '            hev_socks5_server_endpoint_try_rows($0.baseAddress, $0.count)').replace(
+        '        let time = ProcessInfo.processInfo.systemUptime',
+        '        guard required >= 0 else {\n            clientsIncomplete = true\n            return\n        }\n'
+        '        let time = ProcessInfo.processInfo.systemUptime')
     assert without_comments(view.split(sampler, 1)[1]) == approved_sample
     old_task = endpoint_names(old_view.split('        .task(id:', 1)[1].split(renderer, 1)[0])
     guard = 'guard isVisible && scenePhase == .active else { return }'
@@ -203,7 +215,7 @@ def verify_presentation():
     old_prefix = endpoint_names(old_view.split(prefix, 1)[0])\
         .replace('No client payload recorded yet.', 'No peer socket I/O recorded yet.')\
         .replace('New clients will be included in the next sample.',
-                 'Some peer rows are awaiting an update.')
+                 'Statistics are awaiting a complete update.')
     old_opening = ('    var body: some View {\n        let clientRows = clients.rows\n'
                    '        NavigationStack {\n')
     assert old_prefix.count(old_opening) == 1

@@ -1,5 +1,5 @@
 diff --git a/src/hev-main.c b/src/hev-main.c
-index 02239b13719bca765f5049e714915a904e240bd4..42126a4a34d7942f01c3bdcb252fbb13fa2d73ba 100644
+index 689acebda9983ff5ce6823fe3e0262cf6603bd93..0e8f6a7a89d27f158629acd9c85dce7f8dca441f 100644
 --- a/src/hev-main.c
 +++ b/src/hev-main.c
 @@ -8,6 +8,7 @@
@@ -18,7 +18,7 @@ index 02239b13719bca765f5049e714915a904e240bd4..42126a4a34d7942f01c3bdcb252fbb13
  
  #ifdef _WIN32
  #define WEAK
-@@ -184,6 +186,32 @@ hev_socks5_server_endpoint_rows (HevSocks5EndpointStats *rows, size_t capacity)
+@@ -202,6 +204,32 @@
      return hev_meter_rows (rows ? client_stats_copy : NULL, &copy);
  }
  
@@ -52,7 +52,7 @@ index 02239b13719bca765f5049e714915a904e240bd4..42126a4a34d7942f01c3bdcb252fbb13
  main (int argc, char *argv[])
  {
 diff --git a/src/hev-main.h b/src/hev-main.h
-index 701350e846b7bb8299bac7fe7e17e1a654921188..4d805bdb1d1d41f28cd5a162ea30be40b06a2496 100644
+index 5eeaced54340e1d81b141a72c25c58cad3291c93..06430ca106ee513d4e2a8132a04f80212be7817b 100644
 --- a/src/hev-main.h
 +++ b/src/hev-main.h
 @@ -11,6 +11,7 @@
@@ -63,7 +63,7 @@ index 701350e846b7bb8299bac7fe7e17e1a654921188..4d805bdb1d1d41f28cd5a162ea30be40
  
  #ifdef __cplusplus
  extern "C" {
-@@ -84,6 +85,19 @@ void hev_socks5_server_endpoint_stats (uint64_t *received, uint64_t *sent);
+@@ -90,6 +91,19 @@
  size_t hev_socks5_server_endpoint_rows (HevSocks5EndpointStats *rows,
                                          size_t capacity);
  
