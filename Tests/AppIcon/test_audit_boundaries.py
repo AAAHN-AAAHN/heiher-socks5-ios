@@ -13,6 +13,7 @@ import sys
 import tempfile
 import types
 import unittest
+from unittest import mock
 
 import check_compiled as current
 import check_icon
@@ -37,6 +38,52 @@ def old_module():
 
 
 class AuditBoundaries(unittest.TestCase):
+    def test_repeated_attempts_preserve_previous_products(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            out, work = root / 'output', root / 'work'
+            out.mkdir(); work.mkdir()
+            previous = out / 'iphoneos-assets'
+            previous.mkdir()
+            (previous / 'Assets.car').write_bytes(b'prior diagnostic catalog')
+            for label in ('original', 'remapped'):
+                app = work / label / 'Socks5.app'
+                app.mkdir(parents=True)
+                (app / 'receipt').write_text('prior product')
+            with mock.patch.object(current, 'OUT', out), mock.patch.object(current, 'WORK', work):
+                first = current.attempt_directories()
+                second = current.attempt_directories()
+                self.assertNotEqual(first[0], second[0])
+                self.assertNotEqual(first[1], second[1])
+                for attempt, assets in (first, second):
+                    self.assertEqual(list(assets.iterdir()), [])
+                    source = attempt / 'simulator' / 'Socks5.app'
+                    source.mkdir(parents=True)
+                    (source / 'receipt').write_text('current product')
+                    for label in ('original', 'remapped'):
+                        shutil.copytree(source, attempt / label / 'Socks5.app')
+                # The old main failed at device_assets.mkdir() before actool.
+                settings = {'ASSETCATALOG_COMPILER_APPICON_NAME': 'AppIcon',
+                            'IPHONEOS_DEPLOYMENT_TARGET': '17.2',
+                            'PRODUCT_BUNDLE_IDENTIFIER': 'hev.Socks5',
+                            'TARGETED_DEVICE_FAMILY': '1,2',
+                            'INFOPLIST_FILE': 'Socks5/Info.plist'}
+                def boundary(*args, **kwargs):
+                    if args[:2] == ('xcrun', 'actool'):
+                        raise RuntimeError('actool boundary')
+                    if '-showBuildSettings' in args:
+                        return json.dumps([{'target': 'Socks5', 'buildSettings': settings}])
+                    if '--show-sdk-version' in args:
+                        return '27.0'
+                    return ''
+                for _ in range(2):
+                    with mock.patch.object(current, 'run', side_effect=boundary):
+                        with self.assertRaisesRegex(RuntimeError, 'actool boundary'):
+                            current.main()
+            self.assertEqual((previous / 'Assets.car').read_bytes(), b'prior diagnostic catalog')
+            for label in ('original', 'remapped'):
+                self.assertEqual((work / label / 'Socks5.app' / 'receipt').read_text(), 'prior product')
+
     def test_input_and_retry_markers(self):
         real_git = shutil.which('git')
         self.assertIsNotNone(real_git)
