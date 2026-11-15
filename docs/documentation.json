@@ -6,7 +6,7 @@
     "docs/features/integrated.md"
   ],
   "parents": {
-    "feature/app-icon": "b4efcacdfa370749bde9d4f85e30352c55bf960f",
+    "feature/app-icon": "64aef950fe3f3d71950a3a3742417bfa6679b82f",
     "feature/background": "d8aa42e66908385c3ff444e749c33c5092acfd5d",
     "feature/server-control": "d924a80077494f1f765b07003879447daab29b5c",
     "feature/settings-persistence": "a5e0b5d629bce79d388756db1fff0565b556cfca",

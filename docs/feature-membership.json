@@ -1,7 +1,7 @@
 {
   "base_commit": "e30ded4906f98c2ef494fdfb5f3fd98759cc3818",
   "branches": {
-    "feature/app-icon": "b4efcacdfa370749bde9d4f85e30352c55bf960f",
+    "feature/app-icon": "64aef950fe3f3d71950a3a3742417bfa6679b82f",
     "feature/background": "d8aa42e66908385c3ff444e749c33c5092acfd5d",
     "feature/server-control": "d924a80077494f1f765b07003879447daab29b5c",
     "feature/settings-persistence": "a5e0b5d629bce79d388756db1fff0565b556cfca",
@@ -100,11 +100,11 @@
       "sha256": "a9a5d376c6070e822675a22b09985d03014656c9f042efe3ab4d8d096b7de016"
     },
     "Socks5/Assets.xcassets/AppIcon.appiconset/AppIcon.png": {
-      "commit": "b4efcacdfa370749bde9d4f85e30352c55bf960f",
+      "commit": "64aef950fe3f3d71950a3a3742417bfa6679b82f",
       "sha256": "4a2f2a9384e8b6db351a9284232db56e719377e60f17123e4a6992cee1799cc2"
     },
     "Socks5/Assets.xcassets/AppIcon.appiconset/Contents.json": {
-      "commit": "b4efcacdfa370749bde9d4f85e30352c55bf960f",
+      "commit": "64aef950fe3f3d71950a3a3742417bfa6679b82f",
       "sha256": "852920cb36e95beb53771138a4b8195a16fcce1cc31250632f246081cc638f9a"
     },
     "Socks5/BackgroundKeepAlive/BackgroundKeepAlive.swift": {
@@ -188,23 +188,23 @@
       "sha256": "6341b9863690700ba827739cb4008dfd8c0d8ebe2bcf6ddacc0814889fc0504b"
     },
     "Tests/AppIcon/DecodeImages.swift": {
-      "commit": "b4efcacdfa370749bde9d4f85e30352c55bf960f",
+      "commit": "64aef950fe3f3d71950a3a3742417bfa6679b82f",
       "sha256": "b215c1192da9113f81310404ba0f3cadf64cd2759a9c4fa85201166324a10750"
     },
     "Tests/AppIcon/audit_driver_check.py": {
-      "commit": "b4efcacdfa370749bde9d4f85e30352c55bf960f",
+      "commit": "64aef950fe3f3d71950a3a3742417bfa6679b82f",
       "sha256": "a58e6c4446aaef522ddc031199327dbc4a474566b7cbd45259b1308393d29ff5"
     },
     "Tests/AppIcon/check_compiled.py": {
-      "commit": "b4efcacdfa370749bde9d4f85e30352c55bf960f",
-      "sha256": "2c08bd5dcd416aafa06d1850c134226e8ce7af75eacd386b0c43b44c4ef524ce"
+      "commit": "64aef950fe3f3d71950a3a3742417bfa6679b82f",
+      "sha256": "bfae4fca8fb82f7e3881600b0a82b3c46156eba07334ca1a5004ad3358b7a0b2"
     },
     "Tests/AppIcon/check_icon.py": {
-      "commit": "b4efcacdfa370749bde9d4f85e30352c55bf960f",
+      "commit": "64aef950fe3f3d71950a3a3742417bfa6679b82f",
       "sha256": "02748770ae23e9dae4cdbaaf221d3d8c4acc144ae18700fadca8fe461cf5a42b"
     },
     "Tests/AppIcon/run_checks.sh": {
-      "commit": "b4efcacdfa370749bde9d4f85e30352c55bf960f",
+      "commit": "64aef950fe3f3d71950a3a3742417bfa6679b82f",
       "sha256": "deb568cfc732699922a23bfd09dee909d8a0d82e0866ffc0b2a8c879eb02a68b"
     },
     "Tests/AppIcon/runtime_environment.py": {
@@ -212,15 +212,15 @@
       "sha256": "c28cbbe2181245dea07e7c8e6f2920ca17804cc148a1cea63e2d4e78fa4c1e2d"
     },
     "Tests/AppIcon/test_audit_boundaries.py": {
-      "commit": "b4efcacdfa370749bde9d4f85e30352c55bf960f",
-      "sha256": "a92bdf913bfb7593dde7d7671534d3cbcd21dcb7438f2eae0df4c6f3193512a0"
+      "commit": "64aef950fe3f3d71950a3a3742417bfa6679b82f",
+      "sha256": "132d5f7f8f82e70cc07040945b0705ca6c74ff4db73d0d57e87a677f6ad5763b"
     },
     "Tests/AppIcon/test_icon.py": {
-      "commit": "b4efcacdfa370749bde9d4f85e30352c55bf960f",
+      "commit": "64aef950fe3f3d71950a3a3742417bfa6679b82f",
       "sha256": "16577a6829351889fdd92d52607eea0ea5f82c0e71af7326526c41d261cdfc62"
     },
     "Tests/AppIcon/test_imageio.py": {
-      "commit": "b4efcacdfa370749bde9d4f85e30352c55bf960f",
+      "commit": "64aef950fe3f3d71950a3a3742417bfa6679b82f",
       "sha256": "8a5a0fce2529221acc42f299aeaa16186246c57bbd39b1c53b4b29952a61ca29"
     },
     "Tests/Background/ApplicationProviderAccess.swift.inc": {

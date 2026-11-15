@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 from check_icon import ROOT, CATALOG, IMAGE_HASH, require
@@ -84,6 +85,14 @@ def installed_resources(reference, installed, identity):
     return expected
 
 
+def attempt_directories():
+    """Keep prior diagnostics and products; never reuse an earlier test copy."""
+    WORK.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix='attempt-', dir=WORK))
+    assets = Path(tempfile.mkdtemp(prefix='iphoneos-assets-', dir=OUT))
+    return work, assets
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     # Direct retries must not retain a previous successful install verdict.
@@ -92,7 +101,7 @@ def main():
     require(__debug__, 'Run the audit without Python optimization')
     run('git', 'diff', '--exit-code', 'HEAD', '--')
     run('git', 'diff', '--cached', '--exit-code', 'HEAD', '--')
-    WORK.mkdir(parents=True, exist_ok=True)
+    work, device_assets = attempt_directories()
     require(run('xcrun', '--sdk', 'iphoneos', '--show-sdk-version').startswith('27.'), 'Wrong SDK')
     toolchain = run('xcodebuild', '-version') + '\n' + run('xcrun', '--sdk', 'iphoneos', '--show-sdk-version')
     (OUT / 'toolchain.txt').write_text(toolchain + '\n' + run('sw_vers') + '\n' + run('xcrun', 'swiftc', '--version') + '\n')
@@ -107,7 +116,6 @@ def main():
                               ('TARGETED_DEVICE_FAMILY', '1,2'), ('INFOPLIST_FILE', 'Socks5/Info.plist')]:
             require(target[key] == expected, configuration + ': ' + key)
         require(not target.get('CODE_SIGN_ENTITLEMENTS'), 'Unexpected entitlement file')
-    device_assets = OUT / 'iphoneos-assets'; device_assets.mkdir()
     # Compile the real catalog for both target families and the real minimum OS.
     report = run('xcrun', 'actool', ROOT / 'Socks5/Assets.xcassets', '--compile', device_assets,
                  '--platform', 'iphoneos', '--minimum-deployment-target', '17.2', '--app-icon', 'AppIcon',
@@ -123,7 +131,7 @@ def main():
     assetinfo = run('xcrun', 'assetutil', '--info', device_assets / 'Assets.car')
     (OUT / 'assets-info.json').write_text(assetinfo + '\n')
     catalog_renditions(json.loads(assetinfo))
-    decoder = WORK / 'decode-images'
+    decoder = work / 'decode-images'
     run('xcrun', 'swiftc', '-parse-as-library', '-swift-version', '5', '-warnings-as-errors',
         ROOT / 'Tests/AppIcon/DecodeImages.swift', '-o', decoder)
     decoded = run(decoder, ROOT / CATALOG / 'AppIcon.png', *device_images)
@@ -135,11 +143,11 @@ def main():
     with (OUT / 'simulator-build.log').open('w') as log:
         subprocess.run(['xcodebuild', 'build', '-project', str(ROOT / 'Socks5.xcodeproj'), '-scheme', 'Socks5',
                         '-configuration', 'Release', '-sdk', 'iphonesimulator', '-arch', 'arm64',
-                        'CONFIGURATION_BUILD_DIR=' + str(WORK / 'simulator'), 'CODE_SIGNING_ALLOWED=NO',
+                        'CONFIGURATION_BUILD_DIR=' + str(work / 'simulator'), 'CODE_SIGNING_ALLOWED=NO',
                         'MARKETING_VERSION=3.0.0', 'CURRENT_PROJECT_VERSION=1',
                         'SWIFT_TREAT_WARNINGS_AS_ERRORS=YES'], stdout=log, stderr=subprocess.STDOUT,
                        check=True, timeout=300, cwd=ROOT)
-    app = WORK / 'simulator/Socks5.app'
+    app = work / 'simulator/Socks5.app'
     app_info = plistlib.loads((app / 'Info.plist').read_bytes())
     require(app_info['DTSDKName'].startswith('iphonesimulator27.'), 'Wrong Simulator SDK')
     require(app_info['MinimumOSVersion'] == '17.2' and not app_info.get('UIBackgroundModes'), 'Changed app scope')
@@ -162,7 +170,7 @@ def main():
         (OUT / 'boot.log').write_text(run('xcrun', 'simctl', 'bootstatus', device, '-b', timeout=240))
         for identity in ('hev.Socks5', 'hev.Socks5.ICONREVIEW'):
             label = 'original' if identity == 'hev.Socks5' else 'remapped'
-            testapp = WORK / (label + '/Socks5.app')
+            testapp = work / (label + '/Socks5.app')
             shutil.copytree(app, testapp)
             changed_info = dict(app_info, CFBundleIdentifier=identity)
             (testapp / 'Info.plist').write_bytes(plistlib.dumps(changed_info))

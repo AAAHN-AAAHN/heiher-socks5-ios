@@ -24,6 +24,8 @@ The source-image checker validates PNG signature, chunk boundaries, declared len
 
 The compiled-asset checks inspect the application's plist icon dictionaries, Assets.car representations and generated files. Filename point size and scale determine the required pixel dimensions. Apple ImageIO verifies that files are actual PNG images, have the expected square dimensions and are opaque. Empty input and a different image format renamed to PNG are not accepted as successful decoding.
 
+Each compiled audit attempt uses fresh work and device-asset directories. Earlier products and diagnostics are preserved, while original and remapped test copies cannot collide with a preceding attempt. These retained directories consume host disk space; they are test artifacts outside the application target.
+
 Installation checks compare the registered bundle identifier, icon metadata and the complete installed Assets.car/fallback-image fingerprints with the built application. Phone and tablet metadata are checked separately. A registration test does not infer installation identity from a filename alone.
 
 All validation helpers and image fixtures remain outside the application target. Source checks preserve the application code, native inputs and baseline framework while allowing only the declared icon/catalog/project behavior.
