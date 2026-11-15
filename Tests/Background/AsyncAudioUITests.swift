@@ -73,8 +73,10 @@ final class AsyncAudioUITests: XCTestCase {
         app.terminate()
         app.launch()
         app.tabBars.buttons["Background"].tap()
-        XCTAssertEqual(audio.value as? String, "1")
+        // Integrated settings restore asynchronously after launch. Observe the
+        // existing playback predicate before asserting the restored switch value.
         expectAudioState("Playing silent WAV continuously", timeout: 10)
+        XCTAssertEqual(audio.value as? String, "1")
         audio.tap()
         XCTAssertEqual(audio.value as? String, "0")
         // Rapid user intent changes must settle at the final explicit Off.
