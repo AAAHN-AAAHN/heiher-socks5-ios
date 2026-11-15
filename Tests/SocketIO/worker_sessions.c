@@ -161,7 +161,10 @@ main (void)
     wm_add (ap, 47, 53);
     wm_worker_release (b);
     WmWorker *reused = wm_worker_new ();
-    assert (reused == b && peer (reused, "10.20.30.40") == bp);
+    assert (reused == b);
+    /* Release ends peer-reference lifetime; old-session parts may be reclaimed. */
+    bp = peer (reused, "10.20.30.40");
+    assert (bp->identity == ap->identity);
     wm_add (bp, 59, 61);
     check (2, 106, 114);
 

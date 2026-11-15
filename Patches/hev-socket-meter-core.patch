@@ -14,10 +14,10 @@ index 3e9d6486d0cf9d9e3ee2063f87d93b78f0337f2d..da8d1e61ba60d3334647c34941854989
      unsigned int udp_associated : 1;
 diff --git a/src/hev-socks5-meter.c b/src/hev-socks5-meter.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..20efd87d849fbd3ca672c18711ccdfde38e2d272
+index 0000000000000000000000000000000000000000..6cb94b53b8a3adc19564d0d13a19a18fed25b66a
 --- /dev/null
 +++ b/src/hev-socks5-meter.c
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,183 @@
 +/* Server-session/socket metric. Workers own writes; readers only sample. */
 +#include <errno.h>
 +#include <pthread.h>
@@ -194,12 +194,19 @@ index 0000000000000000000000000000000000000000..20efd87d849fbd3ca672c18711ccdfde
 +    return hev_task_io_socket_sendmmsg_observed (
 +        fd, messages, count, flags, yielder, self, socket_observer, self);
 +}
++
++size_t
++hev_meter_try_snapshot (WmVisit callback, void *context, uint64_t *in,
++                        uint64_t *out)
++{
++    return wm_try_snapshot (callback, context, in, out);
++}
 diff --git a/src/hev-socks5-meter.h b/src/hev-socks5-meter.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..1266ebf04d1dae3dd64eda145236a6f3bf2d5ac5
+index 0000000000000000000000000000000000000000..5c52d6bff1fb627ea8cb2a5d414ad7569c552336
 --- /dev/null
 +++ b/src/hev-socks5-meter.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,41 @@
 +/* Program/socket boundary accounting; not IP packet or interface counters. */
 +#ifndef HEV_SOCKS5_METER_H
 +#define HEV_SOCKS5_METER_H
@@ -211,7 +218,7 @@ index 0000000000000000000000000000000000000000..1266ebf04d1dae3dd64eda145236a6f3
 +#include <hev-task-io-socket.h>
 +
 +/* Rows are remote endpoints: In = OS accepted bytes TO peer;
-+ * Out = bytes consumed FROM peer. Nodes live until process exit. */
++ * Out = bytes consumed FROM peer. Callback addresses are borrowed for the call. */
 +typedef void (*HevMeterRow) (uint64_t id, const char *address, uint64_t in,
 +                             uint64_t out, void *context);
 +int hev_meter_prepare (void);
@@ -238,6 +245,8 @@ index 0000000000000000000000000000000000000000..1266ebf04d1dae3dd64eda145236a6f3
 +                        HevTaskIOYielder yielder, void *self);
 +int hev_meter_sendmmsg (int fd, void *messages, unsigned int count, int flags,
 +                        HevTaskIOYielder yielder, void *self);
++size_t hev_meter_try_snapshot (HevMeterRow callback, void *context,
++                               uint64_t *in, uint64_t *out);
 +#endif
 diff --git a/src/hev-socks5-server.c b/src/hev-socks5-server.c
 index 6dd2c7edf9a7231a45465d1bd47ac11f91458fea..2175d26d8e3b75ceca79beae49b6f2e95237ae7b 100644
@@ -532,10 +541,10 @@ index d8ab77e7ced153deb54dc26e37ea02716a84f0fa..f7d96f35c9eb32be17041ef2fa1d9211
      self->addr_family = HEV_SOCKS5_ADDR_FAMILY_UNSPEC;
 diff --git a/src/worker_meter.c b/src/worker_meter.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca31661b39774
+index 0000000000000000000000000000000000000000..83c2004bdee207404498ba653540b9290b4c030a
 --- /dev/null
 +++ b/src/worker_meter.c
-@@ -0,0 +1,344 @@
+@@ -0,0 +1,492 @@
 +#include "worker_meter.h"
 +#include <stdatomic.h>
 +#include <stdlib.h>
@@ -544,6 +553,8 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +#include <arpa/inet.h>
 +#include <netinet/in.h>
 +#include <limits.h>
++#include <sched.h>
++#include <time.h>
 +
 +/* No mutex, compiler TLS, atomic uint64_t, or per-I/O shared RMW. */
 +_Static_assert (sizeof (unsigned) >= 4, "32-bit unsigned required");
@@ -575,6 +586,7 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +{
 +    struct WmWorker *next;
 +    _Atomic unsigned owned;
++    unsigned collected_generation;
 +    WmPeer *buckets[256];
 +    WmPeer unknown;
 +};
@@ -582,6 +594,28 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +static _Atomic (Identity *) identities[256];
 +static _Atomic unsigned serial;
 +static _Atomic unsigned session_generation;
++/* Registry lifetime gate: shared only during registration/snapshot, never
++ * during a counter write. Reclamation is opportunistic and never waits. */
++static _Atomic unsigned registry_users;
++static void
++registry_enter (void)
++{
++    for (;;) {
++        unsigned n =
++            atomic_load_explicit (&registry_users, memory_order_relaxed);
++        if (n < UINT_MAX - 1 && atomic_compare_exchange_weak_explicit (
++                                    &registry_users, &n, n + 1,
++                                    memory_order_acquire, memory_order_relaxed))
++            return;
++        sched_yield ();
++    }
++}
++static void
++registry_leave (void)
++{
++    atomic_fetch_sub_explicit (&registry_users, 1, memory_order_release);
++}
++static void registry_collect (WmWorker *only);
 +static Identity unknown = { .address = "Unattributed" };
 +
 +uint32_t
@@ -604,6 +638,7 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +    } while (!atomic_compare_exchange_weak_explicit (
 +        &session_generation, &previous, previous + 1, memory_order_release,
 +        memory_order_relaxed));
++    registry_collect (NULL);
 +    return 0;
 +}
 +static void
@@ -629,8 +664,8 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +                                                     memory_order_release,
 +                                                     memory_order_relaxed));
 +}
-+WmWorker *
-+wm_worker_new (void)
++static WmWorker *
++worker_new (void)
 +{
 +    WmWorker *head = atomic_load_explicit (&worker_pool, memory_order_acquire);
 +    for (WmWorker *p = head; p; p = p->next) {
@@ -644,6 +679,7 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +    if (!w)
 +        return NULL;
 +    atomic_init (&w->owned, 1);
++    w->collected_generation = wm_generation ();
 +    counter_init (&w->unknown.counter);
 +    publish_part (&w->unknown, &unknown);
 +    do {
@@ -652,11 +688,23 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +        &worker_pool, &head, w, memory_order_release, memory_order_relaxed));
 +    return w;
 +}
++WmWorker *
++wm_worker_new (void)
++{
++    registry_enter ();
++    WmWorker *w = worker_new ();
++    registry_leave ();
++    return w;
++}
 +void
 +wm_worker_release (WmWorker *w)
 +{
-+    if (w)
++    if (w) {
++        int collect = w->collected_generation != wm_generation ();
 +        atomic_store_explicit (&w->owned, 0, memory_order_release);
++        if (collect)
++            registry_collect (w);
++    }
 +}
 +WmPeer *
 +wm_unknown (WmWorker *w)
@@ -704,6 +752,7 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +    for (WmPeer *p = w->buckets[hash]; p; p = p->bucket_next)
 +        if (same (p->identity, family, scope, ip))
 +            return p;
++    registry_enter ();
 +    Identity *id;
 +    for (;;) {
 +        Identity *head =
@@ -714,12 +763,17 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +        if (id)
 +            break;
 +        Identity *fresh = calloc (1, sizeof (*fresh));
-+        if (!fresh)
++        if (!fresh) {
++            registry_leave ();
 +            return &w->unknown;
++        }
 +        char text[INET6_ADDRSTRLEN];
 +        if (!inet_ntop (family, ip, text, sizeof (text))) {
 +            free (fresh);
-+            return &w->unknown;
++            {
++                registry_leave ();
++                return &w->unknown;
++            }
 +        }
 +        /* IDs may have holes after a lost insertion race; snapshots never index
 +         * the caller's array by ID. No ID wrap may silently alias an older IP. */
@@ -727,7 +781,10 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +        do {
 +            if (n == UINT_MAX) {
 +                free (fresh);
-+                return &w->unknown;
++                {
++                    registry_leave ();
++                    return &w->unknown;
++                }
 +            }
 +        } while (!atomic_compare_exchange_weak_explicit (
 +            &serial, &n, n + 1, memory_order_relaxed, memory_order_relaxed));
@@ -752,13 +809,68 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +        free (fresh);
 +    }
 +    WmPeer *p = calloc (1, sizeof (*p));
-+    if (!p)
++    if (!p) {
++        registry_leave ();
 +        return &w->unknown;
++    }
 +    counter_init (&p->counter);
 +    p->bucket_next = w->buckets[hash];
 +    w->buckets[hash] = p;
 +    publish_part (p, id);
++    registry_leave ();
 +    return p;
++}
++static void
++registry_collect (WmWorker *only)
++{
++    unsigned empty = 0;
++    if (!atomic_compare_exchange_strong_explicit (
++            &registry_users, &empty, UINT_MAX, memory_order_acquire,
++            memory_order_relaxed))
++        return;
++    unsigned generation = wm_generation ();
++    for (WmWorker *w = atomic_load (&worker_pool); w; w = w->next) {
++        if ((only && only != w) ||
++            atomic_load_explicit (&w->owned, memory_order_acquire))
++            continue;
++        w->collected_generation = generation;
++        for (unsigned i = 0; i < 256; i++) {
++            WmPeer **link = &w->buckets[i];
++            while (*link) {
++                WmPeer *p = *link;
++                if (atomic_load (&p->counter.generation) >= generation) {
++                    link = &p->bucket_next;
++                    continue;
++                }
++                WmPeer *head = atomic_load (&p->identity->parts);
++                if (head == p)
++                    atomic_store (&p->identity->parts, p->identity_next);
++                else {
++                    WmPeer *previous = head;
++                    while (previous->identity_next != p)
++                        previous = previous->identity_next;
++                    previous->identity_next = p->identity_next;
++                }
++                *link = p->bucket_next;
++                free (p);
++            }
++        }
++    }
++    for (unsigned i = 0; i < 256; i++) {
++        Identity *head = atomic_load (&identities[i]);
++        Identity **link = &head;
++        while (*link) {
++            Identity *id = *link;
++            if (!atomic_load (&id->parts) &&
++                atomic_load (&id->generation) < generation) {
++                *link = id->next;
++                free (id);
++            } else
++                link = &id->next;
++        }
++        atomic_store (&identities[i], head);
++    }
++    atomic_store_explicit (&registry_users, 0, memory_order_release);
 +}
 +void
 +wm_add (WmPeer *peer, size_t in, size_t out)
@@ -802,23 +914,25 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +        }
 +    }
 +}
-+static void
-+counter_read (const Counter *c, unsigned session, uint64_t *in, uint64_t *out)
++static int
++counter_try_read (const Counter *c, unsigned session, uint64_t *in,
++                  uint64_t *out)
 +{
 +    *in = *out = 0;
-+    for (;;) {
++    {
 +        /* Neither a new snapshot nor an obsolete one waits for a suspended
 +         * writer from a previous server session to finish publication. */
 +        if (wm_generation () != session ||
 +            atomic_load_explicit (&c->generation, memory_order_acquire) !=
 +                session)
-+            return;
++            return 1;
 +        /* A new epoch must order the following sequence read after wrap. */
 +        unsigned epoch = atomic_load_explicit (&c->epoch, memory_order_acquire);
 +        unsigned before =
 +            atomic_load_explicit (&c->sequence, memory_order_acquire);
-+        if (before & 1u)
-+            continue;
++        if (before & 1u) {
++            return 0;
++        }
 +        unsigned il = atomic_load_explicit (&c->in_lo, memory_order_relaxed);
 +        unsigned ih = atomic_load_explicit (&c->in_hi, memory_order_relaxed);
 +        unsigned ol = atomic_load_explicit (&c->out_lo, memory_order_relaxed);
@@ -830,23 +944,36 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +        if (before !=
 +                atomic_load_explicit (&c->sequence, memory_order_acquire) ||
 +            epoch != atomic_load_explicit (&c->epoch, memory_order_relaxed))
-+            continue;
++            return 0;
 +        if (generation != session)
-+            return;
++            return 1;
 +        *in = ((uint64_t)ih << 32) | il;
 +        *out = ((uint64_t)oh << 32) | ol;
-+        return;
++        return 1;
 +    }
 +}
++
 +static void
++counter_read (const Counter *c, unsigned session, uint64_t *in, uint64_t *out)
++{
++    while (!counter_try_read (c, session, in, out)) {
++        struct timespec pause = { 0, 1000000 };
++        nanosleep (&pause, NULL);
++    }
++}
++static int
 +identity_read (Identity *id, unsigned generation, WmVisit visit, void *context,
-+               uint64_t *in, uint64_t *out)
++               uint64_t *in, uint64_t *out, int bounded)
 +{
 +    uint64_t a = 0, b = 0;
 +    for (WmPeer *p = atomic_load_explicit (&id->parts, memory_order_acquire); p;
 +         p = p->identity_next) {
 +        uint64_t x, y;
-+        counter_read (&p->counter, generation, &x, &y);
++        if (bounded) {
++            if (!counter_try_read (&p->counter, generation, &x, &y))
++                return 0;
++        } else
++            counter_read (&p->counter, generation, &x, &y);
 +        a += x;
 +        b += y;
 +    }
@@ -854,15 +981,18 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +    *out += b;
 +    if (visit)
 +        visit (id->id, id->address, a, b, context);
++    return 1;
 +}
-+size_t
-+wm_snapshot (WmVisit visit, void *context, uint64_t *in, uint64_t *out)
++static size_t
++snapshot (WmVisit visit, void *context, uint64_t *in, uint64_t *out,
++          int bounded)
 +{
 +    uint64_t a = 0, b = 0;
 +    unsigned generation = wm_generation ();
 +    size_t count = 1;
-+    if (visit || in || out)
-+        identity_read (&unknown, generation, visit, context, &a, &b);
++    if ((visit || in || out) &&
++        !identity_read (&unknown, generation, visit, context, &a, &b, bounded))
++        return SIZE_MAX;
 +    for (unsigned i = 0; i < 256; i++)
 +        for (Identity *id =
 +                 atomic_load_explicit (&identities[i], memory_order_acquire);
@@ -870,22 +1000,49 @@ index 0000000000000000000000000000000000000000..f21ecd9a55ae73fce7489d8797cca316
 +            if (atomic_load_explicit (&id->generation, memory_order_acquire) !=
 +                generation)
 +                continue;
-+            if (visit || in || out)
-+                identity_read (id, generation, visit, context, &a, &b);
++            if ((visit || in || out) &&
++                !identity_read (id, generation, visit, context, &a, &b,
++                                bounded))
++                return SIZE_MAX;
 +            ++count;
 +        }
++    if (bounded && generation != wm_generation ())
++        return SIZE_MAX;
 +    if (in)
 +        *in = a;
 +    if (out)
 +        *out = b;
 +    return count;
 +}
++
++size_t
++wm_snapshot (WmVisit visit, void *context, uint64_t *in, uint64_t *out)
++{
++    registry_enter ();
++    size_t count = snapshot (visit, context, in, out, 0);
++    registry_leave ();
++    return count;
++}
++/* SIZE_MAX means every row and total from this attempt must be discarded.
++ * No busy counter is silently counted as zero. Readers may retry next tick. */
++size_t
++wm_try_snapshot (WmVisit visit, void *context, uint64_t *in, uint64_t *out)
++{
++    unsigned n = atomic_load_explicit (&registry_users, memory_order_relaxed);
++    if (n >= UINT_MAX - 1 || !atomic_compare_exchange_strong_explicit (
++                                 &registry_users, &n, n + 1,
++                                 memory_order_acquire, memory_order_relaxed))
++        return SIZE_MAX;
++    size_t count = snapshot (visit, context, in, out, 1);
++    registry_leave ();
++    return count;
++}
 diff --git a/src/worker_meter.h b/src/worker_meter.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..ac52400d85a80eadceb89be95822274d44aa1a01
+index 0000000000000000000000000000000000000000..b4ae21a4be4915c210177603affd769db36ed62d
 --- /dev/null
 +++ b/src/worker_meter.h
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,30 @@
 +#ifndef WORKER_METER_H
 +#define WORKER_METER_H
 +#include <stddef.h>
@@ -897,10 +1054,11 @@ index 0000000000000000000000000000000000000000..ac52400d85a80eadceb89be95822274d
 +typedef void (*WmVisit) (uint64_t id, const char *address, uint64_t in,
 +                         uint64_t out, void *context);
 +/* One writer per worker. Create/register workers before their first socket I/O.
-+ * Workers and peer references live for the process lifetime. No callback yields.
++ * Peer references remain valid until their owning worker is released. No callback yields.
 + * Each worker part is coherent; rows merge parts read at different times.
-+ * A session begins just before native workers run. No nodes are freed/reset
-+ * externally: each writer lazily starts fresh on its first record in a session.
++ * A session begins just before native workers run. Released old-session parts
++ * are reclaimed only with no registry readers/registration in flight. Active
++ * writers retain their references and reset lazily on their first new record.
 + * Generation zero covers records before the first server start. */
 +uint32_t wm_generation (void);
 +int wm_session_available (void);
@@ -911,4 +1069,7 @@ index 0000000000000000000000000000000000000000..ac52400d85a80eadceb89be95822274d
 +WmPeer *wm_unknown (WmWorker *);
 +void wm_add (WmPeer *, size_t accepted_write, size_t consumed_read);
 +size_t wm_snapshot (WmVisit, void *, uint64_t *in, uint64_t *out);
++/* SIZE_MAX rejects the entire attempt, including callback rows. Totals are
++ * unchanged on rejection. A successful read preserves coherent worker parts. */
++size_t wm_try_snapshot (WmVisit, void *, uint64_t *in, uint64_t *out);
 +#endif

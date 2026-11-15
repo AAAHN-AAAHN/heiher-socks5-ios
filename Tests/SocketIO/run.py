@@ -32,7 +32,7 @@ run([a.cc,'-O2','-pthread',*['-I'+str(n/path) for path in
      ('src','src/misc','src/core/include','third-part/yaml/include','third-part/hev-task-system/include')],
      HERE/'restart_host.c',observed,n/'bin/libhev-socks5-server.a',
      n/'third-part/yaml/bin/libyaml.a',task/'bin/libhev-task-system.a','-o',restart_host])
-for name,defines in [('socket_observer',[]),('socket_observer',['-DFORCE_FALLBACK']),('stream_matrix',['-DENABLE_IO_SPLICE_SYSCALL'] if a.mode=='splice' else []),('registry',[]),('worker_boundaries',[]),('worker_sessions',[])]:
+for name,defines in [('socket_observer',[]),('socket_observer',['-DFORCE_FALLBACK']),('stream_matrix',['-DENABLE_IO_SPLICE_SYSCALL'] if a.mode=='splice' else []),('registry',[]),('worker_boundaries',[]),('worker_sessions',[]),('worker_safety',[])]:
  exe=out/(name+('-fallback' if '-DFORCE_FALLBACK' in defines else ''))
  run([a.cc,'-O2','-std=gnu11','-Wall','-Werror','-Wno-unused-function',*defines,'-I'+str(n/'src/core/src'),'-I'+str(n/'src/core/include'),'-I'+str(task/'src'),'-I'+str(task/'include'),HERE/(name+'.c'),task/'bin/libhev-task-system.a','-pthread','-o',exe]);run([exe])
 for name in ('snapshot_rows','connected_peer','udp_gso_accounting','session_lifecycle'):

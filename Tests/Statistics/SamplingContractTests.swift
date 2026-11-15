@@ -38,6 +38,7 @@ struct HevSocks5EndpointStats {
     final class Clock { var systemUptime = 100.0 }
 }
 @MainActor enum NativeSnapshot {
+    static var reject = 0
     static var generation: UInt32 = 0
     static var generationReads = 0
     static let generationReadsPerSample = 2
@@ -57,6 +58,15 @@ struct HevSocks5EndpointStats {
     _ body: (UnsafePointer<T>) throws -> Result) rethrows -> Result {
     NativeSnapshot.addressReads += 1
     return try Swift.withUnsafePointer(to: &value, body)
+}
+@MainActor func hev_socks5_server_endpoint_try_stats(_ received: inout UInt64, _ sent: inout UInt64) -> Int32 {
+    if NativeSnapshot.reject == 1 { return -1 }
+    hev_socks5_server_endpoint_stats(&received, &sent)
+    return 0
+}
+@MainActor func hev_socks5_server_endpoint_try_rows(_ rows: UnsafeMutablePointer<HevSocks5EndpointStats>?, _ capacity: Int) -> Int {
+    if NativeSnapshot.reject == (rows == nil ? 2 : 3) { return -1 }
+    return hev_socks5_server_endpoint_rows(rows, capacity)
 }
 @MainActor func hev_socks5_server_endpoint_stats(_ received: inout UInt64, _ sent: inout UInt64) {
     NativeSnapshot.totals += 1
@@ -164,6 +174,16 @@ struct HevSocks5EndpointStats {
         sample(view)
         check(view.clients.rows.first?.id == 0, "nonzero unattributed row remains first")
         check(view.clients.entries[7]!.traffic.sumRate == 0, "decreased counters establish a zero-rate baseline")
+        for rejectedStage in 1...3 {
+            NativeSnapshot.reject = rejectedStage
+            let previousTotal = view.statistics.received
+            let previousRows = view.clients.rows.count
+            view.run()
+            check(view.statistics.received == previousTotal && view.clients.rows.count == previousRows,
+                  "rejected sample retains the last complete value")
+            check(view.clientsIncomplete, "rejected sample is marked stale")
+        }
+        NativeSnapshot.reject = 0
         let returned = SamplingHarness()
         sample(returned)
         check(returned.clients.rows.allSatisfy { $0.traffic.sumRate == 0 }, "returning tab starts fresh rates")

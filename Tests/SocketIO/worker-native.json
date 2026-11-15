@@ -1,14 +1,14 @@
 {
   "common": {
-    "src/core/src/hev-socks5-meter.c": "aeb2a2bd3c04ad35f85c30bf9f3d6d411372fbc9b7227f7ea7e25fdaaec08a23",
-    "src/core/src/hev-socks5-meter.h": "a466fb4095f26a509d7079e3dc88ff0f6e0eaba029cb026108a5cf65cbc38e7b",
+    "src/core/src/hev-socks5-meter.c": "ae20f4d3e973dac3f967b1be3115bf94e3e8c6f7fb56042733bc9bd82e7aa820",
+    "src/core/src/hev-socks5-meter.h": "3210d27d821478ad6fb17264a01830d8f0ce85b9abb6136c615213db414ec368",
     "src/core/src/hev-socks5-server.c": "b8b58dcf62461ea8821101bb5edc36433206a13940792513f9b50dc256de10a9",
     "src/core/src/hev-socks5-tcp.c": "3d35efb547a91a452418fc9678553d681d1183bd313b64a9ed3e6d25c82ca28a",
     "src/core/src/hev-socks5-udp.c": "49cdaae126405407303bed8cfc15ff2188962c51c957a9d0d5a1cde70db37775",
     "src/core/src/hev-socks5.c": "5264fd555f1c525690d9ef214d13f6455449a992c485011e9be60976630b3f37",
     "src/core/include/hev-socks5.h": "35e56ca2d3dd62d37923e8d52c2c0eb9611c30ed1836b6e796e637e89576a1e7",
-    "src/core/src/worker_meter.c": "facd70853f600a6dc30c3fc295b2d21653b2ab2a1f5b4f2b5fccdcfd56fcf0c2",
-    "src/core/src/worker_meter.h": "1cc2984d82fd58b65239ce2f779d991313878f6522a03bfc8a3effc339c476d6",
+    "src/core/src/worker_meter.c": "0a4e5c6d88f7bd3a0ec85dc89d6e19072eec5747c3cbdc9e207601c53c65b8ed",
+    "src/core/src/worker_meter.h": "242d9dde9cd201a31e9067da708c630dc1dbeebc9522a2f3e422e0ed687efd6a",
     "third-part/hev-task-system/src/lib/io/basic/hev-task-io.c": "769e7587d8b417258bf0e5c284907b05d636198df63686ad4f7c3f240a693600",
     "third-part/hev-task-system/include/hev-task-io.h": "c84935bbe8acd853fd8c14f558590f720772b0c31d2884a6b71394b67c6ac006",
     "third-part/hev-task-system/src/lib/io/socket/hev-task-io-socket.c": "26b339f309f46610ed7d8b28366a78672b0f6e7d0bf8fbcb3c419848689c0835",
@@ -17,14 +17,14 @@
   },
   "compositions": {
     "statistics": {
-      "src/hev-main.c": "a2e72be1caceb171ce20000a5a309ab252b87efbbc2ae2410a441e8bc7378342",
-      "src/hev-main.h": "5c06f2ef8cbd1436cc06f30df7b9b3881b0dc4b6ae2fa4588ebf0e8cb3ed90ca",
+      "src/hev-main.c": "7e3aee35cc46ee630ee9a956735d2505fd8b4b9d456b22ee4e1d8ce4f77ac0ba",
+      "src/hev-main.h": "c8cccc4b561e4da13078d27183608c80b735384c032cb05f442e39d9ab1c68c7",
       "src/hev-socks5-proxy.c": "90bd3a2acb794713dba1d12fe5fdd158c81dcd3294b31b44a8c1530f10dbbbfb",
       "src/hev-socks5-worker.c": "1463fbdd3126b2c79b566041ca4b91d6a409f0aedd02c8c5b6f8cadb411ce737"
     },
     "integrated": {
-      "src/hev-main.c": "a2e72be1caceb171ce20000a5a309ab252b87efbbc2ae2410a441e8bc7378342",
-      "src/hev-main.h": "2094c6ad64d645cda8d2ac05bec5952fb68208c3d996dc8817d84a4771a46566",
+      "src/hev-main.c": "7e3aee35cc46ee630ee9a956735d2505fd8b4b9d456b22ee4e1d8ce4f77ac0ba",
+      "src/hev-main.h": "b0cdf5d86684ed90c65257fb2321cf1c873e17acdc50a84999e73efacd8d5e97",
       "src/hev-socks5-proxy.c": "99e7cd8d41f864d3f4674ad05710d4b1289fb3295fe4ea07d89fd643f121476f",
       "src/hev-socks5-worker.c": "1463fbdd3126b2c79b566041ca4b91d6a409f0aedd02c8c5b6f8cadb411ce737"
     }

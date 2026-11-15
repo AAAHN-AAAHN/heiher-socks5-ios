@@ -1,5 +1,5 @@
 diff --git a/src/hev-main.c b/src/hev-main.c
-index 306244279673ab6773fa241eaae50337764975eb..02239b13719bca765f5049e714915a904e240bd4 100644
+index 306244279673ab6773fa241eaae50337764975eb..689acebda9983ff5ce6823fe3e0262cf6603bd93 100644
 --- a/src/hev-main.c
 +++ b/src/hev-main.c
 @@ -23,6 +23,7 @@
@@ -10,7 +10,7 @@ index 306244279673ab6773fa241eaae50337764975eb..02239b13719bca765f5049e714915a90
  
  #ifdef _WIN32
  #define WEAK
-@@ -138,6 +139,51 @@ hev_socks5_server_quit (void)
+@@ -138,6 +139,69 @@
      hev_socks5_proxy_stop ();
  }
  
@@ -51,6 +51,24 @@ index 306244279673ab6773fa241eaae50337764975eb..02239b13719bca765f5049e714915a90
 +    snprintf (row->address, sizeof (row->address), "%s", address);
 +}
 +
++int
++hev_socks5_server_endpoint_try_stats (uint64_t *received, uint64_t *sent)
++{
++    return hev_meter_try_snapshot (NULL, NULL, received, sent) == SIZE_MAX ?
++               -1 :
++               0;
++}
++
++ptrdiff_t
++hev_socks5_server_endpoint_try_rows (HevSocks5EndpointStats *rows,
++                                     size_t capacity)
++{
++    ClientStatsCopy copy = { rows, capacity, 0 };
++    size_t count = hev_meter_try_snapshot (rows ? client_stats_copy : NULL,
++                                           &copy, NULL, NULL);
++    return count > PTRDIFF_MAX ? -1 : (ptrdiff_t)count;
++}
++
 +size_t
 +hev_socks5_server_endpoint_rows (HevSocks5EndpointStats *rows, size_t capacity)
 +{
@@ -63,7 +81,7 @@ index 306244279673ab6773fa241eaae50337764975eb..02239b13719bca765f5049e714915a90
  main (int argc, char *argv[])
  {
 diff --git a/src/hev-main.h b/src/hev-main.h
-index f0e45614c74d7cee8b5984b2bda05fd4934c7ab6..701350e846b7bb8299bac7fe7e17e1a654921188 100644
+index f0e45614c74d7cee8b5984b2bda05fd4934c7ab6..5eeaced54340e1d81b141a72c25c58cad3291c93 100644
 --- a/src/hev-main.h
 +++ b/src/hev-main.h
 @@ -9,6 +9,8 @@
@@ -75,7 +93,7 @@ index f0e45614c74d7cee8b5984b2bda05fd4934c7ab6..701350e846b7bb8299bac7fe7e17e1a6
  
  #ifdef __cplusplus
  extern "C" {
-@@ -61,6 +63,27 @@ void hev_socks5_server_prepare (void);
+@@ -61,6 +63,33 @@
   */
  void hev_socks5_server_quit (void);
  
@@ -94,6 +112,12 @@ index f0e45614c74d7cee8b5984b2bda05fd4934c7ab6..701350e846b7bb8299bac7fe7e17e1a6
 +    char address[64];
 +} HevSocks5EndpointStats;
 +uint32_t hev_socks5_server_endpoint_generation (void);
++/* Nonblocking publication attempts. A negative result rejects the entire
++ * attempt, including any partially copied rows; retry at the next sample.
++ * Totals are untouched on rejection. A successful row count can exceed capacity. */
++int hev_socks5_server_endpoint_try_stats (uint64_t *received, uint64_t *sent);
++ptrdiff_t hev_socks5_server_endpoint_try_rows (HevSocks5EndpointStats *rows,
++                                               size_t capacity);
 +void hev_socks5_server_endpoint_stats (uint64_t *received, uint64_t *sent);
 +/* Return required capacity (including Unattributed id 0), copy bounded rows.
 + * Rows use peer IP (either role), normalize IPv4-mapped IPv6, retain scope. */

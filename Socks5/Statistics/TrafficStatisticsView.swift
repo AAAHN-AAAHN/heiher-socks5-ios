@@ -41,7 +41,7 @@ struct TrafficStatisticsView: View {
                                     .foregroundStyle(.secondary)
                             }
                             if clientsIncomplete {
-                                Text("Some peer rows are awaiting an update.")
+                                Text("Statistics are awaiting a complete update.")
                                     .font(.footnote)
                             }
                         }
@@ -143,13 +143,24 @@ struct TrafficStatisticsView: View {
         let generation = hev_socks5_server_endpoint_generation()
         var received: UInt64 = 0
         var sent: UInt64 = 0
-        hev_socks5_server_endpoint_stats(&received, &sent)
+        guard hev_socks5_server_endpoint_try_stats(&received, &sent) == 0 else {
+            clientsIncomplete = true
+            return
+        }
         // Concurrent registration can defer row updates across multiple samples;
         // keep cached rows while subsequent samples retry the bounded copy.
-        let capacity = hev_socks5_server_endpoint_rows(nil, 0)
+        let capacity = hev_socks5_server_endpoint_try_rows(nil, 0)
+        guard capacity >= 0 else {
+            clientsIncomplete = true
+            return
+        }
         var rows = [HevSocks5EndpointStats](repeating: HevSocks5EndpointStats(), count: capacity)
         let required = rows.withUnsafeMutableBufferPointer {
-            hev_socks5_server_endpoint_rows($0.baseAddress, $0.count)
+            hev_socks5_server_endpoint_try_rows($0.baseAddress, $0.count)
+        }
+        guard required >= 0 else {
+            clientsIncomplete = true
+            return
         }
         let time = ProcessInfo.processInfo.systemUptime
         let sameGeneration = sampledGeneration == generation

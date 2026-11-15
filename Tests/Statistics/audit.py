@@ -224,7 +224,7 @@ def native_checks(mode):
     env = dict(os.environ, ASAN_OPTIONS='detect_leaks=0', UBSAN_OPTIONS='halt_on_error=1')
     helpers = [('socket_observer', []), ('socket_observer', ['-DFORCE_FALLBACK']),
                ('stream_matrix', ['-DENABLE_IO_SPLICE_SYSCALL'] if splice else []),
-               ('registry', []), ('worker_boundaries', []), ('worker_sessions', [])]
+               ('registry', []), ('worker_boundaries', []), ('worker_sessions', []), ('worker_safety', [])]
     for label, extra in [('asan', sanitize), ('optimized', ['-O3', '-fstrict-aliasing'])]:
         # Fixtures include the actual socket helpers/worker registry; only syscall
         # outcomes and allocation failures are substituted at controlled boundaries.
@@ -273,7 +273,7 @@ def native_checks(mode):
         run([executable, '--auth-publication'], mode + '-auth-publication-tsan.log',
             env=dict(os.environ, TSAN_OPTIONS='halt_on_error=1'), timeout=40)
         executable.unlink()
-        for name in ('registry', 'worker_boundaries', 'worker_sessions'):
+        for name in ('registry', 'worker_boundaries', 'worker_sessions', 'worker_safety'):
             executable = OUT / ('socket-' + name + '-tsan')
             run([*common, '-O1', '-g', '-fsanitize=thread', *includes,
                  'Tests/SocketIO/' + name + '.c', libs[-1], '-o', executable],
