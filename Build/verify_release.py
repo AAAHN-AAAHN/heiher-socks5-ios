@@ -63,7 +63,7 @@ uuids = subprocess.check_output(['xcrun', 'dwarfdump', '--uuid', str(APP / 'Sock
 ids = re.findall(r'UUID: ([0-9A-Fa-f-]+) \(arm64\)', uuids)
 assert len(ids) == 2 and ids[0] == ids[1]
 symbols = subprocess.check_output(['xcrun', 'nm', '-g', str(dwarf)], text=True)
-for name in ('hev_socks5_server_endpoint_stats', 'hev_socks5_server_endpoint_rows', 'hev_socks5_server_prepare'):
+for name in ('hev_socks5_server_endpoint_try_stats', 'hev_socks5_server_endpoint_try_rows', 'hev_socks5_server_prepare'):
     assert re.search(r'^[0-9a-fA-F]+\s+[Tt]\s+_' + name + '$', symbols, re.M), name
 for name in ('hev_socks5_server_stats', 'hev_socks5_server_client_stats'):
     assert not re.search(r'^[0-9a-fA-F]+\s+[Tt]\s+_' + name + '$', symbols, re.M), name
