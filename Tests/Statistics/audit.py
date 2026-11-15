@@ -110,6 +110,14 @@ def check_udp_inheritance():
 
 def inspect_sources(commit=None):
     commit = commit or git('rev-parse', 'HEAD').decode().strip()
+    # Validate the complete caller -> observer -> common-helper identity chain
+    # before native work or simulator provisioning, so stale pins fail locally.
+    common = (ROOT / 'Build/runtime_environment.py').read_bytes()
+    reader = (ROOT / 'Build/observed_command_status.py').read_bytes()
+    common_pin = re.search(rb"^COMMON_SHA256 = '([0-9a-f]{64})'$", reader, re.M)
+    assert common_pin and common_pin[1].decode() == hashlib.sha256(common).hexdigest(), 'Observer common-helper pin differs'
+    workflow = (ROOT / '.github/workflows/verify-build.yml').read_text()
+    assert f"len(raw) != {len(reader)} or hashlib.sha256(raw).hexdigest() != '{hashlib.sha256(reader).hexdigest()}'" in workflow, 'Workflow observer identity differs'
     import runpy
     documents = runpy.run_path(str(ROOT / 'Build/check_documentation.py'))
     documents['check'](ROOT)
